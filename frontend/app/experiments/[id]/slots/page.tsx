@@ -38,12 +38,13 @@ export default function ExperimentSlotsPage() {
   const [blocks, setBlocks] = useState<Block[]>([]);
 
   const loadBlocks = useCallback(async () => {
-    const response = await backendFetch(`/api/v1/blocks/?experiment=${experimentId}`);
+    const response = await backendFetch(`/api/v1/experiments/${experimentId}/blocks/`);
     if (!response.ok) {
       throw new Error("Unable to load blocks.");
     }
-    const data = (await response.json()) as Block[];
-    setBlocks(data);
+    const data = (await response.json()) as Block[] | { results?: Block[] };
+    const blockList = Array.isArray(data) ? data : data.results ?? [];
+    setBlocks(blockList);
   }, [experimentId]);
 
   useEffect(() => {
@@ -82,12 +83,20 @@ export default function ExperimentSlotsPage() {
     setError("");
     setNotice("");
     try {
-      const response = await backendFetch(`/api/v1/experiments/${experimentId}/blocks/`);
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/blocks/defaults`,
+        { method: "POST" },
+      );
       if (!response.ok) {
         setError("Unable to create default blocks.");
         return;
       }
-      await loadBlocks();
+      const payload = (await response.json()) as { blocks?: Block[] };
+      if (Array.isArray(payload.blocks)) {
+        setBlocks(payload.blocks);
+      } else {
+        await loadBlocks();
+      }
       setNotice("Default blocks created.");
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);

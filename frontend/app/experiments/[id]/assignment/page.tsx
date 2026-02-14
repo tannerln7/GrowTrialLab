@@ -150,9 +150,7 @@ export default function AssignmentPage() {
         }
         setStatusSummary(summary);
 
-        if (summary.setup.is_complete) {
-          await fetchGroupsStatus();
-        }
+        await fetchGroupsStatus();
       } catch (requestError) {
         const normalized = normalizeBackendError(requestError);
         if (normalized.kind === "offline") {
@@ -433,7 +431,7 @@ export default function AssignmentPage() {
         </SectionCard>
       ) : null}
 
-      {!loading && setupComplete ? (
+      {!loading && groupsStatus ? (
         <>
           <SectionCard title="Recipes" subtitle="Define control and treatment recipes (R0, R1, ...)">
             <label className={styles.field}>
@@ -552,6 +550,11 @@ export default function AssignmentPage() {
           </SectionCard>
 
           <SectionCard title="Assignment" subtitle="Preview and apply stratified assignment">
+            {!setupComplete ? (
+              <p className={styles.inlineNote}>
+                Complete plants and slots in setup before running assignment preview/apply.
+              </p>
+            ) : null}
             <div className={styles.formGrid}>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Seed (optional)</span>
@@ -560,7 +563,7 @@ export default function AssignmentPage() {
                   type="number"
                   min={1}
                   value={groupsSeedInput}
-                  disabled={groupsReadOnly}
+                  disabled={groupsReadOnly || !setupComplete}
                   onChange={(event) => setGroupsSeedInput(event.target.value)}
                 />
               </label>
@@ -570,7 +573,7 @@ export default function AssignmentPage() {
               <button
                 className={styles.buttonPrimary}
                 type="button"
-                disabled={saving || groupsReadOnly}
+                disabled={saving || groupsReadOnly || !setupComplete}
                 onClick={() => void previewGroups()}
               >
                 Preview assignment
@@ -578,7 +581,7 @@ export default function AssignmentPage() {
               <button
                 className={styles.buttonSecondary}
                 type="button"
-                disabled={saving || groupsReadOnly}
+                disabled={saving || groupsReadOnly || !setupComplete}
                 onClick={() => void applyGroups()}
               >
                 Apply assignment
@@ -586,7 +589,7 @@ export default function AssignmentPage() {
               <button
                 className={styles.buttonSecondary}
                 type="button"
-                disabled={saving || groupsReadOnly}
+                disabled={saving || groupsReadOnly || !setupComplete}
                 onClick={() => {
                   setGroupsSeedInput("");
                   setPreviewSeed(null);
@@ -707,7 +710,7 @@ export default function AssignmentPage() {
             <button
               className={styles.buttonSecondary}
               type="button"
-              disabled={saving}
+              disabled={saving || !setupComplete}
               onClick={() => void lockAssignmentUi()}
             >
               {saving ? "Locking..." : "Lock UI guardrail"}
