@@ -11,9 +11,16 @@ from api.models import (
     MetricTemplate,
     Plant,
     PlantWeeklyMetric,
+    Recipe,
     Species,
 )
-from api.setup_packets import PACKET_BASELINE, PACKET_ENVIRONMENT, PACKET_GROUPS, PACKET_PLANTS
+from api.setup_packets import (
+    PACKET_BASELINE,
+    PACKET_ENVIRONMENT,
+    PACKET_GROUPS,
+    PACKET_PLANTS,
+    PACKET_TRAYS,
+)
 
 
 class AuthFlowTests(TestCase):
@@ -368,3 +375,143 @@ class Packet3BaselineLockTests(TestCase):
         self.assertEqual(metric.metrics["health_score"], 5)
         plant.refresh_from_db()
         self.assertEqual(plant.bin, "C")
+
+
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
+)
+class Packet4GroupsTests(TestCase):
+    def _create_binned_plants(self, experiment: Experiment):
+        nepenthes = Species.objects.create(name="Nepenthes ampullaria", category="nepenthes")
+        drosera = Species.objects.create(name="Drosera capensis alba", category="drosera")
+        p1 = Plant.objects.create(experiment=experiment, species=nepenthes, plant_id="NP-001", bin="A")
+        p2 = Plant.objects.create(experiment=experiment, species=nepenthes, plant_id="NP-002", bin="A")
+        p3 = Plant.objects.create(experiment=experiment, species=drosera, plant_id="DR-001", bin="B")
+        p4 = Plant.objects.create(experiment=experiment, species=drosera, plant_id="DR-002", bin="B")
+        return [p1, p2, p3, p4]
+
+    def test_preview_and_apply_require_r0_and_at_least_two_recipes(self):
+        experiment = Experiment.objects.create(name="Groups Recipe Validation")
+        self._create_binned_plants(experiment)
+        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+
+        preview_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/groups/preview",
+            data={"seed": 77},
+            content_type="application/json",
+        )
+        self.assertEqual(preview_response.status_code, 400)
+        self.assertIn("At least 2 recipes are required", str(preview_response.json()))
+        self.assertIn("Recipe code 'R0' (control) is required", str(preview_response.json()))
+
+        apply_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/groups/apply",
+            data={"seed": 77},
+            content_type="application/json",
+        )
+        self.assertEqual(apply_response.status_code, 400)
+
+    def test_preview_and_apply_require_bins_for_all_active_plants(self):
+        experiment = Experiment.objects.create(name="Groups Bin Validation")
+        species = Species.objects.create(name="Nepenthes maxima", category="nepenthes")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="NP-010", bin="A")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="NP-011", bin=None)
+        Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+
+        preview_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/groups/preview",
+            data={},
+            content_type="application/json",
+        )
+        self.assertEqual(preview_response.status_code, 400)
+        self.assertEqual(preview_response.json().get("missing_bin_count"), 1)
+
+        apply_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/groups/apply",
+            data={"seed": 11},
+            content_type="application/json",
+        )
+        self.assertEqual(apply_response.status_code, 400)
+
+    def test_preview_generates_seed_and_does_not_persist_assignments(self):
+        experiment = Experiment.objects.create(name="Groups Preview")
+        plants = self._create_binned_plants(experiment)
+        Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/groups/preview",
+            data={},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIsInstance(payload.get("seed"), int)
+        self.assertGreater(payload["seed"], 0)
+        self.assertEqual(payload["algorithm"], "stratified_v1")
+        self.assertEqual(len(payload["proposed_assignments"]), len(plants))
+
+        self.assertEqual(
+            Plant.objects.filter(experiment=experiment, assigned_recipe__isnull=False).count(),
+            0,
+        )
+
+    def test_apply_persists_assignments_and_records_seed_metadata(self):
+        experiment = Experiment.objects.create(name="Groups Apply")
+        plants = self._create_binned_plants(experiment)
+        Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+        seed = 12345
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/groups/apply",
+            data={"seed": seed},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        assigned_count = Plant.objects.filter(
+            id__in=[plant.id for plant in plants],
+            assigned_recipe__isnull=False,
+        ).count()
+        self.assertEqual(assigned_count, len(plants))
+
+        setup_state = ExperimentSetupState.objects.get(experiment=experiment)
+        groups_payload = setup_state.packet_data.get(PACKET_GROUPS, {})
+        self.assertEqual(groups_payload.get("algorithm"), "stratified_v1")
+        self.assertEqual(groups_payload.get("seed"), seed)
+        self.assertIn("applied_at", groups_payload)
+        self.assertEqual(groups_payload.get("locked"), False)
+
+    def test_complete_groups_packet_requires_assignments_and_locks_ui_state(self):
+        experiment = Experiment.objects.create(name="Groups Complete")
+        species = Species.objects.create(name="Pinguicula esseriana", category="pinguicula")
+        recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="PG-001", bin="A")
+
+        setup_state = ExperimentSetupState.objects.get(experiment=experiment)
+        setup_state.completed_packets = [PACKET_ENVIRONMENT, PACKET_PLANTS, PACKET_BASELINE]
+        setup_state.current_packet = PACKET_GROUPS
+        setup_state.save(update_fields=["completed_packets", "current_packet", "updated_at"])
+
+        fail_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/packets/groups/complete/"
+        )
+        self.assertEqual(fail_response.status_code, 400)
+
+        Plant.objects.filter(experiment=experiment).update(assigned_recipe=recipe)
+        success_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/packets/groups/complete/"
+        )
+        self.assertEqual(success_response.status_code, 200)
+
+        setup_state.refresh_from_db()
+        self.assertIn(PACKET_GROUPS, setup_state.completed_packets)
+        self.assertEqual(setup_state.current_packet, PACKET_TRAYS)
+        self.assertTrue(setup_state.packet_data.get(PACKET_GROUPS, {}).get("locked"))
