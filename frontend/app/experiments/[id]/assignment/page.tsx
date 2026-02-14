@@ -197,6 +197,7 @@ export default function AssignmentPage() {
         return;
       }
       setNotice("Assignment settings saved.");
+      setPostApplySummary(null);
       await fetchGroupsStatus();
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
@@ -239,6 +240,7 @@ export default function AssignmentPage() {
       }
 
       setNotice("Recipe added.");
+      setPostApplySummary(null);
       setNewRecipeCode("R1");
       setNewRecipeName("Treatment 1");
       setNewRecipeNotes("");
@@ -274,6 +276,7 @@ export default function AssignmentPage() {
       }
 
       setNotice(`Saved ${recipe.code}.`);
+      setPostApplySummary(null);
       await fetchGroupsStatus();
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
