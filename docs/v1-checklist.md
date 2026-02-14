@@ -13,11 +13,11 @@ Status convention:
 - `[ ] (in progress)` currently active but not complete
 
 ## Current Status Summary
-The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Packet framework is in place and Packet 1 (Environment) and Packet 2 (Plants) are implemented end-to-end with API and UI.
+The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. The setup step framework is in place and Plants + Environments are implemented end-to-end with API and UI.
 
-Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Packet 3 baseline MVP and Packet 4 groups/randomization are implemented with UI-only lock semantics.
+Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Baseline and Groups/Assignment are implemented with UI-only lock semantics.
 
-The largest remaining V1 work is Packet 5-7 workflows, production-hardening/security/deployment details, and operational guardrails (backups, stricter packet-lock governance, reporting/export paths).
+The largest remaining V1 work is Placement/Rotation/Start step implementation, production-hardening/security/deployment details, and operational guardrails (backups, stricter step-lock governance, reporting/export paths).
 
 ## Completed Milestones
 - [x] Monorepo scaffold and local compose runtime (owner: Codex)
@@ -38,19 +38,19 @@ The largest remaining V1 work is Packet 5-7 workflows, production-hardening/secu
 - [x] DRF v1 CRUD routes + experiment filtering baseline (owner: Codex)
   - Refs: `fe4128f6`, `0dc10442`
   - Routes: `/api/v1/species`, `/api/v1/experiments`, `/api/v1/plants`, `/api/v1/photos`, etc.
-- [x] Setup state machine model and packet constants (owner: Codex)
+- [x] Setup state machine model and stable step identifiers (owner: Codex)
   - Refs: `94f306a2`
   - Routes: `GET/PATCH /api/v1/experiments/{id}/setup-state/`.
-- [x] Packet 1 Environment + Blocks APIs and completion validation (owner: Codex)
+- [x] Environments step + Blocks APIs and completion validation (owner: Codex)
   - Refs: `80789485`
   - Routes: `PUT /api/v1/experiments/{id}/packets/environment/`, `POST /api/v1/experiments/{id}/packets/environment/complete/`, `GET/POST /api/v1/experiments/{id}/blocks/`, `PATCH /api/v1/blocks/{id}/`.
-- [x] Wizard shell + Packet 1 frontend (owner: Codex)
+- [x] Wizard shell + Environments frontend (owner: Codex)
   - Refs: `948a8a7a`
   - Routes: `/experiments/{id}/setup`, `/experiments`, `/experiments/new`.
-- [x] Packet 2 Plants APIs (bulk import, ID generation, labels PDF, packet completion) (owner: Codex)
+- [x] Plants step APIs (bulk import, ID generation, labels PDF, completion) (owner: Codex)
   - Refs: `a8766e1f`, `9e81428b`
   - Routes: `GET/POST /api/v1/experiments/{id}/plants/`, `POST /plants/bulk-import/`, `POST /plants/generate-ids/`, `GET /plants/labels.pdf`, `PUT /packets/plants/`, `POST /packets/plants/complete/`.
-- [x] Packet 2 frontend + plants list UX (owner: Codex)
+- [x] Plants frontend + plants list UX (owner: Codex)
   - Refs: `53ace4f8`
   - Routes: `/experiments/{id}/setup`, `/experiments/{id}/plants`.
 - [x] UI placeholder foundation and illustration inventory tracking (owner: Codex)
@@ -73,23 +73,26 @@ The largest remaining V1 work is Packet 5-7 workflows, production-hardening/secu
 - [x] Metric template model seeded with baseline defaults (owner: Codex)
   - Refs: `5571d379`
   - Routes: `GET /api/v1/metric-templates/`, `GET /api/v1/metric-templates/{id}/`.
-- [x] Packet 3 baseline APIs and lock state workflow (owner: Codex)
+- [x] Baseline step APIs and lock state workflow (owner: Codex)
   - Refs: `2f919969`, `d0467ff4`
   - Routes: `GET /api/v1/experiments/{id}/baseline/status`, `GET/POST /api/v1/plants/{uuid}/baseline`, `POST /api/v1/experiments/{id}/baseline/lock`, `PUT /api/v1/experiments/{id}/packets/baseline/`, `POST /api/v1/experiments/{id}/packets/baseline/complete/`.
-  - Notes: Baseline lock state is retained for UX/workflow signaling and packet progression.
-- [x] Packet 3 frontend baseline workflow (owner: Codex)
+  - Notes: Baseline lock state is retained for UX/workflow signaling and step progression.
+- [x] Baseline frontend workflow (owner: Codex)
   - Refs: `4e599540`
-  - Routes: `/experiments/{id}/setup` (Packet 3 section), `/experiments/{id}/baseline`, `/p/{uuid}` baseline shortcut.
+  - Routes: `/experiments/{id}/setup` (Baseline section), `/experiments/{id}/baseline`, `/p/{uuid}` baseline shortcut.
 - [x] Baseline lock semantics switched to UI-only guardrail (owner: Codex)
   - Refs: `de058638`, `1cf9c9e6`, `e68610fc`
   - Notes: Backend no longer returns lock-based 403 for baseline/bin edits; baseline page is read-only by default when locked and supports local unlock/re-lock.
-- [x] Packet 4 groups/randomization APIs with deterministic stratified assignment (owner: Codex)
+- [x] Groups/Assignment APIs with deterministic stratified assignment (owner: Codex)
   - Refs: `a6b19d01`, `990b1c6b`
   - Routes: `GET /api/v1/experiments/{id}/groups/status`, `POST /api/v1/experiments/{id}/groups/recipes`, `PATCH /api/v1/experiments/{id}/groups/recipes/{recipe_id}`, `POST /api/v1/experiments/{id}/groups/preview`, `POST /api/v1/experiments/{id}/groups/apply`, `PUT /api/v1/experiments/{id}/packets/groups/`, `POST /api/v1/experiments/{id}/packets/groups/complete/`.
   - Notes: Uses `stratified_v1` with strata `(bin, species.category)` and seed tracking in `packet_data["groups"]`.
-- [x] Packet 4 frontend wizard flow with preview/apply and UI-only lock guardrail (owner: Codex)
+- [x] Groups frontend flow with preview/apply and UI-only lock guardrail (owner: Codex)
   - Refs: `ea4373b7`
-  - Routes: `/experiments/{id}/setup` (Packet 4 section).
+  - Routes: `/experiments/{id}/setup` (Recipes + Assignment sections).
+- [x] Linear setup UX with descriptive step names and Recipes/Assignment UI split (owner: Codex)
+  - Refs: `a6b19d01`, `ea4373b7`
+  - Notes: User-facing copy now uses setup steps (Plants, Environments, Baseline, Recipes, Assignment, Placement, Rotation, Start) while backend step keys and `/packets/*` endpoints remain unchanged.
   - Notes: Read-only-by-default when locked; local unlock/re-lock modal does not call backend unlock endpoints.
 
 ## Remaining Milestones
@@ -113,40 +116,39 @@ The largest remaining V1 work is Packet 5-7 workflows, production-hardening/secu
 - [ ] Add minimal audit trail model for key experiment mutations (owner: Codex)
   - Notes: currently audit is minimal/log-style.
 
-### Setup Wizard (Packets 1–8)
-- [ ] (in progress) Keep Packet 1/2/3/4 stable while refining packet lock governance (owner: Codex)
+### Setup Wizard (Steps)
+- [ ] (in progress) Keep Plants/Environments/Baseline/Groups stable while refining step lock governance (owner: Codex)
   - Route: `PATCH /api/v1/experiments/{id}/setup-state/`.
-- [ ] (in progress) Strengthen Packet 3 completion rule from MVP threshold to all-plants baseline coverage (owner: Codex)
+- [ ] (in progress) Strengthen Baseline completion rule from MVP threshold to all-plants baseline coverage (owner: Codex)
   - Notes: Current MVP requires at least 1 baseline capture + all bins assigned.
-- [ ] Implement Packet 5 (Tray assignment scaffolding) (owner: Codex)
-- [ ] Implement Packet 6 (Rotation plan scaffolding) (owner: Codex)
-- [ ] Implement Packet 7 (Feeding protocol + weekly loop scaffolding) (owner: Codex)
-- [ ] Implement Packet 8 (Review/freeze setup) (owner: Codex)
+- [ ] Implement Placement step scaffolding (owner: Codex)
+- [ ] Implement Rotation step scaffolding (owner: Codex)
+- [ ] Implement Start step scaffolding (owner: Codex)
 
 ### Experiments/Plants UX
 - [ ] Improve experiment detail context page linking wizard, plants, and outputs (owner: Codex)
   - Routes: `/experiments`, `/experiments/{id}/setup`, `/experiments/{id}/plants`.
 - [ ] Add UX affordances for validation errors and partial saves (owner: Codex)
 
-### Baseline/Binning (Packet 3)
+### Baseline/Binning (Step)
 - [ ] (in progress) Expand metric template governance (owner: Codex)
   - API refs: `/api/v1/metric-templates/`, `/api/v1/plants/{uuid}/baseline`.
   - Notes: Add template migration strategy and tighter category coverage.
-- [ ] Add baseline review/QA pass before packet completion (owner: Codex)
+- [ ] Add baseline review/QA pass before step completion (owner: Codex)
 
-### Randomization/Groups (Packet 4)
+### Randomization/Groups (Step)
 - [x] Add group assignment strategy + deterministic seed handling (owner: Codex)
   - Refs: `a6b19d01`, `990b1c6b`
 - [x] Persist assignment outputs and lock post-confirmation (owner: Codex)
   - Refs: `a6b19d01`, `ea4373b7`
-- [ ] Decide if Packet 4 lock should remain UI-only or move to backend enforcement post-v1 (owner: manual)
+- [ ] Decide if Groups lock should remain UI-only or move to backend enforcement post-v1 (owner: manual)
 
-### Trays/Rotation (Packets 5–6)
+### Placement/Rotation (Future Steps)
 - [ ] Build tray composition UX using `Tray` + `TrayPlant` (owner: Codex)
 - [ ] Build weekly rotation planner and logs workflow (owner: Codex)
   - API refs: `/api/v1/trays`, `/api/v1/tray-plants`, `/api/v1/rotation-logs`.
 
-### Feeding/Lots/Weekly Sessions (Packet 7 + ritual loop)
+### Feeding/Lots/Weekly Sessions (Future Step + Ritual Loop)
 - [ ] Build lot preparation and assignment workflow (owner: Codex)
   - API refs: `/api/v1/lots`, `/api/v1/recipes`.
 - [ ] Build weekly execution loop (session checklist + feeding + adverse events + metrics) (owner: Codex)
@@ -179,9 +181,9 @@ The largest remaining V1 work is Packet 5-7 workflows, production-hardening/secu
 - [ ] Define app operational metrics and alert thresholds (owner: manual)
 
 ## Next 3 Prompts Plan
-1. Packet 5 MVP: tray assignment workflow using existing Tray/TrayPlant models.
-2. Packet 6 MVP: rotation plan/log workflow tied to blocks and trays.
-3. Packet lock governance: define whether backend-enforced locks/audit trail are required for post-MVP integrity.
+1. Placement step MVP: tray assignment workflow using existing Tray/TrayPlant models.
+2. Rotation step MVP: rotation plan/log workflow tied to blocks and trays.
+3. Step lock governance: define whether backend-enforced locks/audit trail are required for post-MVP integrity.
 
 ## Deferred Items (Explicitly Not in V1)
 - [ ] Native mobile apps (iOS/Android) separate from PWA.

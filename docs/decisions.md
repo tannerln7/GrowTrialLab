@@ -11,7 +11,7 @@ This file records architecture/product decisions and why they were made.
 
 ### 2026-02-13: Frontend stack is Next.js App Router (TypeScript)
 - Decision: Use Next.js App Router for frontend UI and route structure.
-- Rationale: File-based routes and strong TS tooling fit rapid packet-based UI iteration.
+- Rationale: File-based routes and strong TS tooling fit rapid setup-step UI iteration.
 - Refs: `d1268cc7`, `948a8a7a`, `53ace4f8`.
 
 ### 2026-02-13: Local runtime is Docker Compose; production target is self-hosted (Proxmox)
@@ -29,9 +29,9 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Reduced permission complexity while preserving admin operations separation (`/api/admin/*`).
 - Refs: `262849c8`, `5d5ee41d`.
 
-### 2026-02-13: Setup flow modeled as packet state machine per experiment
-- Decision: Add `ExperimentSetupState` with ordered packets 1-8 and packet data storage.
-- Rationale: Enables incremental wizard implementation with explicit completion progression.
+### 2026-02-13: Setup flow modeled as a stable step state machine per experiment
+- Decision: Add `ExperimentSetupState` with stable step keys and per-step data storage.
+- Rationale: Enables incremental wizard implementation with explicit completion progression while preserving backward-compatible API endpoints.
 - Refs: `94f306a2`, `80789485`, `948a8a7a`.
 
 ### 2026-02-13: Plant labels encode stable plant identifier path `/p/{plant_uuid}`
@@ -55,27 +55,32 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Keeps baseline capture structured while reusing the existing metrics pipeline.
 - Refs: `5571d379`, `2f919969`, `d0467ff4`.
 
-### 2026-02-14: Packet 3 lock is a UI-only guardrail in v1
+### 2026-02-14: Baseline step lock is a UI-only guardrail in v1
 - Decision: Keep baseline lock state and lock endpoints for workflow signaling, but do not enforce lock-based write denial in backend baseline/bin APIs.
 - Rationale: Reduces v1 complexity and avoids backend unlock override paths while preserving UX-level accidental-edit protection.
 - Refs: `de058638`, `1cf9c9e6`, `e68610fc`.
 - Caution: Audit-grade integrity will require backend-enforced lock rules in a later phase.
 
 ### 2026-02-14: Baseline UX uses dedicated capture page plus wizard summary
-- Decision: Implement `/experiments/{id}/baseline` for save-and-next capture flow and keep `/experiments/{id}/setup` Packet 3 as status/control surface.
-- Rationale: Mobile-first focused data entry flow while preserving packet navigation context.
+- Decision: Implement `/experiments/{id}/baseline` for save-and-next capture flow and keep `/experiments/{id}/setup` Baseline step as status/control surface.
+- Rationale: Mobile-first focused data entry flow while preserving setup navigation context.
 - Refs: `4e599540`.
 
-### 2026-02-14: Packet 4 uses Recipe as group with deterministic stratified randomization
+### 2026-02-14: Groups step uses Recipe as group with deterministic stratified randomization
 - Decision: Reuse `Recipe` as group definition, enforce `R0` + `R1...` codes, and randomize active plants with `stratified_v1` over `(bin, species.category)` using seed-driven deterministic shuffling.
 - Rationale: Avoids extra schema while making group assignment reproducible and balanced within key biological strata.
 - Refs: `a6b19d01`, `990b1c6b`.
 
-### 2026-02-14: Packet 4 lock follows UI-only guardrail semantics
-- Decision: Packet 4 complete sets `packet_data["groups"]["locked"]=true` for UX signaling, but backend apply/edit endpoints remain writable.
-- Rationale: Consistency with Packet 3 v1 lock model and simpler operator workflow.
+### 2026-02-14: Groups lock follows UI-only guardrail semantics
+- Decision: Groups completion sets `packet_data["groups"]["locked"]=true` for UX signaling, but backend apply/edit endpoints remain writable.
+- Rationale: Consistency with baseline v1 lock model and simpler operator workflow.
 - Refs: `a6b19d01`, `ea4373b7`.
 - Caution: Strong integrity controls (auditable lock enforcement) remain a post-v1 hardening item.
+
+### 2026-02-14: Setup wizard uses linear descriptive step names while backend keys remain stable
+- Decision: UI uses step titles (Plants, Environments, Baseline, Recipes, Assignment, Placement, Rotation, Start) and hides user-facing “packet” wording; backend keys and `/packets/*` endpoints remain unchanged for compatibility.
+- Rationale: Improves operator mental model and navigation clarity without data migration risk.
+- Refs: `a6b19d01`, `ea4373b7`.
 
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
