@@ -2,6 +2,7 @@ import uuid
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import Q
 
 from .setup_packets import PACKET_ENVIRONMENT
 
@@ -125,7 +126,7 @@ class Plant(UUIDModel):
 
     experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="plants")
     species = models.ForeignKey(Species, on_delete=models.PROTECT, related_name="plants")
-    plant_id = models.CharField(max_length=64)
+    plant_id = models.CharField(max_length=64, blank=True, default="")
     cultivar = models.CharField(max_length=255, null=True, blank=True)
     bin = models.CharField(max_length=1, choices=Bin.choices, null=True, blank=True)
     assigned_recipe = models.ForeignKey(
@@ -138,11 +139,15 @@ class Plant(UUIDModel):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["experiment", "plant_id"], name="unique_plant_id_in_experiment")
+            models.UniqueConstraint(
+                fields=["experiment", "plant_id"],
+                condition=~Q(plant_id=""),
+                name="unique_plant_id_in_experiment",
+            )
         ]
 
     def __str__(self):
-        return f"{self.experiment.pk}:{self.plant_id}"
+        return f"{self.experiment.pk}:{self.plant_id or '(pending)'}"
 
 
 class Tray(UUIDModel):

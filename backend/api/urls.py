@@ -1,6 +1,14 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from .plants_views import (
+    complete_plants_packet,
+    experiment_plants,
+    experiment_plants_bulk_import,
+    experiment_plants_generate_ids,
+    experiment_plants_labels_pdf,
+    experiment_plants_packet,
+)
 from .views import (
     admin_user_update,
     admin_users,
@@ -66,6 +74,36 @@ urlpatterns = [
         "api/v1/experiments/<uuid:experiment_id>/blocks/",
         experiment_blocks,
         name="experiment-blocks",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/plants/",
+        experiment_plants,
+        name="experiment-plants",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/plants/bulk-import/",
+        experiment_plants_bulk_import,
+        name="experiment-plants-bulk-import",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/plants/generate-ids/",
+        experiment_plants_generate_ids,
+        name="experiment-plants-generate-ids",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/plants/labels.pdf",
+        experiment_plants_labels_pdf,
+        name="experiment-plants-labels-pdf",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/packets/plants/",
+        experiment_plants_packet,
+        name="experiment-plants-packet",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/packets/plants/complete/",
+        complete_plants_packet,
+        name="complete-plants-packet",
     ),
     path("api/v1/", include(router.urls)),
     path("api/admin/users", admin_users, name="admin-users"),

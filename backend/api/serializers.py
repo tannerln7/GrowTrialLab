@@ -106,6 +106,46 @@ class PlantSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class ExperimentPlantSerializer(serializers.ModelSerializer):
+    species_name = serializers.CharField(source="species.name", read_only=True)
+    species_category = serializers.CharField(source="species.category", read_only=True)
+
+    class Meta:
+        model = Plant
+        fields = [
+            "id",
+            "experiment",
+            "species",
+            "species_name",
+            "species_category",
+            "plant_id",
+            "cultivar",
+            "status",
+            "baseline_notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+
+class ExperimentPlantCreateSerializer(serializers.Serializer):
+    species = serializers.UUIDField(required=False)
+    species_name = serializers.CharField(required=False, allow_blank=False)
+    category = serializers.CharField(required=False, allow_blank=True)
+    plant_id = serializers.CharField(required=False, allow_blank=True)
+    cultivar = serializers.CharField(required=False, allow_blank=True)
+    status = serializers.ChoiceField(choices=Plant.Status.choices, required=False)
+    baseline_notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if not attrs.get("species") and not attrs.get("species_name"):
+            raise serializers.ValidationError("Either 'species' or 'species_name' is required.")
+        return attrs
+
+
+class PlantsPacketSerializer(serializers.Serializer):
+    id_format_notes = serializers.CharField(required=False, allow_blank=True)
+
 class TraySerializer(serializers.ModelSerializer):
     class Meta:
         model = Tray
