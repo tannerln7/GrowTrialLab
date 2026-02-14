@@ -2,8 +2,18 @@ from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 
-from api.models import AppUser, Block, Experiment, ExperimentSetupState, Plant, Species
-from api.setup_packets import PACKET_ENVIRONMENT, PACKET_PLANTS
+from api.baseline import BASELINE_WEEK_NUMBER
+from api.models import (
+    AppUser,
+    Block,
+    Experiment,
+    ExperimentSetupState,
+    MetricTemplate,
+    Plant,
+    PlantWeeklyMetric,
+    Species,
+)
+from api.setup_packets import PACKET_BASELINE, PACKET_ENVIRONMENT, PACKET_GROUPS, PACKET_PLANTS
 
 
 class AuthFlowTests(TestCase):
@@ -240,3 +250,124 @@ class Packet2PlantsTests(TestCase):
         self.assertEqual(payload["species"]["category"], "pinguicula")
         self.assertEqual(payload["experiment"]["id"], str(experiment.id))
         self.assertEqual(payload["experiment"]["name"], "Plant Detail")
+
+
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
+)
+class Packet3BaselineTests(TestCase):
+    def test_default_metric_templates_seeded(self):
+        categories = set(MetricTemplate.objects.values_list("category", flat=True))
+        self.assertTrue({"nepenthes", "flytrap", "drosera"}.issubset(categories))
+
+    def test_baseline_save_writes_week_zero_metric_and_bin(self):
+        experiment = Experiment.objects.create(name="Baseline Save")
+        species = Species.objects.create(name="Nepenthes ventricosa", category="nepenthes")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="NP-050")
+
+        response = self.client.post(
+            f"/api/v1/plants/{plant.id}/baseline",
+            data={
+                "metrics": {
+                    "health_score": 4,
+                    "coloration_score": 3,
+                    "growth_notes": "Stable",
+                    "pest_signs": False,
+                },
+                "notes": "Week zero entry",
+                "bin": "A",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        metric = PlantWeeklyMetric.objects.get(plant=plant, week_number=BASELINE_WEEK_NUMBER)
+        self.assertEqual(metric.metrics["health_score"], 4)
+        self.assertEqual(metric.notes, "Week zero entry")
+        plant.refresh_from_db()
+        self.assertEqual(plant.bin, "A")
+
+    def test_baseline_save_validates_required_template_fields(self):
+        experiment = Experiment.objects.create(name="Baseline Validate")
+        species = Species.objects.create(name="Drosera capensis", category="drosera")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="DR-010")
+
+        response = self.client.post(
+            f"/api/v1/plants/{plant.id}/baseline",
+            data={"metrics": {"growth_notes": "Missing required scores"}},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("health_score is required.", str(response.json()))
+
+    def test_complete_baseline_packet_locks_and_advances(self):
+        experiment = Experiment.objects.create(name="Baseline Complete")
+        species = Species.objects.create(name="Flytrap A", category="flytrap")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="VF-001", bin="B")
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=plant,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 5, "coloration_score": 4, "pest_signs": False},
+        )
+
+        setup_state = ExperimentSetupState.objects.get(experiment=experiment)
+        setup_state.completed_packets = [PACKET_ENVIRONMENT, PACKET_PLANTS]
+        setup_state.current_packet = PACKET_BASELINE
+        setup_state.save(update_fields=["completed_packets", "current_packet", "updated_at"])
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/packets/baseline/complete/"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        setup_state.refresh_from_db()
+        self.assertIn(PACKET_BASELINE, setup_state.completed_packets)
+        self.assertEqual(setup_state.current_packet, PACKET_GROUPS)
+        self.assertIn(PACKET_BASELINE, setup_state.locked_packets)
+        self.assertTrue(setup_state.packet_data.get(PACKET_BASELINE, {}).get("locked"))
+
+
+@override_settings(
+    DEBUG=False,
+    CF_ACCESS_TEAM_DOMAIN="tannerln7.cloudflareaccess.com",
+    CF_ACCESS_AUD="real-aud",
+    ADMIN_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
+)
+class Packet3BaselineLockTests(TestCase):
+    @patch(
+        "api.cloudflare_access.CloudflareJWTVerifier.verify",
+        return_value={"email": "member@example.com", "aud": ["real-aud"], "exp": 9999999999},
+    )
+    def test_lock_blocks_non_admin_baseline_edits(self, _mock_verify):
+        AppUser.objects.create(email="member@example.com", role="user", status="active")
+        experiment = Experiment.objects.create(name="Baseline Lock User")
+        species = Species.objects.create(name="Nepenthes lowii", category="nepenthes")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="NP-777")
+
+        lock_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/baseline/lock",
+            HTTP_CF_ACCESS_JWT_ASSERTION="mock.jwt.token",
+        )
+        self.assertEqual(lock_response.status_code, 200)
+
+        update_response = self.client.post(
+            f"/api/v1/plants/{plant.id}/baseline",
+            data={
+                "metrics": {
+                    "health_score": 5,
+                    "coloration_score": 5,
+                    "pest_signs": False,
+                },
+                "bin": "C",
+            },
+            content_type="application/json",
+            HTTP_CF_ACCESS_JWT_ASSERTION="mock.jwt.token",
+        )
+        self.assertEqual(update_response.status_code, 403)
