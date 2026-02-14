@@ -140,6 +140,11 @@ This file records architecture/product decisions and why they were made.
 - Refs: `8f3f79c8`, `f9cb600a`, `dd7a6279`, `47eef321`, `b86db9f1`.
 - Notes: Server enforces one-tray-per-plant and rejects removed plants from placement; placement is not required to start in v1.
 
+### 2026-02-14: Rotation MVP scope (planned) is running-only tray movement logging
+- Decision: Rotation MVP will be overview-launched and limited to logging tray moves between blocks plus recent history review.
+- Rationale: Operators need quick movement logging in running experiments without pulling in weekly scheduler/due logic yet.
+- Notes: Rotation logging should reject non-running lifecycle states and keep hub navigation centered on Overview.
+
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
 - Rationale: Clear persistence boundary and easy backup target.

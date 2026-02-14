@@ -208,9 +208,12 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Notes: Assignment is allowed independently of baseline completion; lock remains a UI-only guardrail.
 
 ### Placement/Rotation (Future Steps)
-- [ ] Build tray composition UX using `Tray` + `TrayPlant` (owner: Codex)
-- [ ] Build weekly rotation planner and logs workflow (owner: Codex)
-  - API refs: `/api/v1/trays`, `/api/v1/tray-plants`, `/api/v1/rotation-logs`.
+- [x] Build tray composition UX using `Tray` + `TrayPlant` (owner: Codex)
+  - Refs: `47eef321`, `b86db9f1`
+  - API refs: `/api/v1/experiments/{id}/placement/summary`, `/api/v1/experiments/{id}/trays`, `/api/v1/trays/{id}/plants`.
+- [ ] (in progress) Build rotation logging workflow tied to trays/blocks (owner: Codex)
+  - Notes: Rotation MVP will add overview-launched logging and recent history without weekly due logic.
+  - Planned routes/API refs: `/experiments/{id}/rotation`, `GET /api/v1/experiments/{id}/rotation/summary`, `POST /api/v1/experiments/{id}/rotation/log`.
 
 ### Feeding/Lots/Weekly Sessions (Future Step + Ritual Loop)
 - [ ] Build lot preparation and assignment workflow (owner: Codex)
@@ -246,7 +249,7 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [ ] Define app operational metrics and alert thresholds (owner: manual)
 
 ## Next 3 Prompts Plan
-1. Rotation step MVP: rotation plan/log workflow tied to blocks and trays.
+1. Rotation step MVP: running-state tray movement logs + recent history.
 2. Lifecycle governance hardening: define backend-enforced immutability/deletion rules after start.
 3. Placement refinements: tray balancing UX and conflict handling for high-volume experiments.
 
