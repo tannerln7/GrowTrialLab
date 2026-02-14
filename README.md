@@ -113,6 +113,13 @@ Notes:
 - `ADMIN_EMAIL`
 - `DEV_EMAIL`
 - `AUTH_MODE`
+- `PUBLIC_BASE_URL`
+
+## Label QR URLs
+
+- Plant label QR codes encode an absolute URL in the form `{PUBLIC_BASE_URL}/p/{plant_uuid}`.
+- If `PUBLIC_BASE_URL` is missing or invalid, labels fall back to `http://localhost:3000/p/{plant_uuid}`.
+- For production, set `PUBLIC_BASE_URL` to the real external app origin so printed QR labels resolve correctly outside local dev.
 
 ## Media uploads (dev)
 

@@ -115,6 +115,7 @@ CF_ACCESS_AUD = os.environ.get("CF_ACCESS_AUD", "").strip()
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@example.com").strip().lower()
 AUTH_MODE = os.environ.get("AUTH_MODE", "invite_only").strip().lower()
 DEV_EMAIL = os.environ.get("DEV_EMAIL", ADMIN_EMAIL).strip().lower()
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip()
 
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",

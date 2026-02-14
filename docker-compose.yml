@@ -27,6 +27,7 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       AUTH_MODE: ${AUTH_MODE:-invite_only}
       DEV_EMAIL: ${DEV_EMAIL:-admin@example.com}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
     command: sh -c "uv run python manage.py migrate && uv run python manage.py bootstrap_admin_user && uv run python manage.py runserver 0.0.0.0:8000"
     ports:
       - "8000:8000"

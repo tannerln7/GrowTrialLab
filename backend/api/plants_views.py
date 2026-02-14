@@ -2,10 +2,11 @@ import csv
 from io import BytesIO, StringIO
 from uuid import UUID
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.http import HttpResponse
-from reportlab.graphics import renderPDF
-from reportlab.graphics.barcode import qr
+import reportlab.graphics.renderPDF as renderPDF
+from reportlab.graphics.barcode.qr import QrCodeWidget
 from reportlab.graphics.shapes import Drawing
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -255,7 +256,7 @@ def experiment_plants_generate_ids(request, experiment_id: UUID):
 
 
 def _draw_qr_label(canv: canvas.Canvas, value: str, x: float, y: float, size: float):
-    qr_widget = qr.QrCodeWidget(value)
+    qr_widget = QrCodeWidget(value)
     bounds = qr_widget.getBounds()
     width = bounds[2] - bounds[0]
     height = bounds[3] - bounds[1]
@@ -266,6 +267,13 @@ def _draw_qr_label(canv: canvas.Canvas, value: str, x: float, y: float, size: fl
     )
     drawing.add(qr_widget)
     renderPDF.draw(drawing, canv, x, y)
+
+
+def _get_qr_base_url() -> str:
+    configured_base_url = (settings.PUBLIC_BASE_URL or "").strip().rstrip("/")
+    if configured_base_url.startswith(("http://", "https://")):
+        return configured_base_url
+    return "http://localhost:3000"
 
 
 @api_view(["GET"])
@@ -292,8 +300,9 @@ def experiment_plants_labels_pdf(request, experiment_id: UUID):
         return Response({"detail": "No plants available for label export."}, status=400)
 
     buffer = BytesIO()
-    canv = canvas.Canvas(buffer, pagesize=letter)
+    canv = canvas.Canvas(buffer, pagesize=letter, pageCompression=0)
     page_width, page_height = letter
+    qr_base_url = _get_qr_base_url()
 
     margin = 36
     gutter = 18
@@ -322,13 +331,14 @@ def experiment_plants_labels_pdf(request, experiment_id: UUID):
         canv.drawString(x + 10, y + label_height - 40, plant.species.name[:42])
 
         plant_path = f"/p/{plant.id}"
+        plant_url = f"{qr_base_url}{plant_path}"
         qr_size = 58
         qr_x = x + 10
         qr_y = y + 12
-        _draw_qr_label(canv, plant_path, qr_x, qr_y, qr_size)
+        _draw_qr_label(canv, plant_url, qr_x, qr_y, qr_size)
 
         canv.setFont("Helvetica", 8)
-        canv.drawString(qr_x + qr_size + 8, qr_y + qr_size - 4, plant_path)
+        canv.drawString(qr_x + qr_size + 8, qr_y + qr_size - 4, plant_label[:28])
 
     canv.save()
     pdf_bytes = buffer.getvalue()
