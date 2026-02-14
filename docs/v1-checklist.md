@@ -85,11 +85,12 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Routes: `GET /api/v1/metric-templates/`, `GET /api/v1/metric-templates/{id}/`.
 - [x] Baseline step APIs and lock state workflow (owner: Codex)
   - Refs: `2f919969`, `d0467ff4`
-  - Routes: `GET /api/v1/experiments/{id}/baseline/status`, `GET/POST /api/v1/plants/{uuid}/baseline`, `POST /api/v1/experiments/{id}/baseline/lock`, `PUT /api/v1/experiments/{id}/packets/baseline/`, `POST /api/v1/experiments/{id}/packets/baseline/complete/`.
+  - Routes: `GET /api/v1/experiments/{id}/baseline/status`, `GET /api/v1/experiments/{id}/baseline/queue`, `GET/POST /api/v1/plants/{uuid}/baseline`, `POST /api/v1/experiments/{id}/baseline/lock`, `PUT /api/v1/experiments/{id}/packets/baseline/`, `POST /api/v1/experiments/{id}/packets/baseline/complete/`.
   - Notes: Baseline lock state is retained for UX/workflow signaling and step progression.
 - [x] Baseline frontend workflow (owner: Codex)
   - Refs: `4e599540`
   - Routes: `/experiments/{id}/baseline`, `/experiments/{id}/overview`, `/p/{uuid}` baseline shortcut.
+  - Notes: Baseline page now supports queue mode (`remaining_count`, next-missing navigation, and save-and-next flow) using `GET /api/v1/experiments/{id}/baseline/queue`.
 - [x] Baseline lock semantics switched to UI-only guardrail (owner: Codex)
   - Refs: `de058638`, `1cf9c9e6`, `e68610fc`
   - Notes: Backend no longer returns lock-based 403 for baseline/bin edits; baseline page is read-only by default when locked and supports local unlock/re-lock.
