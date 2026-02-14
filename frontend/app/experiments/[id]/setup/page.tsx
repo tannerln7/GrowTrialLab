@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { backendFetch } from "@/lib/backend";
+import { backendFetch, backendUrl } from "@/lib/backend";
 import AppMarkPlaceholder from "@/src/components/AppMarkPlaceholder";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import styles from "../../experiments.module.css";
@@ -27,6 +27,14 @@ type Block = {
   id: string;
   name: string;
   description: string;
+};
+
+type PlantRow = {
+  id: string;
+  species_name: string;
+  plant_id: string;
+  cultivar: string | null;
+  status: string;
 };
 
 type EnvironmentForm = {
@@ -92,12 +100,26 @@ export default function ExperimentSetupPage() {
   const [notInvited, setNotInvited] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
   const [setupState, setSetupState] = useState<SetupState | null>(null);
   const [currentPacket, setCurrentPacket] = useState("environment");
+
   const [envForm, setEnvForm] = useState<EnvironmentForm>(DEFAULT_ENV);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [newBlockName, setNewBlockName] = useState("");
   const [newBlockDescription, setNewBlockDescription] = useState("");
+
+  const [plants, setPlants] = useState<PlantRow[]>([]);
+  const [idFormatNotes, setIdFormatNotes] = useState("");
+  const [manualSpeciesName, setManualSpeciesName] = useState("");
+  const [manualCategory, setManualCategory] = useState("");
+  const [manualCultivar, setManualCultivar] = useState("");
+  const [manualBaselineNotes, setManualBaselineNotes] = useState("");
+  const [manualPlantId, setManualPlantId] = useState("");
+  const [manualQuantity, setManualQuantity] = useState(1);
+  const [csvText, setCsvText] = useState("");
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+
   const [saving, setSaving] = useState(false);
 
   const fetchSetupState = useCallback(async () => {
@@ -115,6 +137,11 @@ export default function ExperimentSetupPage() {
     setSetupState(data);
     setCurrentPacket(data.current_packet);
     setEnvForm(toEnvironmentForm(data.packet_data?.environment));
+
+    const plantsData = data.packet_data?.plants as
+      | { id_format_notes?: string }
+      | undefined;
+    setIdFormatNotes(plantsData?.id_format_notes ?? "");
     return data;
   }, [experimentId]);
 
@@ -125,7 +152,15 @@ export default function ExperimentSetupPage() {
     }
     const data = (await response.json()) as Block[];
     setBlocks(data);
-    return data;
+  }, [experimentId]);
+
+  const fetchPlants = useCallback(async () => {
+    const response = await backendFetch(`/api/v1/experiments/${experimentId}/plants/`);
+    if (!response.ok) {
+      throw new Error("Unable to load plants.");
+    }
+    const data = (await response.json()) as PlantRow[];
+    setPlants(data);
   }, [experimentId]);
 
   const reloadPageData = useCallback(async () => {
@@ -141,13 +176,13 @@ export default function ExperimentSetupPage() {
         setNotInvited(true);
         return;
       }
-      await Promise.all([fetchSetupState(), fetchBlocks()]);
+      await Promise.all([fetchSetupState(), fetchBlocks(), fetchPlants()]);
     } catch {
       setError("Unable to load setup.");
     } finally {
       setLoading(false);
     }
-  }, [experimentId, fetchSetupState, fetchBlocks]);
+  }, [experimentId, fetchSetupState, fetchBlocks, fetchPlants]);
 
   useEffect(() => {
     void reloadPageData();
@@ -243,9 +278,7 @@ export default function ExperimentSetupPage() {
       const response = await backendFetch(`/api/v1/blocks/${block.id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          description: block.description,
-        }),
+        body: JSON.stringify({ description: block.description }),
       });
       if (!response.ok) {
         setError(`Unable to save block ${block.name}.`);
@@ -286,6 +319,181 @@ export default function ExperimentSetupPage() {
     }
   }
 
+  async function savePlantsPacket(showNotice = true) {
+    setError("");
+    try {
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/packets/plants/`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id_format_notes: idFormatNotes }),
+        },
+      );
+      if (!response.ok) {
+        setError("Unable to save plants packet settings.");
+        return false;
+      }
+      if (showNotice) {
+        setNotice("Packet 2 settings saved.");
+      }
+      await fetchSetupState();
+      return true;
+    } catch {
+      setError("Unable to save plants packet settings.");
+      return false;
+    }
+  }
+
+  async function completePlantsPacket() {
+    setSaving(true);
+    setNotice("");
+    setError("");
+    try {
+      const saved = await savePlantsPacket(false);
+      if (!saved) {
+        return;
+      }
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/packets/plants/complete/`,
+        { method: "POST" },
+      );
+      if (!response.ok) {
+        const data = (await response.json()) as {
+          detail?: string;
+          errors?: string[];
+        };
+        setError(data.errors?.join(" ") || data.detail || "Packet 2 is not complete.");
+        return;
+      }
+      await fetchSetupState();
+      setNotice("Packet 2 completed.");
+    } catch {
+      setError("Unable to complete packet.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function addPlantsQuick() {
+    if (manualQuantity > 1 && manualPlantId.trim()) {
+      setError("Manual plant_id can only be used when quantity is 1.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      for (let i = 0; i < manualQuantity; i += 1) {
+        const response = await backendFetch(
+          `/api/v1/experiments/${experimentId}/plants/`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              species_name: manualSpeciesName.trim(),
+              category: manualCategory.trim(),
+              cultivar: manualCultivar.trim(),
+              baseline_notes: manualBaselineNotes.trim(),
+              plant_id: i === 0 ? manualPlantId.trim() : "",
+            }),
+          },
+        );
+
+        if (!response.ok) {
+          const payload = (await response.json()) as { detail?: string };
+          setError(payload.detail ?? "Unable to add plant.");
+          return;
+        }
+      }
+
+      setManualPlantId("");
+      setNotice("Plant(s) added.");
+      await fetchPlants();
+    } catch {
+      setError("Unable to add plant.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function importPlantsCsv() {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      let response: Response;
+      if (csvFile) {
+        const formData = new FormData();
+        formData.append("file", csvFile);
+        response = await backendFetch(
+          `/api/v1/experiments/${experimentId}/plants/bulk-import/`,
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
+      } else {
+        response = await backendFetch(
+          `/api/v1/experiments/${experimentId}/plants/bulk-import/`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ csv_text: csvText }),
+          },
+        );
+      }
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { detail?: string };
+        setError(payload.detail ?? "Unable to import CSV.");
+        return;
+      }
+
+      setNotice("CSV import completed.");
+      setCsvText("");
+      setCsvFile(null);
+      await fetchPlants();
+    } catch {
+      setError("Unable to import CSV.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function generateMissingIds() {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/plants/generate-ids/`,
+        { method: "POST" },
+      );
+      if (!response.ok) {
+        setError("Unable to generate IDs.");
+        return;
+      }
+      const data = (await response.json()) as { updated_count: number };
+      setNotice(`Generated IDs for ${data.updated_count} plant(s).`);
+      await fetchPlants();
+    } catch {
+      setError("Unable to generate IDs.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function downloadLabels(mode: "all" | "missing_ids" = "all") {
+    const url = backendUrl(
+      `/api/v1/experiments/${experimentId}/plants/labels.pdf?mode=${mode}`,
+    );
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  const hasPendingPlantIds = plants.some((plant) => !plant.plant_id);
+
   if (notInvited) {
     return (
       <div className={styles.page}>
@@ -308,6 +516,9 @@ export default function ExperimentSetupPage() {
           <div className={styles.actions}>
             <Link className={styles.secondaryButton} href="/experiments">
               Back to experiments
+            </Link>
+            <Link className={styles.secondaryButton} href={`/experiments/${experimentId}/plants`}>
+              Plants list
             </Link>
           </div>
         </header>
@@ -484,9 +695,7 @@ export default function ExperimentSetupPage() {
                       className={styles.textarea}
                       placeholder="Description"
                       value={newBlockDescription}
-                      onChange={(event) =>
-                        setNewBlockDescription(event.target.value)
-                      }
+                      onChange={(event) => setNewBlockDescription(event.target.value)}
                     />
                     <button
                       className={styles.secondaryButton}
@@ -519,13 +728,190 @@ export default function ExperimentSetupPage() {
               ) : currentPacket === "plants" ? (
                 <div className={styles.formGrid}>
                   <h2>Packet 2: Plants</h2>
-                  <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
+
+                  <label className={styles.field}>
+                    ID format notes
+                    <textarea
+                      className={styles.textarea}
+                      value={idFormatNotes}
+                      onChange={(event) => setIdFormatNotes(event.target.value)}
+                    />
+                  </label>
+
+                  <div className={styles.actions}>
+                    <button
+                      className={styles.button}
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void savePlantsPacket()}
+                    >
+                      Save
+                    </button>
+                    <button
+                      className={styles.secondaryButton}
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void completePlantsPacket()}
+                    >
+                      {saving ? "Completing..." : "Mark Complete"}
+                    </button>
+                  </div>
+
+                  <h3>Add plants (manual)</h3>
+                  <div className={styles.formGrid}>
+                    <label className={styles.field}>
+                      Species name
+                      <input
+                        className={styles.input}
+                        value={manualSpeciesName}
+                        onChange={(event) => setManualSpeciesName(event.target.value)}
+                        placeholder="Nepenthes ventricosa"
+                      />
+                    </label>
+
+                    <label className={styles.field}>
+                      Category
+                      <input
+                        className={styles.input}
+                        value={manualCategory}
+                        onChange={(event) => setManualCategory(event.target.value)}
+                        placeholder="nepenthes"
+                      />
+                    </label>
+
+                    <label className={styles.field}>
+                      Cultivar
+                      <input
+                        className={styles.input}
+                        value={manualCultivar}
+                        onChange={(event) => setManualCultivar(event.target.value)}
+                      />
+                    </label>
+
+                    <label className={styles.field}>
+                      Quantity
+                      <input
+                        className={styles.input}
+                        type="number"
+                        min={1}
+                        value={manualQuantity}
+                        onChange={(event) =>
+                          setManualQuantity(Number(event.target.value) || 1)
+                        }
+                      />
+                    </label>
+
+                    <label className={styles.field}>
+                      Plant ID (optional)
+                      <input
+                        className={styles.input}
+                        value={manualPlantId}
+                        onChange={(event) => setManualPlantId(event.target.value)}
+                        placeholder="NP-001"
+                      />
+                    </label>
+
+                    <label className={styles.field}>
+                      Baseline notes
+                      <textarea
+                        className={styles.textarea}
+                        value={manualBaselineNotes}
+                        onChange={(event) =>
+                          setManualBaselineNotes(event.target.value)
+                        }
+                      />
+                    </label>
+
+                    <button
+                      className={styles.button}
+                      type="button"
+                      disabled={saving || !manualSpeciesName.trim()}
+                      onClick={() => void addPlantsQuick()}
+                    >
+                      Add plants
+                    </button>
+                  </div>
+
+                  <h3>Bulk import CSV</h3>
+                  <p className={styles.muted}>
+                    Columns: species_name, category, cultivar, quantity, plant_id,
+                    baseline_notes
+                  </p>
+                  <textarea
+                    className={styles.textarea}
+                    value={csvText}
+                    onChange={(event) => setCsvText(event.target.value)}
+                    placeholder={
+                      "species_name,category,cultivar,quantity,plant_id,baseline_notes\\nNepenthes alata,nepenthes,,3,,batch A"
+                    }
+                  />
+                  <input
+                    className={styles.input}
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={(event) => setCsvFile(event.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    className={styles.secondaryButton}
+                    type="button"
+                    disabled={saving || (!csvFile && !csvText.trim())}
+                    onClick={() => void importPlantsCsv()}
+                  >
+                    Import CSV
+                  </button>
+
+                  <div className={styles.actions}>
+                    <button
+                      className={styles.secondaryButton}
+                      type="button"
+                      disabled={saving || !hasPendingPlantIds}
+                      onClick={() => void generateMissingIds()}
+                    >
+                      Generate IDs for pending plants
+                    </button>
+                    <button
+                      className={styles.secondaryButton}
+                      type="button"
+                      onClick={() => downloadLabels("all")}
+                    >
+                      Download labels PDF
+                    </button>
+                  </div>
+
+                  <h3>Plants</h3>
+                  {plants.length === 0 ? (
+                    <IllustrationPlaceholder
+                      inventoryId="ILL-201"
+                      kind="noPlants"
+                    />
+                  ) : (
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>Plant ID</th>
+                          <th>Species</th>
+                          <th>Cultivar</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {plants.map((plant) => (
+                          <tr key={plant.id}>
+                            <td>{plant.plant_id || "(pending)"}</td>
+                            <td>{plant.species_name}</td>
+                            <td>{plant.cultivar || "-"}</td>
+                            <td>{plant.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               ) : (
                 <div className={styles.formGrid}>
                   <h2>{currentPacket}</h2>
                   <p className={styles.muted}>
-                    This packet is not implemented yet. Complete Packet 1 first.
+                    This packet is not implemented yet. Complete Packet 1 and Packet 2 first.
                   </p>
                 </div>
               )}

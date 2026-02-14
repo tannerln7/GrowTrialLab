@@ -2,12 +2,7 @@ export async function backendFetch(
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const isHostDockerInternal =
-    typeof window !== "undefined" &&
-    window.location.hostname === "host.docker.internal";
-  const bases = isHostDockerInternal
-    ? ["http://host.docker.internal:8000", "http://localhost:8000"]
-    : ["http://localhost:8000", "http://host.docker.internal:8000"];
+  const bases = backendBaseCandidates();
   let lastError: unknown = null;
 
   for (const base of bases) {
@@ -21,4 +16,17 @@ export async function backendFetch(
   throw lastError instanceof Error
     ? lastError
     : new Error("Unable to reach backend.");
+}
+
+export function backendUrl(path: string): string {
+  return `${backendBaseCandidates()[0]}${path}`;
+}
+
+function backendBaseCandidates(): string[] {
+  const isHostDockerInternal =
+    typeof window !== "undefined" &&
+    window.location.hostname === "host.docker.internal";
+  return isHostDockerInternal
+    ? ["http://host.docker.internal:8000", "http://localhost:8000"]
+    : ["http://localhost:8000", "http://host.docker.internal:8000"];
 }
