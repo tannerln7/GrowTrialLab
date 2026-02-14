@@ -19,6 +19,7 @@ from api.models import (
     Recipe,
     RotationLog,
     Species,
+    Tent,
     Tray,
     TrayPlant,
 )
@@ -103,6 +104,22 @@ class ExperimentSetupTests(TestCase):
         self.assertTrue(ExperimentSetupState.objects.filter(experiment=experiment).exists())
         state = ExperimentSetupState.objects.get(experiment=experiment)
         self.assertEqual(state.current_packet, PACKET_PLANTS)
+
+    def test_default_tent_created_with_experiment(self):
+        experiment = Experiment.objects.create(name="Default Tent")
+        tents = Tent.objects.filter(experiment=experiment)
+        self.assertEqual(tents.count(), 1)
+        default_tent = tents.first()
+        if default_tent is None:
+            self.fail("Expected default tent to exist.")
+        self.assertEqual(default_tent.name, "Tent 1")
+        self.assertEqual(default_tent.code, "T1")
+
+    def test_legacy_block_create_without_tent_uses_default_tent(self):
+        experiment = Experiment.objects.create(name="Legacy Block Tent")
+        block = Block.objects.create(experiment=experiment, name="B1", description="slot")
+        self.assertEqual(block.tent.experiment.id, experiment.id)
+        self.assertEqual(block.tent.code, "T1")
 
     def test_environment_payload_can_be_saved(self):
         experiment = Experiment.objects.create(name="Env Save")
@@ -428,6 +445,7 @@ class ExperimentStatusSummaryTests(TestCase):
         payload = response.json()
         self.assertFalse(payload["setup"]["is_complete"])
         self.assertTrue(payload["setup"]["missing"]["plants"])
+        self.assertFalse(payload["setup"]["missing"]["tents"])
         self.assertTrue(payload["setup"]["missing"]["blocks"])
         self.assertTrue(payload["setup"]["missing"]["recipes"])
         self.assertFalse(payload["readiness"]["is_ready"])
@@ -573,6 +591,39 @@ class ExperimentStatusSummaryTests(TestCase):
         self.assertEqual(counts["needs_tray_recipe"], 1)
         self.assertEqual(counts["needs_assignment"], 2)
 
+    def test_status_summary_reports_tent_restriction_violation(self):
+        experiment = Experiment.objects.create(name="Restriction Readiness")
+        allowed = Species.objects.create(name="Allowed Species", category="nepenthes")
+        disallowed = Species.objects.create(name="Disallowed Species", category="drosera")
+        tent = Tent.objects.get(experiment=experiment, code="T1")
+        tent.allowed_species.set([allowed])
+        block = Block.objects.create(experiment=experiment, tent=tent, name="B1", description="slot")
+        recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment")
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=disallowed,
+            plant_id="PL-001",
+            status=Plant.Status.ACTIVE,
+            bin="A",
+        )
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=plant,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4},
+        )
+        tray = Tray.objects.create(experiment=experiment, name="T1", block=block, recipe=recipe)
+        TrayPlant.objects.create(tray=tray, plant=plant, order_index=0)
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/status/summary")
+        self.assertEqual(response.status_code, 200)
+        counts = response.json()["readiness"]["counts"]
+        self.assertEqual(counts["needs_placement"], 0)
+        self.assertEqual(counts["needs_tray_recipe"], 0)
+        self.assertEqual(counts["needs_tent_restriction"], 1)
+        self.assertFalse(response.json()["readiness"]["ready_to_start"])
+
 
 @override_settings(
     DEBUG=True,
@@ -608,6 +659,35 @@ class ExperimentLifecycleTests(TestCase):
         experiment.refresh_from_db()
         self.assertEqual(experiment.lifecycle_state, Experiment.LifecycleState.DRAFT)
         self.assertIsNone(experiment.started_at)
+
+    def test_start_fails_when_tray_recipe_missing(self):
+        experiment = Experiment.objects.create(name="Lifecycle Missing Tray Recipe")
+        species = Species.objects.create(name="Drosera tray recipe", category="drosera")
+        Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment")
+        block = Block.objects.create(experiment=experiment, name="B1", description="slot")
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="DR-010",
+            bin="A",
+            status=Plant.Status.ACTIVE,
+        )
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=plant,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 5},
+        )
+        tray = Tray.objects.create(experiment=experiment, name="T1", block=block, recipe=None)
+        TrayPlant.objects.create(tray=tray, plant=plant, order_index=0)
+
+        response = self.client.post(f"/api/v1/experiments/{experiment.id}/start")
+        self.assertEqual(response.status_code, 409)
+        payload = response.json()
+        self.assertEqual(payload["counts"]["needs_placement"], 0)
+        self.assertEqual(payload["counts"]["needs_tray_recipe"], 1)
+        self.assertFalse(payload["ready_to_start"])
 
     def test_start_succeeds_when_ready(self):
         experiment = Experiment.objects.create(name="Lifecycle Start Success")
@@ -729,6 +809,51 @@ class PlacementApiTests(TestCase):
         summary_response = self.client.get(f"/api/v1/experiments/{experiment.id}/placement/summary")
         self.assertEqual(summary_response.status_code, 200)
         self.assertEqual(summary_response.json()["unplaced_plants_count"], 0)
+
+    def test_add_plant_to_tray_rejects_species_not_allowed_in_tent(self):
+        experiment = Experiment.objects.create(name="Placement Restriction")
+        allowed = Species.objects.create(name="Allowed Placement", category="nepenthes")
+        disallowed = Species.objects.create(name="Blocked Placement", category="drosera")
+        tent = Tent.objects.get(experiment=experiment, code="T1")
+        tent.allowed_species.set([allowed])
+        block = Block.objects.create(experiment=experiment, tent=tent, name="B1", description="slot")
+        tray = Tray.objects.create(experiment=experiment, name="T1", block=block)
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=disallowed,
+            plant_id="DR-777",
+            status=Plant.Status.ACTIVE,
+        )
+
+        response = self.client.post(
+            f"/api/v1/trays/{tray.id}/plants",
+            data={"plant_id": str(plant.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("is not allowed in tent", response.json()["detail"])
+
+    def test_add_plant_to_unplaced_tray_ignores_tent_restrictions(self):
+        experiment = Experiment.objects.create(name="Placement Unplaced Tray")
+        allowed = Species.objects.create(name="Allowed Unplaced", category="nepenthes")
+        disallowed = Species.objects.create(name="Disallowed Unplaced", category="drosera")
+        tent = Tent.objects.get(experiment=experiment, code="T1")
+        tent.allowed_species.set([allowed])
+        Block.objects.create(experiment=experiment, tent=tent, name="B1", description="slot")
+        tray = Tray.objects.create(experiment=experiment, name="T1", block=None)
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=disallowed,
+            plant_id="DR-778",
+            status=Plant.Status.ACTIVE,
+        )
+
+        response = self.client.post(
+            f"/api/v1/trays/{tray.id}/plants",
+            data={"plant_id": str(plant.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
 
     def test_cannot_place_same_plant_in_two_trays(self):
         experiment = Experiment.objects.create(name="Placement Duplicate")
@@ -960,6 +1085,46 @@ class RotationApiTests(TestCase):
             response.json()["detail"],
             "Rotation logs are intended for running experiments. Start the experiment first.",
         )
+
+    def test_rotation_log_rejects_move_into_restricted_tent(self):
+        experiment = Experiment.objects.create(
+            name="Rotation Restriction",
+            lifecycle_state=Experiment.LifecycleState.RUNNING,
+        )
+        allowed = Species.objects.create(name="Rotation Allowed", category="nepenthes")
+        disallowed = Species.objects.create(name="Rotation Blocked", category="drosera")
+        default_tent = Tent.objects.get(experiment=experiment, code="T1")
+        default_tent.allowed_species.clear()
+        source_block = Block.objects.create(
+            experiment=experiment,
+            tent=default_tent,
+            name="B1",
+            description="source",
+        )
+        restricted_tent = Tent.objects.create(experiment=experiment, name="Tent 2", code="T2")
+        restricted_tent.allowed_species.set([allowed])
+        target_block = Block.objects.create(
+            experiment=experiment,
+            tent=restricted_tent,
+            name="B1",
+            description="target",
+        )
+        tray = Tray.objects.create(experiment=experiment, name="T1", block=source_block)
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=disallowed,
+            plant_id="DR-820",
+            status=Plant.Status.ACTIVE,
+        )
+        TrayPlant.objects.create(tray=tray, plant=plant, order_index=0)
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/rotation/log",
+            data={"tray_id": str(tray.id), "to_block_id": str(target_block.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("Tray move blocked", response.json()["detail"])
 
 
 @override_settings(
