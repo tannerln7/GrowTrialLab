@@ -93,7 +93,10 @@ export default function ExperimentSetupPage() {
     setSaving(true);
     setError("");
     try {
-      const response = await backendFetch(`/api/v1/experiments/${experimentId}/blocks/`);
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/blocks/defaults`,
+        { method: "POST" },
+      );
       if (!response.ok) {
         setError("Unable to create default blocks.");
         return;
