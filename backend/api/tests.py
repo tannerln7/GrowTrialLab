@@ -810,6 +810,28 @@ class PlacementApiTests(TestCase):
         self.assertEqual(summary_response.status_code, 200)
         self.assertEqual(summary_response.json()["unplaced_plants_count"], 0)
 
+    def test_add_plant_to_tray_rejects_when_capacity_full(self):
+        experiment = Experiment.objects.create(name="Placement Capacity")
+        species = Species.objects.create(name="Capacity Species", category="drosera")
+        p1 = Plant.objects.create(experiment=experiment, species=species, plant_id="DR-901", status=Plant.Status.ACTIVE)
+        p2 = Plant.objects.create(experiment=experiment, species=species, plant_id="DR-902", status=Plant.Status.ACTIVE)
+        tray = Tray.objects.create(experiment=experiment, name="TR1", capacity=1)
+
+        first_response = self.client.post(
+            f"/api/v1/trays/{tray.id}/plants",
+            data={"plant_id": str(p1.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(first_response.status_code, 201)
+
+        second_response = self.client.post(
+            f"/api/v1/trays/{tray.id}/plants",
+            data={"plant_id": str(p2.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(second_response.status_code, 409)
+        self.assertEqual(second_response.json()["detail"], "Tray is full (capacity 1).")
+
     def test_add_plant_to_tray_rejects_species_not_allowed_in_tent(self):
         experiment = Experiment.objects.create(name="Placement Restriction")
         allowed = Species.objects.create(name="Allowed Placement", category="nepenthes")
@@ -955,13 +977,42 @@ class PlacementApiTests(TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertIn("requires baseline week 0", response.json()["detail"])
 
+    def test_auto_place_reports_no_tented_blocks_diagnostics(self):
+        experiment = Experiment.objects.create(name="Placement Auto No Blocks")
+        species = Species.objects.create(name="No Blocks Species", category="nepenthes")
+        recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Tray.objects.create(experiment=experiment, name="TR1", recipe=recipe)
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-551",
+            bin="A",
+            status=Plant.Status.ACTIVE,
+        )
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=plant,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4},
+        )
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/placement/auto",
+            data={"mode": "bin_balance_v1", "clear_existing": True},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        payload = response.json()
+        self.assertEqual(payload["remaining_unplaced_plants"], 1)
+        self.assertEqual(payload["reason_counts"]["no_tented_blocks"], 1)
+
     def test_auto_place_balances_bins_and_ignores_removed_plants(self):
         experiment = Experiment.objects.create(name="Placement Auto Balance")
         species = Species.objects.create(name="Drosera auto", category="drosera")
         block = Block.objects.create(experiment=experiment, name="B1", description="slot")
         recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
-        tray_a = Tray.objects.create(experiment=experiment, name="T1", block=block, recipe=recipe)
-        tray_b = Tray.objects.create(experiment=experiment, name="T2", block=block, recipe=recipe)
+        tray_a = Tray.objects.create(experiment=experiment, name="T1", block=block, recipe=recipe, capacity=3)
+        tray_b = Tray.objects.create(experiment=experiment, name="T2", block=block, recipe=recipe, capacity=3)
 
         plants: list[Plant] = []
         for idx in range(6):
@@ -1000,6 +1051,115 @@ class PlacementApiTests(TestCase):
         placed_on_a = TrayPlant.objects.filter(tray=tray_a, plant__status=Plant.Status.ACTIVE).count()
         placed_on_b = TrayPlant.objects.filter(tray=tray_b, plant__status=Plant.Status.ACTIVE).count()
         self.assertLessEqual(abs(placed_on_a - placed_on_b), 1)
+
+    def test_auto_place_returns_diagnostics_when_compatible_trays_full(self):
+        experiment = Experiment.objects.create(name="Placement Auto Full")
+        species = Species.objects.create(name="Full Species", category="drosera")
+        block = Block.objects.create(experiment=experiment, name="B1", description="slot")
+        recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        tray = Tray.objects.create(experiment=experiment, name="TR1", block=block, recipe=recipe, capacity=1)
+
+        existing = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="DR-100",
+            bin="A",
+            status=Plant.Status.ACTIVE,
+        )
+        incoming = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="DR-101",
+            bin="A",
+            status=Plant.Status.ACTIVE,
+        )
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=existing,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4},
+        )
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=incoming,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4},
+        )
+        TrayPlant.objects.create(tray=tray, plant=existing, order_index=0)
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/placement/auto",
+            data={"mode": "bin_balance_v1", "clear_existing": False},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        payload = response.json()
+        self.assertEqual(payload["remaining_unplaced_plants"], 1)
+        self.assertEqual(payload["reason_counts"]["compatible_trays_full"], 1)
+        self.assertEqual(payload["unplaceable_plants"][0]["reason"], "compatible_trays_full")
+
+    def test_auto_place_respects_tent_restrictions_when_assigning_blocks(self):
+        experiment = Experiment.objects.create(name="Placement Auto Restriction")
+        allowed = Species.objects.create(name="Restricted Allowed", category="nepenthes")
+        disallowed = Species.objects.create(name="Restricted Blocked", category="drosera")
+        default_tent = Tent.objects.get(experiment=experiment, code="T1")
+        default_tent.allowed_species.clear()
+        restricted_tent = Tent.objects.create(experiment=experiment, name="Tent 2", code="TN2")
+        restricted_tent.allowed_species.set([allowed])
+        unrestricted_block = Block.objects.create(
+            experiment=experiment,
+            tent=default_tent,
+            name="B1",
+            description="unrestricted",
+        )
+        restricted_block = Block.objects.create(
+            experiment=experiment,
+            tent=restricted_tent,
+            name="B1",
+            description="restricted",
+        )
+        recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        tray_a = Tray.objects.create(experiment=experiment, name="TR1", recipe=recipe, capacity=2)
+        tray_b = Tray.objects.create(experiment=experiment, name="TR2", recipe=recipe, capacity=2)
+        self.assertIsNotNone(unrestricted_block.id)
+        self.assertIsNotNone(restricted_block.id)
+
+        allowed_plant = Plant.objects.create(
+            experiment=experiment,
+            species=allowed,
+            plant_id="NP-001",
+            bin="A",
+            status=Plant.Status.ACTIVE,
+        )
+        blocked_plant = Plant.objects.create(
+            experiment=experiment,
+            species=disallowed,
+            plant_id="DR-001",
+            bin="A",
+            status=Plant.Status.ACTIVE,
+        )
+        for plant in [allowed_plant, blocked_plant]:
+            PlantWeeklyMetric.objects.create(
+                experiment=experiment,
+                plant=plant,
+                week_number=BASELINE_WEEK_NUMBER,
+                metrics={"health_score": 5},
+            )
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/placement/auto",
+            data={"mode": "bin_balance_v1", "clear_existing": True},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        for tray_plant in TrayPlant.objects.filter(tray__experiment=experiment).select_related(
+            "tray__block__tent",
+            "plant__species",
+        ):
+            tray_tent = tray_plant.tray.block.tent
+            if tray_tent.allowed_species.exists():
+                self.assertTrue(tray_tent.allowed_species.filter(id=tray_plant.plant.species_id).exists())
 
 
 @override_settings(
