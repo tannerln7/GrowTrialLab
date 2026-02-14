@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { backendFetch } from "@/lib/backend";
+import { backendFetch, normalizeBackendError } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
@@ -22,6 +22,7 @@ export default function ExperimentsPage() {
   const [loading, setLoading] = useState(true);
   const [notInvited, setNotInvited] = useState(false);
   const [error, setError] = useState("");
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -44,7 +45,12 @@ export default function ExperimentsPage() {
           | Experiment[];
         const experiments = Array.isArray(data) ? data : data.results ?? [];
         setItems(experiments);
-      } catch {
+        setOffline(false);
+      } catch (requestError) {
+        const normalizedError = normalizeBackendError(requestError);
+        if (normalizedError.kind === "offline") {
+          setOffline(true);
+        }
         setError("Unable to load experiments.");
       } finally {
         setLoading(false);
@@ -122,6 +128,9 @@ export default function ExperimentsPage() {
               />
             }
           />
+        ) : null}
+        {offline ? (
+          <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" />
         ) : null}
       </SectionCard>
       <SectionCard>

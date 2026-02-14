@@ -1,3 +1,20 @@
+export type BackendErrorKind = "offline" | "unknown";
+
+export class BackendClientError extends Error {
+  kind: BackendErrorKind;
+
+  constructor(kind: BackendErrorKind, message: string) {
+    super(message);
+    this.kind = kind;
+    this.name = "BackendClientError";
+  }
+}
+
+export type BackendErrorShape = {
+  kind: BackendErrorKind;
+  message: string;
+};
+
 export async function backendFetch(
   path: string,
   init?: RequestInit,
@@ -13,9 +30,10 @@ export async function backendFetch(
     }
   }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Unable to reach backend.");
+  if (lastError instanceof Error) {
+    throw new BackendClientError("offline", "Backend is unreachable.");
+  }
+  throw new BackendClientError("unknown", "Unexpected backend error.");
 }
 
 export function backendUrl(path: string): string {
@@ -29,4 +47,14 @@ function backendBaseCandidates(): string[] {
   return isHostDockerInternal
     ? ["http://host.docker.internal:8000", "http://localhost:8000"]
     : ["http://localhost:8000", "http://host.docker.internal:8000"];
+}
+
+export function normalizeBackendError(error: unknown): BackendErrorShape {
+  if (error instanceof BackendClientError) {
+    return { kind: error.kind, message: error.message };
+  }
+  if (error instanceof Error) {
+    return { kind: "unknown", message: error.message || "Unexpected error." };
+  }
+  return { kind: "unknown", message: "Unexpected error." };
 }

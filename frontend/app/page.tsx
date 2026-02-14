@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { backendFetch } from "@/lib/backend";
+import { backendFetch, normalizeBackendError } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
@@ -15,6 +15,7 @@ export default function Home() {
   const [meLoading, setMeLoading] = useState(false);
   const [meResult, setMeResult] = useState<string>("No profile loaded.");
   const [notInvited, setNotInvited] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   async function checkBackendHealth() {
     setLoading(true);
@@ -26,7 +27,9 @@ export default function Home() {
       }
       const data = await response.json();
       setResult(JSON.stringify(data, null, 2));
+      setOffline(false);
     } catch {
+      setOffline(true);
       setResult("Unable to reach backend.");
     } finally {
       setLoading(false);
@@ -49,7 +52,12 @@ export default function Home() {
       const data = await response.json();
       setMeResult(`${data.email} (${data.role}, ${data.status})`);
       setNotInvited(false);
-    } catch {
+      setOffline(false);
+    } catch (requestError) {
+      const error = normalizeBackendError(requestError);
+      if (error.kind === "offline") {
+        setOffline(true);
+      }
       setMeResult("Unable to load profile.");
     } finally {
       setMeLoading(false);
@@ -92,6 +100,9 @@ export default function Home() {
         ) : (
           <p className={styles.mutedText}>{meResult}</p>
         )}
+        {offline ? (
+          <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" />
+        ) : null}
         <pre className={styles.output}>{result || "No result yet."}</pre>
       </SectionCard>
     </PageShell>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
-import { backendFetch } from "@/lib/backend";
+import { backendFetch, normalizeBackendError } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
@@ -17,6 +17,7 @@ export default function NewExperimentPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notInvited, setNotInvited] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     async function checkAccess() {
@@ -25,7 +26,11 @@ export default function NewExperimentPage() {
         if (response.status === 403) {
           setNotInvited(true);
         }
-      } catch {
+      } catch (requestError) {
+        const normalizedError = normalizeBackendError(requestError);
+        if (normalizedError.kind === "offline") {
+          setOffline(true);
+        }
         setError("Unable to confirm access.");
       }
     }
@@ -55,7 +60,11 @@ export default function NewExperimentPage() {
 
       const data = (await response.json()) as { id: string };
       router.push(`/experiments/${data.id}/setup`);
-    } catch {
+    } catch (requestError) {
+      const normalizedError = normalizeBackendError(requestError);
+      if (normalizedError.kind === "offline") {
+        setOffline(true);
+      }
       setError("Unable to create experiment.");
     } finally {
       setSaving(false);
@@ -117,6 +126,9 @@ export default function NewExperimentPage() {
           </div>
 
           {error ? <p className={styles.errorText}>{error}</p> : null}
+          {offline ? (
+            <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" />
+          ) : null}
         </form>
       </SectionCard>
     </PageShell>

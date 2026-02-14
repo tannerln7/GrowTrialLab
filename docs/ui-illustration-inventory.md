@@ -8,4 +8,4 @@ This file tracks illustration placeholders used in the UI before final artwork e
 | ILL-101 | Experiments list empty state | `frontend/app/experiments/page.tsx` | `noExperiments` | `FlaskConical` |
 | ILL-201 | Plants empty state | `frontend/app/experiments/[id]/setup/page.tsx`, `frontend/app/experiments/[id]/plants/page.tsx` | `noPlants` | `Sprout` |
 | ILL-002 | Generic error state | Reserved for API/load errors | `error` | `TriangleAlert` |
-| ILL-003 | Backend offline state | Reserved for connection failures | `offline` | `WifiOff` |
+| ILL-003 | Backend offline state | `frontend/app/page.tsx`, `frontend/app/experiments/page.tsx`, `frontend/app/experiments/new/page.tsx`, `frontend/app/experiments/[id]/setup/page.tsx`, `frontend/app/experiments/[id]/plants/page.tsx` | `offline` | `WifiOff` |

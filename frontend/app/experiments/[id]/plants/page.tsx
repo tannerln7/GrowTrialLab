@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { backendFetch, backendUrl } from "@/lib/backend";
+import { backendFetch, backendUrl, normalizeBackendError } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
@@ -34,6 +34,7 @@ export default function ExperimentPlantsPage() {
   const [loading, setLoading] = useState(true);
   const [notInvited, setNotInvited] = useState(false);
   const [error, setError] = useState("");
+  const [offline, setOffline] = useState(false);
   const [plants, setPlants] = useState<PlantRow[]>([]);
 
   useEffect(() => {
@@ -55,7 +56,12 @@ export default function ExperimentPlantsPage() {
         }
         const data = (await response.json()) as PlantRow[];
         setPlants(data);
-      } catch {
+        setOffline(false);
+      } catch (requestError) {
+        const normalizedError = normalizeBackendError(requestError);
+        if (normalizedError.kind === "offline") {
+          setOffline(true);
+        }
         setError("Unable to load plants.");
       } finally {
         setLoading(false);
@@ -150,6 +156,9 @@ export default function ExperimentPlantsPage() {
               <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
             }
           />
+        ) : null}
+        {offline ? (
+          <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" />
         ) : null}
       </SectionCard>
     </PageShell>

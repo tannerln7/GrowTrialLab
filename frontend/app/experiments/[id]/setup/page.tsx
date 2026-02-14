@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { backendFetch, backendUrl } from "@/lib/backend";
+import { backendFetch, backendUrl, normalizeBackendError } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
@@ -102,6 +102,7 @@ export default function ExperimentSetupPage() {
 
   const [loading, setLoading] = useState(true);
   const [notInvited, setNotInvited] = useState(false);
+  const [offline, setOffline] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
@@ -124,6 +125,18 @@ export default function ExperimentSetupPage() {
   const [manualQuantity, setManualQuantity] = useState(1);
   const [csvText, setCsvText] = useState("");
   const [csvFile, setCsvFile] = useState<File | null>(null);
+
+  function handleRequestError(
+    requestError: unknown,
+    fallbackMessage: string,
+  ): string {
+    const normalizedError = normalizeBackendError(requestError);
+    if (normalizedError.kind === "offline") {
+      setOffline(true);
+      return "Backend is unreachable.";
+    }
+    return fallbackMessage;
+  }
 
   const fetchSetupState = useCallback(async () => {
     const response = await backendFetch(
@@ -180,8 +193,9 @@ export default function ExperimentSetupPage() {
         return;
       }
       await Promise.all([fetchSetupState(), fetchBlocks(), fetchPlants()]);
-    } catch {
-      setError("Unable to load setup.");
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to load setup."));
     } finally {
       setLoading(false);
     }
@@ -212,8 +226,8 @@ export default function ExperimentSetupPage() {
       const data = (await response.json()) as SetupState;
       setSetupState(data);
       setCurrentPacket(data.current_packet);
-    } catch {
-      setError("Unable to switch packet.");
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to switch packet."));
     }
   }
 
@@ -236,9 +250,12 @@ export default function ExperimentSetupPage() {
         setNotice("Packet 1 saved.");
       }
       await fetchSetupState();
+      setOffline(false);
       return true;
-    } catch {
-      setError("Unable to save environment packet.");
+    } catch (requestError) {
+      setError(
+        handleRequestError(requestError, "Unable to save environment packet."),
+      );
       return false;
     }
   }
@@ -270,8 +287,9 @@ export default function ExperimentSetupPage() {
       setSetupState(data);
       setCurrentPacket(data.current_packet);
       setNotice("Packet 1 completed.");
-    } catch {
-      setError("Unable to complete packet.");
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to complete packet."));
     } finally {
       setSaving(false);
     }
@@ -295,8 +313,11 @@ export default function ExperimentSetupPage() {
 
       setNotice(`Saved block ${block.name}.`);
       await fetchBlocks();
-    } catch {
-      setError(`Unable to save block ${block.name}.`);
+      setOffline(false);
+    } catch (requestError) {
+      setError(
+        handleRequestError(requestError, `Unable to save block ${block.name}.`),
+      );
     }
   }
 
@@ -326,8 +347,9 @@ export default function ExperimentSetupPage() {
       setNewBlockDescription("");
       setNotice("Block added.");
       await fetchBlocks();
-    } catch {
-      setError("Unable to add block.");
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to add block."));
     }
   }
 
@@ -351,9 +373,12 @@ export default function ExperimentSetupPage() {
         setNotice("Packet 2 settings saved.");
       }
       await fetchSetupState();
+      setOffline(false);
       return true;
-    } catch {
-      setError("Unable to save plants packet settings.");
+    } catch (requestError) {
+      setError(
+        handleRequestError(requestError, "Unable to save plants packet settings."),
+      );
       return false;
     }
   }
@@ -383,8 +408,9 @@ export default function ExperimentSetupPage() {
 
       await fetchSetupState();
       setNotice("Packet 2 completed.");
-    } catch {
-      setError("Unable to complete packet.");
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to complete packet."));
     } finally {
       setSaving(false);
     }
@@ -427,8 +453,9 @@ export default function ExperimentSetupPage() {
       setManualPlantId("");
       setNotice("Plant(s) added.");
       await fetchPlants();
-    } catch {
-      setError("Unable to add plant.");
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to add plant."));
     } finally {
       setSaving(false);
     }
@@ -472,8 +499,9 @@ export default function ExperimentSetupPage() {
       setCsvFile(null);
       setNotice("CSV import completed.");
       await fetchPlants();
-    } catch {
-      setError("Unable to import CSV.");
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to import CSV."));
     } finally {
       setSaving(false);
     }
@@ -498,8 +526,9 @@ export default function ExperimentSetupPage() {
       const data = (await response.json()) as { updated_count: number };
       setNotice(`Generated IDs for ${data.updated_count} plant(s).`);
       await fetchPlants();
-    } catch {
-      setError("Unable to generate IDs.");
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to generate IDs."));
     } finally {
       setSaving(false);
     }
@@ -548,6 +577,9 @@ export default function ExperimentSetupPage() {
       {loading ? <p className={styles.mutedText}>Loading setup...</p> : null}
       {error ? <p className={styles.errorText}>{error}</p> : null}
       {notice ? <p className={styles.successText}>{notice}</p> : null}
+      {offline ? (
+        <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" />
+      ) : null}
 
       {!loading ? (
         <section className={styles.wizardLayout}>
