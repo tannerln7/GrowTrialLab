@@ -622,6 +622,149 @@ class PlantCockpitTests(TestCase):
     DEV_EMAIL="admin@example.com",
     AUTH_MODE="invite_only",
 )
+class PlantReplacementTests(TestCase):
+    def test_replace_marks_original_removed_and_creates_chain(self):
+        experiment = Experiment.objects.create(name="Replace Chain")
+        species = Species.objects.create(name="Nepenthes hamata", category="nepenthes")
+        recipe = Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+        original = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-001",
+            assigned_recipe=recipe,
+            bin="A",
+            status=Plant.Status.ACTIVE,
+        )
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=original,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4},
+        )
+
+        response = self.client.post(
+            f"/api/v1/plants/{original.id}/replace",
+            data={"removed_reason": "Leaf collapse"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        replacement_uuid = payload["replacement"]["uuid"]
+
+        original.refresh_from_db()
+        replacement = Plant.objects.get(id=replacement_uuid)
+
+        self.assertEqual(original.status, Plant.Status.REMOVED)
+        self.assertEqual(original.removed_reason, "Leaf collapse")
+        self.assertEqual(str(original.replaced_by_id), replacement_uuid)
+        self.assertEqual(replacement.status, Plant.Status.ACTIVE)
+        self.assertEqual(replacement.assigned_recipe_id, recipe.id)
+        self.assertIsNone(replacement.bin)
+        self.assertNotEqual(replacement.plant_id, original.plant_id)
+        self.assertFalse(
+            PlantWeeklyMetric.objects.filter(
+                experiment=experiment,
+                plant=replacement,
+                week_number=BASELINE_WEEK_NUMBER,
+            ).exists()
+        )
+        self.assertEqual(replacement.replaces.id, original.id)
+
+    def test_replacement_updates_readiness_and_baseline_queue(self):
+        experiment = Experiment.objects.create(name="Replace Readiness")
+        species = Species.objects.create(name="Drosera capensis red", category="drosera")
+        Block.objects.create(experiment=experiment, name="B1", description="slot")
+        Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        recipe = Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+        original = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="DR-001",
+            assigned_recipe=recipe,
+            bin="B",
+            status=Plant.Status.ACTIVE,
+        )
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=original,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 5, "coloration_score": 4, "pest_signs": False},
+        )
+
+        replace_response = self.client.post(
+            f"/api/v1/plants/{original.id}/replace",
+            data={"removed_reason": "Root rot"},
+            content_type="application/json",
+        )
+        self.assertEqual(replace_response.status_code, 201)
+        replacement_uuid = replace_response.json()["replacement"]["uuid"]
+
+        summary_response = self.client.get(f"/api/v1/experiments/{experiment.id}/status/summary")
+        self.assertEqual(summary_response.status_code, 200)
+        summary_payload = summary_response.json()["readiness"]["counts"]
+        self.assertEqual(summary_payload["active_plants"], 1)
+        self.assertEqual(summary_payload["needs_baseline"], 1)
+        self.assertEqual(summary_payload["needs_assignment"], 0)
+
+        queue_response = self.client.get(f"/api/v1/experiments/{experiment.id}/baseline/queue")
+        self.assertEqual(queue_response.status_code, 200)
+        queued_ids = [item["uuid"] for item in queue_response.json()["plants"]]
+        self.assertIn(replacement_uuid, queued_ids)
+        self.assertNotIn(str(original.id), queued_ids)
+
+    def test_replace_blocks_double_replacement(self):
+        experiment = Experiment.objects.create(name="Replace Twice")
+        species = Species.objects.create(name="Flytrap Typical", category="flytrap")
+        original = Plant.objects.create(experiment=experiment, species=species, plant_id="VF-001")
+
+        first_response = self.client.post(f"/api/v1/plants/{original.id}/replace", data={})
+        self.assertEqual(first_response.status_code, 201)
+
+        second_response = self.client.post(f"/api/v1/plants/{original.id}/replace", data={})
+        self.assertEqual(second_response.status_code, 400)
+        self.assertEqual(
+            second_response.json()["detail"],
+            "This plant already has a replacement.",
+        )
+
+    def test_cockpit_includes_replacement_chain_info(self):
+        experiment = Experiment.objects.create(name="Cockpit Chain")
+        species = Species.objects.create(name="Pinguicula emarginata", category="pinguicula")
+        original = Plant.objects.create(experiment=experiment, species=species, plant_id="PG-001")
+
+        replace_response = self.client.post(
+            f"/api/v1/plants/{original.id}/replace",
+            data={"removed_reason": "Trial replacement"},
+            content_type="application/json",
+        )
+        self.assertEqual(replace_response.status_code, 201)
+        replacement_uuid = replace_response.json()["replacement"]["uuid"]
+
+        original_cockpit = self.client.get(f"/api/v1/plants/{original.id}/cockpit")
+        self.assertEqual(original_cockpit.status_code, 200)
+        self.assertEqual(
+            original_cockpit.json()["derived"]["replaced_by_uuid"],
+            replacement_uuid,
+        )
+
+        replacement_cockpit = self.client.get(f"/api/v1/plants/{replacement_uuid}/cockpit")
+        self.assertEqual(replacement_cockpit.status_code, 200)
+        replacement_payload = replacement_cockpit.json()
+        self.assertEqual(
+            replacement_payload["derived"]["replaces_uuid"],
+            str(original.id),
+        )
+        self.assertIn("Replacement of", replacement_payload["derived"]["chain_label"])
+
+
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
+)
 class Packet3BaselineTests(TestCase):
     def test_default_metric_templates_seeded(self):
         categories = set(MetricTemplate.objects.values_list("category", flat=True))
