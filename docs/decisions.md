@@ -146,6 +146,11 @@ This file records architecture/product decisions and why they were made.
 - Refs: `3b52663c`, `9798c9fe`, `ec06d079`, `b80218ae`.
 - Notes: Rotation logging rejects non-running lifecycle states (`409`) and updates `Tray.block` to the destination block as the canonical current location.
 
+### 2026-02-14: Feeding MVP scope (planned) is running-only event logging with queue UX
+- Decision: Feeding MVP will be launched from Overview and Plant Cockpit, using a 7-day needs-feeding queue and simple feed event entry.
+- Rationale: Operators need fast feed capture in active runs without waiting for lot/batch workflow implementation.
+- Notes: Feeding write endpoints must enforce running lifecycle state and keep lots optional/deferred.
+
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
 - Rationale: Clear persistence boundary and easy backup target.
