@@ -20,6 +20,7 @@ from .models import (
     WeeklySession,
 )
 from .setup_packets import STEP_LABELS, STEP_ORDER, normalize_step_ids
+from .tent_restrictions import first_disallowed_plant, tent_allows_species
 
 
 class SpeciesSerializer(serializers.ModelSerializer):
@@ -269,10 +270,33 @@ class TraySerializer(serializers.ModelSerializer):
         assigned_recipe = attrs.get("assigned_recipe") or (
             self.instance.assigned_recipe if self.instance else None
         )
+        capacity = attrs.get("capacity")
+        if capacity is None and self.instance is not None:
+            capacity = self.instance.capacity
+        if capacity is not None and capacity < 1:
+            raise serializers.ValidationError("capacity must be at least 1.")
         if experiment and block and block.tent.experiment_id != experiment.id:
             raise serializers.ValidationError("Block must belong to the same experiment as tray.")
+        if block and not block.tent_id:
+            raise serializers.ValidationError("Block must be assigned to a tent before placing trays.")
         if experiment and assigned_recipe and assigned_recipe.experiment_id != experiment.id:
             raise serializers.ValidationError("Recipe must belong to the same experiment as tray.")
+        if self.instance is not None:
+            current_count = self.instance.tray_plants.count()
+            if capacity is not None and current_count > capacity:
+                raise serializers.ValidationError(
+                    f"Tray currently has {current_count} plants; capacity cannot be set below that."
+                )
+            if block and block.tent:
+                tray_plants = list(self.instance.tray_plants.select_related("plant__species").all())
+                violating = first_disallowed_plant(block.tent, [item.plant for item in tray_plants])
+                if violating:
+                    raise serializers.ValidationError(
+                        (
+                            f"Tray move blocked: tent '{block.tent.name}' does not allow "
+                            f"plant '{violating.plant_id or violating.id}' ({violating.species.name})."
+                        )
+                    )
         return attrs
 
     class Meta:
@@ -295,6 +319,16 @@ class TrayPlantSerializer(serializers.ModelSerializer):
                 existing_qs = existing_qs.exclude(id=self.instance.id)
             if existing_qs.exists():
                 raise serializers.ValidationError("Plant is already placed in another tray.")
+        if tray:
+            occupancy_qs = tray.tray_plants.all()
+            if self.instance:
+                occupancy_qs = occupancy_qs.exclude(id=self.instance.id)
+            if occupancy_qs.count() >= tray.capacity:
+                raise serializers.ValidationError(f"Tray is full (capacity {tray.capacity}).")
+            if plant and tray.block and tray.block.tent and not tent_allows_species(tray.block.tent, plant.species_id):
+                raise serializers.ValidationError(
+                    f"Plant species '{plant.species.name}' is not allowed in tent '{tray.block.tent.name}'."
+                )
         return attrs
 
     class Meta:

@@ -1,4 +1,5 @@
 import csv
+import re
 from io import BytesIO, StringIO
 from uuid import UUID
 
@@ -16,7 +17,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .models import Experiment, ExperimentSetupState, Plant, Species
-from .plant_ids import ExperimentPlantIdAllocator
+from .plant_ids import ExperimentPlantIdAllocator, prefix_for_species
 from .serializers import (
     ExperimentPlantCreateSerializer,
     ExperimentPlantSerializer,
@@ -101,6 +102,17 @@ def _create_plant(
     )
 
 
+def _suggest_next_plant_id(experiment: Experiment, prefix: str) -> str:
+    normalized_prefix = (prefix or "PL").strip().upper()
+    pattern = re.compile(rf"^{re.escape(normalized_prefix)}-(\d+)$")
+    highest = 0
+    for existing in Plant.objects.filter(experiment=experiment).exclude(plant_id="").values_list("plant_id", flat=True):
+        match = pattern.match(existing)
+        if match:
+            highest = max(highest, int(match.group(1)))
+    return f"{normalized_prefix}-{highest + 1:03d}"
+
+
 def _load_csv_rows(request):
     uploaded_file = request.FILES.get("file")
     csv_text = request.data.get("csv_text")
@@ -145,15 +157,27 @@ def experiment_plants(request, experiment_id: UUID):
     )
 
     allocator = ExperimentPlantIdAllocator(experiment)
-    plant = _create_plant(
-        experiment=experiment,
-        species=species,
-        allocator=allocator,
-        plant_id=serializer.validated_data.get("plant_id", ""),
-        cultivar=serializer.validated_data.get("cultivar", ""),
-        baseline_notes=serializer.validated_data.get("baseline_notes", ""),
-        status=serializer.validated_data.get("status", Plant.Status.ACTIVE),
-    )
+    requested_plant_id = serializer.validated_data.get("plant_id", "")
+    try:
+        plant = _create_plant(
+            experiment=experiment,
+            species=species,
+            allocator=allocator,
+            plant_id=requested_plant_id,
+            cultivar=serializer.validated_data.get("cultivar", ""),
+            baseline_notes=serializer.validated_data.get("baseline_notes", ""),
+            status=serializer.validated_data.get("status", Plant.Status.ACTIVE),
+        )
+    except IntegrityError:
+        prefix_match = re.match(r"^([A-Za-z]+)-\\d+$", requested_plant_id.strip())
+        prefix = prefix_match.group(1).upper() if prefix_match else prefix_for_species(species)
+        return Response(
+            {
+                "detail": f"plant_id '{requested_plant_id.strip()}' already exists in this experiment.",
+                "suggested_plant_id": _suggest_next_plant_id(experiment, prefix),
+            },
+            status=409,
+        )
     return Response(ExperimentPlantSerializer(plant).data, status=201)
 
 

@@ -206,6 +206,7 @@ class Tray(UUIDModel):
         related_name="trays",
     )
     name = models.CharField(max_length=64)
+    capacity = models.IntegerField(default=1, validators=[MinValueValidator(1)])
     notes = models.TextField(blank=True)
     plants = models.ManyToManyField(Plant, through="TrayPlant", related_name="trays")
 

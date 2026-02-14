@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from uuid import UUID
 
+from django.db import IntegrityError
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
@@ -13,6 +15,31 @@ DEFAULT_BLOCKS = [
     ("B3", "Back-left position"),
     ("B4", "Back-right position"),
 ]
+
+
+def _suggest_next_code(existing_values: list[str], prefix: str) -> str:
+    pattern = re.compile(rf"^{re.escape(prefix)}(\d+)$", flags=re.IGNORECASE)
+    highest = 0
+    for value in existing_values:
+        match = pattern.match((value or "").strip())
+        if match:
+            highest = max(highest, int(match.group(1)))
+    return f"{prefix}{highest + 1}"
+
+
+def _suggest_next_tent_code(experiment: Experiment) -> str:
+    existing_codes = list(Tent.objects.filter(experiment=experiment).values_list("code", flat=True))
+    return _suggest_next_code(existing_codes, "TN")
+
+
+def _suggest_next_tent_name(experiment: Experiment) -> str:
+    existing_names = list(Tent.objects.filter(experiment=experiment).values_list("name", flat=True))
+    return _suggest_next_code(existing_names, "Tent ")
+
+
+def _suggest_next_block_name(tent: Tent) -> str:
+    existing_names = list(Block.objects.filter(tent=tent).values_list("name", flat=True))
+    return _suggest_next_code(existing_names, "B")
 
 
 def _require_app_user(request):
@@ -90,17 +117,43 @@ def experiment_tents(request, experiment_id: UUID):
     notes = (request.data.get("notes") or "").strip()
     if not name:
         return Response({"detail": "Tent name is required."}, status=400)
+    if Tent.objects.filter(experiment=experiment, name=name).exists():
+        return Response(
+            {
+                "detail": "Tent name already exists in this experiment.",
+                "suggested_name": _suggest_next_tent_name(experiment),
+            },
+            status=409,
+        )
+    if code and Tent.objects.filter(experiment=experiment, code=code).exists():
+        return Response(
+            {
+                "detail": "Tent code already exists in this experiment.",
+                "suggested_code": _suggest_next_tent_code(experiment),
+            },
+            status=409,
+        )
 
     allowed_species, error_response = _parse_allowed_species_ids(request.data.get("allowed_species"))
     if error_response:
         return error_response
 
-    tent = Tent.objects.create(
-        experiment=experiment,
-        name=name,
-        code=code,
-        notes=notes,
-    )
+    try:
+        tent = Tent.objects.create(
+            experiment=experiment,
+            name=name,
+            code=code,
+            notes=notes,
+        )
+    except IntegrityError:
+        return Response(
+            {
+                "detail": "Tent values conflict with existing records in this experiment.",
+                "suggested_name": _suggest_next_tent_name(experiment),
+                "suggested_code": _suggest_next_tent_code(experiment),
+            },
+            status=409,
+        )
     if allowed_species:
         tent.allowed_species.set(allowed_species)
     return Response(_serialize_tent(tent, include_blocks=True), status=201)
@@ -129,9 +182,26 @@ def tent_detail(request, tent_id: UUID):
         name = (request.data.get("name") or "").strip()
         if not name:
             return Response({"detail": "Tent name cannot be blank."}, status=400)
+        if Tent.objects.filter(experiment=tent.experiment, name=name).exclude(id=tent.id).exists():
+            return Response(
+                {
+                    "detail": "Tent name already exists in this experiment.",
+                    "suggested_name": _suggest_next_tent_name(tent.experiment),
+                },
+                status=409,
+            )
         tent.name = name
     if "code" in request.data:
-        tent.code = (request.data.get("code") or "").strip()
+        code = (request.data.get("code") or "").strip()
+        if code and Tent.objects.filter(experiment=tent.experiment, code=code).exclude(id=tent.id).exists():
+            return Response(
+                {
+                    "detail": "Tent code already exists in this experiment.",
+                    "suggested_code": _suggest_next_tent_code(tent.experiment),
+                },
+                status=409,
+            )
+        tent.code = code
     if "notes" in request.data:
         tent.notes = (request.data.get("notes") or "").strip()
 
@@ -143,7 +213,17 @@ def tent_detail(request, tent_id: UUID):
         tent.allowed_species.set(allowed_species)
         return Response(_serialize_tent(tent, include_blocks=True))
 
-    tent.save()
+    try:
+        tent.save()
+    except IntegrityError:
+        return Response(
+            {
+                "detail": "Tent values conflict with existing records in this experiment.",
+                "suggested_name": _suggest_next_tent_name(tent.experiment),
+                "suggested_code": _suggest_next_tent_code(tent.experiment),
+            },
+            status=409,
+        )
     return Response(_serialize_tent(tent, include_blocks=True))
 
 
@@ -175,6 +255,14 @@ def tent_blocks(request, tent_id: UUID):
     name = (request.data.get("name") or "").strip()
     if not name:
         return Response({"detail": "Block name is required."}, status=400)
+    if Block.objects.filter(tent=tent, name=name).exists():
+        return Response(
+            {
+                "detail": "Block name already exists in this tent.",
+                "suggested_name": _suggest_next_block_name(tent),
+            },
+            status=409,
+        )
     description = (request.data.get("description") or "").strip()
     block = Block.objects.create(
         experiment=tent.experiment,
