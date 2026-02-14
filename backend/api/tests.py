@@ -267,6 +267,121 @@ class Packet2PlantsTests(TestCase):
     DEV_EMAIL="admin@example.com",
     AUTH_MODE="invite_only",
 )
+class ExperimentOverviewTests(TestCase):
+    def test_overview_endpoint_returns_expected_counts(self):
+        experiment = Experiment.objects.create(name="Overview Counts")
+        other_experiment = Experiment.objects.create(name="Other")
+        species = Species.objects.create(name="Nepenthes rafflesiana", category="nepenthes")
+        recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+
+        plant_ready = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-100",
+            status=Plant.Status.ACTIVE,
+            bin="A",
+            assigned_recipe=recipe,
+        )
+        plant_needs_all = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-101",
+            status=Plant.Status.ACTIVE,
+            bin=None,
+        )
+        Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-102",
+            status=Plant.Status.INACTIVE,
+            bin=None,
+        )
+        Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-103",
+            status=Plant.Status.DEAD,
+            bin="B",
+        )
+        Plant.objects.create(
+            experiment=other_experiment,
+            species=species,
+            plant_id="NP-999",
+            status=Plant.Status.ACTIVE,
+            bin="A",
+        )
+
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=plant_ready,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4},
+        )
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/overview/plants")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        self.assertEqual(payload["counts"]["total"], 4)
+        self.assertEqual(payload["counts"]["active"], 2)
+        self.assertEqual(payload["counts"]["removed"], 2)
+        self.assertEqual(payload["counts"]["needs_baseline"], 1)
+        self.assertEqual(payload["counts"]["needs_bin"], 1)
+        self.assertEqual(payload["counts"]["needs_assignment"], 1)
+
+        uuids = {item["uuid"] for item in payload["plants"]}
+        self.assertIn(str(plant_ready.id), uuids)
+        self.assertIn(str(plant_needs_all.id), uuids)
+        self.assertNotIn(
+            str(
+                Plant.objects.get(
+                    experiment=other_experiment,
+                    plant_id="NP-999",
+                ).id
+            ),
+            uuids,
+        )
+
+    def test_overview_endpoint_computes_has_baseline_per_plant(self):
+        experiment = Experiment.objects.create(name="Overview Baseline")
+        species = Species.objects.create(name="Drosera adelae", category="drosera")
+        with_baseline = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="DR-201",
+            status=Plant.Status.ACTIVE,
+            bin="A",
+        )
+        without_baseline = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="DR-202",
+            status=Plant.Status.ACTIVE,
+            bin="B",
+        )
+
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=with_baseline,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 5},
+        )
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/overview/plants")
+        self.assertEqual(response.status_code, 200)
+        plants_by_uuid = {item["uuid"]: item for item in response.json()["plants"]}
+        self.assertTrue(plants_by_uuid[str(with_baseline.id)]["has_baseline"])
+        self.assertFalse(plants_by_uuid[str(without_baseline.id)]["has_baseline"])
+
+
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
+)
 class Packet3BaselineTests(TestCase):
     def test_default_metric_templates_seeded(self):
         categories = set(MetricTemplate.objects.values_list("category", flat=True))
