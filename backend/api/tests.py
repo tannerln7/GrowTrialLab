@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
 from api.baseline import BASELINE_WEEK_NUMBER
@@ -9,6 +10,7 @@ from api.models import (
     Experiment,
     ExperimentSetupState,
     MetricTemplate,
+    Photo,
     Plant,
     PlantWeeklyMetric,
     Recipe,
@@ -372,6 +374,84 @@ class ExperimentOverviewTests(TestCase):
         plants_by_uuid = {item["uuid"]: item for item in response.json()["plants"]}
         self.assertTrue(plants_by_uuid[str(with_baseline.id)]["has_baseline"])
         self.assertFalse(plants_by_uuid[str(without_baseline.id)]["has_baseline"])
+
+
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
+    MEDIA_ROOT="/tmp/growtriallab-test-media",
+)
+class PlantCockpitTests(TestCase):
+    def test_cockpit_endpoint_returns_derived_fields(self):
+        experiment = Experiment.objects.create(name="Cockpit Derived")
+        species = Species.objects.create(name="Nepenthes truncata", category="nepenthes")
+        recipe = Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-301",
+            bin="A",
+            assigned_recipe=recipe,
+        )
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=plant,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4},
+        )
+
+        response = self.client.get(f"/api/v1/plants/{plant.id}/cockpit")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["derived"]["has_baseline"])
+        self.assertEqual(payload["derived"]["assigned_recipe_code"], "R1")
+        self.assertEqual(payload["plant"]["plant_id"], "NP-301")
+        self.assertEqual(
+            payload["links"]["baseline_capture"],
+            f"/experiments/{experiment.id}/baseline?plant={plant.id}",
+        )
+
+    def test_cockpit_endpoint_returns_recent_photos(self):
+        experiment = Experiment.objects.create(name="Cockpit Photos")
+        species = Species.objects.create(name="Drosera slackii", category="drosera")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="DR-501")
+        Photo.objects.create(
+            experiment=experiment,
+            plant=plant,
+            tag=Photo.Tag.BASELINE,
+            week_number=0,
+            file=SimpleUploadedFile("one.jpg", b"one", content_type="image/jpeg"),
+        )
+        Photo.objects.create(
+            experiment=experiment,
+            plant=plant,
+            tag=Photo.Tag.WEEKLY,
+            week_number=1,
+            file=SimpleUploadedFile("two.jpg", b"two", content_type="image/jpeg"),
+        )
+
+        response = self.client.get(f"/api/v1/plants/{plant.id}/cockpit")
+        self.assertEqual(response.status_code, 200)
+        photos = response.json()["recent_photos"]
+        self.assertEqual(len(photos), 2)
+        self.assertTrue(photos[0]["url"].startswith("http://testserver/media/"))
+        self.assertIn(photos[0]["tag"], {Photo.Tag.BASELINE, Photo.Tag.WEEKLY})
+
+    def test_cockpit_endpoint_allows_empty_recent_photos(self):
+        experiment = Experiment.objects.create(name="Cockpit Empty Photos")
+        species = Species.objects.create(name="Pinguicula moranensis", category="pinguicula")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="")
+
+        response = self.client.get(f"/api/v1/plants/{plant.id}/cockpit")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload["derived"]["has_baseline"])
+        self.assertIsNone(payload["derived"]["assigned_recipe_code"])
+        self.assertEqual(payload["recent_photos"], [])
 
 
 @override_settings(
