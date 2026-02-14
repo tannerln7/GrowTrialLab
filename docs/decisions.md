@@ -7,9 +7,9 @@ This file records architecture/product decisions and why they were made.
 - Canonical entry route: `/experiments/{id}`.
   - Redirect to `/experiments/{id}/setup` until bootstrap setup is complete.
   - Redirect to `/experiments/{id}/overview` once bootstrap setup is complete.
-- Canonical bootstrap setup scope: Plants, Blocks/Slots, Recipes only.
+- Canonical bootstrap setup scope: Plants, Tents+Blocks/Slots, Recipes only.
 - Canonical readiness flows: `/experiments/{id}/baseline`, `/experiments/{id}/placement`, `/experiments/{id}/rotation`, and `/experiments/{id}/feeding`, launched from Overview.
-- Assignment page remains available for legacy recipe/group tooling, but tray-level placement is now the canonical recipe-assignment source for operations.
+- Assignment page remains available for legacy recipe/group tooling, but tray-level placement is now the canonical recipe-assignment source for operations (`Tray.assigned_recipe`).
 - Lifecycle prerequisite policy: deletion gating and strict immutability are deferred until lifecycle primitives (`draft`/`running`/`stopped`) exist.
 
 ## Lifecycle Implications (Planned)
@@ -155,7 +155,7 @@ This file records architecture/product decisions and why they were made.
 - Deferred hooks: lot/batch integration and richer dose structure are intentionally deferred.
 
 ### 2026-02-14: Trays are the canonical assignment unit; feeding is locked to tray recipe
-- Decision: Canonical assignment for operations is derived from placement (`TrayPlant -> Tray.recipe`), not from a separate per-plant assignment field. `Plant.assigned_recipe` is retained only as compatibility fallback where needed.
+- Decision: Canonical assignment for operations is derived from placement (`TrayPlant -> Tray.assigned_recipe`), not from a separate per-plant assignment field. `Plant.assigned_recipe` is retained only as compatibility fallback where needed.
 - Rationale: Removes duplicated assignment systems (groups vs placement) and aligns operator behavior with physical tray workflow.
 - Refs: `fec05082`, `a3fd3a1d`.
 - Invariants:
@@ -163,6 +163,15 @@ This file records architecture/product decisions and why they were made.
   - `POST /api/v1/plants/{uuid}/feed` resolves recipe from tray placement and returns `409` when unplaced or tray recipe is missing.
   - Placement edits (`tray patch`, `add/remove plant`, `auto-place`) are blocked while lifecycle is `running`.
 - UX impact: Overview readiness/actions and feeding queue now surface placement/tray-recipe blockers directly.
+
+### 2026-02-14: Multi-tent hierarchy is first-class and restrictions are backend-enforced
+- Decision: Physical hierarchy is now `Tent -> Block -> Tray -> Plant`; blocks belong to tents and experiments can manage multiple tents. Tent-level `allowed_species` restrictions are enforced server-side for both `POST /api/v1/trays/{tray_id}/plants` and `POST /api/v1/experiments/{id}/rotation/log` destination moves.
+- Rationale: Multi-tent operations require explicit structure and hard validation to prevent accidental placement/moves into incompatible environments.
+- Refs: pending this prompt commit.
+- Invariants:
+  - Empty `tent.allowed_species` means unrestricted; non-empty means only listed species allowed.
+  - Restrictions apply when a tray is in a block/tent; unplaced trays are not restriction-checked until placement/move.
+  - `GET /api/v1/experiments/{id}/status/summary` now includes tent-aware readiness (`needs_tent_restriction`) and setup requires tents + blocks.
 
 ### 2026-02-14: Legacy assignment compatibility remains temporarily
 - Decision: Keep Groups endpoints and `Plant.assigned_recipe` writes for backward compatibility while new readiness/feeding flows rely on tray-derived assignment.
