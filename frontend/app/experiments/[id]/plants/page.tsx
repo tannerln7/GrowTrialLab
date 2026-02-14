@@ -108,6 +108,12 @@ export default function ExperimentPlantsPage() {
           >
             Back to setup
           </Link>
+          <Link
+            className={styles.buttonSecondary}
+            href={`/experiments/${experimentId}/overview`}
+          >
+            Open overview
+          </Link>
         </div>
       }
     >

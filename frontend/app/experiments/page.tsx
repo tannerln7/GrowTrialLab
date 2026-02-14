@@ -105,10 +105,10 @@ export default function ExperimentsPage() {
                 render: (item) => item.status,
               },
               {
-                key: "setup",
-                label: "Setup",
+                key: "overview",
+                label: "Overview",
                 render: (item) => (
-                  <Link href={`/experiments/${item.id}/setup`}>Open setup</Link>
+                  <Link href={`/experiments/${item.id}/overview`}>Open overview</Link>
                 ),
               },
             ]}
@@ -118,6 +118,7 @@ export default function ExperimentsPage() {
                 <strong>{item.name}</strong>
                 <span>Status</span>
                 <strong>{item.status}</strong>
+                <Link href={`/experiments/${item.id}/overview`}>Open overview</Link>
                 <Link href={`/experiments/${item.id}/setup`}>Open setup</Link>
               </div>
             )}

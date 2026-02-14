@@ -1203,6 +1203,12 @@ export default function ExperimentSetupPage() {
           >
             Plants list
           </Link>
+          <Link
+            className={styles.buttonSecondary}
+            href={`/experiments/${experimentId}/overview`}
+          >
+            Overview
+          </Link>
         </div>
       }
     >

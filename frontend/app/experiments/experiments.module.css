@@ -193,6 +193,47 @@
   color: var(--text);
 }
 
+.tileGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.tileButton {
+  border: 1px solid var(--border);
+  background: var(--surface-elevated);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 0.7rem;
+  text-align: left;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.tileButton strong {
+  font-size: 1.1rem;
+}
+
+.tileButtonActive {
+  border-color: color-mix(in srgb, var(--primary) 65%, var(--border));
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface-elevated));
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.badgeWarn {
+  font-size: 0.75rem;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: color-mix(in srgb, var(--danger) 18%, var(--surface-elevated));
+  border-radius: 999px;
+  padding: 0.16rem 0.45rem;
+}
+
 @media (min-width: 920px) {
   .wizardLayout {
     grid-template-columns: 248px 1fr;
@@ -209,5 +250,9 @@
   .packetButton {
     border-radius: 10px;
     text-align: left;
+  }
+
+  .tileGrid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
