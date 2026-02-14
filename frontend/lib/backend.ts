@@ -24,7 +24,7 @@ export async function backendFetch(
 
   for (const base of bases) {
     try {
-      return await fetch(`${base}${path}`, init);
+      return await fetch(joinBaseAndPath(base, path), init);
     } catch (error) {
       lastError = error;
     }
@@ -37,16 +37,40 @@ export async function backendFetch(
 }
 
 export function backendUrl(path: string): string {
-  return `${backendBaseCandidates()[0]}${path}`;
+  return joinBaseAndPath(backendBaseCandidates()[0], path);
 }
 
 function backendBaseCandidates(): string[] {
-  const isHostDockerInternal =
-    typeof window !== "undefined" &&
-    window.location.hostname === "host.docker.internal";
-  return isHostDockerInternal
-    ? ["http://host.docker.internal:8000", "http://localhost:8000"]
-    : ["http://localhost:8000", "http://host.docker.internal:8000"];
+  const publicBase = normalizeBase(
+    process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "",
+  );
+  if (publicBase) {
+    return [publicBase];
+  }
+
+  // Browser should hit same-origin frontend and rely on Next rewrites.
+  if (typeof window !== "undefined") {
+    return [""];
+  }
+
+  // Server-side fallback for local tooling.
+  const internalBase = normalizeBase(
+    process.env.NEXT_BACKEND_ORIGIN || "http://localhost:8000",
+  );
+  return internalBase ? [internalBase] : [""];
+}
+
+function normalizeBase(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  return trimmed.replace(/\/+$/, "");
+}
+
+function joinBaseAndPath(base: string, path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return base ? `${base}${normalizedPath}` : normalizedPath;
 }
 
 export function normalizeBackendError(error: unknown): BackendErrorShape {

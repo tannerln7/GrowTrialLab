@@ -18,6 +18,9 @@ ALLOWED_HOSTS = [
     ).split(",")
     if host.strip()
 ]
+if DEBUG and "*" not in ALLOWED_HOSTS:
+    # Local/LAN development should not fail on host-IP access.
+    ALLOWED_HOSTS.append("*")
 
 
 # Application definition

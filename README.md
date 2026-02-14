@@ -24,6 +24,16 @@ Experiment flow summary:
    - Backend health: `http://localhost:8000/healthz`
    - Frontend: `http://localhost:3000`
    - API root: `http://localhost:8000/api/v1/`
+   - LAN frontend (same network): `http://<HOST_LAN_IP>:3000`
+
+### LAN access notes
+
+- Frontend now uses same-origin API requests (`/api/*`, `/healthz`, `/media/*`) and Next rewrites to reach backend.
+- This means opening `http://<HOST_LAN_IP>:3000` from another device works without browser calls to `localhost:8000`.
+- Docker Compose defaults:
+  - `NEXT_BACKEND_ORIGIN=http://backend:8000` (frontend proxy target inside compose network)
+  - `DJANGO_ALLOWED_HOSTS=*` for local dev convenience
+- Production should set strict host allowlists and explicit origins.
 
 ## Stop
 
@@ -138,6 +148,8 @@ What it runs:
 - `DEV_EMAIL`
 - `AUTH_MODE`
 - `PUBLIC_BASE_URL`
+- `NEXT_BACKEND_ORIGIN` (compose/internal proxy target for frontend rewrites)
+- `NEXT_PUBLIC_BACKEND_BASE_URL` (optional browser override; usually leave unset to use same-origin rewrites)
 
 ## Label QR URLs
 
