@@ -23,7 +23,9 @@ type FeedingQueuePlant = {
   species_name: string;
   species_category: string;
   cultivar: string | null;
+  assigned_recipe_id: string | null;
   assigned_recipe_code: string | null;
+  assigned_recipe_name: string | null;
   last_fed_at: string | null;
   needs_feeding: boolean;
 };
@@ -32,16 +34,6 @@ type FeedingQueueResponse = {
   remaining_count: number;
   window_days: number;
   plants: FeedingQueuePlant[];
-};
-
-type GroupRecipe = {
-  id: string;
-  code: string;
-  name: string;
-};
-
-type GroupsStatusResponse = {
-  recipes: GroupRecipe[];
 };
 
 function normalizeFromParam(rawFrom: string | null): string | null {
@@ -119,9 +111,7 @@ export default function FeedingPage() {
   const [notice, setNotice] = useState("");
   const [statusSummary, setStatusSummary] = useState<ExperimentStatusSummary | null>(null);
   const [queue, setQueue] = useState<FeedingQueueResponse | null>(null);
-  const [recipes, setRecipes] = useState<GroupRecipe[]>([]);
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null);
-  const [selectedRecipeId, setSelectedRecipeId] = useState<string>("none");
   const [amountText, setAmountText] = useState("");
   const [showNote, setShowNote] = useState(false);
   const [note, setNote] = useState("");
@@ -142,6 +132,8 @@ export default function FeedingPage() {
       .slice(0, 3);
   }, [queue, selectedPlantId]);
   const canSaveAndNext = (queue?.remaining_count ?? 0) > 0;
+  const selectedPlantAssigned = Boolean(selectedPlant?.assigned_recipe_id);
+  const saveBlockedByAssignment = Boolean(selectedPlant && !selectedPlantAssigned);
 
   const updatePlantQuery = useCallback(
     (plantId: string | null) => {
@@ -181,16 +173,6 @@ export default function FeedingPage() {
     return payload;
   }, [experimentId]);
 
-  const loadRecipes = useCallback(async () => {
-    const response = await backendFetch(`/api/v1/experiments/${experimentId}/groups/status`);
-    if (!response.ok) {
-      setRecipes([]);
-      return;
-    }
-    const payload = (await response.json()) as GroupsStatusResponse;
-    setRecipes(payload.recipes ?? []);
-  }, [experimentId]);
-
   useEffect(() => {
     async function load() {
       if (!experimentId) {
@@ -223,7 +205,7 @@ export default function FeedingPage() {
           return;
         }
 
-        const [queuePayload] = await Promise.all([loadQueue(), loadRecipes()]);
+        const queuePayload = await loadQueue();
         if (preselectedPlantId) {
           setSelectedPlantId(preselectedPlantId);
         } else if (queuePayload.remaining_count > 0) {
@@ -246,28 +228,15 @@ export default function FeedingPage() {
     }
 
     void load();
-  }, [experimentId, loadQueue, loadRecipes, preselectedPlantId, router, selectPlant]);
-
-  useEffect(() => {
-    if (!selectedPlant) {
-      setSelectedRecipeId("none");
-      return;
-    }
-    if (!selectedPlant.assigned_recipe_code) {
-      setSelectedRecipeId("none");
-      return;
-    }
-    const matching = recipes.find((recipe) => recipe.code === selectedPlant.assigned_recipe_code);
-    if (matching) {
-      setSelectedRecipeId(matching.id);
-    } else {
-      setSelectedRecipeId("none");
-    }
-  }, [recipes, selectedPlant]);
+  }, [experimentId, loadQueue, preselectedPlantId, router, selectPlant]);
 
   async function saveFeeding(moveNext: boolean) {
     if (!selectedPlantId) {
       setError("Choose a plant to feed.");
+      return;
+    }
+    if (!selectedPlantAssigned) {
+      setError("This plant needs assignment before feeding.");
       return;
     }
 
@@ -276,7 +245,6 @@ export default function FeedingPage() {
     setNotice("");
     try {
       const payload = {
-        recipe_id: selectedRecipeId !== "none" ? selectedRecipeId : undefined,
         amount_text: amountText.trim() || undefined,
         note: note.trim() || undefined,
       };
@@ -420,25 +388,13 @@ export default function FeedingPage() {
                     Last fed: {formatLastFed(selectedPlant.last_fed_at)}
                   </p>
                   <p className={styles.mutedText}>
-                    Assigned recipe: {selectedPlant.assigned_recipe_code || "None"}
+                    Assigned recipe:{" "}
+                    {selectedPlant.assigned_recipe_code
+                      ? `${selectedPlant.assigned_recipe_code}${selectedPlant.assigned_recipe_name ? ` - ${selectedPlant.assigned_recipe_name}` : ""}`
+                      : "Unassigned"}
                   </p>
                 </div>
               ) : null}
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Recipe (optional)</span>
-                <select
-                  className={styles.select}
-                  value={selectedRecipeId}
-                  onChange={(event) => setSelectedRecipeId(event.target.value)}
-                >
-                  <option value="none">None</option>
-                  {recipes.map((recipe) => (
-                    <option key={recipe.id} value={recipe.id}>
-                      {recipe.code} - {recipe.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Amount (optional)</span>
                 <input
@@ -467,6 +423,17 @@ export default function FeedingPage() {
               ) : null}
             </div>
           </SectionCard>
+
+          {saveBlockedByAssignment ? (
+            <SectionCard title="Assignment Required Before Feeding">
+              <p className={styles.mutedText}>
+                This plant needs assignment before feeding.
+              </p>
+              <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/assignment`}>
+                Go to Assignment
+              </Link>
+            </SectionCard>
+          ) : null}
 
           {upNext.length > 0 ? (
             <SectionCard title="Up Next">
@@ -515,7 +482,7 @@ export default function FeedingPage() {
             <button
               className={styles.buttonPrimary}
               type="button"
-              disabled={!selectedPlantId || saving}
+              disabled={!selectedPlantId || saving || saveBlockedByAssignment}
               onClick={() => void saveFeeding(false)}
             >
               {saving ? "Saving..." : "Save"}
@@ -523,7 +490,7 @@ export default function FeedingPage() {
             <button
               className={styles.buttonSecondary}
               type="button"
-              disabled={!selectedPlantId || saving || !canSaveAndNext}
+              disabled={!selectedPlantId || saving || !canSaveAndNext || saveBlockedByAssignment}
               onClick={() => void saveFeeding(true)}
             >
               Save & Next

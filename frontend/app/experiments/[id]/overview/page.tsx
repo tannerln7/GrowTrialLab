@@ -32,7 +32,9 @@ type OverviewPlant = {
   cultivar: string | null;
   status: string;
   bin: string | null;
+  assigned_recipe_id: string | null;
   assigned_recipe_code: string | null;
+  assigned_recipe_name: string | null;
   has_baseline: boolean;
   replaced_by_uuid: string | null;
 };
@@ -478,6 +480,11 @@ export default function ExperimentOverviewPage() {
                   Feeding
                 </Link>
               </div>
+              {summary.readiness.counts.needs_assignment > 0 ? (
+                <p className={styles.inlineNote}>
+                  Assign recipes to enable feeding for all plants.
+                </p>
+              ) : null}
             </div>
           )}
         </SectionCard>
@@ -495,6 +502,11 @@ export default function ExperimentOverviewPage() {
               Feeding
             </Link>
           </div>
+          {summary.readiness.counts.needs_assignment > 0 ? (
+            <p className={styles.inlineNote}>
+              Assign recipes to enable feeding for all plants.
+            </p>
+          ) : null}
           {summary.lifecycle.state !== "running" ? (
             <p className={styles.inlineNote}>Start to enable feeding.</p>
           ) : null}

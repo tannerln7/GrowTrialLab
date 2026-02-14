@@ -52,7 +52,9 @@ type PlantCockpit = {
   };
   derived: {
     has_baseline: boolean;
+    assigned_recipe_id: string | null;
     assigned_recipe_code: string | null;
+    assigned_recipe_name: string | null;
     last_fed_at: string | null;
     replaced_by_uuid: string | null;
     replaces_uuid: string | null;
@@ -581,6 +583,11 @@ export default function PlantQrPage() {
                 <strong>{nowAction.title}</strong>
               </div>
               <p className={sharedStyles.mutedText}>{nowAction.detail}</p>
+              {cockpit.plant.status === "active" && !cockpit.derived.assigned_recipe_code ? (
+                <span className={sharedStyles.badgeWarn}>
+                  Needs assignment before feeding
+                </span>
+              ) : null}
               {cockpit.plant.status !== "active" ? (
                 <p className={sharedStyles.mutedText}>
                   Removed plants are read-only. Use chain links to review related plants.
