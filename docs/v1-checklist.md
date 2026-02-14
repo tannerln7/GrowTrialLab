@@ -14,6 +14,7 @@ Status convention:
 
 ## Current Canonical Flow
 - Canonical client flow uses `GET /api/v1/experiments/{id}/status/summary` as the source of truth for gating and readiness.
+- Frontend network contract uses same-origin API paths (`/api/*`, `/healthz`, `/media/*`) proxied by Next rewrites, so LAN clients can use `http://<host-ip>:3000` without direct browser calls to backend `localhost`.
 - Canonical navigation starts at `/experiments/{id}`:
   - Redirects to `/experiments/{id}/setup` while bootstrap setup is incomplete.
   - Redirects to `/experiments/{id}/overview` after bootstrap setup is complete.
@@ -51,6 +52,9 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
 - [x] Local verification workflow script and docs (owner: Codex)
   - Refs: `0a2e3228`
   - Notes: `infra/scripts/verify.sh` runs tests/typecheck/build checks.
+- [x] LAN-safe frontend backend proxy wiring (owner: Codex)
+  - Refs: `244c69c5`
+  - Notes: Frontend now uses same-origin requests + Next rewrites to backend (`NEXT_BACKEND_ORIGIN`), replacing browser `localhost:8000` dependency.
 - [x] Local dev DB reset script for clean-state validation (owner: Codex)
   - Refs: `b8ac31e9`
   - Notes: `infra/scripts/reset-dev.sh` safely resets local compose Postgres volume, rebuilds stack, and runs migrations.

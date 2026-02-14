@@ -39,6 +39,11 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Single command startup and reproducible service topology.
 - Refs: `d1268cc7`, `0a2e3228`; runtime file `docker-compose.yml`.
 
+### 2026-02-14: Frontend uses same-origin API proxy for LAN-safe access
+- Decision: Frontend network calls now target same-origin paths (`/api/*`, `/healthz`, `/media/*`) and rely on Next rewrites to proxy requests to backend (`NEXT_BACKEND_ORIGIN`).
+- Rationale: Avoids browser-side hardcoded `localhost:8000` failures when operators open the app from other LAN devices via `http://<host-ip>:3000`.
+- Notes: Local compose defaults are intentionally dev-oriented (`NEXT_BACKEND_ORIGIN=http://backend:8000`, permissive `DJANGO_ALLOWED_HOSTS` override). Production must set strict host/origin values.
+
 ### 2026-02-13: Auth model is Cloudflare Access JWT verification + invite-only users
 - Decision: Verify `Cf-Access-Jwt-Assertion` server-side; do not trust headers alone; unknown users denied unless bootstrap admin path applies.
 - Rationale: Zero-password architecture with strong edge identity and strict invite-only access.
