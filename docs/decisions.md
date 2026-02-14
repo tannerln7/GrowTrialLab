@@ -180,7 +180,7 @@ This file records architecture/product decisions and why they were made.
 - Refs: `35513ef9`, `ee65db44`, `edcc4142`.
 - Invariants:
   - `POST /api/v1/trays/{tray_id}/plants` returns `409` when tray is full (`Tray is full (capacity N).`) and still enforces tent restrictions.
-  - `PATCH /api/v1/trays/{id}/` validates destination block compatibility against tray contents.
+  - `PATCH /api/v1/trays/{id}/` validates destination block compatibility against tray contents and enforces one tray per block.
   - `POST /api/v1/experiments/{id}/placement/auto` is deterministic and now returns structured unplaceable diagnostics (`reason_counts`, `unplaceable_plants`) instead of opaque failures.
 - UX alignment:
   - Placement/rotation pickers exclude non-compatible blocks.
