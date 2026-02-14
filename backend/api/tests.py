@@ -383,6 +383,104 @@ class ExperimentOverviewTests(TestCase):
     ADMIN_EMAIL="admin@example.com",
     DEV_EMAIL="admin@example.com",
     AUTH_MODE="invite_only",
+)
+class ExperimentStatusSummaryTests(TestCase):
+    def test_status_summary_marks_setup_incomplete_without_plants_blocks_recipes(self):
+        experiment = Experiment.objects.create(name="Setup Missing")
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/status/summary")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload["setup"]["is_complete"])
+        self.assertTrue(payload["setup"]["missing"]["plants"])
+        self.assertTrue(payload["setup"]["missing"]["blocks"])
+        self.assertTrue(payload["setup"]["missing"]["recipes"])
+        self.assertFalse(payload["readiness"]["is_ready"])
+
+    def test_status_summary_marks_setup_complete_with_plants_blocks_and_valid_recipes(self):
+        experiment = Experiment.objects.create(name="Setup Complete")
+        species = Species.objects.create(name="Nepenthes ampullaria x", category="nepenthes")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="NP-123")
+        Block.objects.create(experiment=experiment, name="B1", description="Front-left")
+        Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/status/summary")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["setup"]["is_complete"])
+        self.assertFalse(payload["setup"]["missing"]["plants"])
+        self.assertFalse(payload["setup"]["missing"]["blocks"])
+        self.assertFalse(payload["setup"]["missing"]["recipes"])
+
+    def test_status_summary_computes_readiness_counts(self):
+        experiment = Experiment.objects.create(name="Readiness Counts")
+        species = Species.objects.create(name="Nepenthes mirabilis", category="nepenthes")
+        block = Block.objects.create(experiment=experiment, name="B1", description="slot")
+        Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        assigned_recipe = Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+        self.assertIsNotNone(block.id)
+
+        ready_plant = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-001",
+            bin="A",
+            assigned_recipe=assigned_recipe,
+        )
+        no_baseline_no_assignment = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-002",
+            bin=None,
+            assigned_recipe=None,
+        )
+        baseline_without_bin = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-003",
+            bin=None,
+            assigned_recipe=None,
+        )
+        Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-004",
+            status=Plant.Status.DEAD,
+            bin=None,
+            assigned_recipe=None,
+        )
+
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=ready_plant,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4},
+        )
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=baseline_without_bin,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 3},
+        )
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/status/summary")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["setup"]["is_complete"])
+        self.assertFalse(payload["readiness"]["is_ready"])
+        self.assertEqual(payload["readiness"]["counts"]["active_plants"], 3)
+        self.assertEqual(payload["readiness"]["counts"]["needs_baseline"], 2)
+        self.assertEqual(payload["readiness"]["counts"]["needs_assignment"], 2)
+
+
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
     MEDIA_ROOT="/tmp/growtriallab-test-media",
 )
 class PlantCockpitTests(TestCase):
