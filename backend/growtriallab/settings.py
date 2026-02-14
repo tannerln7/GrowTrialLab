@@ -99,7 +99,7 @@ USE_TZ = True
 
 
 STATIC_URL = "static/"
-MEDIA_URL = "/uploads/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = Path("/data/uploads")
 
 CORS_ALLOWED_ORIGINS = [

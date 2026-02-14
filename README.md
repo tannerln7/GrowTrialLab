@@ -18,6 +18,7 @@ Monorepo scaffold for local development with:
 3. Verify:
    - Backend health: `http://localhost:8000/healthz`
    - Frontend: `http://localhost:3000`
+   - API root: `http://localhost:8000/api/v1/`
 
 ## Stop
 
@@ -35,6 +36,7 @@ docker compose down
   - Unknown authenticated users are rejected with 403.
   - `ADMIN_EMAIL` is auto-bootstrapped as an active admin.
 - `/api/me` returns the authenticated app user profile.
+- Core CRUD endpoints are under `/api/v1/*` and are available to any authenticated `app_user`.
 - Admin APIs:
   - `GET /api/admin/users`
   - `POST /api/admin/users` (invite by email)
@@ -61,6 +63,12 @@ docker compose down
 - `ADMIN_EMAIL`
 - `DEV_EMAIL`
 - `AUTH_MODE`
+
+## Media uploads (dev)
+
+- Uploaded files are stored in `/data/uploads` in the backend container.
+- In local compose, this maps to `./data/uploads` on the host.
+- Django serves media at `/media/` when `DJANGO_DEBUG=1`.
 
 ## Env safety
 
