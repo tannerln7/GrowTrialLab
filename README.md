@@ -26,6 +26,36 @@ Monorepo scaffold for local development with:
 docker compose down
 ```
 
+## PWA install and offline checks
+
+PWA features are configured in `frontend/` with:
+- `frontend/public/manifest.webmanifest`
+- `frontend/public/sw.js`
+- `frontend/app/offline/page.tsx`
+
+Run a production frontend build for service worker behavior:
+
+```bash
+cd frontend
+pnpm build
+pnpm start
+```
+
+Verify in Chrome/Edge DevTools:
+1. Open `http://localhost:3000`.
+2. Go to `Application` > `Manifest` and confirm manifest is detected.
+3. Go to `Application` > `Service Workers` and confirm `sw.js` is active.
+4. In DevTools `Network`, toggle `Offline`, reload, and confirm offline fallback appears (`/offline`).
+
+Install prompts:
+1. Android (Chrome): browser menu > `Install app` / `Add to Home screen`.
+2. iOS (Safari): `Share` > `Add to Home Screen`.
+3. Desktop (Chrome/Edge): click the install icon in the address bar.
+
+Notes:
+- Service workers require secure context; `localhost` is allowed for local testing.
+- Do not commit local `.env` files.
+
 ## Local editor setup (WSL + VSCode)
 
 - Python interpreter is pinned in `.vscode/settings.json` to:
