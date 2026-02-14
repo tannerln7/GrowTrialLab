@@ -94,7 +94,7 @@ class ExperimentSetupTests(TestCase):
         experiment = Experiment.objects.create(name="Setup Test")
         self.assertTrue(ExperimentSetupState.objects.filter(experiment=experiment).exists())
         state = ExperimentSetupState.objects.get(experiment=experiment)
-        self.assertEqual(state.current_packet, PACKET_ENVIRONMENT)
+        self.assertEqual(state.current_packet, PACKET_PLANTS)
 
     def test_environment_payload_can_be_saved(self):
         experiment = Experiment.objects.create(name="Env Save")

@@ -10,7 +10,7 @@ from typing import Iterable, Mapping
 from django.utils import timezone
 
 from .models import Experiment, ExperimentSetupState, Plant, Recipe
-from .setup_packets import PACKET_BASELINE, PACKET_GROUPS, normalize_packet_ids
+from .setup_packets import PACKET_BASELINE, PACKET_GROUPS, PACKET_PLANTS, normalize_packet_ids
 
 GROUP_CODE_PATTERN = re.compile(r"^R\d+$")
 GROUP_ASSIGNMENT_ALGORITHM = "stratified_v1"
@@ -25,7 +25,10 @@ class GroupValidationResult:
 
 
 def get_or_create_setup_state(experiment: Experiment) -> ExperimentSetupState:
-    setup_state, _ = ExperimentSetupState.objects.get_or_create(experiment=experiment)
+    setup_state, _ = ExperimentSetupState.objects.get_or_create(
+        experiment=experiment,
+        defaults={"current_packet": PACKET_PLANTS},
+    )
     return setup_state
 
 

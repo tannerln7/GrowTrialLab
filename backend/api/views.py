@@ -11,6 +11,7 @@ from api.serializers import (
 )
 from api.setup_packets import (
     PACKET_ENVIRONMENT,
+    PACKET_PLANTS,
     normalize_packet_ids,
     next_incomplete_packet,
 )
@@ -52,7 +53,10 @@ def _get_experiment(experiment_id: UUID):
 
 
 def _get_or_create_setup_state(experiment: Experiment):
-    return ExperimentSetupState.objects.get_or_create(experiment=experiment)[0]
+    return ExperimentSetupState.objects.get_or_create(
+        experiment=experiment,
+        defaults={"current_packet": PACKET_PLANTS},
+    )[0]
 
 
 def _ensure_default_blocks(experiment: Experiment):

@@ -18,7 +18,7 @@ from .models import (
     TrayPlant,
     WeeklySession,
 )
-from .setup_packets import PACKET_LABELS, PACKET_ORDER, normalize_packet_ids
+from .setup_packets import STEP_LABELS, STEP_ORDER, normalize_step_ids
 
 
 class SpeciesSerializer(serializers.ModelSerializer):
@@ -49,11 +49,11 @@ class ExperimentSetupStateSerializer(serializers.ModelSerializer):
         ]
 
     def get_packet_progress(self, obj: ExperimentSetupState):
-        completed = set(normalize_packet_ids(obj.completed_packets or []))
-        locked = set(normalize_packet_ids(obj.locked_packets or []))
-        current_packet = obj.current_packet if obj.current_packet in PACKET_ORDER else PACKET_ORDER[0]
+        completed = set(normalize_step_ids(obj.completed_packets or []))
+        locked = set(normalize_step_ids(obj.locked_packets or []))
+        current_packet = obj.current_packet if obj.current_packet in STEP_ORDER else STEP_ORDER[0]
         progress = []
-        for packet_id in PACKET_ORDER:
+        for packet_id in STEP_ORDER:
             if packet_id in completed:
                 status = "done"
             elif packet_id == current_packet:
@@ -63,7 +63,7 @@ class ExperimentSetupStateSerializer(serializers.ModelSerializer):
             progress.append(
                 {
                     "id": packet_id,
-                    "name": PACKET_LABELS[packet_id],
+                    "name": STEP_LABELS[packet_id],
                     "status": status,
                     "locked": packet_id in locked,
                 }
@@ -72,9 +72,9 @@ class ExperimentSetupStateSerializer(serializers.ModelSerializer):
 
 
 class SetupStateUpdateSerializer(serializers.Serializer):
-    current_packet = serializers.ChoiceField(choices=PACKET_ORDER, required=False)
+    current_packet = serializers.ChoiceField(choices=STEP_ORDER, required=False)
     completed_packets = serializers.ListField(
-        child=serializers.ChoiceField(choices=PACKET_ORDER),
+        child=serializers.ChoiceField(choices=STEP_ORDER),
         required=False,
     )
 

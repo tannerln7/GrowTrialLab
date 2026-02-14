@@ -6,7 +6,7 @@ from typing import Any
 from rest_framework.exceptions import ValidationError
 
 from .models import Experiment, ExperimentSetupState, MetricTemplate
-from .setup_packets import PACKET_BASELINE, normalize_packet_ids
+from .setup_packets import PACKET_BASELINE, PACKET_PLANTS, normalize_packet_ids
 
 BASELINE_WEEK_NUMBER = 0
 
@@ -21,7 +21,10 @@ class TemplateField:
 
 
 def get_or_create_setup_state(experiment: Experiment) -> ExperimentSetupState:
-    setup_state, _ = ExperimentSetupState.objects.get_or_create(experiment=experiment)
+    setup_state, _ = ExperimentSetupState.objects.get_or_create(
+        experiment=experiment,
+        defaults={"current_packet": PACKET_PLANTS},
+    )
     return setup_state
 
 
