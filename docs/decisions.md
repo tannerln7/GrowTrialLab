@@ -43,6 +43,7 @@ This file records architecture/product decisions and why they were made.
 - Decision: Frontend network calls now target same-origin paths (`/api/*`, `/healthz`, `/media/*`) and rely on Next rewrites to proxy requests to backend (`NEXT_BACKEND_ORIGIN`).
 - Rationale: Avoids browser-side hardcoded `localhost:8000` failures when operators open the app from other LAN devices via `http://<host-ip>:3000`.
 - Notes: Local compose defaults are intentionally dev-oriented (`NEXT_BACKEND_ORIGIN=http://backend:8000`, permissive `DJANGO_ALLOWED_HOSTS` override). Production must set strict host/origin values.
+- Follow-up: Rewrite config preserves trailing slashes for `/api/:path*/` so DRF list routes do not enter slash-normalization redirect loops.
 
 ### 2026-02-13: Auth model is Cloudflare Access JWT verification + invite-only users
 - Decision: Verify `Cf-Access-Jwt-Assertion` server-side; do not trust headers alone; unknown users denied unless bootstrap admin path applies.

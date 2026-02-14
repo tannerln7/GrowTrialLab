@@ -6,8 +6,13 @@ const backendOrigin = (process.env.NEXT_BACKEND_ORIGIN || "http://localhost:8000
 );
 
 const nextConfig: NextConfig = {
+  skipTrailingSlashRedirect: true,
   async rewrites() {
     return [
+      {
+        source: "/api/:path*/",
+        destination: `${backendOrigin}/api/:path*/`,
+      },
       {
         source: "/api/:path*",
         destination: `${backendOrigin}/api/:path*`,

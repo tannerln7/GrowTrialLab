@@ -54,7 +54,7 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Notes: `infra/scripts/verify.sh` runs tests/typecheck/build checks.
 - [x] LAN-safe frontend backend proxy wiring (owner: Codex)
   - Refs: `244c69c5`
-  - Notes: Frontend now uses same-origin requests + Next rewrites to backend (`NEXT_BACKEND_ORIGIN`), replacing browser `localhost:8000` dependency.
+  - Notes: Frontend now uses same-origin requests + Next rewrites to backend (`NEXT_BACKEND_ORIGIN`), replacing browser `localhost:8000` dependency. Rewrite rules preserve trailing slashes for DRF list routes to avoid proxy redirect loops.
 - [x] Local dev DB reset script for clean-state validation (owner: Codex)
   - Refs: `b8ac31e9`
   - Notes: `infra/scripts/reset-dev.sh` safely resets local compose Postgres volume, rebuilds stack, and runs migrations.
