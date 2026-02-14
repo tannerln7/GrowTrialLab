@@ -24,6 +24,10 @@ def _photo_url(request, photo: Photo) -> str:
     return request.build_absolute_uri(url)
 
 
+def _replaces_plant(plant: Plant) -> Plant | None:
+    return Plant.objects.filter(replaced_by=plant).only("id", "plant_id").first()
+
+
 @api_view(["GET"])
 def plant_cockpit(request, plant_id: UUID):
     rejection = _require_app_user(request)
@@ -53,6 +57,14 @@ def plant_cockpit(request, plant_id: UUID):
         if setup_status.is_complete
         else f"/experiments/{plant.experiment.id}/setup"
     )
+    replaces = _replaces_plant(plant)
+    replaced_by_uuid = str(plant.replaced_by_id) if plant.replaced_by_id else None
+    replaces_uuid = str(replaces.id) if replaces else None
+    chain_label = None
+    if replaces:
+        chain_label = f"Replacement of {replaces.plant_id or str(replaces.id)}"
+    elif plant.replaced_by_id:
+        chain_label = "Has replacement"
 
     return Response(
         {
@@ -62,6 +74,8 @@ def plant_cockpit(request, plant_id: UUID):
                 "cultivar": plant.cultivar,
                 "status": plant.status,
                 "bin": plant.bin,
+                "removed_at": plant.removed_at.isoformat() if plant.removed_at else None,
+                "removed_reason": plant.removed_reason,
                 "species": {
                     "id": str(plant.species.id),
                     "name": plant.species.name,
@@ -75,6 +89,9 @@ def plant_cockpit(request, plant_id: UUID):
             "derived": {
                 "has_baseline": has_baseline,
                 "assigned_recipe_code": plant.assigned_recipe.code if plant.assigned_recipe else None,
+                "replaced_by_uuid": replaced_by_uuid,
+                "replaces_uuid": replaces_uuid,
+                "chain_label": chain_label,
             },
             "links": {
                 "experiment_home": experiment_home,
