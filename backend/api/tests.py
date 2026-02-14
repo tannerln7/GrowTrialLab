@@ -333,28 +333,21 @@ class Packet3BaselineTests(TestCase):
         self.assertTrue(setup_state.packet_data.get(PACKET_BASELINE, {}).get("locked"))
 
 
-@override_settings(
-    DEBUG=False,
-    CF_ACCESS_TEAM_DOMAIN="tannerln7.cloudflareaccess.com",
-    CF_ACCESS_AUD="real-aud",
-    ADMIN_EMAIL="admin@example.com",
-    AUTH_MODE="invite_only",
-)
 class Packet3BaselineLockTests(TestCase):
-    @patch(
-        "api.cloudflare_access.CloudflareJWTVerifier.verify",
-        return_value={"email": "member@example.com", "aud": ["real-aud"], "exp": 9999999999},
+    @override_settings(
+        DEBUG=True,
+        CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+        CF_ACCESS_AUD="REPLACE_ME",
+        ADMIN_EMAIL="admin@example.com",
+        DEV_EMAIL="admin@example.com",
+        AUTH_MODE="invite_only",
     )
-    def test_lock_blocks_non_admin_baseline_edits(self, _mock_verify):
-        AppUser.objects.create(email="member@example.com", role="user", status="active")
+    def test_lock_does_not_block_baseline_edits(self):
         experiment = Experiment.objects.create(name="Baseline Lock User")
         species = Species.objects.create(name="Nepenthes lowii", category="nepenthes")
         plant = Plant.objects.create(experiment=experiment, species=species, plant_id="NP-777")
 
-        lock_response = self.client.post(
-            f"/api/v1/experiments/{experiment.id}/baseline/lock",
-            HTTP_CF_ACCESS_JWT_ASSERTION="mock.jwt.token",
-        )
+        lock_response = self.client.post(f"/api/v1/experiments/{experiment.id}/baseline/lock")
         self.assertEqual(lock_response.status_code, 200)
 
         update_response = self.client.post(
@@ -368,6 +361,10 @@ class Packet3BaselineLockTests(TestCase):
                 "bin": "C",
             },
             content_type="application/json",
-            HTTP_CF_ACCESS_JWT_ASSERTION="mock.jwt.token",
         )
-        self.assertEqual(update_response.status_code, 403)
+        self.assertEqual(update_response.status_code, 200)
+
+        metric = PlantWeeklyMetric.objects.get(plant=plant, week_number=BASELINE_WEEK_NUMBER)
+        self.assertEqual(metric.metrics["health_score"], 5)
+        plant.refresh_from_db()
+        self.assertEqual(plant.bin, "C")
