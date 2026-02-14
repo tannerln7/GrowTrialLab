@@ -92,6 +92,12 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Preserves work-queue filters when navigating from overview without introducing open redirect risk.
 - Refs: `2e911442`, `226d9654`.
 
+### 2026-02-14: `/p/{uuid}` is a QR-first Plant Cockpit (task launcher + minimal history)
+- Decision: Upgrade plant pages to consume `GET /api/v1/plants/{uuid}/cockpit` and show a mobile-first cockpit with sticky plant context, prioritized next action links, inline photo upload, and recent activity.
+- Rationale: QR scan workflows need immediate action guidance without extra navigation; cockpit keeps operators in one-handed flow while reusing existing Baseline/Assignment routes.
+- Refs: `6e26cb27`, `2ff247c6`, `3ae322ad`.
+- Notes: Safe back-to-overview behavior (`from` sanitization + fallback) is preserved.
+
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
 - Rationale: Clear persistence boundary and easy backup target.

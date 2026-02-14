@@ -15,7 +15,7 @@ Status convention:
 ## Current Status Summary
 The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. The setup step framework is in place and Plants + Environments are implemented end-to-end with API and UI.
 
-Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Baseline and Groups/Assignment are implemented with UI-only lock semantics.
+Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Baseline and Groups/Assignment are implemented with UI-only lock semantics, and `/p/{uuid}` now functions as a mobile-first plant cockpit/task launcher.
 
 The largest remaining V1 work is Placement/Rotation/Start step implementation, production-hardening/security/deployment details, and operational guardrails (backups, stricter step-lock governance, reporting/export paths).
 
@@ -102,6 +102,10 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Refs: `2e911442`, `226d9654`
   - Routes: `/p/{uuid}?from=...`.
   - Notes: `from` is sanitized to same-origin relative experiment paths (`/experiments/...`); QR direct visits default to `/experiments/{id}/overview`.
+- [x] Plant cockpit summary API and QR-first cockpit UI (owner: Codex)
+  - Refs: `6e26cb27`, `2ff247c6`, `3ae322ad`
+  - Routes: `GET /api/v1/plants/{uuid}/cockpit`, `/p/{uuid}`.
+  - Notes: Cockpit adds sticky status strip, prioritized Now panel, inline photo upload, and recent activity preview while preserving safe back-to-overview behavior.
 
 ## Remaining Milestones
 
@@ -163,8 +167,9 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - API refs: `/api/v1/weekly-sessions`, `/api/v1/feeding-events`, `/api/v1/adverse-events`, `/api/v1/plant-weekly-metrics`.
 
 ### Photos & Media Handling
-- [ ] Add photo upload UX and gallery browsing per experiment/plant/week (owner: Codex)
+- [ ] (in progress) Expand photo UX beyond cockpit inline capture (owner: Codex)
   - API refs: `/api/v1/photos`, media path `/media/...`.
+  - Notes: QR plant cockpit now supports inline photo upload and recent-photo preview; experiment-level gallery/reporting flows still pending.
 - [ ] Add image processing policy (size caps, optional EXIF stripping) (owner: Codex)
 
 ### Reporting/Exports
