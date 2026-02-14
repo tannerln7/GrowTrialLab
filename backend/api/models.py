@@ -299,8 +299,14 @@ class FeedingEvent(UUIDModel):
 
     experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="feeding_events")
     plant = models.ForeignKey(Plant, on_delete=models.CASCADE, related_name="feeding_events")
-    week_number = models.IntegerField()
-    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name="feeding_events")
+    week_number = models.IntegerField(null=True, blank=True)
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="feeding_events",
+    )
     lot = models.ForeignKey(
         BatchLot, on_delete=models.SET_NULL, null=True, blank=True, related_name="feeding_events"
     )
@@ -309,6 +315,10 @@ class FeedingEvent(UUIDModel):
     dosed_trap_count = models.IntegerField(null=True, blank=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.FED)
     notes = models.TextField(blank=True)
+    note = models.TextField(blank=True)
+    amount_text = models.CharField(max_length=64, blank=True)
+    created_by_email = models.EmailField(blank=True)
+    occurred_at = models.DateTimeField(default=timezone.now)
     recorded_at = models.DateTimeField(auto_now_add=True)
 
 

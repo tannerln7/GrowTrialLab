@@ -37,6 +37,7 @@ from .baseline_views import (
     experiment_baseline_status,
     plant_baseline,
 )
+from .feeding_views import experiment_feeding_queue, plant_feed, plant_feeding_recent
 from .views import (
     admin_user_update,
     admin_users,
@@ -152,9 +153,24 @@ urlpatterns = [
         name="experiment-baseline-queue",
     ),
     path(
+        "api/v1/experiments/<uuid:experiment_id>/feeding/queue",
+        experiment_feeding_queue,
+        name="experiment-feeding-queue",
+    ),
+    path(
         "api/v1/plants/<uuid:plant_id>/baseline",
         plant_baseline,
         name="plant-baseline",
+    ),
+    path(
+        "api/v1/plants/<uuid:plant_id>/feed",
+        plant_feed,
+        name="plant-feed",
+    ),
+    path(
+        "api/v1/plants/<uuid:plant_id>/feeding/recent",
+        plant_feeding_recent,
+        name="plant-feeding-recent",
     ),
     path(
         "api/v1/experiments/<uuid:experiment_id>/baseline/lock",

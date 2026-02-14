@@ -6,7 +6,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from .baseline import BASELINE_WEEK_NUMBER
-from .models import Photo, Plant, PlantWeeklyMetric
+from .models import FeedingEvent, Photo, Plant, PlantWeeklyMetric
 from .status_summary import compute_setup_status
 
 
@@ -61,6 +61,13 @@ def plant_cockpit(request, plant_id: UUID):
     replaced_by = plant.replaced_by
     replaced_by_uuid = str(replaced_by.id) if replaced_by else None
     replaces_uuid = str(replaces.id) if replaces else None
+    latest_feeding_event = (
+        FeedingEvent.objects.filter(plant=plant)
+        .only("occurred_at")
+        .order_by("-occurred_at")
+        .first()
+    )
+    last_fed_at = latest_feeding_event.occurred_at if latest_feeding_event else None
     chain_label = None
     if replaces:
         chain_label = f"Replacement of {replaces.plant_id or str(replaces.id)}"
@@ -90,6 +97,7 @@ def plant_cockpit(request, plant_id: UUID):
             "derived": {
                 "has_baseline": has_baseline,
                 "assigned_recipe_code": plant.assigned_recipe.code if plant.assigned_recipe else None,
+                "last_fed_at": last_fed_at.isoformat() if last_fed_at else None,
                 "replaced_by_uuid": replaced_by_uuid,
                 "replaces_uuid": replaces_uuid,
                 "chain_label": chain_label,
