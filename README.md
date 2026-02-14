@@ -26,6 +26,26 @@ Monorepo scaffold for local development with:
 docker compose down
 ```
 
+## Local editor setup (WSL + VSCode)
+
+- Python interpreter is pinned in `.vscode/settings.json` to:
+  - `${workspaceFolder}/backend/.venv/bin/python`
+- Create/sync local backend env:
+  - `cd backend && uv venv`
+  - `cd backend && uv sync`
+- Type checking:
+  - `pnpm pyright`
+  - Config lives in `pyrightconfig.json` (scoped to `backend/`).
+
+## Verification script
+
+- Run full checks:
+  - `infra/scripts/verify.sh`
+- Script runs:
+  - backend tests
+  - pyright
+  - docker compose build
+
 ## Auth behavior
 
 - There is no login UI and no password auth.

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO_ROOT"
+
+echo "[verify] Running backend tests..."
+(cd backend && uv run python manage.py test)
+
+echo "[verify] Running pyright..."
+pnpm pyright
+
+echo "[verify] Building docker compose images..."
+docker compose build
+
+echo "[verify] OK"
