@@ -24,6 +24,7 @@ Status convention:
   - Placement: `/experiments/{id}/placement`
   - Rotation: `/experiments/{id}/rotation`
   - Feeding: `/experiments/{id}/feeding`
+- Terminology note: API/DB field `bin` remains unchanged for compatibility, but UI presents it as **Grade** to avoid confusion with physical tray/bin containers.
 - Assignment route (`/experiments/{id}/assignment`) remains for legacy recipe/group tooling, but tray placement (`Tray.assigned_recipe`) is the canonical recipe-assignment source for start/readiness/feeding.
 - Experiment lifecycle is being introduced as a prerequisite for future delete-gating/immutability:
   - `draft` -> `running` -> `stopped` (archive deferred)
@@ -121,7 +122,7 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
 - [x] Experiment overview roster/work queue endpoint and UI (owner: Codex)
   - Refs: `51a32d99`, `65f84632`, `12517df6`
   - Routes: `GET /api/v1/experiments/{id}/overview/plants`, `/experiments/{id}/overview`.
-  - Notes: Includes aggregate counts and filterable plant queue (Needs Baseline/Bin/Assignment, Active, Removed) with mobile cards.
+  - Notes: Includes aggregate counts and filterable plant queue (Needs Baseline/Grade/Placement/Tray Recipe, Active, Removed) with mobile cards.
 - [x] Hub-and-spoke experiment navigation centered on Overview (owner: Codex)
   - Refs: `310f00b5`, `41599236`, `669ae104`, `7005524b`, `f2b49938`, `c61be2e7`
   - Routes: `/experiments/{id}` now routes to `/setup` until bootstrap is complete, then to `/overview`; subpages keep prominent `← Overview` return links.
@@ -142,6 +143,9 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Refs: `6e26cb27`, `2ff247c6`, `3ae322ad`
   - Routes: `GET /api/v1/plants/{uuid}/cockpit`, `/p/{uuid}`.
   - Notes: Cockpit adds sticky status strip, prioritized Now panel, inline photo upload, and recent activity preview while preserving safe back-to-overview behavior.
+- [x] Location-aware plant context and UI Grade terminology pass (owner: Codex)
+  - Routes: `GET /api/v1/experiments/{id}/overview/plants`, `GET /api/v1/plants/{uuid}/cockpit`, `/experiments/{id}/overview`, `/p/{uuid}`, `/experiments/{id}/baseline`.
+  - Notes: Overview/cockpit payloads now include derived tent/block/tray location + tray occupancy fields; overview roster is grouped/sorted by tent and tray with an explicit Unplaced section; user-facing `Bin` labels are now `Grade` while API keys remain `bin`.
 - [x] Plant replacement workflow with remove/replace chain links (owner: Codex)
   - Refs: `20032471`, `eea577e4`, `153922e9`, `e0800082`, `74506afa`, `325a7667`, `9169ace1`
   - Routes: `POST /api/v1/plants/{uuid}/replace`, `GET /api/v1/plants/{uuid}/cockpit`, `GET /api/v1/experiments/{id}/overview/plants`.

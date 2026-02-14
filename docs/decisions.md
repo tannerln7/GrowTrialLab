@@ -11,6 +11,7 @@ This file records architecture/product decisions and why they were made.
 - Canonical readiness flows: `/experiments/{id}/baseline`, `/experiments/{id}/placement`, `/experiments/{id}/rotation`, and `/experiments/{id}/feeding`, launched from Overview.
 - Assignment page remains available for legacy recipe/group tooling, but tray-level placement is now the canonical recipe-assignment source for operations (`Tray.assigned_recipe`).
 - Lifecycle prerequisite policy: deletion gating and strict immutability are deferred until lifecycle primitives (`draft`/`running`/`stopped`) exist.
+- Terminology policy: API/DB key `bin` remains stable, but user-facing UI copy uses **Grade**.
 
 ## Lifecycle Implications (Planned)
 - Intended freeze scope once an experiment is `running`:
@@ -185,6 +186,17 @@ This file records architecture/product decisions and why they were made.
   - Placement/rotation pickers exclude non-compatible blocks.
   - Add-plant tray pickers are filtered by tent restrictions and tray capacity.
   - Create forms prefill suggested IDs (`TN*`, `B*`, `TR*`, and category-derived plant IDs).
+
+### 2026-02-14: Plant location context is surfaced directly in overview and cockpit
+- Decision: Extend overview/cockpit payloads with derived location fields (`tent_*`, `block_*`, `tray_*`, tray occupancy) and render tent/tray-aware grouping in the overview queue.
+- Rationale: Operators need immediate physical context (where a plant is) without opening placement pages or making additional API calls.
+- Routes/APIs: `GET /api/v1/experiments/{id}/overview/plants`, `GET /api/v1/plants/{uuid}/cockpit`, `/experiments/{id}/overview`, `/p/{uuid}`.
+- Notes: Overview sorting/grouping is deterministic (tent, tray, plant ID) with a dedicated unplaced section.
+
+### 2026-02-14: UI terminology uses Grade while backend contract keeps bin
+- Decision: Rename user-facing `Bin`/`Needs Bin` labels to `Grade`/`Needs Grade` in overview, baseline, cockpit, placement, and assignment screens while keeping backend keys unchanged.
+- Rationale: Avoids confusion between biological grading (`bin`) and physical container concepts (tray/bin language).
+- Scope: UI copy only; no DB/schema/API key rename.
 
 ### 2026-02-14: Legacy assignment compatibility remains temporarily
 - Decision: Keep Groups endpoints and `Plant.assigned_recipe` writes for backward compatibility while new readiness/feeding flows rely on tray-derived assignment.
