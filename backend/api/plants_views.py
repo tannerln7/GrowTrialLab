@@ -336,6 +336,12 @@ def experiment_plants_labels_pdf(request, experiment_id: UUID):
         qr_x = x + 10
         qr_y = y + 12
         _draw_qr_label(canv, plant_url, qr_x, qr_y, qr_size)
+        canv.linkURL(
+            plant_url,
+            (qr_x, qr_y, qr_x + qr_size, qr_y + qr_size),
+            relative=0,
+            thickness=0,
+        )
 
         canv.setFont("Helvetica", 8)
         canv.drawString(qr_x + qr_size + 8, qr_y + qr_size - 4, plant_label[:28])
