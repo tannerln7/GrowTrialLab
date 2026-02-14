@@ -1,6 +1,19 @@
 import logging
+from uuid import UUID
 
 from api.models import AppUser
+from api.models import Block, Experiment, ExperimentSetupState
+from api.serializers import (
+    BlockSerializer,
+    EnvironmentPacketSerializer,
+    ExperimentSetupStateSerializer,
+    SetupStateUpdateSerializer,
+)
+from api.setup_packets import (
+    PACKET_ENVIRONMENT,
+    normalize_packet_ids,
+    next_incomplete_packet,
+)
 from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -25,6 +38,154 @@ def me(request):
             "status": app_user.status,
         }
     )
+
+
+def _require_app_user(request):
+    app_user = getattr(request, "app_user", None)
+    if app_user is None:
+        return Response({"detail": "Not authenticated."}, status=403)
+    return None
+
+
+def _get_experiment(experiment_id: UUID):
+    return Experiment.objects.filter(id=experiment_id).first()
+
+
+def _get_or_create_setup_state(experiment: Experiment):
+    return ExperimentSetupState.objects.get_or_create(experiment=experiment)[0]
+
+
+def _ensure_default_blocks(experiment: Experiment):
+    if Block.objects.filter(experiment=experiment).exists():
+        return
+    defaults = [
+        ("B1", "Front-left position"),
+        ("B2", "Front-right position"),
+        ("B3", "Back-left position"),
+        ("B4", "Back-right position"),
+    ]
+    for name, description in defaults:
+        Block.objects.get_or_create(
+            experiment=experiment,
+            name=name,
+            defaults={"description": description},
+        )
+
+
+@api_view(["GET", "PATCH"])
+def experiment_setup_state(request, experiment_id: UUID):
+    rejection = _require_app_user(request)
+    if rejection:
+        return rejection
+
+    experiment = _get_experiment(experiment_id)
+    if experiment is None:
+        return Response({"detail": "Experiment not found."}, status=404)
+
+    setup_state = _get_or_create_setup_state(experiment)
+    if request.method == "GET":
+        serializer = ExperimentSetupStateSerializer(setup_state)
+        return Response(serializer.data)
+
+    serializer = SetupStateUpdateSerializer(data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    if "current_packet" in serializer.validated_data:
+        setup_state.current_packet = serializer.validated_data["current_packet"]
+    if "completed_packets" in serializer.validated_data:
+        setup_state.completed_packets = normalize_packet_ids(
+            serializer.validated_data["completed_packets"]
+        )
+        if setup_state.current_packet in setup_state.completed_packets:
+            setup_state.current_packet = next_incomplete_packet(setup_state.completed_packets)
+    setup_state.save()
+    return Response(ExperimentSetupStateSerializer(setup_state).data)
+
+
+@api_view(["PUT"])
+def experiment_environment_packet(request, experiment_id: UUID):
+    rejection = _require_app_user(request)
+    if rejection:
+        return rejection
+
+    experiment = _get_experiment(experiment_id)
+    if experiment is None:
+        return Response({"detail": "Experiment not found."}, status=404)
+
+    setup_state = _get_or_create_setup_state(experiment)
+    serializer = EnvironmentPacketSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    payload = {
+        "tent_name": serializer.validated_data.get("tent_name", ""),
+        "light_schedule": serializer.validated_data.get("light_schedule", ""),
+        "light_height_notes": serializer.validated_data.get("light_height_notes", ""),
+        "ventilation_notes": serializer.validated_data.get("ventilation_notes", ""),
+        "water_source": serializer.validated_data.get("water_source", ""),
+        "run_in_days": serializer.validated_data.get("run_in_days", 14),
+        "notes": serializer.validated_data.get("notes", ""),
+    }
+    setup_state.packet_data[PACKET_ENVIRONMENT] = payload
+    setup_state.save(update_fields=["packet_data", "updated_at"])
+    return Response({"packet": PACKET_ENVIRONMENT, "data": payload})
+
+
+@api_view(["POST"])
+def complete_environment_packet(request, experiment_id: UUID):
+    rejection = _require_app_user(request)
+    if rejection:
+        return rejection
+
+    experiment = _get_experiment(experiment_id)
+    if experiment is None:
+        return Response({"detail": "Experiment not found."}, status=404)
+
+    setup_state = _get_or_create_setup_state(experiment)
+    payload = setup_state.packet_data.get(PACKET_ENVIRONMENT)
+    errors: list[str] = []
+    if not isinstance(payload, dict):
+        errors.append("Environment payload has not been saved yet.")
+    else:
+        if not str(payload.get("tent_name", "")).strip():
+            errors.append("Environment field 'tent_name' is required.")
+        if not str(payload.get("light_schedule", "")).strip():
+            errors.append("Environment field 'light_schedule' is required.")
+
+    block_count = Block.objects.filter(experiment=experiment).count()
+    if block_count < 2:
+        errors.append("At least 2 blocks are required before completing Packet 1.")
+
+    if errors:
+        return Response(
+            {"detail": "Packet 1 cannot be completed.", "errors": errors},
+            status=400,
+        )
+
+    completed = normalize_packet_ids([*setup_state.completed_packets, PACKET_ENVIRONMENT])
+    setup_state.completed_packets = completed
+    setup_state.current_packet = next_incomplete_packet(completed)
+    setup_state.save(update_fields=["completed_packets", "current_packet", "updated_at"])
+    return Response(ExperimentSetupStateSerializer(setup_state).data)
+
+
+@api_view(["GET", "POST"])
+def experiment_blocks(request, experiment_id: UUID):
+    rejection = _require_app_user(request)
+    if rejection:
+        return rejection
+
+    experiment = _get_experiment(experiment_id)
+    if experiment is None:
+        return Response({"detail": "Experiment not found."}, status=404)
+
+    if request.method == "GET":
+        _ensure_default_blocks(experiment)
+        serializer = BlockSerializer(Block.objects.filter(experiment=experiment).order_by("name"), many=True)
+        return Response(serializer.data)
+
+    serializer = BlockSerializer(data={**request.data, "experiment": str(experiment.id)})
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data, status=201)
 
 
 def _serialize_user(app_user: AppUser):

@@ -1,7 +1,16 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import admin_user_update, admin_users, healthz, me
+from .views import (
+    admin_user_update,
+    admin_users,
+    complete_environment_packet,
+    experiment_blocks,
+    experiment_environment_packet,
+    experiment_setup_state,
+    healthz,
+    me,
+)
 from .viewsets import (
     AdverseEventViewSet,
     BatchLotViewSet,
@@ -38,6 +47,26 @@ router.register("photos", PhotoViewSet, basename="photos")
 urlpatterns = [
     path("healthz", healthz, name="healthz"),
     path("api/me", me, name="me"),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/setup-state/",
+        experiment_setup_state,
+        name="experiment-setup-state",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/packets/environment/",
+        experiment_environment_packet,
+        name="experiment-environment-packet",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/packets/environment/complete/",
+        complete_environment_packet,
+        name="complete-environment-packet",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/blocks/",
+        experiment_blocks,
+        name="experiment-blocks",
+    ),
     path("api/v1/", include(router.urls)),
     path("api/admin/users", admin_users, name="admin-users"),
     path("api/admin/users/<int:user_id>", admin_user_update, name="admin-user-update"),
