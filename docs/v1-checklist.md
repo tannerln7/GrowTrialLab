@@ -140,6 +140,14 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Refs: `20032471`, `eea577e4`, `153922e9`, `e0800082`, `74506afa`, `325a7667`, `9169ace1`
   - Routes: `POST /api/v1/plants/{uuid}/replace`, `GET /api/v1/plants/{uuid}/cockpit`, `GET /api/v1/experiments/{id}/overview/plants`.
   - Notes: Replacement creates a new plant record/UUID, marks original as `removed`, keeps chain links (`old -> new` and `new -> old`), inherits assignment by default, and requires new baseline capture.
+- [x] Experiment lifecycle state and start/stop controls (owner: Codex)
+  - Refs: `8f3f79c8`, `f9cb600a`, `dd7a6279`, `b86db9f1`
+  - Routes: `POST /api/v1/experiments/{id}/start`, `POST /api/v1/experiments/{id}/stop`, `GET /api/v1/experiments/{id}/status/summary`.
+  - Notes: Lifecycle states are `draft`/`running`/`stopped`; start requires readiness (`ready_to_start=true`) and returns `409` with counts when blocked.
+- [x] Placement step MVP with tray composition workflow (owner: Codex)
+  - Refs: `8f3f79c8`, `f9cb600a`, `dd7a6279`, `47eef321`, `b86db9f1`
+  - Routes: `GET /api/v1/experiments/{id}/placement/summary`, `POST /api/v1/experiments/{id}/trays`, `PATCH /api/v1/trays/{id}/`, `POST /api/v1/trays/{id}/plants`, `DELETE /api/v1/trays/{id}/plants/{tray_plant_id}`, `/experiments/{id}/placement`.
+  - Notes: Enforces one-tray-per-plant and blocks placement for removed plants.
 
 ## Remaining Milestones
 
@@ -163,8 +171,6 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Notes: currently audit is minimal/log-style.
 
 ### Experiment Lifecycle
-- [ ] (in progress) Add lifecycle state model + start/stop transitions (owner: Codex)
-  - Notes: `draft`/`running`/`stopped` is the prerequisite for future delete gating and immutability enforcement.
 - [ ] Add delete-gating and immutability policy enforcement after lifecycle stabilizes (owner: Codex)
   - Notes: Deferred intentionally; implement after lifecycle API/UX is in place.
 
@@ -240,9 +246,9 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [ ] Define app operational metrics and alert thresholds (owner: manual)
 
 ## Next 3 Prompts Plan
-1. Placement step MVP + lifecycle controls: tray composition plus draft/running/stopped transitions.
-2. Rotation step MVP: rotation plan/log workflow tied to blocks and trays.
-3. Step lock and lifecycle governance: decide backend-enforced immutability/deletion rules after start.
+1. Rotation step MVP: rotation plan/log workflow tied to blocks and trays.
+2. Lifecycle governance hardening: define backend-enforced immutability/deletion rules after start.
+3. Placement refinements: tray balancing UX and conflict handling for high-volume experiments.
 
 ## History / Legacy Appendix
 - Legacy setup naming migration (completed):

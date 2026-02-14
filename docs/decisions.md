@@ -128,6 +128,18 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Baseline and assignment are readiness actions coordinated by overview, not setup prerequisites.
 - Refs: `a181325a`, `c61be2e7`.
 
+### 2026-02-14: Lifecycle primitives introduced before delete-gating and immutability enforcement
+- Decision: Add experiment lifecycle fields and transitions (`draft`/`running`/`stopped`) with start/stop endpoints; keep strict delete-gating and immutability policies deferred.
+- Rationale: Lifecycle state is the prerequisite for policy enforcement and avoids backtracking when implementing future “cannot delete while running” rules.
+- Refs: `8f3f79c8`, `f9cb600a`, `dd7a6279`, `b86db9f1`.
+- Notes: Start uses canonical readiness from `GET /api/v1/experiments/{id}/status/summary` and returns `409` with readiness counts if blocked.
+
+### 2026-02-14: Placement MVP uses trays as physical placement units
+- Decision: Implement dedicated placement workflow on `/experiments/{id}/placement` with experiment-scoped summary and tray add/remove convenience APIs.
+- Rationale: Operators need a focused surface to place plants into physical containers without mixing placement work into setup/assignment screens.
+- Refs: `8f3f79c8`, `f9cb600a`, `dd7a6279`, `47eef321`, `b86db9f1`.
+- Notes: Server enforces one-tray-per-plant and rejects removed plants from placement; placement is not required to start in v1.
+
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
 - Rationale: Clear persistence boundary and easy backup target.
