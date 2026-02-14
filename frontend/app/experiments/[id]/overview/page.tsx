@@ -219,13 +219,7 @@ export default function ExperimentOverviewPage() {
     return `/experiments/${experimentId}/overview${query ? `?${query}` : ""}`;
   }, [searchParams, experimentId]);
 
-  const firstMissingBaselinePlant = useMemo(
-    () => data.plants.find((plant) => plant.status === "active" && (!plant.has_baseline || !plant.bin)),
-    [data.plants],
-  );
-  const baselineActionHref = firstMissingBaselinePlant
-    ? `/experiments/${experimentId}/baseline?plant=${firstMissingBaselinePlant.uuid}`
-    : `/experiments/${experimentId}/baseline`;
+  const baselineActionHref = `/experiments/${experimentId}/baseline`;
 
   function plantNeedsLabels(plant: OverviewPlant): string[] {
     const needs: string[] = [];
