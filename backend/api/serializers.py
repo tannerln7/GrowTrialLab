@@ -14,6 +14,7 @@ from .models import (
     Recipe,
     RotationLog,
     Species,
+    Tent,
     Tray,
     TrayPlant,
     WeeklySession,
@@ -249,13 +250,28 @@ class MetricTemplateSerializer(serializers.ModelSerializer):
 
 
 class TraySerializer(serializers.ModelSerializer):
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            mutable = dict(data)
+            if "assigned_recipe" not in mutable:
+                if "recipe_id" in mutable:
+                    mutable["assigned_recipe"] = mutable.get("recipe_id")
+                elif "recipe" in mutable:
+                    mutable["assigned_recipe"] = mutable.get("recipe")
+            if "block" not in mutable and "block_id" in mutable:
+                mutable["block"] = mutable.get("block_id")
+            data = mutable
+        return super().to_internal_value(data)
+
     def validate(self, attrs):
         experiment = attrs.get("experiment") or (self.instance.experiment if self.instance else None)
         block = attrs.get("block") or (self.instance.block if self.instance else None)
-        recipe = attrs.get("recipe") or (self.instance.recipe if self.instance else None)
-        if experiment and block and block.experiment_id != experiment.id:
+        assigned_recipe = attrs.get("assigned_recipe") or (
+            self.instance.assigned_recipe if self.instance else None
+        )
+        if experiment and block and block.tent.experiment_id != experiment.id:
             raise serializers.ValidationError("Block must belong to the same experiment as tray.")
-        if experiment and recipe and recipe.experiment_id != experiment.id:
+        if experiment and assigned_recipe and assigned_recipe.experiment_id != experiment.id:
             raise serializers.ValidationError("Recipe must belong to the same experiment as tray.")
         return attrs
 
@@ -287,8 +303,21 @@ class TrayPlantSerializer(serializers.ModelSerializer):
 
 
 class BlockSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        experiment = attrs.get("experiment") or (self.instance.experiment if self.instance else None)
+        tent = attrs.get("tent") or (self.instance.tent if self.instance else None)
+        if experiment and tent and tent.experiment_id != experiment.id:
+            raise serializers.ValidationError("Tent must belong to the same experiment as block.")
+        return attrs
+
     class Meta:
         model = Block
+        fields = "__all__"
+
+
+class TentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tent
         fields = "__all__"
 
 

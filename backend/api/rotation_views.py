@@ -8,6 +8,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from .models import Block, Experiment, RotationLog, Tray, TrayPlant
+from .tent_restrictions import first_disallowed_plant
 
 
 def _require_app_user(request):
@@ -33,7 +34,7 @@ def experiment_rotation_summary(request, experiment_id: UUID):
 
     trays = list(
         Tray.objects.filter(experiment=experiment)
-        .select_related("block")
+        .select_related("block__tent")
         .order_by("name")
     )
     recent_logs = list(
@@ -50,6 +51,8 @@ def experiment_rotation_summary(request, experiment_id: UUID):
                     "tray_name": tray.name,
                     "current_block_id": str(tray.block.id) if tray.block else None,
                     "current_block_name": tray.block.name if tray.block else None,
+                    "current_tent_id": str(tray.block.tent.id) if tray.block and tray.block.tent else None,
+                    "current_tent_name": tray.block.tent.name if tray.block and tray.block.tent else None,
                     "plant_count": TrayPlant.objects.filter(tray=tray).count(),
                 }
                 for tray in trays
@@ -89,16 +92,37 @@ def experiment_rotation_log(request, experiment_id: UUID):
     if not tray_id:
         return Response({"detail": "tray_id is required."}, status=400)
 
-    tray = Tray.objects.filter(id=tray_id, experiment=experiment).select_related("block").first()
+    tray = Tray.objects.filter(id=tray_id, experiment=experiment).select_related("block__tent").first()
     if tray is None:
         return Response({"detail": "Tray not found for this experiment."}, status=404)
 
     to_block_id = request.data.get("to_block_id")
     to_block: Block | None = None
     if to_block_id:
-        to_block = Block.objects.filter(id=to_block_id, experiment=experiment).first()
+        to_block = Block.objects.filter(id=to_block_id, tent__experiment=experiment).select_related("tent").first()
         if to_block is None:
             return Response({"detail": "Destination block not found for this experiment."}, status=400)
+
+    if to_block and to_block.tent:
+        tray_plants = (
+            TrayPlant.objects.filter(tray=tray)
+            .select_related("plant__species")
+            .order_by("order_index", "id")
+        )
+        violating = first_disallowed_plant(
+            to_block.tent,
+            [item.plant for item in tray_plants],
+        )
+        if violating:
+            return Response(
+                {
+                    "detail": (
+                        f"Tray move blocked: tent '{to_block.tent.name}' does not allow "
+                        f"plant '{violating.plant_id or violating.id}' ({violating.species.name})."
+                    )
+                },
+                status=409,
+            )
 
     note = (request.data.get("note") or "").strip()
     occurred_at = timezone.now()
@@ -123,6 +147,7 @@ def experiment_rotation_log(request, experiment_id: UUID):
             "tray_name": tray.name,
             "from_block_name": from_block.name if from_block else None,
             "to_block_name": to_block.name if to_block else None,
+            "to_tent_name": to_block.tent.name if to_block and to_block.tent else None,
             "occurred_at": log.occurred_at.isoformat(),
             "note": log.note,
         },

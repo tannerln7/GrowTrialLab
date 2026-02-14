@@ -2,7 +2,7 @@ import logging
 from uuid import UUID
 
 from api.models import AppUser
-from api.models import Block, Experiment, ExperimentSetupState
+from api.models import Block, Experiment, ExperimentSetupState, Tent
 from api.serializers import (
     BlockSerializer,
     EnvironmentPacketSerializer,
@@ -60,6 +60,11 @@ def _get_or_create_setup_state(experiment: Experiment):
 
 
 def _ensure_default_blocks(experiment: Experiment):
+    default_tent, _ = Tent.objects.get_or_create(
+        experiment=experiment,
+        code="T1",
+        defaults={"name": "Tent 1"},
+    )
     defaults = [
         ("B1", "Front-left position"),
         ("B2", "Front-right position"),
@@ -70,6 +75,7 @@ def _ensure_default_blocks(experiment: Experiment):
     for name, description in defaults:
         _, created = Block.objects.get_or_create(
             experiment=experiment,
+            tent=default_tent,
             name=name,
             defaults={"description": description},
         )
@@ -156,7 +162,7 @@ def complete_environment_packet(request, experiment_id: UUID):
         if not str(payload.get("light_schedule", "")).strip():
             errors.append("Environment field 'light_schedule' is required.")
 
-    block_count = Block.objects.filter(experiment=experiment).count()
+    block_count = Block.objects.filter(tent__experiment=experiment).count()
     if block_count < 2:
         errors.append("At least 2 blocks are required before completing the Environments step.")
 
@@ -184,10 +190,26 @@ def experiment_blocks(request, experiment_id: UUID):
         return Response({"detail": "Experiment not found."}, status=404)
 
     if request.method == "GET":
-        serializer = BlockSerializer(Block.objects.filter(experiment=experiment).order_by("name"), many=True)
+        serializer = BlockSerializer(
+            Block.objects.filter(tent__experiment=experiment).order_by("name"),
+            many=True,
+        )
         return Response(serializer.data)
 
-    serializer = BlockSerializer(data={**request.data, "experiment": str(experiment.id)})
+    tent_id = request.data.get("tent")
+    if tent_id:
+        tent = Tent.objects.filter(id=tent_id, experiment=experiment).first()
+        if tent is None:
+            return Response({"detail": "Tent not found for this experiment."}, status=400)
+    else:
+        tent, _ = Tent.objects.get_or_create(
+            experiment=experiment,
+            code="T1",
+            defaults={"name": "Tent 1"},
+        )
+    serializer = BlockSerializer(
+        data={**request.data, "experiment": str(experiment.id), "tent": str(tent.id)}
+    )
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response(serializer.data, status=201)
@@ -204,7 +226,7 @@ def experiment_blocks_defaults(request, experiment_id: UUID):
         return Response({"detail": "Experiment not found."}, status=404)
 
     created_count = _ensure_default_blocks(experiment)
-    blocks = Block.objects.filter(experiment=experiment).order_by("name")
+    blocks = Block.objects.filter(tent__experiment=experiment).order_by("name")
     serializer = BlockSerializer(blocks, many=True)
     return Response(
         {

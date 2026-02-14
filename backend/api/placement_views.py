@@ -8,7 +8,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from .baseline import BASELINE_WEEK_NUMBER
-from .models import Block, Experiment, Plant, PlantWeeklyMetric, Recipe, Tray, TrayPlant
+from .models import Block, Experiment, Plant, PlantWeeklyMetric, Recipe, Tent, Tray, TrayPlant
+from .tent_restrictions import tent_allows_species
 from .tray_assignment import experiment_tray_placements
 
 
@@ -46,10 +47,20 @@ def experiment_placement_summary(request, experiment_id: UUID):
     if experiment is None:
         return Response({"detail": "Experiment not found."}, status=404)
 
+    tents = list(
+        Tent.objects.filter(experiment=experiment)
+        .prefetch_related("allowed_species")
+        .order_by("name", "id")
+    )
+    blocks = list(
+        Block.objects.filter(tent__experiment=experiment)
+        .select_related("tent")
+        .order_by("tent__name", "name", "id")
+    )
     trays = list(
         Tray.objects.filter(experiment=experiment)
-        .select_related("block", "recipe")
-        .prefetch_related("tray_plants__plant__species", "tray_plants__plant__assigned_recipe", "tray_plants__plant")
+        .select_related("block__tent", "assigned_recipe")
+        .prefetch_related("tray_plants__plant__species", "tray_plants__plant")
         .order_by("name")
     )
     placement_map = experiment_tray_placements(experiment.id)
@@ -63,9 +74,46 @@ def experiment_placement_summary(request, experiment_id: UUID):
     )
     unplaced_active_count = unplaced_active_qs.count()
     unplaced_active = list(unplaced_active_qs[:50])
+    unplaced_trays = [tray for tray in trays if tray.block is None]
+
+    tray_counts_by_block: dict[str, int] = {}
+    for tray in trays:
+        if tray.block:
+            block_key = str(tray.block.id)
+            tray_counts_by_block[block_key] = tray_counts_by_block.get(block_key, 0) + 1
+
+    tents_payload: list[dict] = []
+    for tent in tents:
+        tent_blocks = [block for block in blocks if block.tent.id == tent.id]
+        tents_payload.append(
+            {
+                "tent_id": str(tent.id),
+                "name": tent.name,
+                "code": tent.code,
+                "allowed_species_count": tent.allowed_species.count(),
+                "allowed_species": [
+                    {
+                        "id": str(species.id),
+                        "name": species.name,
+                        "category": species.category,
+                    }
+                    for species in tent.allowed_species.all().order_by("name")
+                ],
+                "blocks": [
+                    {
+                        "block_id": str(block.id),
+                        "name": block.name,
+                        "description": block.description,
+                        "tray_count": tray_counts_by_block.get(str(block.id), 0),
+                    }
+                    for block in tent_blocks
+                ],
+            }
+        )
 
     return Response(
         {
+            "tents": tents_payload,
             "trays": [
                 {
                     "tray_id": str(tray.id),
@@ -73,9 +121,15 @@ def experiment_placement_summary(request, experiment_id: UUID):
                     "tray_name": tray.name,
                     "block_id": str(tray.block.id) if tray.block else None,
                     "block_name": tray.block.name if tray.block else None,
-                    "recipe_id": str(tray.recipe.id) if tray.recipe else None,
-                    "recipe_code": tray.recipe.code if tray.recipe else None,
-                    "recipe_name": tray.recipe.name if tray.recipe else None,
+                    "tent_id": str(tray.block.tent.id) if tray.block else None,
+                    "tent_name": tray.block.tent.name if tray.block else None,
+                    "assigned_recipe_id": str(tray.assigned_recipe.id) if tray.assigned_recipe else None,
+                    "assigned_recipe_code": tray.assigned_recipe.code if tray.assigned_recipe else None,
+                    "assigned_recipe_name": tray.assigned_recipe.name if tray.assigned_recipe else None,
+                    # Compatibility aliases
+                    "recipe_id": str(tray.assigned_recipe.id) if tray.assigned_recipe else None,
+                    "recipe_code": tray.assigned_recipe.code if tray.assigned_recipe else None,
+                    "recipe_name": tray.assigned_recipe.name if tray.assigned_recipe else None,
                     "plant_count": TrayPlant.objects.filter(
                         tray=tray,
                         plant__status=Plant.Status.ACTIVE,
@@ -92,9 +146,9 @@ def experiment_placement_summary(request, experiment_id: UUID):
                             "species_name": tray_plant.plant.species.name,
                             "bin": tray_plant.plant.bin,
                             "status": tray_plant.plant.status,
-                            "assigned_recipe_id": str(tray.recipe.id) if tray.recipe else None,
-                            "assigned_recipe_code": tray.recipe.code if tray.recipe else None,
-                            "assigned_recipe_name": tray.recipe.name if tray.recipe else None,
+                            "assigned_recipe_id": str(tray.assigned_recipe.id) if tray.assigned_recipe else None,
+                            "assigned_recipe_code": tray.assigned_recipe.code if tray.assigned_recipe else None,
+                            "assigned_recipe_name": tray.assigned_recipe.name if tray.assigned_recipe else None,
                         }
                         for tray_plant in TrayPlant.objects.filter(tray=tray)
                         .select_related("plant__species")
@@ -113,6 +167,15 @@ def experiment_placement_summary(request, experiment_id: UUID):
                     "status": plant.status,
                 }
                 for plant in unplaced_active
+            ],
+            "unplaced_trays": [
+                {
+                    "tray_id": str(tray.id),
+                    "tray_name": tray.name,
+                    "assigned_recipe_id": str(tray.assigned_recipe.id) if tray.assigned_recipe else None,
+                    "assigned_recipe_code": tray.assigned_recipe.code if tray.assigned_recipe else None,
+                }
+                for tray in unplaced_trays
             ],
             # Backward-compatible keys for existing clients.
             "unplaced_active_plants_count": unplaced_active_count,
@@ -150,21 +213,21 @@ def experiment_trays(request, experiment_id: UUID):
 
     block = None
     if block_id:
-        block = Block.objects.filter(id=block_id, experiment=experiment).first()
+        block = Block.objects.filter(id=block_id, tent__experiment=experiment).first()
         if block is None:
             return Response({"detail": "Block not found for this experiment."}, status=400)
-    recipe_id = request.data.get("recipe_id")
-    recipe = None
-    if recipe_id:
-        recipe = Recipe.objects.filter(id=recipe_id, experiment=experiment).first()
-        if recipe is None:
+    assigned_recipe_id = request.data.get("assigned_recipe_id") or request.data.get("recipe_id")
+    assigned_recipe = None
+    if assigned_recipe_id:
+        assigned_recipe = Recipe.objects.filter(id=assigned_recipe_id, experiment=experiment).first()
+        if assigned_recipe is None:
             return Response({"detail": "Recipe not found for this experiment."}, status=400)
 
     tray = Tray.objects.create(
         experiment=experiment,
         name=name,
         block=block,
-        recipe=recipe,
+        assigned_recipe=assigned_recipe,
         notes=notes,
     )
     return Response(
@@ -173,7 +236,8 @@ def experiment_trays(request, experiment_id: UUID):
             "experiment": str(experiment.id),
             "name": tray.name,
             "block": str(tray.block.id) if tray.block else None,
-            "recipe": str(tray.recipe.id) if tray.recipe else None,
+            "assigned_recipe": str(tray.assigned_recipe.id) if tray.assigned_recipe else None,
+            "recipe": str(tray.assigned_recipe.id) if tray.assigned_recipe else None,
             "notes": tray.notes,
         },
         status=201,
@@ -186,7 +250,7 @@ def tray_add_plant(request, tray_id: UUID):
     if rejection:
         return rejection
 
-    tray = Tray.objects.filter(id=tray_id).select_related("experiment").first()
+    tray = Tray.objects.filter(id=tray_id).select_related("experiment", "block__tent", "assigned_recipe").first()
     if tray is None:
         return Response({"detail": "Tray not found."}, status=404)
     if _is_running(tray.experiment):
@@ -205,6 +269,18 @@ def tray_add_plant(request, tray_id: UUID):
         return Response({"detail": "Removed plants cannot be placed in trays."}, status=400)
     if TrayPlant.objects.filter(plant=plant).exists():
         return Response({"detail": "Plant is already placed in another tray."}, status=400)
+    if tray.block and tray.block.tent:
+        tent = tray.block.tent
+        if not tent_allows_species(tent, plant.species.id):
+            return Response(
+                {
+                    "detail": (
+                        f"Plant species '{plant.species.name}' is not allowed in tent "
+                        f"'{tent.name}'."
+                    )
+                },
+                status=409,
+            )
 
     with transaction.atomic():
         max_order = TrayPlant.objects.filter(tray=tray).aggregate(max_order=Max("order_index"))["max_order"]
@@ -223,7 +299,7 @@ def tray_add_plant(request, tray_id: UUID):
             "order_index": tray_plant.order_index,
             "plant_id": plant.plant_id,
             "species_name": plant.species.name,
-            "assigned_recipe_code": tray.recipe.code if tray.recipe else None,
+            "assigned_recipe_code": tray.assigned_recipe.code if tray.assigned_recipe else None,
             "bin": plant.bin,
         },
         status=201,
@@ -274,21 +350,21 @@ def experiment_placement_auto(request, experiment_id: UUID):
     if tray_ids:
         trays = list(
             Tray.objects.filter(experiment=experiment, id__in=tray_ids)
-            .select_related("recipe")
+            .select_related("assigned_recipe", "block__tent")
             .order_by("name", "id")
         )
         if len(trays) != len(set(tray_ids)):
             return Response({"detail": "One or more tray_ids are invalid for this experiment."}, status=400)
     else:
         trays = list(
-            Tray.objects.filter(experiment=experiment, recipe__isnull=False)
-            .select_related("recipe")
+            Tray.objects.filter(experiment=experiment, assigned_recipe__isnull=False)
+            .select_related("assigned_recipe", "block__tent")
             .order_by("name", "id")
         )
 
     if not trays:
         return Response({"detail": "At least one tray with a recipe is required for auto placement."}, status=409)
-    if any(tray.recipe is None for tray in trays):
+    if any(tray.assigned_recipe is None for tray in trays):
         return Response({"detail": "All selected trays must have a recipe assigned."}, status=409)
 
     active_plants = list(
@@ -351,6 +427,19 @@ def experiment_placement_auto(request, experiment_id: UUID):
             )
             for idx, plant in enumerate(bin_plants):
                 tray = tray_order[idx % len(tray_order)]
+                if tray.block and tray.block.tent and not tent_allows_species(
+                    tray.block.tent, plant.species.id
+                ):
+                    return Response(
+                        {
+                            "detail": (
+                                f"Auto placement blocked: plant '{plant.plant_id or plant.id}' "
+                                f"({plant.species.name}) is not allowed in tent "
+                                f"'{tray.block.tent.name}'."
+                            )
+                        },
+                        status=409,
+                    )
                 tray_key = str(tray.id)
                 to_create.append(
                     TrayPlant(

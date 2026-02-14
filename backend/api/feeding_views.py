@@ -94,7 +94,7 @@ def experiment_feeding_queue(request, experiment_id: UUID):
     tray_placements = {
         str(item.plant.id): item
         for item in TrayPlant.objects.filter(tray__experiment=experiment).select_related(
-            "tray__recipe", "tray__block"
+            "tray__assigned_recipe", "tray__block"
         )
     }
 

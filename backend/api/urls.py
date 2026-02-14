@@ -29,6 +29,12 @@ from .placement_views import (
     tray_add_plant,
     tray_remove_plant,
 )
+from .tents_views import (
+    experiment_tents,
+    tent_blocks,
+    tent_blocks_defaults,
+    tent_detail,
+)
 from .rotation_views import experiment_rotation_log, experiment_rotation_summary
 from .baseline_views import (
     complete_baseline_packet,
@@ -102,6 +108,26 @@ urlpatterns = [
         "api/v1/experiments/<uuid:experiment_id>/packets/environment/complete/",
         complete_environment_packet,
         name="complete-environment-packet",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/tents",
+        experiment_tents,
+        name="experiment-tents",
+    ),
+    path(
+        "api/v1/tents/<uuid:tent_id>",
+        tent_detail,
+        name="tent-detail",
+    ),
+    path(
+        "api/v1/tents/<uuid:tent_id>/blocks",
+        tent_blocks,
+        name="tent-blocks",
+    ),
+    path(
+        "api/v1/tents/<uuid:tent_id>/blocks/defaults",
+        tent_blocks_defaults,
+        name="tent-blocks-defaults",
     ),
     path(
         "api/v1/experiments/<uuid:experiment_id>/blocks/",

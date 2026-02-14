@@ -147,6 +147,15 @@ class BlockViewSet(ExperimentFilteredViewSet):
     queryset = Block.objects.all().order_by("name")
     serializer_class = BlockSerializer
 
+    def destroy(self, request, *args, **kwargs):
+        block = self.get_object()
+        if Tray.objects.filter(block=block).exists():
+            return Response(
+                {"detail": "Block cannot be deleted while trays are placed in it."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().destroy(request, *args, **kwargs)
+
 
 class RotationLogViewSet(ExperimentFilteredViewSet):
     queryset = RotationLog.objects.all().order_by("-occurred_at", "tray_id")

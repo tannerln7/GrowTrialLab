@@ -198,7 +198,7 @@ class Plant(UUIDModel):
 class Tray(UUIDModel):
     experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="trays")
     block = models.ForeignKey("Block", on_delete=models.SET_NULL, null=True, blank=True, related_name="trays")
-    recipe = models.ForeignKey(
+    assigned_recipe = models.ForeignKey(
         "Recipe",
         on_delete=models.SET_NULL,
         null=True,
@@ -213,6 +213,20 @@ class Tray(UUIDModel):
         constraints = [
             models.UniqueConstraint(fields=["experiment", "name"], name="unique_tray_name_in_experiment")
         ]
+
+    def __init__(self, *args, **kwargs):
+        legacy_recipe = kwargs.pop("recipe", None)
+        if "assigned_recipe" not in kwargs and legacy_recipe is not None:
+            kwargs["assigned_recipe"] = legacy_recipe
+        super().__init__(*args, **kwargs)
+
+    @property
+    def recipe(self):
+        return self.assigned_recipe
+
+    @recipe.setter
+    def recipe(self, value):
+        self.assigned_recipe = value
 
     def __str__(self):
         return f"{self.experiment.pk}:{self.name}"
@@ -233,16 +247,53 @@ class TrayPlant(UUIDModel):
 
 class Block(UUIDModel):
     experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="blocks")
+    tent = models.ForeignKey("Tent", on_delete=models.CASCADE, related_name="blocks")
     name = models.CharField(max_length=64)
     description = models.TextField(blank=True)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["experiment", "name"], name="unique_block_name_in_experiment")
+            models.UniqueConstraint(fields=["tent", "name"], name="unique_block_name_in_tent")
         ]
+
+    def save(self, *args, **kwargs):
+        tent_id = self.__dict__.get("tent_id")
+        experiment_id = self.__dict__.get("experiment_id")
+        if tent_id is None and experiment_id is not None:
+            default_tent, _ = Tent.objects.get_or_create(
+                experiment_id=experiment_id,
+                code="T1",
+                defaults={"name": "Tent 1"},
+            )
+            self.tent = default_tent
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.experiment.pk}:{self.name}"
+
+
+class Tent(UUIDModel):
+    experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="tents")
+    name = models.CharField(max_length=128)
+    code = models.CharField(max_length=16, blank=True, default="")
+    notes = models.TextField(blank=True)
+    allowed_species = models.ManyToManyField(Species, related_name="tents", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["experiment", "name"], name="unique_tent_name_in_experiment"),
+            models.UniqueConstraint(
+                fields=["experiment", "code"],
+                condition=~Q(code=""),
+                name="unique_tent_code_in_experiment",
+            ),
+        ]
+
+    def __str__(self):
+        suffix = f" ({self.code})" if self.code else ""
+        return f"{self.experiment.pk}:{self.name}{suffix}"
 
 
 class RotationLog(UUIDModel):

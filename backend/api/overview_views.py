@@ -69,7 +69,7 @@ def experiment_overview_plants(request, experiment_id: UUID):
             if tray_placement is None:
                 needs_placement_count += 1
                 needs_assignment_count += 1
-            elif tray_placement.tray.recipe is None:
+            elif tray_placement.tray.assigned_recipe is None:
                 needs_tray_recipe_count += 1
                 needs_assignment_count += 1
         else:
