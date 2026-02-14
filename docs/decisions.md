@@ -50,6 +50,21 @@ This file records architecture/product decisions and why they were made.
 - Refs: `66824a6e`.
 - Caution: Production must set `PUBLIC_BASE_URL` or printed QR codes will point to localhost.
 
+### 2026-02-14: Baseline metrics use structured templates with week 0 storage
+- Decision: Add `MetricTemplate` model and validate baseline payloads by species category template; store baseline records in `PlantWeeklyMetric` with `week_number=0`.
+- Rationale: Keeps baseline capture structured while reusing the existing metrics pipeline.
+- Refs: `5571d379`, `2f919969`, `d0467ff4`.
+
+### 2026-02-14: Packet 3 enforces lock semantics for baseline/bin edits
+- Decision: Completing/locking baseline sets packet lock state and blocks baseline/bin edits for non-admin users unless admin override (`?unlock=true`) is used.
+- Rationale: Preserves experiment integrity after baseline capture without introducing full unlock workflow yet.
+- Refs: `2f919969`, `d0467ff4`.
+
+### 2026-02-14: Baseline UX uses dedicated capture page plus wizard summary
+- Decision: Implement `/experiments/{id}/baseline` for save-and-next capture flow and keep `/experiments/{id}/setup` Packet 3 as status/control surface.
+- Rationale: Mobile-first focused data entry flow while preserving packet navigation context.
+- Refs: `4e599540`.
+
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
 - Rationale: Clear persistence boundary and easy backup target.

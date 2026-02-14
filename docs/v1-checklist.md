@@ -15,7 +15,9 @@ Status convention:
 ## Current Status Summary
 The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Packet framework is in place and Packet 1 (Environment) and Packet 2 (Plants) are implemented end-to-end with API and UI.
 
-Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels now resolve to an in-app plant page and labels encode absolute URLs. The largest remaining V1 work is implementing Packet 3-7 workflows, tightening production-hardening/security/deployment details, and completing operational guardrails (backups, metrics templates, packet integrity rules, exports/reporting).
+Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Packet 3 baseline MVP is now implemented with template-driven metrics, baseline capture UI, bin assignment, and baseline locking.
+
+The largest remaining V1 work is Packet 4-7 workflows, production-hardening/security/deployment details, and operational guardrails (backups, stricter packet-lock governance, reporting/export paths).
 
 ## Completed Milestones
 - [x] Monorepo scaffold and local compose runtime (owner: Codex)
@@ -67,6 +69,16 @@ Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/
   - Refs: `66824a6e`, `c8aa364c`
   - Routes/env: `GET /api/v1/experiments/{id}/plants/labels.pdf`, `PUBLIC_BASE_URL`.
   - Notes: Production must set `PUBLIC_BASE_URL`; fallback is `http://localhost:3000`.
+- [x] Metric template model seeded with baseline defaults (owner: Codex)
+  - Refs: `5571d379`
+  - Routes: `GET /api/v1/metric-templates/`, `GET /api/v1/metric-templates/{id}/`.
+- [x] Packet 3 baseline APIs and lock integrity rules (owner: Codex)
+  - Refs: `2f919969`, `d0467ff4`
+  - Routes: `GET /api/v1/experiments/{id}/baseline/status`, `GET/POST /api/v1/plants/{uuid}/baseline`, `POST /api/v1/experiments/{id}/baseline/lock`, `PUT /api/v1/experiments/{id}/packets/baseline/`, `POST /api/v1/experiments/{id}/packets/baseline/complete/`.
+  - Notes: Baseline lock blocks bin and week-0 baseline edits for non-admin users.
+- [x] Packet 3 frontend baseline workflow (owner: Codex)
+  - Refs: `4e599540`
+  - Routes: `/experiments/{id}/setup` (Packet 3 section), `/experiments/{id}/baseline`, `/p/{uuid}` baseline shortcut.
 
 ## Remaining Milestones
 
@@ -90,9 +102,10 @@ Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/
   - Notes: currently audit is minimal/log-style.
 
 ### Setup Wizard (Packets 1–8)
-- [ ] (in progress) Keep Packet 1/2 stable while adding packet lock progression rules (owner: Codex)
+- [ ] (in progress) Keep Packet 1/2/3 stable while adding packet lock progression rules (owner: Codex)
   - Route: `PATCH /api/v1/experiments/{id}/setup-state/`.
-- [ ] Implement Packet 3 (Baseline capture scaffolding) (owner: Codex)
+- [ ] (in progress) Strengthen Packet 3 completion rule from MVP threshold to all-plants baseline coverage (owner: Codex)
+  - Notes: Current MVP requires at least 1 baseline capture + all bins assigned.
 - [ ] Implement Packet 4 (Groups/randomization setup scaffolding) (owner: Codex)
 - [ ] Implement Packet 5 (Tray assignment scaffolding) (owner: Codex)
 - [ ] Implement Packet 6 (Rotation plan scaffolding) (owner: Codex)
@@ -105,9 +118,10 @@ Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/
 - [ ] Add UX affordances for validation errors and partial saves (owner: Codex)
 
 ### Baseline/Binning (Packet 3)
-- [ ] Define baseline metric template/schema and enforce shape (owner: Codex)
-  - API refs: `/api/v1/plant-weekly-metrics`, Packet 3 endpoints (TBD).
-- [ ] Add binning workflow UI and API contract (owner: Codex)
+- [ ] (in progress) Expand metric template governance (owner: Codex)
+  - API refs: `/api/v1/metric-templates/`, `/api/v1/plants/{uuid}/baseline`.
+  - Notes: Add template migration strategy and tighter category coverage.
+- [ ] Add baseline review/QA pass before packet completion (owner: Codex)
 
 ### Randomization/Groups (Packet 4)
 - [ ] Add group assignment strategy + deterministic seed handling (owner: Codex)
@@ -151,9 +165,9 @@ Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/
 - [ ] Define app operational metrics and alert thresholds (owner: manual)
 
 ## Next 3 Prompts Plan
-1. Packet 3 baseline scaffolding: define baseline metric template + API + minimal wizard UI.
-2. Packet lock rules: prevent invalid back-edits after completion and add explicit unlock flow for admins.
-3. Weekly ritual loop MVP: weekly session + feeding/adverse event entry flow with guardrails.
+1. Packet 4 MVP: group/randomization setup flow without full statistical engine.
+2. Packet lock governance: explicit admin unlock endpoint + audit trace for lock bypass.
+3. Packet 7 weekly ritual MVP: weekly session, feeding events, and adverse event flow.
 
 ## Deferred Items (Explicitly Not in V1)
 - [ ] Native mobile apps (iOS/Android) separate from PWA.
