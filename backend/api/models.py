@@ -75,9 +75,21 @@ class Experiment(UUIDModel):
         ACTIVE = "active", "active"
         COMPLETED = "completed", "completed"
 
+    class LifecycleState(models.TextChoices):
+        DRAFT = "draft", "draft"
+        RUNNING = "running", "running"
+        STOPPED = "stopped", "stopped"
+
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    lifecycle_state = models.CharField(
+        max_length=16,
+        choices=LifecycleState.choices,
+        default=LifecycleState.DRAFT,
+    )
+    started_at = models.DateTimeField(null=True, blank=True)
+    stopped_at = models.DateTimeField(null=True, blank=True)
     start_date = models.DateField(null=True, blank=True)
     duration_weeks = models.IntegerField(default=0)
     light_schedule = models.TextField(blank=True)
@@ -184,6 +196,7 @@ class Plant(UUIDModel):
 
 class Tray(UUIDModel):
     experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="trays")
+    block = models.ForeignKey("Block", on_delete=models.SET_NULL, null=True, blank=True, related_name="trays")
     name = models.CharField(max_length=64)
     notes = models.TextField(blank=True)
     plants = models.ManyToManyField(Plant, through="TrayPlant", related_name="trays")
@@ -205,6 +218,7 @@ class TrayPlant(UUIDModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["tray", "plant"], name="unique_plant_in_tray"),
+            models.UniqueConstraint(fields=["plant"], name="unique_plant_single_tray"),
             models.UniqueConstraint(fields=["tray", "order_index"], name="unique_tray_order_index"),
         ]
 
