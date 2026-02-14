@@ -5,6 +5,7 @@ from uuid import UUID
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.http import HttpResponse
+from django.utils import timezone
 import reportlab.graphics.renderPDF as renderPDF
 from reportlab.graphics.barcode.qr import QrCodeWidget
 from reportlab.graphics.shapes import Drawing
@@ -19,6 +20,7 @@ from .plant_ids import ExperimentPlantIdAllocator
 from .serializers import (
     ExperimentPlantCreateSerializer,
     ExperimentPlantSerializer,
+    PlantReplaceSerializer,
     PlantsPacketSerializer,
     SpeciesSerializer,
 )
@@ -356,6 +358,103 @@ def experiment_plants_labels_pdf(request, experiment_id: UUID):
         f'attachment; filename="experiment-{experiment.id}-plant-labels.pdf"'
     )
     return response
+
+
+@api_view(["POST"])
+def plant_replace(request, plant_id: UUID):
+    rejection = _require_app_user(request)
+    if rejection:
+        return rejection
+
+    original = (
+        Plant.objects.filter(id=plant_id)
+        .select_related("experiment", "species", "assigned_recipe")
+        .first()
+    )
+    if original is None:
+        return Response({"detail": "Plant not found."}, status=404)
+    if original.replaced_by_id:
+        return Response({"detail": "This plant already has a replacement."}, status=400)
+
+    serializer = PlantReplaceSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    payload = serializer.validated_data
+
+    mark_original_removed = payload.get("mark_original_removed", True)
+    copy_identity_fields = payload.get("copy_identity_fields", True)
+    inherit_assignment = payload.get("inherit_assignment", True)
+    inherit_bin = payload.get("inherit_bin", False)
+    removed_reason = (payload.get("removed_reason") or "").strip()
+    removed_at = payload.get("removed_at") or timezone.now()
+
+    allocator = ExperimentPlantIdAllocator(original.experiment)
+    if "new_plant_id" in payload:
+        raw_new_plant_id = payload.get("new_plant_id")
+        new_plant_id = (raw_new_plant_id or "").strip()
+    else:
+        new_plant_id = allocator.allocate(original.species)
+
+    requested_reuse_plant_id = bool(new_plant_id) and new_plant_id == original.plant_id
+    if requested_reuse_plant_id and not mark_original_removed:
+        return Response(
+            {"detail": "Reusing plant_id requires mark_original_removed=true."},
+            status=400,
+        )
+
+    with transaction.atomic():
+        if requested_reuse_plant_id:
+            original.status = Plant.Status.REMOVED
+            original.removed_at = removed_at
+            original.removed_reason = removed_reason
+            original.save(update_fields=["status", "removed_at", "removed_reason", "updated_at"])
+
+        try:
+            replacement = Plant.objects.create(
+                experiment=original.experiment,
+                species=original.species,
+                plant_id=new_plant_id,
+                cultivar=original.cultivar if copy_identity_fields else None,
+                baseline_notes=original.baseline_notes if copy_identity_fields else "",
+                assigned_recipe=original.assigned_recipe if inherit_assignment else None,
+                bin=original.bin if inherit_bin else None,
+                status=Plant.Status.ACTIVE,
+            )
+        except IntegrityError as exc:
+            raise ValidationError(
+                f"plant_id '{new_plant_id}' already exists in this experiment."
+            ) from exc
+
+        if mark_original_removed and not requested_reuse_plant_id:
+            original.status = Plant.Status.REMOVED
+            original.removed_at = removed_at
+            original.removed_reason = removed_reason
+
+        original.replaced_by = replacement
+        update_fields = ["replaced_by", "updated_at"]
+        if mark_original_removed:
+            update_fields.extend(["status", "removed_at", "removed_reason"])
+        original.save(update_fields=update_fields)
+
+    return Response(
+        {
+            "original": {
+                "uuid": str(original.id),
+                "plant_id": original.plant_id,
+                "status": original.status,
+                "replaced_by_uuid": str(replacement.id),
+            },
+            "replacement": {
+                "uuid": str(replacement.id),
+                "plant_id": replacement.plant_id,
+                "status": replacement.status,
+                "replaces_uuid": str(original.id),
+                "assigned_recipe_code": replacement.assigned_recipe.code if replacement.assigned_recipe else None,
+                "bin": replacement.bin,
+                "has_baseline": False,
+            },
+        },
+        status=201,
+    )
 
 
 @api_view(["PUT"])

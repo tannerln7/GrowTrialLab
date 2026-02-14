@@ -139,6 +139,9 @@ class PlantDetailSerializer(serializers.ModelSerializer):
             "species",
             "cultivar",
             "status",
+            "removed_at",
+            "removed_reason",
+            "replaced_by",
             "baseline_notes",
             "experiment",
             "assigned_recipe",
@@ -227,6 +230,16 @@ class PlantBaselineSaveSerializer(serializers.Serializer):
     metrics = serializers.JSONField(required=True)
     notes = serializers.CharField(required=False, allow_blank=True)
     bin = serializers.ChoiceField(choices=Plant.Bin.choices, required=False)
+
+
+class PlantReplaceSerializer(serializers.Serializer):
+    new_plant_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    copy_identity_fields = serializers.BooleanField(required=False, default=True)
+    inherit_assignment = serializers.BooleanField(required=False, default=True)
+    inherit_bin = serializers.BooleanField(required=False, default=False)
+    mark_original_removed = serializers.BooleanField(required=False, default=True)
+    removed_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    removed_at = serializers.DateTimeField(required=False, allow_null=True)
 
 
 class MetricTemplateSerializer(serializers.ModelSerializer):

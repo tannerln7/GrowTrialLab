@@ -8,6 +8,7 @@ from .plants_views import (
     experiment_plants_generate_ids,
     experiment_plants_labels_pdf,
     experiment_plants_packet,
+    plant_replace,
 )
 from .cockpit_views import plant_cockpit
 from .groups_views import (
@@ -182,6 +183,11 @@ urlpatterns = [
         "api/v1/plants/<uuid:plant_id>/cockpit",
         plant_cockpit,
         name="plant-cockpit",
+    ),
+    path(
+        "api/v1/plants/<uuid:plant_id>/replace",
+        plant_replace,
+        name="plant-replace",
     ),
     path(
         "api/v1/experiments/<uuid:experiment_id>/groups/recipes",
