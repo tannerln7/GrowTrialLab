@@ -24,6 +24,7 @@ from .serializers import (
     ExperimentSerializer,
     FeedingEventSerializer,
     PhotoSerializer,
+    PlantDetailSerializer,
     PlantSerializer,
     PlantWeeklyMetricSerializer,
     RecipeSerializer,
@@ -73,6 +74,17 @@ class BatchLotViewSet(ExperimentFilteredViewSet):
 class PlantViewSet(ExperimentFilteredViewSet):
     queryset = Plant.objects.all().order_by("plant_id")
     serializer_class = PlantSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.action == "retrieve":
+            queryset = queryset.select_related("species", "experiment")
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return PlantDetailSerializer
+        return super().get_serializer_class()
 
 
 class TrayViewSet(ExperimentFilteredViewSet):

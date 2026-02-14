@@ -106,6 +106,38 @@ class PlantSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class PlantDetailSpeciesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Species
+        fields = ["id", "name", "category"]
+
+
+class PlantDetailExperimentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Experiment
+        fields = ["id", "name"]
+
+
+class PlantDetailSerializer(serializers.ModelSerializer):
+    uuid = serializers.UUIDField(source="id", read_only=True)
+    species = PlantDetailSpeciesSerializer(read_only=True)
+    experiment = PlantDetailExperimentSerializer(read_only=True)
+
+    class Meta:
+        model = Plant
+        fields = [
+            "uuid",
+            "plant_id",
+            "species",
+            "cultivar",
+            "status",
+            "baseline_notes",
+            "experiment",
+            "created_at",
+            "updated_at",
+        ]
+
+
 class ExperimentPlantSerializer(serializers.ModelSerializer):
     species_name = serializers.CharField(source="species.name", read_only=True)
     species_category = serializers.CharField(source="species.category", read_only=True)
