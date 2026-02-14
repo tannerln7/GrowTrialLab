@@ -279,6 +279,14 @@ class TraySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Block must belong to the same experiment as tray.")
         if block and not block.tent_id:
             raise serializers.ValidationError("Block must be assigned to a tent before placing trays.")
+        if block:
+            conflicting_trays = Tray.objects.filter(block=block)
+            if self.instance is not None:
+                conflicting_trays = conflicting_trays.exclude(id=self.instance.id)
+            if conflicting_trays.exists():
+                raise serializers.ValidationError(
+                    "Block already has a tray. Each block can contain only one tray."
+                )
         if experiment and assigned_recipe and assigned_recipe.experiment_id != experiment.id:
             raise serializers.ValidationError("Recipe must belong to the same experiment as tray.")
         if self.instance is not None:

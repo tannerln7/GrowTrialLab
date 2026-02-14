@@ -114,6 +114,27 @@ class TrayViewSet(ExperimentFilteredViewSet):
     def _placement_locked(self, tray: Tray) -> bool:
         return tray.experiment.lifecycle_state == Experiment.LifecycleState.RUNNING
 
+    def _block_conflict_response(self, tray: Tray):
+        requested_block = self.request.data.get("block")
+        if requested_block is None:
+            requested_block = self.request.data.get("block_id")
+        if requested_block in {None, ""}:
+            return None
+        block = Block.objects.filter(id=requested_block, tent__experiment=tray.experiment).first()
+        if block is None:
+            return None
+        conflict_exists = (
+            Tray.objects.filter(experiment=tray.experiment, block=block)
+            .exclude(id=tray.id)
+            .exists()
+        )
+        if conflict_exists:
+            return Response(
+                {"detail": "Block already has a tray. Each block can contain only one tray."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return None
+
     def update(self, request, *args, **kwargs):
         tray = self.get_object()
         if self._placement_locked(tray):
@@ -123,6 +144,9 @@ class TrayViewSet(ExperimentFilteredViewSet):
                 },
                 status=status.HTTP_409_CONFLICT,
             )
+        conflict_response = self._block_conflict_response(tray)
+        if conflict_response is not None:
+            return conflict_response
         return super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
@@ -134,6 +158,9 @@ class TrayViewSet(ExperimentFilteredViewSet):
                 },
                 status=status.HTTP_409_CONFLICT,
             )
+        conflict_response = self._block_conflict_response(tray)
+        if conflict_response is not None:
+            return conflict_response
         return super().partial_update(request, *args, **kwargs)
 
 

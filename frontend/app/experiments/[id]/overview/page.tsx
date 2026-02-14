@@ -115,10 +115,9 @@ function locationLabel(plant: OverviewPlant): string {
   if (!plant.tent_id || !plant.tray_id) {
     return "Unplaced";
   }
-  const tentLabel = plant.tent_code || plant.tent_name || "Tent";
-  const blockLabel = plant.block_name || "No block";
-  const trayLabel = plant.tray_code || plant.tray_name || plant.placed_tray_name || "Tray";
-  return `${tentLabel} > ${blockLabel} > ${trayLabel}${occupancyLabel(plant)}`;
+  const blockName = plant.block_name || "Unassigned";
+  const trayName = plant.tray_code || plant.tray_name || plant.placed_tray_name || "Unassigned";
+  return `Block ${blockName} > Tray ${trayName}${occupancyLabel(plant)}`;
 }
 
 export default function ExperimentOverviewPage() {

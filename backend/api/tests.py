@@ -834,6 +834,42 @@ class PlacementApiTests(TestCase):
         self.assertEqual(summary_response.status_code, 200)
         self.assertEqual(summary_response.json()["unplaced_plants_count"], 0)
 
+    def test_create_tray_rejects_when_block_already_has_tray(self):
+        experiment = Experiment.objects.create(name="Placement Single Tray Block Create")
+        tent = Tent.objects.get(experiment=experiment, code="T1")
+        block = Block.objects.create(experiment=experiment, tent=tent, name="B1", description="slot")
+        Tray.objects.create(experiment=experiment, name="TR1", block=block)
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/trays",
+            data={"name": "TR2", "block_id": str(block.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"],
+            "Block already has a tray. Each block can contain only one tray.",
+        )
+
+    def test_patch_tray_rejects_when_block_already_has_tray(self):
+        experiment = Experiment.objects.create(name="Placement Single Tray Block Patch")
+        tent = Tent.objects.get(experiment=experiment, code="T1")
+        block_a = Block.objects.create(experiment=experiment, tent=tent, name="B1", description="slot")
+        block_b = Block.objects.create(experiment=experiment, tent=tent, name="B2", description="slot")
+        Tray.objects.create(experiment=experiment, name="TR1", block=block_a)
+        tray_two = Tray.objects.create(experiment=experiment, name="TR2", block=block_b)
+
+        response = self.client.patch(
+            f"/api/v1/trays/{tray_two.id}/",
+            data={"block": str(block_a.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"],
+            "Block already has a tray. Each block can contain only one tray.",
+        )
+
     def test_add_plant_to_tray_rejects_when_capacity_full(self):
         experiment = Experiment.objects.create(name="Placement Capacity")
         species = Species.objects.create(name="Capacity Species", category="drosera")
@@ -1034,9 +1070,10 @@ class PlacementApiTests(TestCase):
         experiment = Experiment.objects.create(name="Placement Auto Balance")
         species = Species.objects.create(name="Drosera auto", category="drosera")
         block = Block.objects.create(experiment=experiment, name="B1", description="slot")
+        block_b = Block.objects.create(experiment=experiment, name="B2", description="slot")
         recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
         tray_a = Tray.objects.create(experiment=experiment, name="T1", block=block, recipe=recipe, capacity=3)
-        tray_b = Tray.objects.create(experiment=experiment, name="T2", block=block, recipe=recipe, capacity=3)
+        tray_b = Tray.objects.create(experiment=experiment, name="T2", block=block_b, recipe=recipe, capacity=3)
 
         plants: list[Plant] = []
         for idx in range(6):

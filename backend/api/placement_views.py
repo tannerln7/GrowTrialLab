@@ -363,6 +363,11 @@ def experiment_trays(request, experiment_id: UUID):
         block = Block.objects.filter(id=block_id, tent__experiment=experiment).first()
         if block is None:
             return Response({"detail": "Block not found for this experiment."}, status=400)
+        if Tray.objects.filter(experiment=experiment, block=block).exists():
+            return Response(
+                {"detail": "Block already has a tray. Each block can contain only one tray."},
+                status=409,
+            )
 
     assigned_recipe_id = request.data.get("assigned_recipe_id") or request.data.get("recipe_id")
     assigned_recipe = None
@@ -757,7 +762,22 @@ def experiment_placement_auto(request, experiment_id: UUID):
                 str(block.id),
             )
         )
-        planned_block = compatible_blocks[0]
+        available_blocks = [
+            block for block in compatible_blocks if block_load.get(str(block.id), 0) == 0
+        ]
+        if not available_blocks:
+            return Response(
+                {
+                    "detail": (
+                        "Could not auto-place trays because no empty compatible block is available. "
+                        "Each block can contain only one tray."
+                    ),
+                    "tray_id": str(state.tray.id),
+                    "tray_name": state.tray.name,
+                },
+                status=409,
+            )
+        planned_block = available_blocks[0]
         state.planned_block = planned_block
         block_load[str(planned_block.id)] += 1
 

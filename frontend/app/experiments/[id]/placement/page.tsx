@@ -226,6 +226,16 @@ export default function PlacementPage() {
 
   const hasTentedBlocks = blocks.length > 0;
 
+  const occupiedTrayIdByBlockId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const tray of summary?.trays || []) {
+      if (tray.block_id) {
+        map.set(tray.block_id, tray.tray_id);
+      }
+    }
+    return map;
+  }, [summary?.trays]);
+
   const speciesAllowedByBlock = useCallback(
     (speciesId: string, blockId: string | null): boolean => {
       if (!blockId) {
@@ -252,6 +262,10 @@ export default function PlacementPage() {
     const map = new Map<string, string[]>();
     for (const tray of summary?.trays || []) {
       const compatible = blocks
+        .filter((block) => {
+          const occupyingTrayId = occupiedTrayIdByBlockId.get(block.id);
+          return !occupyingTrayId || occupyingTrayId === tray.tray_id;
+        })
         .filter((block) =>
           tray.plants.every((plant) => speciesAllowedByBlock(plant.species_id, block.id)),
         )
@@ -259,7 +273,12 @@ export default function PlacementPage() {
       map.set(tray.tray_id, compatible);
     }
     return map;
-  }, [blocks, summary?.trays, speciesAllowedByBlock]);
+  }, [blocks, occupiedTrayIdByBlockId, summary?.trays, speciesAllowedByBlock]);
+
+  const availableBlocksForNewTray = useMemo(
+    () => blocks.filter((block) => !occupiedTrayIdByBlockId.has(block.id)),
+    [blocks, occupiedTrayIdByBlockId],
+  );
 
   const compatibleTrayIdsByPlant = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -809,31 +828,51 @@ export default function PlacementPage() {
                     <div className={styles.blocksList}>
                       {tent.blocks.map((block) => {
                         const traysInBlock = summary.trays.filter((tray) => tray.block_id === block.block_id);
+                        const trayInBlock = traysInBlock[0];
                         return (
                           <article className={styles.blockRow} key={block.block_id}>
                             <div className={styles.actions}>
                               <strong>{block.name}</strong>
-                              <span className={styles.mutedText}>
-                                Trays: {traysInBlock.length}
-                              </span>
                             </div>
                             {traysInBlock.length === 0 ? (
-                              <p className={styles.mutedText}>No trays placed in this block.</p>
-                            ) : (
+                              <p className={styles.mutedText}>No tray assigned to this block.</p>
+                            ) : traysInBlock.length > 1 ? (
                               <div className={styles.stack}>
+                                <p className={styles.inlineNote}>
+                                  Multiple trays found in this block (legacy data). Only one tray per block is allowed.
+                                </p>
                                 {traysInBlock.map((tray) => (
                                   <div className={styles.actions} key={tray.tray_id}>
                                     <span>
-                                      {tray.tray_name}
-                                      {tray.assigned_recipe_code
-                                        ? ` - ${tray.assigned_recipe_code}`
-                                        : " - Missing tray recipe"}
-                                    </span>
-                                    <span className={styles.mutedText}>
-                                      {tray.placed_count} plant(s)
+                                      Tray {tray.tray_name} ({tray.current_count}/{tray.capacity})
                                     </span>
                                   </div>
                                 ))}
+                              </div>
+                            ) : (
+                              <div className={styles.stack}>
+                                <div className={styles.actions}>
+                                  <span>Tray</span>
+                                  <strong>
+                                    {trayInBlock?.tray_name} ({trayInBlock?.current_count}/{trayInBlock?.capacity})
+                                  </strong>
+                                </div>
+                                <div className={styles.actions}>
+                                  <span>Recipe</span>
+                                  <strong>
+                                    {trayInBlock?.assigned_recipe_code
+                                      ? `${trayInBlock.assigned_recipe_code}${
+                                          trayInBlock.assigned_recipe_name
+                                            ? ` - ${trayInBlock.assigned_recipe_name}`
+                                            : ""
+                                        }`
+                                      : "Missing tray recipe"}
+                                  </strong>
+                                </div>
+                                <div className={styles.actions}>
+                                  <span>Plants</span>
+                                  <strong>{trayInBlock?.placed_count}</strong>
+                                </div>
                               </div>
                             )}
                           </article>
@@ -912,7 +951,7 @@ export default function PlacementPage() {
                           </button>
                           {compatibleBlocks.length === 0 ? (
                             <span className={styles.inlineNote}>
-                              No compatible destination blocks for this tray. This tray contains plants not allowed in restricted tents.
+                              No compatible destination blocks for this tray. All compatible blocks are occupied or restricted by tent species rules.
                               <Link href={`/experiments/${experimentId}/slots`}> Adjust tent restrictions</Link>.
                               {trayDetail?.plants.length
                                 ? ` Offending species: ${Array.from(
@@ -961,7 +1000,7 @@ export default function PlacementPage() {
                       </select>
                       {compatibleBlocks.length === 0 ? (
                         <span className={styles.inlineNote}>
-                          No compatible destination blocks for this tray.
+                          No compatible destination blocks for this tray. All compatible blocks are occupied or restricted by tent species rules.
                           <Link href={`/experiments/${experimentId}/slots`}> Adjust tent restrictions</Link>.
                           {trayDetail?.plants.length
                             ? ` Offending species: ${Array.from(
@@ -1035,12 +1074,17 @@ export default function PlacementPage() {
                   disabled={saving || placementLocked}
                 >
                   <option value="">No block</option>
-                  {blocks.map((block) => (
+                  {availableBlocksForNewTray.map((block) => (
                     <option key={block.id} value={block.id}>
                       {block.label}
                     </option>
                   ))}
                 </select>
+                {availableBlocksForNewTray.length === 0 ? (
+                  <span className={styles.inlineNote}>
+                    All blocks already have a tray. Each block can contain only one tray.
+                  </span>
+                ) : null}
               </label>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Tray recipe (optional)</span>
@@ -1161,7 +1205,7 @@ export default function PlacementPage() {
                       {tray.plants.length > 0 &&
                       (compatibleBlockIdsByTray.get(tray.tray_id) || []).length === 0 ? (
                         <p className={styles.inlineNote}>
-                          No compatible destination blocks for this tray.
+                          No compatible destination blocks for this tray. All compatible blocks are occupied or restricted.
                         </p>
                       ) : null}
                     </label>
