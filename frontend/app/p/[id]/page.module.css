@@ -41,6 +41,11 @@
   color: var(--text);
 }
 
+.alertBox {
+  display: grid;
+  gap: 0.6rem;
+}
+
 .nowCard {
   display: grid;
   gap: 0.7rem;

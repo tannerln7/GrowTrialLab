@@ -5,11 +5,12 @@ import {
   Camera,
   ClipboardPlus,
   FlaskConical,
+  RefreshCcw,
   ShieldAlert,
   Tag,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { backendFetch, backendUrl, normalizeBackendError } from "@/lib/backend";
@@ -37,6 +38,8 @@ type PlantCockpit = {
     cultivar: string | null;
     status: string;
     bin: string | null;
+    removed_at: string | null;
+    removed_reason: string;
     species: {
       id: string;
       name: string;
@@ -50,6 +53,9 @@ type PlantCockpit = {
   derived: {
     has_baseline: boolean;
     assigned_recipe_code: string | null;
+    replaced_by_uuid: string | null;
+    replaces_uuid: string | null;
+    chain_label: string | null;
   };
   links: {
     experiment_home: string;
@@ -76,6 +82,12 @@ type NowAction = {
   href?: string;
   buttonLabel?: string;
   icon: typeof FlaskConical;
+};
+
+type ReplacementResponse = {
+  replacement: {
+    uuid: string;
+  };
 };
 
 const TAG_OPTIONS: Array<{ value: UploadTag; label: string }> = [
@@ -136,6 +148,14 @@ function buildNowAction(cockpit: PlantCockpit | null): NowAction {
     };
   }
 
+  if (cockpit.plant.status !== "active") {
+    return {
+      title: "Plant removed",
+      detail: "This plant is no longer active in the experiment.",
+      icon: Tag,
+    };
+  }
+
   if (!cockpit.derived.has_baseline || !cockpit.plant.bin) {
     return {
       title: "Baseline needed",
@@ -165,6 +185,7 @@ function buildNowAction(cockpit: PlantCockpit | null): NowAction {
 
 export default function PlantQrPage() {
   const params = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const plantUuid = useMemo(() => {
@@ -187,6 +208,14 @@ export default function PlantQrPage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadTag, setUploadTag] = useState<UploadTag>("identity");
+  const [showReplaceModal, setShowReplaceModal] = useState(false);
+  const [replaceConfirmed, setReplaceConfirmed] = useState(false);
+  const [replacing, setReplacing] = useState(false);
+  const [newPlantId, setNewPlantId] = useState("");
+  const [removedReason, setRemovedReason] = useState("");
+  const [inheritAssignment, setInheritAssignment] = useState(true);
+  const [copyIdentity, setCopyIdentity] = useState(true);
+  const [inheritBin, setInheritBin] = useState(false);
 
   const overviewFromParam = useMemo(
     () => normalizeFromParam(searchParams.get("from")),
@@ -194,6 +223,7 @@ export default function PlantQrPage() {
   );
   const overviewHref =
     overviewFromParam || cockpit?.links.experiment_home || "/experiments";
+  const replacementCreated = searchParams.get("replacementCreated") === "1";
 
   const nowAction = useMemo(() => buildNowAction(cockpit), [cockpit]);
 
@@ -244,6 +274,20 @@ export default function PlantQrPage() {
 
     void loadCockpit();
   }, [plantUuid]);
+
+  useEffect(() => {
+    if (replacementCreated) {
+      setNotice("Replacement created - baseline required.");
+    }
+  }, [replacementCreated]);
+
+  function replacementHref(targetPlantId: string): string {
+    const nextParams = new URLSearchParams();
+    if (overviewFromParam) {
+      nextParams.set("from", overviewFromParam);
+    }
+    return `/p/${targetPlantId}${nextParams.toString() ? `?${nextParams.toString()}` : ""}`;
+  }
 
   async function handlePhotoUpload() {
     if (!cockpit || !photoFile) {
@@ -307,6 +351,56 @@ export default function PlantQrPage() {
       }
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleReplacePlant() {
+    if (!cockpit) {
+      return;
+    }
+    setReplacing(true);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await backendFetch(`/api/v1/plants/${cockpit.plant.uuid}/replace`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          new_plant_id: newPlantId.trim() || null,
+          copy_identity_fields: copyIdentity,
+          inherit_assignment: inheritAssignment,
+          inherit_bin: inheritBin,
+          mark_original_removed: true,
+          removed_reason: removedReason.trim() || null,
+        }),
+      });
+
+      const payload = (await response.json()) as ReplacementResponse | { detail?: string };
+      if (!response.ok) {
+        setError(
+          (payload as { detail?: string }).detail || "Unable to replace plant.",
+        );
+        return;
+      }
+      const nextParams = new URLSearchParams();
+      if (overviewFromParam) {
+        nextParams.set("from", overviewFromParam);
+      }
+      nextParams.set("replacementCreated", "1");
+      router.push(`/p/${(payload as ReplacementResponse).replacement.uuid}?${nextParams.toString()}`);
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+        setError("You are offline. Replacement is unavailable.");
+      } else {
+        setError("Unable to replace plant.");
+      }
+    } finally {
+      setReplacing(false);
+      setShowReplaceModal(false);
+      setReplaceConfirmed(false);
     }
   }
 
@@ -405,6 +499,56 @@ export default function PlantQrPage() {
             </div>
           </SectionCard>
 
+          {cockpit.plant.status !== "active" ? (
+            <SectionCard title="Removed Plant">
+              <div className={styles.alertBox}>
+                <p className={sharedStyles.mutedText}>
+                  This plant was removed
+                  {cockpit.plant.removed_at
+                    ? ` on ${formatShortDate(cockpit.plant.removed_at)}`
+                    : ""}.
+                </p>
+                {cockpit.plant.removed_reason ? (
+                  <p className={sharedStyles.mutedText}>
+                    Reason: {cockpit.plant.removed_reason}
+                  </p>
+                ) : null}
+                {cockpit.derived.replaced_by_uuid ? (
+                  <Link
+                    className={sharedStyles.buttonPrimary}
+                    href={replacementHref(cockpit.derived.replaced_by_uuid)}
+                  >
+                    Open Replacement
+                  </Link>
+                ) : null}
+              </div>
+            </SectionCard>
+          ) : null}
+
+          {cockpit.derived.replaces_uuid ? (
+            <SectionCard title="Replacement Chain">
+              <p className={sharedStyles.mutedText}>
+                {cockpit.derived.chain_label || "This plant is a replacement."}
+              </p>
+              <div className={sharedStyles.actions}>
+                <Link
+                  className={sharedStyles.buttonSecondary}
+                  href={replacementHref(cockpit.derived.replaces_uuid)}
+                >
+                  Open Previous Plant
+                </Link>
+                {cockpit.derived.replaced_by_uuid ? (
+                  <Link
+                    className={sharedStyles.buttonSecondary}
+                    href={replacementHref(cockpit.derived.replaced_by_uuid)}
+                  >
+                    Open Next Replacement
+                  </Link>
+                ) : null}
+              </div>
+            </SectionCard>
+          ) : null}
+
           <SectionCard title="Now" subtitle="Next best action for this plant">
             <div className={styles.nowCard}>
               <div className={styles.nowHeading}>
@@ -412,7 +556,11 @@ export default function PlantQrPage() {
                 <strong>{nowAction.title}</strong>
               </div>
               <p className={sharedStyles.mutedText}>{nowAction.detail}</p>
-              {nowAction.href && nowAction.buttonLabel ? (
+              {cockpit.plant.status !== "active" ? (
+                <p className={sharedStyles.mutedText}>
+                  Removed plants are read-only. Use chain links to review related plants.
+                </p>
+              ) : nowAction.href && nowAction.buttonLabel ? (
                 <Link className={sharedStyles.buttonPrimary} href={nowAction.href}>
                   {nowAction.buttonLabel}
                 </Link>
@@ -434,6 +582,24 @@ export default function PlantQrPage() {
               )}
             </div>
           </SectionCard>
+
+          {cockpit.plant.status === "active" ? (
+            <SectionCard title="Manage">
+              <div className={sharedStyles.stack}>
+                <p className={sharedStyles.mutedText}>
+                  Replace this plant if it was removed from trial or needs substitution.
+                </p>
+                <button
+                  className={sharedStyles.buttonDanger}
+                  type="button"
+                  onClick={() => setShowReplaceModal(true)}
+                >
+                  <RefreshCcw size={16} />
+                  Replace plant
+                </button>
+              </div>
+            </SectionCard>
+          ) : null}
 
           <SectionCard title="Quick Actions">
             <div className={sharedStyles.formGrid}>
@@ -557,7 +723,14 @@ export default function PlantQrPage() {
             <Link className={sharedStyles.buttonSecondary} href={overviewHref}>
               ← Overview
             </Link>
-            {nowAction.href && nowAction.buttonLabel ? (
+            {cockpit.plant.status !== "active" && cockpit.derived.replaced_by_uuid ? (
+              <Link
+                className={sharedStyles.buttonPrimary}
+                href={replacementHref(cockpit.derived.replaced_by_uuid)}
+              >
+                Open Replacement
+              </Link>
+            ) : nowAction.href && nowAction.buttonLabel ? (
               <Link className={sharedStyles.buttonPrimary} href={nowAction.href}>
                 {nowAction.buttonLabel}
               </Link>
@@ -574,6 +747,93 @@ export default function PlantQrPage() {
             )}
           </StickyActionBar>
         </>
+      ) : null}
+
+      {showReplaceModal ? (
+        <div className={sharedStyles.modalBackdrop} role="presentation">
+          <SectionCard title="Replace Plant">
+            <div className={sharedStyles.stack}>
+              <p className={sharedStyles.mutedText}>
+                This creates a new plant record and marks the current plant as removed.
+                Baseline must be recaptured for the replacement.
+              </p>
+              <label className={sharedStyles.field}>
+                <span className={sharedStyles.fieldLabel}>Removed reason (optional)</span>
+                <textarea
+                  className={sharedStyles.textarea}
+                  value={removedReason}
+                  onChange={(event) => setRemovedReason(event.target.value)}
+                />
+              </label>
+              <label className={sharedStyles.field}>
+                <span className={sharedStyles.fieldLabel}>New Plant ID (optional)</span>
+                <input
+                  className={sharedStyles.input}
+                  placeholder="Leave blank for pending ID"
+                  value={newPlantId}
+                  onChange={(event) => setNewPlantId(event.target.value)}
+                />
+              </label>
+              <label className={sharedStyles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={inheritAssignment}
+                  onChange={(event) => setInheritAssignment(event.target.checked)}
+                />
+                <span>Inherit assignment (recommended)</span>
+              </label>
+              <label className={sharedStyles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={copyIdentity}
+                  onChange={(event) => setCopyIdentity(event.target.checked)}
+                />
+                <span>Copy identity fields (species/cultivar/notes)</span>
+              </label>
+              <label className={sharedStyles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={inheritBin}
+                  onChange={(event) => setInheritBin(event.target.checked)}
+                />
+                <span>Inherit bin assignment</span>
+              </label>
+              <label className={sharedStyles.checkboxRow}>
+                <input type="checkbox" checked readOnly />
+                <span>Mark original plant as removed</span>
+              </label>
+              <label className={sharedStyles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={replaceConfirmed}
+                  onChange={(event) => setReplaceConfirmed(event.target.checked)}
+                />
+                <span>I have read and understand.</span>
+              </label>
+              <div className={sharedStyles.actions}>
+                <button
+                  className={sharedStyles.buttonSecondary}
+                  type="button"
+                  disabled={replacing}
+                  onClick={() => {
+                    setShowReplaceModal(false);
+                    setReplaceConfirmed(false);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className={sharedStyles.buttonDanger}
+                  type="button"
+                  disabled={!replaceConfirmed || replacing}
+                  onClick={() => void handleReplacePlant()}
+                >
+                  {replacing ? "Replacing..." : "Replace plant"}
+                </button>
+              </div>
+            </div>
+          </SectionCard>
+        </div>
       ) : null}
     </PageShell>
   );
