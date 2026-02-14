@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { backendFetch, normalizeBackendError } from "@/lib/backend";
+import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
@@ -42,9 +42,8 @@ export default function ExperimentSlotsPage() {
     if (!response.ok) {
       throw new Error("Unable to load blocks.");
     }
-    const data = (await response.json()) as Block[] | { results?: Block[] };
-    const blockList = Array.isArray(data) ? data : data.results ?? [];
-    setBlocks(blockList);
+    const payload = (await response.json()) as unknown;
+    setBlocks(unwrapList<Block>(payload));
   }, [experimentId]);
 
   useEffect(() => {

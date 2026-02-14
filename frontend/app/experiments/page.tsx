@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { backendFetch, normalizeBackendError } from "@/lib/backend";
+import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
@@ -40,11 +40,8 @@ export default function ExperimentsPage() {
           setError("Unable to load experiments.");
           return;
         }
-        const data = (await response.json()) as
-          | { results?: Experiment[] }
-          | Experiment[];
-        const experiments = Array.isArray(data) ? data : data.results ?? [];
-        setItems(experiments);
+        const payload = (await response.json()) as unknown;
+        setItems(unwrapList<Experiment>(payload));
         setOffline(false);
       } catch (requestError) {
         const normalizedError = normalizeBackendError(requestError);

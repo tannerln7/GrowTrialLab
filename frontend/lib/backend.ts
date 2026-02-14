@@ -58,3 +58,23 @@ export function normalizeBackendError(error: unknown): BackendErrorShape {
   }
   return { kind: "unknown", message: "Unexpected error." };
 }
+
+export function unwrapList<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) {
+    return payload as T[];
+  }
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "results" in payload &&
+    Array.isArray((payload as { results?: unknown }).results)
+  ) {
+    return (payload as { results: T[] }).results;
+  }
+
+  throw new BackendClientError(
+    "unknown",
+    "Expected list response from backend.",
+  );
+}
