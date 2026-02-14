@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError } from "@/lib/backend";
 import {
@@ -96,6 +96,10 @@ export default function ExperimentOverviewPage() {
   const [offline, setOffline] = useState(false);
   const [experimentName, setExperimentName] = useState("");
   const [summary, setSummary] = useState<ExperimentStatusSummary | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionNotice, setActionNotice] = useState("");
+  const [showStopModal, setShowStopModal] = useState(false);
+  const [stopConfirmed, setStopConfirmed] = useState(false);
   const [data, setData] = useState<OverviewResponse>({
     counts: {
       total: 0,
@@ -107,6 +111,16 @@ export default function ExperimentOverviewPage() {
     },
     plants: [],
   });
+
+  const refreshStatusSummary = useCallback(async (): Promise<ExperimentStatusSummary | null> => {
+    const statusSummary = await fetchExperimentStatusSummary(experimentId);
+    if (!statusSummary) {
+      setError("Unable to load overview status.");
+      return null;
+    }
+    setSummary(statusSummary);
+    return statusSummary;
+  }, [experimentId]);
 
   useEffect(() => {
     async function load() {
@@ -125,9 +139,8 @@ export default function ExperimentOverviewPage() {
           return;
         }
 
-        const statusSummary = await fetchExperimentStatusSummary(experimentId);
+        const statusSummary = await refreshStatusSummary();
         if (!statusSummary) {
-          setError("Unable to load overview status.");
           return;
         }
         if (!statusSummary.setup.is_complete) {
@@ -145,7 +158,6 @@ export default function ExperimentOverviewPage() {
           return;
         }
 
-        setSummary(statusSummary);
         const overviewPayload = (await overviewResponse.json()) as OverviewResponse;
         setData(overviewPayload);
         if (experimentResponse.ok) {
@@ -165,7 +177,64 @@ export default function ExperimentOverviewPage() {
     }
 
     void load();
-  }, [experimentId, refreshToken, router]);
+  }, [experimentId, refreshToken, refreshStatusSummary, router]);
+
+  async function handleStartExperiment() {
+    if (!summary || !summary.readiness.ready_to_start) {
+      return;
+    }
+    setActionBusy(true);
+    setActionNotice("");
+    setError("");
+    try {
+      const response = await backendFetch(`/api/v1/experiments/${experimentId}/start`, {
+        method: "POST",
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setError((payload as { detail?: string }).detail || "Unable to start experiment.");
+        return;
+      }
+      setSummary(payload as ExperimentStatusSummary);
+      setActionNotice("Experiment started.");
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to start experiment.");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function handleStopExperiment() {
+    setActionBusy(true);
+    setActionNotice("");
+    setError("");
+    try {
+      const response = await backendFetch(`/api/v1/experiments/${experimentId}/stop`, {
+        method: "POST",
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setError((payload as { detail?: string }).detail || "Unable to stop experiment.");
+        return;
+      }
+      setSummary(payload as ExperimentStatusSummary);
+      setActionNotice("Experiment stopped.");
+      setShowStopModal(false);
+      setStopConfirmed(false);
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to stop experiment.");
+    } finally {
+      setActionBusy(false);
+    }
+  }
 
   function updateQuery(nextFilter: FilterId, nextQ: string) {
     const next = new URLSearchParams(searchParams.toString());
@@ -291,6 +360,69 @@ export default function ExperimentOverviewPage() {
           Tap a plant to open its action page. Scan QR codes to jump directly to a plant.
         </p>
       </SectionCard>
+      {actionNotice ? <p className={styles.successText}>{actionNotice}</p> : null}
+
+      {summary ? (
+        <SectionCard title="Experiment State">
+          <p className={styles.mutedText}>
+            Current state: <strong>{summary.lifecycle.state}</strong>
+          </p>
+          {summary.lifecycle.started_at ? (
+            <p className={styles.mutedText}>
+              Started: {new Date(summary.lifecycle.started_at).toLocaleString()}
+            </p>
+          ) : null}
+          {summary.lifecycle.stopped_at ? (
+            <p className={styles.mutedText}>
+              Stopped: {new Date(summary.lifecycle.stopped_at).toLocaleString()}
+            </p>
+          ) : null}
+          <div className={styles.actions}>
+            <button
+              className={styles.buttonPrimary}
+              type="button"
+              disabled={actionBusy || !summary.readiness.ready_to_start}
+              onClick={() => void handleStartExperiment()}
+            >
+              {actionBusy ? "Working..." : "Start"}
+            </button>
+            {summary.lifecycle.state === "running" ? (
+              <button
+                className={styles.buttonDanger}
+                type="button"
+                disabled={actionBusy}
+                onClick={() => setShowStopModal(true)}
+              >
+                Stop
+              </button>
+            ) : null}
+          </div>
+          {!summary.readiness.ready_to_start ? (
+            <div className={styles.stack}>
+              <p className={styles.inlineNote}>
+                Start is disabled until setup, baseline, and assignment readiness are complete.
+              </p>
+              <div className={styles.actions}>
+                {!summary.setup.is_complete ? (
+                  <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/setup`}>
+                    Complete setup
+                  </Link>
+                ) : null}
+                {summary.readiness.counts.needs_baseline > 0 ? (
+                  <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/baseline`}>
+                    Capture baselines
+                  </Link>
+                ) : null}
+                {summary.readiness.counts.needs_assignment > 0 ? (
+                  <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/assignment`}>
+                    Run assignment
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </SectionCard>
+      ) : null}
 
       {summary ? (
         <SectionCard title="Readiness">
@@ -317,9 +449,24 @@ export default function ExperimentOverviewPage() {
                 >
                   Run assignment
                 </Link>
+                <Link
+                  className={styles.buttonSecondary}
+                  href={`/experiments/${experimentId}/placement`}
+                >
+                  Placement
+                </Link>
               </div>
             </div>
           )}
+        </SectionCard>
+      ) : null}
+      {summary?.readiness.is_ready ? (
+        <SectionCard title="Actions">
+          <div className={styles.actions}>
+            <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/placement`}>
+              Placement
+            </Link>
+          </div>
         </SectionCard>
       ) : null}
 
@@ -476,6 +623,43 @@ export default function ExperimentOverviewPage() {
         ) : null}
         {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
       </SectionCard>
+      {showStopModal ? (
+        <div className={styles.modalBackdrop} role="presentation">
+          <SectionCard title="Stop Experiment">
+            <p className={styles.mutedText}>
+              Stopping marks the experiment as stopped. You can still edit data in v1.
+            </p>
+            <label className={styles.checkboxRow}>
+              <input
+                type="checkbox"
+                checked={stopConfirmed}
+                onChange={(event) => setStopConfirmed(event.target.checked)}
+              />
+              <span>I understand and want to stop this experiment.</span>
+            </label>
+            <div className={styles.actions}>
+              <button
+                className={styles.buttonSecondary}
+                type="button"
+                onClick={() => {
+                  setShowStopModal(false);
+                  setStopConfirmed(false);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.buttonDanger}
+                type="button"
+                disabled={!stopConfirmed || actionBusy}
+                onClick={() => void handleStopExperiment()}
+              >
+                {actionBusy ? "Stopping..." : "Stop experiment"}
+              </button>
+            </div>
+          </SectionCard>
+        </div>
+      ) : null}
     </PageShell>
   );
 }
