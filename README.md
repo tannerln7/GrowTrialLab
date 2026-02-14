@@ -8,7 +8,7 @@ Monorepo scaffold for local development with:
 Experiment flow summary:
 - `/experiments/{id}` is the canonical experiment entry route.
 - It redirects to `/experiments/{id}/setup` until bootstrap setup is complete (plants + blocks + recipes).
-- After bootstrap setup, it redirects to `/experiments/{id}/overview` for readiness work (baseline + assignment).
+- After bootstrap setup, it redirects to `/experiments/{id}/overview` for readiness work (baseline + placement/tray recipes + feeding).
 
 ## Quick start
 
@@ -80,6 +80,25 @@ Notes:
   - backend tests
   - pyright
   - docker compose build
+
+## Reset Local Dev DB
+
+Use this only when you intentionally want a clean empty local database.
+
+```bash
+infra/scripts/reset-dev.sh
+```
+
+What it deletes:
+- The Docker Compose Postgres named volume backing `/var/lib/postgresql/data`.
+- This removes all local dev DB rows (experiments, plants, events, users in DB, etc.).
+
+What it runs:
+- `docker compose down --remove-orphans`
+- Detects the actual Postgres volume name from `docker compose config --format json`
+- `docker volume rm -f <detected_postgres_volume>`
+- `docker compose up --build -d`
+- `docker compose exec -T backend uv run python manage.py migrate`
 
 ## Auth behavior
 
