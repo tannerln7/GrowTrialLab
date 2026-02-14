@@ -29,6 +29,10 @@ type PlantDetail = {
   updated_at: string;
 };
 
+type BaselineStatusSummary = {
+  baseline_locked: boolean;
+};
+
 export default function PlantQrPage() {
   const params = useParams();
   const plantUuid = useMemo(() => {
@@ -47,6 +51,7 @@ export default function PlantQrPage() {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState("");
   const [plant, setPlant] = useState<PlantDetail | null>(null);
+  const [baselineLocked, setBaselineLocked] = useState(false);
 
   useEffect(() => {
     async function loadPlant() {
@@ -92,6 +97,28 @@ export default function PlantQrPage() {
 
     void loadPlant();
   }, [plantUuid]);
+
+  useEffect(() => {
+    async function loadBaselineStatus() {
+      if (!plant) {
+        return;
+      }
+      try {
+        const response = await backendFetch(
+          `/api/v1/experiments/${plant.experiment.id}/baseline/status`,
+        );
+        if (!response.ok) {
+          return;
+        }
+        const data = (await response.json()) as BaselineStatusSummary;
+        setBaselineLocked(Boolean(data.baseline_locked));
+      } catch {
+        // Keep this non-fatal for QR landing.
+      }
+    }
+
+    void loadBaselineStatus();
+  }, [plant]);
 
   if (notInvited) {
     return (
@@ -151,11 +178,22 @@ export default function PlantQrPage() {
               </Link>
               <Link
                 className={styles.buttonSecondary}
+                href={`/experiments/${plant.experiment.id}/baseline?plant=${plant.uuid}`}
+              >
+                Baseline Capture
+              </Link>
+              <Link
+                className={styles.buttonSecondary}
                 href={`/experiments/${plant.experiment.id}/plants`}
               >
                 Open Plants List
               </Link>
             </div>
+            {baselineLocked ? (
+              <p className={styles.mutedText}>
+                Baseline is locked for this experiment.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </SectionCard>

@@ -36,9 +36,29 @@ type Block = {
 type PlantRow = {
   id: string;
   species_name: string;
+  species_category: string;
   plant_id: string;
+  bin: string | null;
   cultivar: string | null;
   status: string;
+};
+
+type BaselinePlantStatus = {
+  id: string;
+  plant_id: string;
+  species_name: string;
+  species_category: string;
+  bin: string | null;
+  baseline_done: boolean;
+};
+
+type BaselineStatus = {
+  total_plants: number;
+  baseline_completed: number;
+  bins_assigned: number;
+  photos_count: number;
+  baseline_locked: boolean;
+  plants: BaselinePlantStatus[];
 };
 
 type EnvironmentForm = {
@@ -125,6 +145,7 @@ export default function ExperimentSetupPage() {
   const [manualQuantity, setManualQuantity] = useState(1);
   const [csvText, setCsvText] = useState("");
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [baselineStatus, setBaselineStatus] = useState<BaselineStatus | null>(null);
 
   function handleRequestError(
     requestError: unknown,
@@ -179,6 +200,17 @@ export default function ExperimentSetupPage() {
     setPlants(data);
   }, [experimentId]);
 
+  const fetchBaselineStatus = useCallback(async () => {
+    const response = await backendFetch(
+      `/api/v1/experiments/${experimentId}/baseline/status`,
+    );
+    if (!response.ok) {
+      throw new Error("Unable to load baseline status.");
+    }
+    const data = (await response.json()) as BaselineStatus;
+    setBaselineStatus(data);
+  }, [experimentId]);
+
   const reloadPageData = useCallback(async () => {
     if (!experimentId) {
       return;
@@ -192,14 +224,19 @@ export default function ExperimentSetupPage() {
         setNotInvited(true);
         return;
       }
-      await Promise.all([fetchSetupState(), fetchBlocks(), fetchPlants()]);
+      await Promise.all([
+        fetchSetupState(),
+        fetchBlocks(),
+        fetchPlants(),
+        fetchBaselineStatus(),
+      ]);
       setOffline(false);
     } catch (requestError) {
       setError(handleRequestError(requestError, "Unable to load setup."));
     } finally {
       setLoading(false);
     }
-  }, [experimentId, fetchSetupState, fetchBlocks, fetchPlants]);
+  }, [experimentId, fetchSetupState, fetchBlocks, fetchPlants, fetchBaselineStatus]);
 
   useEffect(() => {
     void reloadPageData();
@@ -416,6 +453,93 @@ export default function ExperimentSetupPage() {
     }
   }
 
+  async function saveBaselinePacket(showNotice = true) {
+    setError("");
+    try {
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/packets/baseline/`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      if (!response.ok) {
+        setError("Unable to save baseline packet settings.");
+        return false;
+      }
+      if (showNotice) {
+        setNotice("Packet 3 settings saved.");
+      }
+      await fetchSetupState();
+      await fetchBaselineStatus();
+      setOffline(false);
+      return true;
+    } catch (requestError) {
+      setError(
+        handleRequestError(requestError, "Unable to save baseline packet settings."),
+      );
+      return false;
+    }
+  }
+
+  async function lockBaseline() {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/baseline/lock`,
+        { method: "POST" },
+      );
+      if (!response.ok) {
+        setError("Unable to lock baseline.");
+        return;
+      }
+      await fetchSetupState();
+      await fetchBaselineStatus();
+      setNotice("Baseline locked.");
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to lock baseline."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function completeBaselinePacket() {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const saved = await saveBaselinePacket(false);
+      if (!saved) {
+        return;
+      }
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/packets/baseline/complete/`,
+        { method: "POST" },
+      );
+      if (!response.ok) {
+        const data = (await response.json()) as {
+          detail?: string;
+          errors?: string[];
+        };
+        setError(data.errors?.join(" ") || data.detail || "Packet 3 is not complete.");
+        return;
+      }
+
+      await fetchSetupState();
+      await fetchBaselineStatus();
+      setNotice("Packet 3 completed and baseline locked.");
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to complete packet."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function addPlantsQuick() {
     if (manualQuantity > 1 && manualPlantId.trim()) {
       setError("Manual plant_id can only be used when quantity is 1.");
@@ -559,11 +683,21 @@ export default function ExperimentSetupPage() {
     <PageShell
       title="Experiment Setup"
       subtitle={`Experiment: ${experimentId}`}
-      stickyOffset={currentPacket === "environment" || currentPacket === "plants"}
+      stickyOffset={
+        currentPacket === "environment" ||
+        currentPacket === "plants" ||
+        currentPacket === "baseline"
+      }
       actions={
         <div className={styles.actions}>
           <Link className={styles.buttonSecondary} href="/experiments">
             Back to experiments
+          </Link>
+          <Link
+            className={styles.buttonSecondary}
+            href={`/experiments/${experimentId}/baseline`}
+          >
+            Baseline capture
           </Link>
           <Link
             className={styles.buttonSecondary}
@@ -992,7 +1126,121 @@ export default function ExperimentSetupPage() {
               </>
             ) : null}
 
-            {currentPacket !== "environment" && currentPacket !== "plants" ? (
+            {currentPacket === "baseline" ? (
+              <>
+                <SectionCard title="Packet 3: Baseline">
+                  {baselineStatus ? (
+                    <div className={styles.formGrid}>
+                      <p className={styles.mutedText}>
+                        Total plants: {baselineStatus.total_plants}
+                      </p>
+                      <p className={styles.mutedText}>
+                        Baseline captured: {baselineStatus.baseline_completed}
+                      </p>
+                      <p className={styles.mutedText}>
+                        Bins assigned: {baselineStatus.bins_assigned}
+                      </p>
+                      <p className={styles.mutedText}>
+                        Baseline photos: {baselineStatus.photos_count}
+                      </p>
+                      {baselineStatus.baseline_locked ? (
+                        <p className={styles.successText}>
+                          Baseline is locked for integrity.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className={styles.mutedText}>Loading baseline status...</p>
+                  )}
+
+                  <div className={styles.actions}>
+                    <Link
+                      className={styles.buttonPrimary}
+                      href={`/experiments/${experimentId}/baseline`}
+                    >
+                      Start Baseline Capture
+                    </Link>
+                  </div>
+                </SectionCard>
+
+                <SectionCard title="Baseline Progress">
+                  {baselineStatus && baselineStatus.total_plants === 0 ? (
+                    <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
+                  ) : null}
+                  {baselineStatus && baselineStatus.total_plants > 0 ? (
+                    <ResponsiveList
+                      items={baselineStatus.plants}
+                      getKey={(plant) => plant.id}
+                      columns={[
+                        {
+                          key: "plant_id",
+                          label: "Plant ID",
+                          render: (plant) => plant.plant_id || "(pending)",
+                        },
+                        {
+                          key: "species",
+                          label: "Species",
+                          render: (plant) => plant.species_name,
+                        },
+                        {
+                          key: "baseline",
+                          label: "Baseline",
+                          render: (plant) => (plant.baseline_done ? "Done" : "Missing"),
+                        },
+                        {
+                          key: "bin",
+                          label: "Bin",
+                          render: (plant) => plant.bin || "Missing",
+                        },
+                      ]}
+                      renderMobileCard={(plant) => (
+                        <div className={styles.cardKeyValue}>
+                          <span>Plant ID</span>
+                          <strong>{plant.plant_id || "(pending)"}</strong>
+                          <span>Species</span>
+                          <strong>{plant.species_name}</strong>
+                          <span>Baseline</span>
+                          <strong>{plant.baseline_done ? "Done" : "Missing"}</strong>
+                          <span>Bin</span>
+                          <strong>{plant.bin || "Missing"}</strong>
+                        </div>
+                      )}
+                    />
+                  ) : null}
+                </SectionCard>
+
+                <StickyActionBar>
+                  <button
+                    className={styles.buttonPrimary}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void saveBaselinePacket()}
+                  >
+                    Save
+                  </button>
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    disabled={saving || baselineStatus?.baseline_locked}
+                    onClick={() => void lockBaseline()}
+                  >
+                    {saving ? "Locking..." : "Lock Baseline"}
+                  </button>
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void completeBaselinePacket()}
+                  >
+                    {saving ? "Completing..." : "Mark Complete"}
+                  </button>
+                </StickyActionBar>
+              </>
+            ) : null}
+
+            {currentPacket !== "environment" &&
+            currentPacket !== "plants" &&
+            currentPacket !== "baseline" ? (
               <SectionCard title={currentPacket}>
                 <p className={styles.mutedText}>
                   This packet is not implemented yet. Complete Packet 1 and Packet 2 first.
