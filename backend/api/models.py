@@ -143,6 +143,7 @@ class Plant(UUIDModel):
 
     class Status(models.TextChoices):
         ACTIVE = "active", "active"
+        REMOVED = "removed", "removed"
         INACTIVE = "inactive", "inactive"
         DEAD = "dead", "dead"
 
@@ -155,6 +156,15 @@ class Plant(UUIDModel):
         Recipe, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_plants"
     )
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    removed_at = models.DateTimeField(null=True, blank=True)
+    removed_reason = models.TextField(blank=True)
+    replaced_by = models.OneToOneField(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="replaces",
+    )
     baseline_notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -163,7 +173,7 @@ class Plant(UUIDModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["experiment", "plant_id"],
-                condition=~Q(plant_id=""),
+                condition=~Q(plant_id="") & ~Q(status="removed"),
                 name="unique_plant_id_in_experiment",
             )
         ]
