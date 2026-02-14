@@ -158,11 +158,11 @@ def complete_environment_packet(request, experiment_id: UUID):
 
     block_count = Block.objects.filter(experiment=experiment).count()
     if block_count < 2:
-        errors.append("At least 2 blocks are required before completing Packet 1.")
+        errors.append("At least 2 blocks are required before completing the Environments step.")
 
     if errors:
         return Response(
-            {"detail": "Packet 1 cannot be completed.", "errors": errors},
+            {"detail": "Environments step cannot be completed.", "errors": errors},
             status=400,
         )
 

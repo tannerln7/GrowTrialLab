@@ -233,14 +233,14 @@ def complete_baseline_packet(request, experiment_id: UUID):
 
     errors: list[str] = []
     if total_plants < 1:
-        errors.append("At least 1 plant is required before completing Packet 3.")
+        errors.append("At least 1 plant is required before completing the Baseline step.")
     if baseline_completed < 1:
-        errors.append("At least 1 baseline capture is required before completing Packet 3.")
+        errors.append("At least 1 baseline capture is required before completing the Baseline step.")
     if bins_assigned < total_plants:
-        errors.append("All plants must have a bin assignment before completing Packet 3.")
+        errors.append("All plants must have a bin assignment before completing the Baseline step.")
 
     if errors:
-        return Response({"detail": "Packet 3 cannot be completed.", "errors": errors}, status=400)
+        return Response({"detail": "Baseline step cannot be completed.", "errors": errors}, status=400)
 
     setup_state = get_or_create_setup_state(experiment)
     completed = normalize_packet_ids([*setup_state.completed_packets, PACKET_BASELINE])

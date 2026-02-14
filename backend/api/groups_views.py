@@ -295,11 +295,11 @@ def complete_groups_packet(request, experiment_id: UUID):
     unassigned = active_plants.filter(assigned_recipe__isnull=True).count()
     errors: list[str] = []
     if total_active < 1:
-        errors.append("At least 1 active plant is required before completing Packet 4.")
+        errors.append("At least 1 active plant is required before completing the Assignment step.")
     if unassigned > 0:
-        errors.append("All active plants must have an assigned group before completing Packet 4.")
+        errors.append("All active plants must have an assigned group before completing the Assignment step.")
     if errors:
-        return Response({"detail": "Packet 4 cannot be completed.", "errors": errors}, status=400)
+        return Response({"detail": "Assignment step cannot be completed.", "errors": errors}, status=400)
 
     setup_state = get_or_create_setup_state(experiment)
     completed = normalize_packet_ids([*setup_state.completed_packets, PACKET_GROUPS])

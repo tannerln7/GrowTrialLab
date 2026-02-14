@@ -392,8 +392,8 @@ def complete_plants_packet(request, experiment_id: UUID):
     if not Plant.objects.filter(experiment=experiment).exists():
         return Response(
             {
-                "detail": "Packet 2 cannot be completed.",
-                "errors": ["At least 1 plant is required before completing Packet 2."],
+                "detail": "Plants step cannot be completed.",
+                "errors": ["At least 1 plant is required before completing the Plants step."],
             },
             status=400,
         )
