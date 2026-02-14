@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+
+import { backendFetch } from "@/lib/backend";
 import styles from "./page.module.css";
 
 export default function Home() {
@@ -9,19 +12,11 @@ export default function Home() {
   const [meLoading, setMeLoading] = useState(false);
   const [meResult, setMeResult] = useState<string>("No profile loaded.");
 
-  async function fetchBackend(path: string) {
-    try {
-      return await fetch(`http://localhost:8000${path}`);
-    } catch {
-      return await fetch(`http://host.docker.internal:8000${path}`);
-    }
-  }
-
   async function checkBackendHealth() {
     setLoading(true);
     setResult("");
     try {
-      const response = await fetchBackend("/healthz");
+      const response = await backendFetch("/healthz");
       if (!response.ok) {
         throw new Error("Backend returned a non-OK response.");
       }
@@ -37,7 +32,7 @@ export default function Home() {
   async function loadMe() {
     setMeLoading(true);
     try {
-      const response = await fetchBackend("/api/me");
+      const response = await backendFetch("/api/me");
       if (response.status === 403) {
         setMeResult("Not invited.");
         return;
@@ -77,6 +72,9 @@ export default function Home() {
           >
             {meLoading ? "Loading..." : "Load my profile"}
           </button>
+          <Link className={styles.button} href="/experiments">
+            Experiments
+          </Link>
         </div>
         <p className={styles.me}>{meResult}</p>
         <pre className={styles.output}>{result || "No result yet."}</pre>
