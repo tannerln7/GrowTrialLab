@@ -25,6 +25,7 @@ from .baseline_views import (
     complete_baseline_packet,
     experiment_baseline_lock,
     experiment_baseline_packet,
+    experiment_baseline_queue,
     experiment_baseline_status,
     plant_baseline,
 )
@@ -136,6 +137,11 @@ urlpatterns = [
         "api/v1/experiments/<uuid:experiment_id>/baseline/status",
         experiment_baseline_status,
         name="experiment-baseline-status",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/baseline/queue",
+        experiment_baseline_queue,
+        name="experiment-baseline-queue",
     ),
     path(
         "api/v1/plants/<uuid:plant_id>/baseline",

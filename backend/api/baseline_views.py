@@ -99,6 +99,70 @@ def experiment_baseline_status(request, experiment_id: UUID):
     return Response(payload)
 
 
+@api_view(["GET"])
+def experiment_baseline_queue(request, experiment_id: UUID):
+    rejection = _require_app_user(request)
+    if rejection:
+        return rejection
+
+    experiment = _get_experiment(experiment_id)
+    if experiment is None:
+        return Response({"detail": "Experiment not found."}, status=404)
+
+    plants = list(
+        Plant.objects.filter(experiment=experiment, status=Plant.Status.ACTIVE)
+        .select_related("species")
+        .order_by("id")
+    )
+    baseline_plant_ids = {
+        str(item)
+        for item in PlantWeeklyMetric.objects.filter(
+            experiment=experiment,
+            week_number=BASELINE_WEEK_NUMBER,
+        ).values_list("plant_id", flat=True)
+    }
+
+    def has_baseline(plant: Plant) -> bool:
+        return str(plant.id) in baseline_plant_ids
+
+    def has_bin(plant: Plant) -> bool:
+        return bool(plant.bin)
+
+    def needs_baseline(plant: Plant) -> bool:
+        return not has_baseline(plant) or not has_bin(plant)
+
+    remaining_count = sum(1 for plant in plants if needs_baseline(plant))
+    ordered_plants = sorted(
+        plants,
+        key=lambda plant: (
+            0 if needs_baseline(plant) else 1,
+            0 if plant.plant_id else 1,
+            (plant.plant_id or "").lower(),
+            plant.created_at,
+            str(plant.id),
+        ),
+    )
+
+    return Response(
+        {
+            "remaining_count": remaining_count,
+            "plants": [
+                {
+                    "uuid": str(plant.id),
+                    "plant_id": plant.plant_id,
+                    "species_name": plant.species.name,
+                    "species_category": plant.species.category,
+                    "cultivar": plant.cultivar,
+                    "status": plant.status,
+                    "has_baseline": has_baseline(plant),
+                    "has_bin": has_bin(plant),
+                }
+                for plant in ordered_plants[:50]
+            ],
+        }
+    )
+
+
 @api_view(["GET", "POST"])
 def plant_baseline(request, plant_id: UUID):
     rejection = _require_app_user(request)
