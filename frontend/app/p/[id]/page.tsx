@@ -52,6 +52,7 @@ type PlantCockpit = {
     assigned_recipe_code: string | null;
   };
   links: {
+    experiment_home: string;
     experiment_overview: string;
     setup_assignment: string;
     baseline_capture: string;
@@ -192,7 +193,7 @@ export default function PlantQrPage() {
     [searchParams],
   );
   const overviewHref =
-    overviewFromParam || cockpit?.links.experiment_overview || "/experiments";
+    overviewFromParam || cockpit?.links.experiment_home || "/experiments";
 
   const nowAction = useMemo(() => buildNowAction(cockpit), [cockpit]);
 
