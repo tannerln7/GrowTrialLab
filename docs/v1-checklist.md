@@ -94,6 +94,14 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Refs: `a6b19d01`, `ea4373b7`
   - Notes: User-facing copy now uses setup steps (Plants, Environments, Baseline, Recipes, Assignment, Placement, Rotation, Start) while backend step keys and `/packets/*` endpoints remain unchanged.
   - Notes: Read-only-by-default when locked; local unlock/re-lock modal does not call backend unlock endpoints.
+- [x] Experiment overview roster/work queue endpoint and UI (owner: Codex)
+  - Refs: `51a32d99`, `65f84632`, `12517df6`
+  - Routes: `GET /api/v1/experiments/{id}/overview/plants`, `/experiments/{id}/overview`.
+  - Notes: Includes aggregate counts and filterable plant queue (Needs Baseline/Bin/Assignment, Active, Removed) with mobile cards.
+- [x] Plant action pages support safe return to experiment overview with filter preservation (owner: Codex)
+  - Refs: `2e911442`, `226d9654`
+  - Routes: `/p/{uuid}?from=...`.
+  - Notes: `from` is sanitized to same-origin relative experiment paths (`/experiments/...`); QR direct visits default to `/experiments/{id}/overview`.
 
 ## Remaining Milestones
 
@@ -126,8 +134,8 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [ ] Implement Start step scaffolding (owner: Codex)
 
 ### Experiments/Plants UX
-- [ ] Improve experiment detail context page linking wizard, plants, and outputs (owner: Codex)
-  - Routes: `/experiments`, `/experiments/{id}/setup`, `/experiments/{id}/plants`.
+- [ ] (in progress) Improve experiment detail context page linking setup, overview, plants, and outputs (owner: Codex)
+  - Routes: `/experiments`, `/experiments/{id}/setup`, `/experiments/{id}/overview`, `/experiments/{id}/plants`.
 - [ ] Add UX affordances for validation errors and partial saves (owner: Codex)
 
 ### Baseline/Binning (Step)

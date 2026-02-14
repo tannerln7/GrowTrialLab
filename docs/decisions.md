@@ -82,6 +82,16 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Improves operator mental model and navigation clarity without data migration risk.
 - Refs: `a6b19d01`, `ea4373b7`.
 
+### 2026-02-14: Experiment Overview is the primary roster/work queue surface
+- Decision: Add `/experiments/{id}/overview` backed by `GET /api/v1/experiments/{id}/overview/plants` to centralize plant queue triage (needs baseline/bin/assignment, active, removed) and search.
+- Rationale: Operators need one mobile-first page to identify what requires action before entering specific step flows.
+- Refs: `51a32d99`, `65f84632`, `12517df6`.
+
+### 2026-02-14: Plant action pages use explicit safe return links to overview
+- Decision: Plant pages accept a `from` query value for back navigation, but only honor relative experiment paths (`/experiments/...`); otherwise fallback to the plant experiment overview.
+- Rationale: Preserves work-queue filters when navigating from overview without introducing open redirect risk.
+- Refs: `2e911442`, `226d9654`.
+
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
 - Rationale: Clear persistence boundary and easy backup target.
