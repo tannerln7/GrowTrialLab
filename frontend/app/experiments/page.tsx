@@ -119,7 +119,6 @@ export default function ExperimentsPage() {
                 <span>Status</span>
                 <strong>{item.status}</strong>
                 <Link href={`/experiments/${item.id}/overview`}>Open overview</Link>
-                <Link href={`/experiments/${item.id}/setup`}>Open setup</Link>
               </div>
             )}
             emptyState={
