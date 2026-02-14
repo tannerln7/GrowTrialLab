@@ -21,7 +21,8 @@ Status convention:
 - Readiness work happens from Overview and dedicated pages:
   - Baseline capture: `/experiments/{id}/baseline`
   - Assignment: `/experiments/{id}/assignment`
-  - Placement: `/experiments/{id}/placement` (MVP in progress)
+  - Placement: `/experiments/{id}/placement`
+  - Rotation: `/experiments/{id}/rotation`
 - Experiment lifecycle is being introduced as a prerequisite for future delete-gating/immutability:
   - `draft` -> `running` -> `stopped` (archive deferred)
 
@@ -37,7 +38,7 @@ The repo has a working monorepo foundation with Docker Compose, Django + DRF bac
 
 Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Baseline and Groups/Assignment are implemented with UI-only lock semantics, and `/p/{uuid}` now functions as a mobile-first plant cockpit/task launcher.
 
-The largest remaining V1 work is Placement/Rotation/Start step implementation, production-hardening/security/deployment details, and operational guardrails (backups, stricter step-lock governance, reporting/export paths).
+The largest remaining V1 work is lifecycle hardening (immutability/deletion policies), production-hardening/security/deployment details, and operational guardrails (backups, stricter step-lock governance, reporting/export paths).
 
 ## Completed Milestones
 - [x] Monorepo scaffold and local compose runtime (owner: Codex)
@@ -148,6 +149,10 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Refs: `8f3f79c8`, `f9cb600a`, `dd7a6279`, `47eef321`, `b86db9f1`
   - Routes: `GET /api/v1/experiments/{id}/placement/summary`, `POST /api/v1/experiments/{id}/trays`, `PATCH /api/v1/trays/{id}/`, `POST /api/v1/trays/{id}/plants`, `DELETE /api/v1/trays/{id}/plants/{tray_plant_id}`, `/experiments/{id}/placement`.
   - Notes: Enforces one-tray-per-plant and blocks placement for removed plants.
+- [x] Rotation MVP with tray movement logs and recent history (owner: Codex)
+  - Refs: `3b52663c`, `9798c9fe`, `ec06d079`, `b80218ae`
+  - Routes: `GET /api/v1/experiments/{id}/rotation/summary`, `POST /api/v1/experiments/{id}/rotation/log`, `/experiments/{id}/rotation`.
+  - Notes: Rotation logging is allowed only for `running` lifecycle state and updates `Tray.block` as the canonical current location.
 
 ## Remaining Milestones
 
@@ -179,8 +184,6 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Route: `PATCH /api/v1/experiments/{id}/setup-state/`.
 - [ ] (in progress) Strengthen Baseline completion rule from MVP threshold to all-plants baseline coverage (owner: Codex)
   - Notes: Current MVP requires at least 1 baseline capture + all bins assigned.
-- [ ] Implement Placement step scaffolding (owner: Codex)
-- [ ] Implement Rotation step scaffolding (owner: Codex)
 - [ ] Implement Start step scaffolding (owner: Codex)
 
 ### Experiments/Plants UX
@@ -211,9 +214,9 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [x] Build tray composition UX using `Tray` + `TrayPlant` (owner: Codex)
   - Refs: `47eef321`, `b86db9f1`
   - API refs: `/api/v1/experiments/{id}/placement/summary`, `/api/v1/experiments/{id}/trays`, `/api/v1/trays/{id}/plants`.
-- [ ] (in progress) Build rotation logging workflow tied to trays/blocks (owner: Codex)
-  - Notes: Rotation MVP will add overview-launched logging and recent history without weekly due logic.
-  - Planned routes/API refs: `/experiments/{id}/rotation`, `GET /api/v1/experiments/{id}/rotation/summary`, `POST /api/v1/experiments/{id}/rotation/log`.
+- [x] Build rotation logging workflow tied to trays/blocks (owner: Codex)
+  - Refs: `3b52663c`, `9798c9fe`, `ec06d079`, `b80218ae`
+  - API refs: `/experiments/{id}/rotation`, `GET /api/v1/experiments/{id}/rotation/summary`, `POST /api/v1/experiments/{id}/rotation/log`.
 
 ### Feeding/Lots/Weekly Sessions (Future Step + Ritual Loop)
 - [ ] Build lot preparation and assignment workflow (owner: Codex)
@@ -249,9 +252,9 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [ ] Define app operational metrics and alert thresholds (owner: manual)
 
 ## Next 3 Prompts Plan
-1. Rotation step MVP: running-state tray movement logs + recent history.
-2. Lifecycle governance hardening: define backend-enforced immutability/deletion rules after start.
-3. Placement refinements: tray balancing UX and conflict handling for high-volume experiments.
+1. Lifecycle governance hardening: define backend-enforced immutability/deletion rules after start.
+2. Start step scaffolding aligned with lifecycle transitions and overview hub behavior.
+3. Placement/rotation refinements: high-volume UX and conflict handling.
 
 ## History / Legacy Appendix
 - Legacy setup naming migration (completed):
