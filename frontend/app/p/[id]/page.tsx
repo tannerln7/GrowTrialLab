@@ -2,7 +2,6 @@
 
 import {
   AlertCircle,
-  ArrowLeft,
   Camera,
   ClipboardPlus,
   FlaskConical,
@@ -316,8 +315,7 @@ export default function PlantQrPage() {
         title="Plant Cockpit"
         actions={
           <Link className={sharedStyles.buttonPrimary} href={overviewHref}>
-            <ArrowLeft size={16} />
-            Overview
+            ← Overview
           </Link>
         }
       >
@@ -334,8 +332,7 @@ export default function PlantQrPage() {
         title="Plant Cockpit"
         actions={
           <Link className={sharedStyles.buttonPrimary} href={overviewHref}>
-            <ArrowLeft size={16} />
-            Overview
+            ← Overview
           </Link>
         }
       >
@@ -358,8 +355,7 @@ export default function PlantQrPage() {
       stickyOffset
       actions={
         <Link className={sharedStyles.buttonPrimary} href={overviewHref}>
-          <ArrowLeft size={16} />
-          Overview
+          ← Overview
         </Link>
       }
     >
@@ -558,8 +554,7 @@ export default function PlantQrPage() {
 
           <StickyActionBar>
             <Link className={sharedStyles.buttonSecondary} href={overviewHref}>
-              <ArrowLeft size={16} />
-              Overview
+              ← Overview
             </Link>
             {nowAction.href && nowAction.buttonLabel ? (
               <Link className={sharedStyles.buttonPrimary} href={nowAction.href}>

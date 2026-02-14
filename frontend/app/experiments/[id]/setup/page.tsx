@@ -1102,6 +1102,32 @@ export default function ExperimentSetupPage() {
   const recipeCodes = (groupsStatus?.recipes ?? []).map((recipe) => recipe.code);
   const recipesConfigured =
     recipeCodes.includes("R0") && (groupsStatus?.recipes.length ?? 0) >= 2;
+  const baselineStatusByPlantId = useMemo(() => {
+    const map = new Map<string, BaselinePlantStatus>();
+    (baselineStatus?.plants ?? []).forEach((plant) => {
+      map.set(plant.id, plant);
+    });
+    return map;
+  }, [baselineStatus?.plants]);
+  const activePlantsMissingBaselineOrBin = useMemo(
+    () =>
+      plants.filter((plant) => {
+        if (plant.status !== "active") {
+          return false;
+        }
+        const baselineRow = baselineStatusByPlantId.get(plant.id);
+        const hasBaseline = baselineRow ? baselineRow.baseline_done : false;
+        const hasBin = Boolean(plant.bin || baselineRow?.bin);
+        return !hasBaseline || !hasBin;
+      }),
+    [plants, baselineStatusByPlantId],
+  );
+  const assignmentPrereqsMet = activePlantsMissingBaselineOrBin.length === 0;
+  const assignmentReadyForDone = Boolean(
+    groupsStatus &&
+      groupsStatus.summary.total_plants > 0 &&
+      groupsStatus.summary.unassigned === 0,
+  );
 
   const currentStep: SetupStepId = useMemo(() => {
     if (currentPacket === "groups") {
@@ -1798,16 +1824,8 @@ export default function ExperimentSetupPage() {
             {(currentStep === "recipes" || currentStep === "assignment") ? (
               <>
                 <SectionCard
-                  title={
-                    currentStep === "recipes"
-                      ? "Recipes"
-                      : "Assignment"
-                  }
-                  subtitle={
-                    currentStep === "recipes"
-                      ? "Define control and treatment recipes (R0, R1, ...)"
-                      : "Assign plants to recipes using stratified randomization"
-                  }
+                  title="Assignment Status"
+                  subtitle="Recipes and randomization progress"
                 >
                   {groupsStatus ? (
                     <div className={styles.formGrid}>
@@ -1866,10 +1884,15 @@ export default function ExperimentSetupPage() {
                   )}
                 </SectionCard>
 
-                {currentStep === "recipes" ? (
-                  <SectionCard title="Setup Notes">
+                <SectionCard
+                  title="Recipes"
+                  subtitle="Define control and treatment recipes (R0, R1, ...)"
+                >
+                  <p className={styles.inlineNote}>
+                    Recipes must include R0 (control) and at least one treatment recipe.
+                  </p>
                   <label className={styles.field}>
-                    <span className={styles.fieldLabel}>Notes</span>
+                    <span className={styles.fieldLabel}>Setup notes</span>
                     <textarea
                       className={styles.textarea}
                       value={groupsNotes}
@@ -1877,14 +1900,6 @@ export default function ExperimentSetupPage() {
                       onChange={(event) => setGroupsNotes(event.target.value)}
                     />
                   </label>
-                  </SectionCard>
-                ) : null}
-
-                {currentStep === "recipes" ? (
-                  <SectionCard title="Recipe Editor">
-                  <p className={styles.inlineNote}>
-                    Recipes must include R0 (control) and at least one treatment recipe.
-                  </p>
                   <div className={styles.blocksList}>
                     {(groupsStatus?.recipes ?? []).map((recipe) => (
                       <article className={styles.blockRow} key={recipe.id}>
@@ -1993,62 +2008,84 @@ export default function ExperimentSetupPage() {
                       Add recipe
                     </button>
                   </div>
-                  </SectionCard>
-                ) : null}
+                </SectionCard>
 
                 {currentStep === "assignment" ? (
-                  <SectionCard title="Randomization">
-                  <div className={styles.formGrid}>
-                    <label className={styles.field}>
-                      <span className={styles.fieldLabel}>Seed (optional)</span>
-                      <input
-                        className={styles.input}
-                        type="number"
-                        min={1}
-                        value={groupsSeedInput}
-                        disabled={groupsReadOnly}
-                        onChange={(event) => setGroupsSeedInput(event.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <div className={styles.actions}>
-                    <button
-                      className={styles.buttonPrimary}
-                      type="button"
-                      disabled={saving || groupsReadOnly}
-                      onClick={() => void previewGroups()}
+                  assignmentPrereqsMet ? (
+                    <SectionCard
+                      title="Assignment"
+                      subtitle="Assign plants to recipes using stratified randomization"
                     >
-                      Preview assignment
-                    </button>
-                    <button
-                      className={styles.buttonSecondary}
-                      type="button"
-                      disabled={saving || groupsReadOnly}
-                      onClick={() => void applyGroups()}
-                    >
-                      Apply assignment
-                    </button>
-                    <button
-                      className={styles.buttonSecondary}
-                      type="button"
-                      disabled={saving || groupsReadOnly}
-                      onClick={() => {
-                        setGroupsSeedInput("");
-                        setPreviewSeed(null);
-                        setPreviewAssignments([]);
-                        void previewGroups(true);
-                      }}
-                    >
-                      Reroll
-                    </button>
-                  </div>
-                  {previewSeed ? (
-                    <p className={styles.mutedText}>Preview seed: {previewSeed}</p>
-                  ) : null}
-                  </SectionCard>
+                      <div className={styles.formGrid}>
+                        <label className={styles.field}>
+                          <span className={styles.fieldLabel}>Seed (optional)</span>
+                          <input
+                            className={styles.input}
+                            type="number"
+                            min={1}
+                            value={groupsSeedInput}
+                            disabled={groupsReadOnly}
+                            onChange={(event) => setGroupsSeedInput(event.target.value)}
+                          />
+                        </label>
+                      </div>
+                      <div className={styles.actions}>
+                        <button
+                          className={styles.buttonPrimary}
+                          type="button"
+                          disabled={saving || groupsReadOnly}
+                          onClick={() => void previewGroups()}
+                        >
+                          Preview assignment
+                        </button>
+                        <button
+                          className={styles.buttonSecondary}
+                          type="button"
+                          disabled={saving || groupsReadOnly}
+                          onClick={() => void applyGroups()}
+                        >
+                          Apply assignment
+                        </button>
+                        <button
+                          className={styles.buttonSecondary}
+                          type="button"
+                          disabled={saving || groupsReadOnly}
+                          onClick={() => {
+                            setGroupsSeedInput("");
+                            setPreviewSeed(null);
+                            setPreviewAssignments([]);
+                            void previewGroups(true);
+                          }}
+                        >
+                          Reroll
+                        </button>
+                      </div>
+                      {previewSeed ? (
+                        <p className={styles.mutedText}>Preview seed: {previewSeed}</p>
+                      ) : null}
+                    </SectionCard>
+                  ) : (
+                    <SectionCard title="Assignment">
+                      <p className={styles.errorText}>
+                        Assignment requires baseline binning for all active plants.
+                      </p>
+                      <p className={styles.mutedText}>
+                        {activePlantsMissingBaselineOrBin.length} active plant(s) are still missing
+                        baseline and/or bin assignment.
+                      </p>
+                      <div className={styles.actions}>
+                        <Link
+                          className={styles.buttonPrimary}
+                          href={`/experiments/${experimentId}/overview`}
+                        >
+                          Back to Overview
+                        </Link>
+                      </div>
+                    </SectionCard>
+                  )
                 ) : null}
 
-                {currentStep === "assignment" ? (
+                {currentStep === "assignment" && assignmentPrereqsMet ? (
                   <SectionCard title="Distribution Summary">
                   {previewSummary ? (
                     <p className={styles.mutedText}>
@@ -2106,10 +2143,20 @@ export default function ExperimentSetupPage() {
                       </div>
                     )}
                   />
+                  {assignmentReadyForDone ? (
+                    <div className={styles.actions}>
+                      <Link
+                        className={styles.buttonPrimary}
+                        href={`/experiments/${experimentId}/overview`}
+                      >
+                        Done → Overview
+                      </Link>
+                    </div>
+                  ) : null}
                   </SectionCard>
                 ) : null}
 
-                {currentStep === "assignment" && previewAssignments.length > 0 ? (
+                {currentStep === "assignment" && assignmentPrereqsMet && previewAssignments.length > 0 ? (
                   <SectionCard title="Preview Assignments">
                     <ResponsiveList
                       items={previewAssignments}
@@ -2138,34 +2185,46 @@ export default function ExperimentSetupPage() {
                   </SectionCard>
                 ) : null}
 
-                <StickyActionBar>
-                  <button
-                    className={styles.buttonPrimary}
-                    type="button"
-                    disabled={saving || groupsReadOnly}
-                    onClick={() => void saveGroupsPacket()}
-                  >
-                    Save
-                  </button>
-                  <button
-                    className={styles.buttonSecondary}
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void completeGroupsPacket()}
-                  >
-                    {saving ? "Completing..." : "Mark Complete"}
-                  </button>
-                  <button
-                    className={styles.buttonSecondary}
-                    type="button"
-                    disabled={saving || nextDisabled}
-                    onClick={() => void goToNextStep()}
-                    title={nextDisabledReason}
-                  >
-                    Next step
-                  </button>
-                </StickyActionBar>
-                {nextDisabledReason ? <p className={styles.inlineNote}>{nextDisabledReason}</p> : null}
+                {(currentStep === "recipes" || assignmentPrereqsMet) ? (
+                  <>
+                    <StickyActionBar>
+                      <button
+                        className={styles.buttonPrimary}
+                        type="button"
+                        disabled={saving || groupsReadOnly}
+                        onClick={() => void saveGroupsPacket()}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className={styles.buttonSecondary}
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void completeGroupsPacket()}
+                      >
+                        {saving ? "Completing..." : "Mark Complete"}
+                      </button>
+                      {currentStep === "assignment" && assignmentReadyForDone ? (
+                        <Link
+                          className={styles.buttonSecondary}
+                          href={`/experiments/${experimentId}/overview`}
+                        >
+                          Done → Overview
+                        </Link>
+                      ) : null}
+                      <button
+                        className={styles.buttonSecondary}
+                        type="button"
+                        disabled={saving || nextDisabled}
+                        onClick={() => void goToNextStep()}
+                        title={nextDisabledReason}
+                      >
+                        Next step
+                      </button>
+                    </StickyActionBar>
+                    {nextDisabledReason ? <p className={styles.inlineNote}>{nextDisabledReason}</p> : null}
+                  </>
+                ) : null}
               </>
             ) : null}
 
