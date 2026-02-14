@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError } from "@/lib/backend";
@@ -40,6 +40,7 @@ type BaselineStatusSummary = {
 
 export default function PlantQrPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const plantUuid = useMemo(() => {
     if (typeof params.id === "string") {
       return params.id;
@@ -57,6 +58,23 @@ export default function PlantQrPage() {
   const [error, setError] = useState("");
   const [plant, setPlant] = useState<PlantDetail | null>(null);
   const [baselineLocked, setBaselineLocked] = useState(false);
+
+  const overviewFromParam = useMemo(() => {
+    const rawFrom = searchParams.get("from");
+    if (!rawFrom) {
+      return null;
+    }
+    let decoded = rawFrom;
+    try {
+      decoded = decodeURIComponent(rawFrom);
+    } catch {
+      decoded = rawFrom;
+    }
+    if (decoded.startsWith("/experiments/")) {
+      return decoded;
+    }
+    return null;
+  }, [searchParams]);
 
   useEffect(() => {
     async function loadPlant() {
@@ -152,6 +170,19 @@ export default function PlantQrPage() {
 
   return (
     <PageShell title="Plant Details" subtitle={plantUuid || "Unknown plant"}>
+      <SectionCard>
+        <div className={styles.actions}>
+          <Link
+            className={styles.buttonPrimary}
+            href={
+              overviewFromParam ||
+              (plant ? `/experiments/${plant.experiment.id}/overview` : "/experiments")
+            }
+          >
+            ← Overview
+          </Link>
+        </div>
+      </SectionCard>
       <SectionCard>
         {loading ? <p className={styles.mutedText}>Loading plant details...</p> : null}
         {error ? <p className={styles.errorText}>{error}</p> : null}
