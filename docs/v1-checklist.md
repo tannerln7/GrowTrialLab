@@ -20,10 +20,10 @@ Status convention:
 - Bootstrap setup is intentionally minimal: Plants, Blocks/Slots, and Recipes.
 - Readiness work happens from Overview and dedicated pages:
   - Baseline capture: `/experiments/{id}/baseline`
-  - Assignment: `/experiments/{id}/assignment`
   - Placement: `/experiments/{id}/placement`
   - Rotation: `/experiments/{id}/rotation`
   - Feeding: `/experiments/{id}/feeding`
+- Assignment route (`/experiments/{id}/assignment`) remains for legacy recipe/group tooling, but tray placement (`Tray.recipe`) is the canonical recipe-assignment source for start/readiness/feeding.
 - Experiment lifecycle is being introduced as a prerequisite for future delete-gating/immutability:
   - `draft` -> `running` -> `stopped` (archive deferred)
 
@@ -35,7 +35,7 @@ Status convention:
 - Deletion gating and hard immutability rules are intentionally deferred until lifecycle primitives exist.
 
 ## Current Status Summary
-The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Setup is now bootstrap-only (Plants, Blocks/Slots, Recipes), and readiness workflows (baseline + assignment) are centered in Overview and dedicated pages.
+The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Setup is now bootstrap-only (Plants, Blocks/Slots, Recipes), and readiness workflows (baseline + placement/tray recipes + feeding) are centered in Overview and dedicated pages.
 
 Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Baseline and Groups/Assignment are implemented with UI-only lock semantics, and `/p/{uuid}` now functions as a mobile-first plant cockpit/task launcher.
 
@@ -48,6 +48,9 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
 - [x] Local verification workflow script and docs (owner: Codex)
   - Refs: `0a2e3228`
   - Notes: `infra/scripts/verify.sh` runs tests/typecheck/build checks.
+- [x] Local dev DB reset script for clean-state validation (owner: Codex)
+  - Refs: pending current prompt commit
+  - Notes: `infra/scripts/reset-dev.sh` safely resets local compose Postgres volume, rebuilds stack, and runs migrations.
 - [x] Cloudflare Access auth middleware with invite-only provisioning and bootstrap admin (owner: Codex)
   - Refs: `262849c8`, `bba65cd9`, `f00306e5`
   - Routes: `GET /api/me`, middleware exemption `GET /healthz`.
@@ -125,7 +128,7 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
 - [x] Experiment status summary endpoint for bootstrap/readiness gating (owner: Codex)
   - Refs: `ee000fab`, `c8b7db72`, `d302abd6`
   - Route: `GET /api/v1/experiments/{id}/status/summary`.
-  - Notes: Setup completeness checks plants/blocks/recipes only; readiness counts track baseline/bin + assignment gaps on active plants and are refreshed after assignment apply.
+  - Notes: Setup completeness checks plants/blocks/recipes only; readiness now tracks `needs_baseline`, `needs_placement`, and `needs_tray_recipe` on active plants.
 - [x] Bootstrap-only setup checklist + dedicated slots and assignment pages (owner: Codex)
   - Refs: `f2b49938`, `a181325a`, `c61be2e7`
   - Routes: `/experiments/{id}/setup`, `/experiments/{id}/slots`, `/experiments/{id}/assignment`.
@@ -148,8 +151,8 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Notes: Lifecycle states are `draft`/`running`/`stopped`; start requires readiness (`ready_to_start=true`) and returns `409` with counts when blocked.
 - [x] Placement step MVP with tray composition workflow (owner: Codex)
   - Refs: `8f3f79c8`, `f9cb600a`, `dd7a6279`, `47eef321`, `b86db9f1`
-  - Routes: `GET /api/v1/experiments/{id}/placement/summary`, `POST /api/v1/experiments/{id}/trays`, `PATCH /api/v1/trays/{id}/`, `POST /api/v1/trays/{id}/plants`, `DELETE /api/v1/trays/{id}/plants/{tray_plant_id}`, `/experiments/{id}/placement`.
-  - Notes: Enforces one-tray-per-plant and blocks placement for removed plants.
+  - Routes: `GET /api/v1/experiments/{id}/placement/summary`, `POST /api/v1/experiments/{id}/placement/auto`, `POST /api/v1/experiments/{id}/trays`, `PATCH /api/v1/trays/{id}/`, `POST /api/v1/trays/{id}/plants`, `DELETE /api/v1/trays/{id}/plants/{tray_plant_id}`, `/experiments/{id}/placement`.
+  - Notes: Enforces one-tray-per-plant, tray-level recipe assignment, removed-plant placement rejection, and running-state placement mutation locks.
 - [x] Rotation MVP with tray movement logs and recent history (owner: Codex)
   - Refs: `3b52663c`, `9798c9fe`, `ec06d079`, `b80218ae`
   - Routes: `GET /api/v1/experiments/{id}/rotation/summary`, `POST /api/v1/experiments/{id}/rotation/log`, `/experiments/{id}/rotation`.
@@ -158,10 +161,10 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Refs: `90aa50fb`, `af3c5c71`, `6146269d`
   - Routes: `GET /api/v1/experiments/{id}/feeding/queue`, `POST /api/v1/plants/{uuid}/feed`, `GET /api/v1/plants/{uuid}/feeding/recent`, `/experiments/{id}/feeding`.
   - Notes: Feeding writes are lifecycle-gated to `running` (backend `409` outside running); queue uses a 7-day needs-first window and Plant Cockpit now exposes last-fed hint + quick feed launch.
-- [x] Canonical assignment persistence and recipe-locked feeding (owner: Codex)
-  - Refs: `0f5683d0`, `9b0de186`, `1e804826`
-  - Routes: `POST /api/v1/experiments/{id}/groups/apply`, `POST /api/v1/plants/{uuid}/feed`, `GET /api/v1/experiments/{id}/feeding/queue`, `GET /api/v1/plants/{uuid}/cockpit`, `GET /api/v1/experiments/{id}/overview/plants`.
-  - Notes: `Plant.assigned_recipe` is the canonical source of plant→recipe assignment; feeding auto-uses assigned recipe, rejects mismatched `recipe_id`, and blocks unassigned plants (UI + backend `409`).
+- [x] Tray-canonical assignment + recipe-locked feeding/readiness (owner: Codex)
+  - Refs: pending current prompt commit
+  - Routes: `GET /api/v1/experiments/{id}/status/summary`, `GET /api/v1/experiments/{id}/overview/plants`, `GET /api/v1/plants/{uuid}/cockpit`, `GET /api/v1/experiments/{id}/feeding/queue`, `POST /api/v1/plants/{uuid}/feed`, `POST /api/v1/experiments/{id}/placement/auto`, `PATCH /api/v1/trays/{id}/`.
+  - Notes: Operational assignment derives from tray placement (`TrayPlant -> Tray.recipe`); feeding and start readiness both block when plants are unplaced or tray recipes are missing.
 
 ## Remaining Milestones
 

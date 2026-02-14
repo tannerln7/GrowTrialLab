@@ -8,7 +8,8 @@ This file records architecture/product decisions and why they were made.
   - Redirect to `/experiments/{id}/setup` until bootstrap setup is complete.
   - Redirect to `/experiments/{id}/overview` once bootstrap setup is complete.
 - Canonical bootstrap setup scope: Plants, Blocks/Slots, Recipes only.
-- Canonical readiness flows: `/experiments/{id}/baseline`, `/experiments/{id}/assignment`, and `/experiments/{id}/feeding`, launched from Overview.
+- Canonical readiness flows: `/experiments/{id}/baseline`, `/experiments/{id}/placement`, `/experiments/{id}/rotation`, and `/experiments/{id}/feeding`, launched from Overview.
+- Assignment page remains available for legacy recipe/group tooling, but tray-level placement is now the canonical recipe-assignment source for operations.
 - Lifecycle prerequisite policy: deletion gating and strict immutability are deferred until lifecycle primitives (`draft`/`running`/`stopped`) exist.
 
 ## Lifecycle Implications (Planned)
@@ -151,17 +152,22 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Operators need fast, repetitive feed capture in active runs without waiting for lot/batch tooling; queue mode reduces navigation overhead.
 - Refs: `90aa50fb`, `af3c5c71`, `6146269d`.
 - Invariants: Backend feed writes enforce lifecycle `running` (`409` when draft/stopped); queue uses a fixed 7-day needs-feeding window for v1.
-- Deferred hooks: `recipe` remains optional and lot/batch integration is intentionally deferred.
+- Deferred hooks: lot/batch integration and richer dose structure are intentionally deferred.
 
-### 2026-02-14: Assignment is canonical for plant recipe, and feeding is recipe-locked
-- Decision: Treat `Plant.assigned_recipe` as the canonical persisted assignment from Groups Apply; feeding always uses this assigned recipe.
-- Rationale: Prevents recipe drift between assignment and operations, and removes operator ambiguity during feed entry.
-- Refs: `0f5683d0`, `9b0de186`, `1e804826`.
+### 2026-02-14: Trays are the canonical assignment unit; feeding is locked to tray recipe
+- Decision: Canonical assignment for operations is derived from placement (`TrayPlant -> Tray.recipe`), not from a separate per-plant assignment field. `Plant.assigned_recipe` is retained only as compatibility fallback where needed.
+- Rationale: Removes duplicated assignment systems (groups vs placement) and aligns operator behavior with physical tray workflow.
+- Refs: pending current prompt commit.
 - Invariants:
-  - `POST /api/v1/plants/{uuid}/feed` returns `409` when the plant has no assignment.
-  - If `recipe_id` is sent and differs from assignment, backend returns `409`.
-  - If `recipe_id` is omitted, backend auto-applies `plant.assigned_recipe`.
-- UX impact: Feeding UI is simplified to read-only assigned recipe display; unassigned plants are blocked with a direct assignment CTA.
+  - `GET /api/v1/experiments/{id}/status/summary` readiness now includes `needs_placement` and `needs_tray_recipe`; `ready_to_start` requires both to be zero.
+  - `POST /api/v1/plants/{uuid}/feed` resolves recipe from tray placement and returns `409` when unplaced or tray recipe is missing.
+  - Placement edits (`tray patch`, `add/remove plant`, `auto-place`) are blocked while lifecycle is `running`.
+- UX impact: Overview readiness/actions and feeding queue now surface placement/tray-recipe blockers directly.
+
+### 2026-02-14: Legacy assignment compatibility remains temporarily
+- Decision: Keep Groups endpoints and `Plant.assigned_recipe` writes for backward compatibility while new readiness/feeding flows rely on tray-derived assignment.
+- Rationale: Avoids risky endpoint churn while migration to tray-canonical behavior is completed.
+- Refs: pending current prompt commit.
 
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
