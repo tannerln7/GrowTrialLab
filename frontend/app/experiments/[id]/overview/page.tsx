@@ -45,6 +45,17 @@ type OverviewResponse = {
   plants: OverviewPlant[];
 };
 
+type SetupProgress = {
+  id: string;
+  status: "done" | "current" | "todo";
+};
+
+type SetupState = {
+  current_packet: string;
+  completed_packets: string[];
+  packet_progress: SetupProgress[];
+};
+
 const FILTERS: Array<{ id: FilterId; label: string }> = [
   { id: "all", label: "All" },
   { id: "needs_baseline", label: "Needs Baseline" },
@@ -88,6 +99,7 @@ export default function ExperimentOverviewPage() {
   const [error, setError] = useState("");
   const [offline, setOffline] = useState(false);
   const [experimentName, setExperimentName] = useState("");
+  const [setupState, setSetupState] = useState<SetupState | null>(null);
   const [data, setData] = useState<OverviewResponse>({
     counts: {
       total: 0,
@@ -115,9 +127,10 @@ export default function ExperimentOverviewPage() {
           return;
         }
 
-        const [overviewResponse, experimentResponse] = await Promise.all([
+        const [overviewResponse, experimentResponse, setupStateResponse] = await Promise.all([
           backendFetch(`/api/v1/experiments/${experimentId}/overview/plants`),
           backendFetch(`/api/v1/experiments/${experimentId}/`),
+          backendFetch(`/api/v1/experiments/${experimentId}/setup-state/`),
         ]);
 
         if (!overviewResponse.ok) {
@@ -130,6 +143,10 @@ export default function ExperimentOverviewPage() {
         if (experimentResponse.ok) {
           const experimentPayload = (await experimentResponse.json()) as { name?: string };
           setExperimentName(experimentPayload.name ?? "");
+        }
+        if (setupStateResponse.ok) {
+          const setupStatePayload = (await setupStateResponse.json()) as SetupState;
+          setSetupState(setupStatePayload);
         }
         setOffline(false);
       } catch (requestError) {
@@ -200,6 +217,20 @@ export default function ExperimentOverviewPage() {
     return `/experiments/${experimentId}/overview${query ? `?${query}` : ""}`;
   }, [searchParams, experimentId]);
 
+  const pendingPlantIdCount = useMemo(
+    () =>
+      data.plants.filter((plant) => !plant.plant_id.trim()).length,
+    [data.plants],
+  );
+  const setupComplete = useMemo(() => {
+    if (!setupState) {
+      return false;
+    }
+    const requiredSetupSteps = ["plants", "environment", "baseline", "groups"];
+    const completed = new Set(setupState.completed_packets);
+    return requiredSetupSteps.every((step) => completed.has(step));
+  }, [setupState]);
+
   function plantNeedsLabels(plant: OverviewPlant): string[] {
     const needs: string[] = [];
     if (plant.status === "active" && !plant.has_baseline) {
@@ -212,6 +243,26 @@ export default function ExperimentOverviewPage() {
       needs.push("Needs Assignment");
     }
     return needs;
+  }
+
+  function quickActionHref(plant: OverviewPlant): string | null {
+    if (plant.status !== "active") {
+      return null;
+    }
+    if (!plant.has_baseline || !plant.bin) {
+      return `/experiments/${experimentId}/baseline?plant=${plant.uuid}`;
+    }
+    if (!plant.assigned_recipe_code) {
+      return `/experiments/${experimentId}/setup?tab=assignment`;
+    }
+    return null;
+  }
+
+  function quickActionLabel(plant: OverviewPlant): string {
+    if (!plant.has_baseline || !plant.bin) {
+      return "Baseline";
+    }
+    return "Assign";
   }
 
   if (notInvited) {
@@ -230,11 +281,8 @@ export default function ExperimentOverviewPage() {
       subtitle={experimentName ? `${experimentName}` : `Experiment: ${experimentId}`}
       actions={
         <div className={styles.actions}>
-          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/setup`}>
-            Open setup
-          </Link>
-          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/plants`}>
-            Plants list
+          <Link className={styles.buttonSecondary} href="/experiments">
+            Back to experiments
           </Link>
         </div>
       }
@@ -243,6 +291,53 @@ export default function ExperimentOverviewPage() {
         <p className={styles.inlineNote}>
           Tap a plant to open its action page. Scan QR codes to jump directly to a plant.
         </p>
+      </SectionCard>
+
+      <SectionCard title="Setup">
+        <div className={styles.actions}>
+          {!setupComplete ? (
+            <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/setup`}>
+              Continue setup
+            </Link>
+          ) : null}
+          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/setup`}>
+            Open setup
+          </Link>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Now Actions">
+        <div className={styles.actions}>
+          {data.counts.needs_baseline > 0 ? (
+            <Link
+              className={styles.buttonPrimary}
+              href={`/experiments/${experimentId}/setup?step=baseline`}
+            >
+              Finish baseline ({data.counts.needs_baseline})
+            </Link>
+          ) : null}
+          {data.counts.needs_assignment > 0 ? (
+            <Link
+              className={styles.buttonPrimary}
+              href={`/experiments/${experimentId}/setup?tab=assignment`}
+            >
+              Finish assignment ({data.counts.needs_assignment})
+            </Link>
+          ) : null}
+          {pendingPlantIdCount > 0 ? (
+            <Link
+              className={styles.buttonSecondary}
+              href={`/experiments/${experimentId}/setup?step=plants`}
+            >
+              Generate/Print labels ({pendingPlantIdCount})
+            </Link>
+          ) : null}
+          {data.counts.needs_baseline === 0 &&
+          data.counts.needs_assignment === 0 &&
+          pendingPlantIdCount === 0 ? (
+            <p className={styles.mutedText}>No immediate setup actions pending.</p>
+          ) : null}
+        </div>
       </SectionCard>
 
       <SectionCard title="Status Filters">
@@ -328,9 +423,21 @@ export default function ExperimentOverviewPage() {
                 label: "Group",
                 render: (plant) => plant.assigned_recipe_code || "Missing",
               },
+              {
+                key: "action",
+                label: "Action",
+                render: (plant) => {
+                  const href = quickActionHref(plant);
+                  if (!href) {
+                    return "Open";
+                  }
+                  return <Link href={href}>{quickActionLabel(plant)}</Link>;
+                },
+              },
             ]}
             renderMobileCard={(plant) => {
               const needs = plantNeedsLabels(plant);
+              const quickHref = quickActionHref(plant);
               return (
                 <div className={styles.cardKeyValue}>
                   <span>Plant ID</span>
@@ -359,6 +466,11 @@ export default function ExperimentOverviewPage() {
                       </span>
                     ))}
                   </div>
+                  {quickHref ? (
+                    <Link className={styles.buttonSecondary} href={quickHref}>
+                      {quickActionLabel(plant)}
+                    </Link>
+                  ) : null}
                 </div>
               );
             }}
