@@ -224,6 +224,7 @@ export default function ExperimentSetupPage() {
   const [groupsEditingUnlocked, setGroupsEditingUnlocked] = useState(false);
   const [showGroupsUnlockModal, setShowGroupsUnlockModal] = useState(false);
   const [groupsUnlockConfirmed, setGroupsUnlockConfirmed] = useState(false);
+  const [stepQueryConsumed, setStepQueryConsumed] = useState(false);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -233,6 +234,35 @@ export default function ExperimentSetupPage() {
       setGroupsView("recipes");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (stepQueryConsumed) {
+      return;
+    }
+
+    const step = searchParams.get("step");
+    if (!step) {
+      return;
+    }
+
+    if (step === "assignment") {
+      setCurrentPacket("groups");
+      setGroupsView("assignment");
+    } else if (step === "recipes") {
+      setCurrentPacket("groups");
+      setGroupsView("recipes");
+    } else if (step === "plants" || step === "environment" || step === "baseline") {
+      setCurrentPacket(step);
+    } else {
+      return;
+    }
+
+    setStepQueryConsumed(true);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("step");
+    const query = nextParams.toString();
+    router.replace(`/experiments/${experimentId}/setup${query ? `?${query}` : ""}`);
+  }, [stepQueryConsumed, searchParams, router, experimentId]);
 
   function handleRequestError(
     requestError: unknown,
@@ -1188,26 +1218,11 @@ export default function ExperimentSetupPage() {
       }
       actions={
         <div className={styles.actions}>
-          <Link className={styles.buttonSecondary} href="/experiments">
-            Back to experiments
-          </Link>
           <Link
-            className={styles.buttonSecondary}
-            href={`/experiments/${experimentId}/baseline`}
-          >
-            Baseline capture
-          </Link>
-          <Link
-            className={styles.buttonSecondary}
-            href={`/experiments/${experimentId}/plants`}
-          >
-            Plants list
-          </Link>
-          <Link
-            className={styles.buttonSecondary}
+            className={styles.buttonPrimary}
             href={`/experiments/${experimentId}/overview`}
           >
-            Overview
+            ← Overview
           </Link>
         </div>
       }

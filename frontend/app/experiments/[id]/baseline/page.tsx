@@ -434,11 +434,8 @@ export default function BaselineCapturePage() {
       stickyOffset
       actions={
         <div className={styles.actions}>
-          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/setup`}>
-            Back to setup
-          </Link>
-          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/plants`}>
-            Plants list
+          <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+            ← Overview
           </Link>
         </div>
       }

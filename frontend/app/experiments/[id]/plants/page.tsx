@@ -95,25 +95,19 @@ export default function ExperimentPlantsPage() {
       subtitle={`Experiment: ${experimentId}`}
       actions={
         <div className={styles.actions}>
-          <button
+          <Link
             className={styles.buttonPrimary}
+            href={`/experiments/${experimentId}/overview`}
+          >
+            ← Overview
+          </Link>
+          <button
+            className={styles.buttonSecondary}
             type="button"
             onClick={downloadLabels}
           >
             Download labels PDF
           </button>
-          <Link
-            className={styles.buttonSecondary}
-            href={`/experiments/${experimentId}/setup`}
-          >
-            Back to setup
-          </Link>
-          <Link
-            className={styles.buttonSecondary}
-            href={`/experiments/${experimentId}/overview`}
-          >
-            Open overview
-          </Link>
         </div>
       }
     >
