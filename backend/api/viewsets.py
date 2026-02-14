@@ -1,7 +1,5 @@
 from rest_framework import viewsets
-from rest_framework.exceptions import PermissionDenied
 
-from .baseline import BASELINE_WEEK_NUMBER, is_baseline_locked, is_unlock_request
 from .models import (
     AdverseEvent,
     BatchLot,
@@ -108,22 +106,6 @@ class PlantViewSet(ExperimentFilteredViewSet):
             return PlantDetailSerializer
         return super().get_serializer_class()
 
-    def perform_update(self, serializer):
-        instance = serializer.instance
-        if instance is None:
-            serializer.save()
-            return
-        new_bin = serializer.validated_data.get("bin")
-        bin_change_requested = "bin" in serializer.validated_data and new_bin != instance.bin
-        if (
-            bin_change_requested
-            and is_baseline_locked(instance.experiment)
-            and not is_unlock_request(self.request)
-        ):
-            raise PermissionDenied("Baseline is locked. Admin unlock is required.")
-        serializer.save()
-
-
 class TrayViewSet(ExperimentFilteredViewSet):
     queryset = Tray.objects.all().order_by("name")
     serializer_class = TraySerializer
@@ -153,28 +135,6 @@ class WeeklySessionViewSet(ExperimentFilteredViewSet):
 class PlantWeeklyMetricViewSet(ExperimentFilteredViewSet):
     queryset = PlantWeeklyMetric.objects.all().order_by("week_number", "plant_id")
     serializer_class = PlantWeeklyMetricSerializer
-
-    def _assert_unlocked(self, experiment, week_number):
-        if week_number == BASELINE_WEEK_NUMBER and is_baseline_locked(experiment) and not is_unlock_request(
-            self.request
-        ):
-            raise PermissionDenied("Baseline is locked. Admin unlock is required.")
-
-    def perform_create(self, serializer):
-        experiment = serializer.validated_data["experiment"]
-        week_number = serializer.validated_data.get("week_number")
-        self._assert_unlocked(experiment, week_number)
-        serializer.save()
-
-    def perform_update(self, serializer):
-        instance = serializer.instance
-        if instance is None:
-            serializer.save()
-            return
-        experiment = serializer.validated_data.get("experiment", instance.experiment)
-        week_number = serializer.validated_data.get("week_number", instance.week_number)
-        self._assert_unlocked(experiment, week_number)
-        serializer.save()
 
 
 class FeedingEventViewSet(ExperimentFilteredViewSet):

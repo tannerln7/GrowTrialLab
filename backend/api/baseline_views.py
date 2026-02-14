@@ -11,7 +11,6 @@ from .baseline import (
     get_metric_template_for_category,
     get_or_create_setup_state,
     is_baseline_locked,
-    is_unlock_request,
     lock_baseline,
     validate_metrics_against_template,
 )
@@ -128,9 +127,6 @@ def plant_baseline(request, plant_id: UUID):
                 "baseline": PlantWeeklyMetricSerializer(baseline_metric).data if baseline_metric else None,
             }
         )
-
-    if is_baseline_locked(plant.experiment) and not is_unlock_request(request):
-        return Response({"detail": "Baseline is locked. Admin unlock is required."}, status=403)
 
     serializer = PlantBaselineSaveSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)

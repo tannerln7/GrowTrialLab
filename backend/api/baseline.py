@@ -5,7 +5,7 @@ from typing import Any
 
 from rest_framework.exceptions import ValidationError
 
-from .models import AppUser, Experiment, ExperimentSetupState, MetricTemplate
+from .models import Experiment, ExperimentSetupState, MetricTemplate
 from .setup_packets import PACKET_BASELINE, normalize_packet_ids
 
 BASELINE_WEEK_NUMBER = 0
@@ -123,12 +123,6 @@ def is_baseline_locked(experiment: Experiment) -> bool:
     baseline_packet = setup_state.packet_data.get(PACKET_BASELINE, {})
     packet_locked = isinstance(baseline_packet, dict) and bool(baseline_packet.get("locked"))
     return packet_locked or PACKET_BASELINE in normalize_packet_ids(setup_state.locked_packets or [])
-
-
-def is_unlock_request(request) -> bool:
-    app_user = getattr(request, "app_user", None)
-    unlock_value = str(request.query_params.get("unlock", "")).strip().lower()
-    return bool(app_user and app_user.role == AppUser.Role.ADMIN and unlock_value == "true")
 
 
 def lock_baseline(setup_state: ExperimentSetupState) -> None:
