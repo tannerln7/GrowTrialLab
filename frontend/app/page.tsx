@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { backendFetch } from "@/lib/backend";
+import AppMarkPlaceholder from "@/src/components/AppMarkPlaceholder";
+import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import styles from "./page.module.css";
 
 export default function Home() {
@@ -11,6 +13,7 @@ export default function Home() {
   const [result, setResult] = useState<string>("");
   const [meLoading, setMeLoading] = useState(false);
   const [meResult, setMeResult] = useState<string>("No profile loaded.");
+  const [notInvited, setNotInvited] = useState(false);
 
   async function checkBackendHealth() {
     setLoading(true);
@@ -34,6 +37,7 @@ export default function Home() {
     try {
       const response = await backendFetch("/api/me");
       if (response.status === 403) {
+        setNotInvited(true);
         setMeResult("Not invited.");
         return;
       }
@@ -43,6 +47,7 @@ export default function Home() {
       }
       const data = await response.json();
       setMeResult(`${data.email} (${data.role}, ${data.status})`);
+      setNotInvited(false);
     } catch {
       setMeResult("Unable to load profile.");
     } finally {
@@ -53,6 +58,7 @@ export default function Home() {
   return (
     <div className={styles.page}>
       <main className={styles.main}>
+        <AppMarkPlaceholder />
         <h1>GrowTrialLab</h1>
         <p>Django API + Next.js frontend local dev scaffold.</p>
         <div className={styles.buttons}>
@@ -76,7 +82,11 @@ export default function Home() {
             Experiments
           </Link>
         </div>
-        <p className={styles.me}>{meResult}</p>
+        {notInvited ? (
+          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
+        ) : (
+          <p className={styles.me}>{meResult}</p>
+        )}
         <pre className={styles.output}>{result || "No result yet."}</pre>
       </main>
     </div>

@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch } from "@/lib/backend";
+import AppMarkPlaceholder from "@/src/components/AppMarkPlaceholder";
+import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import styles from "../../experiments.module.css";
 
 type PacketProgress = {
@@ -288,8 +290,9 @@ export default function ExperimentSetupPage() {
     return (
       <div className={styles.page}>
         <main className={styles.container}>
+          <AppMarkPlaceholder />
           <h1>Experiment setup</h1>
-          <p className={styles.error}>Not invited.</p>
+          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
         </main>
       </div>
     );
@@ -299,6 +302,7 @@ export default function ExperimentSetupPage() {
     <div className={styles.page}>
       <main className={styles.container}>
         <header className={styles.header}>
+          <AppMarkPlaceholder />
           <h1>Experiment setup</h1>
           <p className={styles.muted}>Experiment: {experimentId}</p>
           <div className={styles.actions}>
@@ -511,6 +515,11 @@ export default function ExperimentSetupPage() {
                       {saving ? "Completing..." : "Mark Complete"}
                     </button>
                   </div>
+                </div>
+              ) : currentPacket === "plants" ? (
+                <div className={styles.formGrid}>
+                  <h2>Packet 2: Plants</h2>
+                  <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
                 </div>
               ) : (
                 <div className={styles.formGrid}>

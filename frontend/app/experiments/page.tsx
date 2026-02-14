@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { backendFetch } from "@/lib/backend";
+import AppMarkPlaceholder from "@/src/components/AppMarkPlaceholder";
+import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import styles from "./experiments.module.css";
 
 type Experiment = {
@@ -54,8 +56,9 @@ export default function ExperimentsPage() {
     return (
       <div className={styles.page}>
         <main className={styles.container}>
+          <AppMarkPlaceholder />
           <h1>Experiments</h1>
-          <p className={styles.error}>Not invited.</p>
+          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
         </main>
       </div>
     );
@@ -65,6 +68,7 @@ export default function ExperimentsPage() {
     <div className={styles.page}>
       <main className={styles.container}>
         <header className={styles.header}>
+          <AppMarkPlaceholder />
           <h1>Experiments</h1>
           <p className={styles.muted}>
             Create and configure experiments with setup packets.
@@ -82,7 +86,11 @@ export default function ExperimentsPage() {
         {loading ? <p>Loading...</p> : null}
         {error ? <p className={styles.error}>{error}</p> : null}
 
-        {!loading && !error ? (
+        {!loading && !error && items.length === 0 ? (
+          <IllustrationPlaceholder inventoryId="ILL-101" kind="noExperiments" />
+        ) : null}
+
+        {!loading && !error && items.length > 0 ? (
           <table className={styles.table}>
             <thead>
               <tr>
@@ -92,25 +100,17 @@ export default function ExperimentsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className={styles.muted}>
-                    No experiments yet.
+              {items.map((experiment) => (
+                <tr key={experiment.id}>
+                  <td>{experiment.name}</td>
+                  <td>{experiment.status}</td>
+                  <td>
+                    <Link href={`/experiments/${experiment.id}/setup`}>
+                      Open setup
+                    </Link>
                   </td>
                 </tr>
-              ) : (
-                items.map((experiment) => (
-                  <tr key={experiment.id}>
-                    <td>{experiment.name}</td>
-                    <td>{experiment.status}</td>
-                    <td>
-                      <Link href={`/experiments/${experiment.id}/setup`}>
-                        Open setup
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         ) : null}

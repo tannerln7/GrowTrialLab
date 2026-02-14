@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
 import { backendFetch } from "@/lib/backend";
+import AppMarkPlaceholder from "@/src/components/AppMarkPlaceholder";
+import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import styles from "../experiments.module.css";
 
 export default function NewExperimentPage() {
@@ -63,8 +65,9 @@ export default function NewExperimentPage() {
     return (
       <div className={styles.page}>
         <main className={styles.container}>
+          <AppMarkPlaceholder />
           <h1>New experiment</h1>
-          <p className={styles.error}>Not invited.</p>
+          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
         </main>
       </div>
     );
@@ -74,6 +77,7 @@ export default function NewExperimentPage() {
     <div className={styles.page}>
       <main className={styles.container}>
         <header className={styles.header}>
+          <AppMarkPlaceholder />
           <h1>New experiment</h1>
           <p className={styles.muted}>
             Start an experiment and continue to setup packets.

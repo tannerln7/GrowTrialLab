@@ -1,0 +1,35 @@
+.card {
+  border: 1px dashed #94a3b8;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 1rem;
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.iconWrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  background: #e2e8f0;
+  display: grid;
+  place-items: center;
+  color: #334155;
+  flex-shrink: 0;
+}
+
+.text {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.text p {
+  margin: 0;
+  color: #475569;
+}
+
+.text small {
+  color: #64748b;
+  font-size: 0.75rem;
+}
