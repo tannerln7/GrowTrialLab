@@ -49,7 +49,7 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Refs: `0a2e3228`
   - Notes: `infra/scripts/verify.sh` runs tests/typecheck/build checks.
 - [x] Local dev DB reset script for clean-state validation (owner: Codex)
-  - Refs: pending current prompt commit
+  - Refs: `b8ac31e9`
   - Notes: `infra/scripts/reset-dev.sh` safely resets local compose Postgres volume, rebuilds stack, and runs migrations.
 - [x] Cloudflare Access auth middleware with invite-only provisioning and bootstrap admin (owner: Codex)
   - Refs: `262849c8`, `bba65cd9`, `f00306e5`
@@ -162,7 +162,7 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Routes: `GET /api/v1/experiments/{id}/feeding/queue`, `POST /api/v1/plants/{uuid}/feed`, `GET /api/v1/plants/{uuid}/feeding/recent`, `/experiments/{id}/feeding`.
   - Notes: Feeding writes are lifecycle-gated to `running` (backend `409` outside running); queue uses a 7-day needs-first window and Plant Cockpit now exposes last-fed hint + quick feed launch.
 - [x] Tray-canonical assignment + recipe-locked feeding/readiness (owner: Codex)
-  - Refs: pending current prompt commit
+  - Refs: `fec05082`, `a3fd3a1d`
   - Routes: `GET /api/v1/experiments/{id}/status/summary`, `GET /api/v1/experiments/{id}/overview/plants`, `GET /api/v1/plants/{uuid}/cockpit`, `GET /api/v1/experiments/{id}/feeding/queue`, `POST /api/v1/plants/{uuid}/feed`, `POST /api/v1/experiments/{id}/placement/auto`, `PATCH /api/v1/trays/{id}/`.
   - Notes: Operational assignment derives from tray placement (`TrayPlant -> Tray.recipe`); feeding and start readiness both block when plants are unplaced or tray recipes are missing.
 

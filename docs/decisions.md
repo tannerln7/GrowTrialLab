@@ -157,7 +157,7 @@ This file records architecture/product decisions and why they were made.
 ### 2026-02-14: Trays are the canonical assignment unit; feeding is locked to tray recipe
 - Decision: Canonical assignment for operations is derived from placement (`TrayPlant -> Tray.recipe`), not from a separate per-plant assignment field. `Plant.assigned_recipe` is retained only as compatibility fallback where needed.
 - Rationale: Removes duplicated assignment systems (groups vs placement) and aligns operator behavior with physical tray workflow.
-- Refs: pending current prompt commit.
+- Refs: `fec05082`, `a3fd3a1d`.
 - Invariants:
   - `GET /api/v1/experiments/{id}/status/summary` readiness now includes `needs_placement` and `needs_tray_recipe`; `ready_to_start` requires both to be zero.
   - `POST /api/v1/plants/{uuid}/feed` resolves recipe from tray placement and returns `409` when unplaced or tray recipe is missing.
@@ -167,7 +167,7 @@ This file records architecture/product decisions and why they were made.
 ### 2026-02-14: Legacy assignment compatibility remains temporarily
 - Decision: Keep Groups endpoints and `Plant.assigned_recipe` writes for backward compatibility while new readiness/feeding flows rely on tray-derived assignment.
 - Rationale: Avoids risky endpoint churn while migration to tray-canonical behavior is completed.
-- Refs: pending current prompt commit.
+- Refs: `fec05082`.
 
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
