@@ -158,6 +158,9 @@ export default function BaselineCapturePage() {
   const [baselineStatus, setBaselineStatus] = useState<BaselineStatus | null>(null);
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null);
   const [baselineLocked, setBaselineLocked] = useState(false);
+  const [editingUnlocked, setEditingUnlocked] = useState(false);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [unlockConfirmed, setUnlockConfirmed] = useState(false);
 
   const [templateFields, setTemplateFields] = useState<TemplateField[]>([]);
   const [usingFallbackTemplate, setUsingFallbackTemplate] = useState(false);
@@ -170,6 +173,7 @@ export default function BaselineCapturePage() {
     () => plants.find((plant) => plant.id === selectedPlantId) ?? null,
     [plants, selectedPlantId],
   );
+  const readOnly = baselineLocked && !editingUnlocked;
 
   function handleRequestError(requestError: unknown, fallbackMessage: string): string {
     const normalizedError = normalizeBackendError(requestError);
@@ -204,6 +208,11 @@ export default function BaselineCapturePage() {
     const data = (await response.json()) as BaselineStatus;
     setBaselineStatus(data);
     setBaselineLocked(data.baseline_locked);
+    if (!data.baseline_locked) {
+      setEditingUnlocked(false);
+      setShowUnlockModal(false);
+      setUnlockConfirmed(false);
+    }
     return data;
   }, [experimentId]);
 
@@ -215,6 +224,11 @@ export default function BaselineCapturePage() {
 
     const data = (await response.json()) as PlantBaselinePayload;
     setBaselineLocked(data.baseline_locked);
+    if (!data.baseline_locked) {
+      setEditingUnlocked(false);
+      setShowUnlockModal(false);
+      setUnlockConfirmed(false);
+    }
     setMetrics(data.baseline?.metrics ?? {});
     setNotes(data.baseline?.notes ?? "");
     setSelectedBin((data.bin as "A" | "B" | "C" | null) ?? "");
@@ -396,6 +410,13 @@ export default function BaselineCapturePage() {
     });
   }
 
+  function confirmUnlockEditing() {
+    setEditingUnlocked(true);
+    setShowUnlockModal(false);
+    setUnlockConfirmed(false);
+    setNotice("Editing unlocked for this page session.");
+  }
+
   if (notInvited) {
     return (
       <PageShell title="Baseline Capture">
@@ -434,7 +455,33 @@ export default function BaselineCapturePage() {
           <p className={styles.mutedText}>Bins assigned: {baselineStatus.bins_assigned}</p>
           <p className={styles.mutedText}>Baseline photos: {baselineStatus.photos_count}</p>
           {baselineLocked ? (
-            <p className={styles.successText}>Baseline is locked for this experiment.</p>
+            <>
+              <p className={styles.successText}>
+                Baseline is locked for this experiment. Inputs are read-only by default in the UI.
+              </p>
+              <div className={styles.actions}>
+                {readOnly ? (
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    onClick={() => setShowUnlockModal(true)}
+                  >
+                    Unlock editing
+                  </button>
+                ) : (
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    onClick={() => {
+                      setEditingUnlocked(false);
+                      setUnlockConfirmed(false);
+                    }}
+                  >
+                    Re-lock
+                  </button>
+                )}
+              </div>
+            </>
           ) : null}
         </SectionCard>
       ) : null}
@@ -513,6 +560,11 @@ export default function BaselineCapturePage() {
                   No metric template found for this species category. Using fallback MVP fields.
                 </p>
               ) : null}
+              {readOnly ? (
+                <p className={styles.mutedText}>
+                  Baseline is currently read-only in this UI. Use Unlock editing to make changes.
+                </p>
+              ) : null}
 
               <div className={styles.formGrid}>
                 {templateFields.map((field) => {
@@ -524,7 +576,7 @@ export default function BaselineCapturePage() {
                           className={styles.input}
                           type="checkbox"
                           checked={Boolean(metrics[field.key])}
-                          disabled={saving || baselineLocked}
+                          disabled={saving || readOnly}
                           onChange={(event) =>
                             updateMetricValue(field, event.target.checked)
                           }
@@ -540,7 +592,7 @@ export default function BaselineCapturePage() {
                         <textarea
                           className={styles.textarea}
                           value={String(metrics[field.key] ?? "")}
-                          disabled={saving || baselineLocked}
+                          disabled={saving || readOnly}
                           onChange={(event) =>
                             updateMetricValue(field, event.target.value)
                           }
@@ -563,7 +615,7 @@ export default function BaselineCapturePage() {
                             ? String(metrics[field.key])
                             : ""
                         }
-                        disabled={saving || baselineLocked}
+                        disabled={saving || readOnly}
                         onChange={(event) =>
                           updateMetricValue(field, event.target.value)
                         }
@@ -579,7 +631,7 @@ export default function BaselineCapturePage() {
                       <button
                         key={binValue}
                         type="button"
-                        disabled={saving || baselineLocked}
+                        disabled={saving || readOnly}
                         className={
                           selectedBin === binValue
                             ? styles.buttonPrimary
@@ -599,7 +651,7 @@ export default function BaselineCapturePage() {
                     className={styles.input}
                     type="file"
                     accept="image/*"
-                    disabled={saving || baselineLocked}
+                    disabled={saving || readOnly}
                     onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
                   />
                 </label>
@@ -609,7 +661,7 @@ export default function BaselineCapturePage() {
                   <textarea
                     className={styles.textarea}
                     value={notes}
-                    disabled={saving || baselineLocked}
+                    disabled={saving || readOnly}
                     onChange={(event) => setNotes(event.target.value)}
                   />
                 </label>
@@ -621,7 +673,7 @@ export default function BaselineCapturePage() {
             <button
               className={styles.buttonPrimary}
               type="button"
-              disabled={saving || baselineLocked || !selectedPlantId}
+              disabled={saving || readOnly || !selectedPlantId}
               onClick={() => void saveBaseline(false)}
             >
               {saving ? "Saving..." : "Save"}
@@ -629,13 +681,50 @@ export default function BaselineCapturePage() {
             <button
               className={styles.buttonSecondary}
               type="button"
-              disabled={saving || baselineLocked || !selectedPlantId}
+              disabled={saving || readOnly || !selectedPlantId}
               onClick={() => void saveBaseline(true)}
             >
               {saving ? "Saving..." : "Save & Next"}
             </button>
           </StickyActionBar>
         </>
+      ) : null}
+      {showUnlockModal ? (
+        <div className={styles.modalBackdrop} role="presentation">
+          <SectionCard title="Unlock baseline editing">
+            <p className={styles.mutedText}>
+              This lock is a UI guardrail only. API edits are still allowed.
+            </p>
+            <label className={styles.checkboxRow}>
+              <input
+                type="checkbox"
+                checked={unlockConfirmed}
+                onChange={(event) => setUnlockConfirmed(event.target.checked)}
+              />
+              <span>I understand and want to enable editing on this page.</span>
+            </label>
+            <div className={styles.actions}>
+              <button
+                className={styles.buttonSecondary}
+                type="button"
+                onClick={() => {
+                  setShowUnlockModal(false);
+                  setUnlockConfirmed(false);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.buttonDanger}
+                type="button"
+                disabled={!unlockConfirmed}
+                onClick={confirmUnlockEditing}
+              >
+                Unlock editing
+              </button>
+            </div>
+          </SectionCard>
+        </div>
       ) : null}
     </PageShell>
   );

@@ -1145,7 +1145,7 @@ export default function ExperimentSetupPage() {
                       </p>
                       {baselineStatus.baseline_locked ? (
                         <p className={styles.successText}>
-                          Baseline is locked for integrity.
+                          Baseline is locked in the UI to reduce accidental edits. API edits are still allowed.
                         </p>
                       ) : null}
                     </div>
