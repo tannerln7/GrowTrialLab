@@ -14,6 +14,7 @@ from api.models import (
     Plant,
     PlantWeeklyMetric,
     Recipe,
+    RotationLog,
     Species,
     Tray,
     TrayPlant,
@@ -746,6 +747,91 @@ class PlacementApiTests(TestCase):
         self.assertEqual(
             response.json()["detail"],
             "Removed plants cannot be placed in trays.",
+        )
+
+
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
+)
+class RotationApiTests(TestCase):
+    def test_rotation_summary_returns_trays_and_recent_logs(self):
+        experiment = Experiment.objects.create(
+            name="Rotation Summary",
+            lifecycle_state=Experiment.LifecycleState.RUNNING,
+        )
+        block_a = Block.objects.create(experiment=experiment, name="B1", description="Front")
+        block_b = Block.objects.create(experiment=experiment, name="B2", description="Back")
+        tray = Tray.objects.create(experiment=experiment, name="T1", block=block_a)
+        species = Species.objects.create(name="Nepenthes veitchii stripe", category="nepenthes")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="NP-801")
+        TrayPlant.objects.create(tray=tray, plant=plant, order_index=0)
+        RotationLog.objects.create(
+            experiment=experiment,
+            tray=tray,
+            from_block=block_a,
+            to_block=block_b,
+            note="Rotate clockwise",
+            created_by_email="admin@example.com",
+        )
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/rotation/summary")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload["trays"]), 1)
+        self.assertEqual(payload["trays"][0]["tray_name"], "T1")
+        self.assertEqual(payload["trays"][0]["plant_count"], 1)
+        self.assertEqual(len(payload["recent_logs"]), 1)
+        self.assertEqual(payload["recent_logs"][0]["tray_name"], "T1")
+        self.assertEqual(payload["recent_logs"][0]["from_block_name"], "B1")
+        self.assertEqual(payload["recent_logs"][0]["to_block_name"], "B2")
+
+    def test_rotation_log_updates_tray_block_and_appears_in_summary(self):
+        experiment = Experiment.objects.create(
+            name="Rotation Log",
+            lifecycle_state=Experiment.LifecycleState.RUNNING,
+        )
+        block_a = Block.objects.create(experiment=experiment, name="B1", description="Front")
+        block_b = Block.objects.create(experiment=experiment, name="B2", description="Back")
+        tray = Tray.objects.create(experiment=experiment, name="T1", block=block_a)
+
+        post_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/rotation/log",
+            data={"tray_id": str(tray.id), "to_block_id": str(block_b.id), "note": "move to back"},
+            content_type="application/json",
+        )
+        self.assertEqual(post_response.status_code, 201)
+        tray.refresh_from_db()
+        self.assertEqual(tray.block.id, block_b.id)
+
+        summary_response = self.client.get(f"/api/v1/experiments/{experiment.id}/rotation/summary")
+        self.assertEqual(summary_response.status_code, 200)
+        recent_logs = summary_response.json()["recent_logs"]
+        self.assertGreaterEqual(len(recent_logs), 1)
+        self.assertEqual(recent_logs[0]["from_block_name"], "B1")
+        self.assertEqual(recent_logs[0]["to_block_name"], "B2")
+        self.assertEqual(recent_logs[0]["note"], "move to back")
+
+    def test_rotation_log_rejected_when_not_running(self):
+        experiment = Experiment.objects.create(
+            name="Rotation Not Running",
+            lifecycle_state=Experiment.LifecycleState.DRAFT,
+        )
+        tray = Tray.objects.create(experiment=experiment, name="T1")
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/rotation/log",
+            data={"tray_id": str(tray.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"],
+            "Rotation logs are intended for running experiments. Start the experiment first.",
         )
 
 
