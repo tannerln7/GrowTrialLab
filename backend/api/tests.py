@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 
-from api.models import AppUser, Block, Experiment, ExperimentSetupState
+from api.models import AppUser, Block, Experiment, ExperimentSetupState, Plant, Species
 from api.setup_packets import PACKET_ENVIRONMENT, PACKET_PLANTS
 
 
@@ -121,3 +121,81 @@ class ExperimentSetupTests(TestCase):
         self.assertEqual(response.status_code, 200)
         names = [item["name"] for item in response.json()]
         self.assertEqual(names, ["B1", "B2", "B3", "B4"])
+
+
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
+)
+class Packet2PlantsTests(TestCase):
+    def test_bulk_import_creates_species_and_plants(self):
+        experiment = Experiment.objects.create(name="Bulk Import")
+        csv_text = (
+            "species_name,category,cultivar,quantity,baseline_notes\n"
+            "Nepenthes alata,nepenthes,,2,batch A\n"
+            "Drosera capensis,drosera,,1,batch B\n"
+        )
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/plants/bulk-import/",
+            data={"csv_text": csv_text},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(payload["created_count"], 3)
+        self.assertEqual(Plant.objects.filter(experiment=experiment).count(), 3)
+        self.assertTrue(Species.objects.filter(name__iexact="Nepenthes alata").exists())
+        self.assertTrue(Species.objects.filter(name__iexact="Drosera capensis").exists())
+
+    def test_generate_ids_assigns_unique_ids(self):
+        experiment = Experiment.objects.create(name="Generate IDs")
+        species = Species.objects.create(name="Nepenthes ventricosa", category="nepenthes")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="NP-001")
+        missing_one = Plant.objects.create(experiment=experiment, species=species, plant_id="")
+        missing_two = Plant.objects.create(experiment=experiment, species=species, plant_id="")
+
+        response = self.client.post(f"/api/v1/experiments/{experiment.id}/plants/generate-ids/")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["updated_count"], 2)
+
+        missing_one.refresh_from_db()
+        missing_two.refresh_from_db()
+        self.assertTrue(missing_one.plant_id.startswith("NP-"))
+        self.assertTrue(missing_two.plant_id.startswith("NP-"))
+        self.assertNotEqual(missing_one.plant_id, missing_two.plant_id)
+        self.assertNotEqual(missing_one.plant_id, "NP-001")
+        self.assertNotEqual(missing_two.plant_id, "NP-001")
+
+    def test_labels_pdf_endpoint_returns_pdf(self):
+        experiment = Experiment.objects.create(name="Labels PDF")
+        species = Species.objects.create(name="Sarracenia purpurea", category="sarracenia")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="SA-001")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="SA-002")
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/plants/labels.pdf?mode=all")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertTrue(response.content.startswith(b"%PDF"))
+        self.assertGreater(len(response.content), 1200)
+
+    def test_packet_2_complete_requires_plants(self):
+        experiment = Experiment.objects.create(name="Packet 2")
+        fail_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/packets/plants/complete/"
+        )
+        self.assertEqual(fail_response.status_code, 400)
+        self.assertIn("At least 1 plant is required", fail_response.json()["errors"][0])
+
+        species = Species.objects.create(name="Pinguicula moranensis", category="pinguicula")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="PG-001")
+        success_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/packets/plants/complete/"
+        )
+        self.assertEqual(success_response.status_code, 200)
+        payload = success_response.json()
+        self.assertIn(PACKET_PLANTS, payload["completed_packets"])
