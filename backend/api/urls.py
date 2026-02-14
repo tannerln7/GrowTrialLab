@@ -9,6 +9,15 @@ from .plants_views import (
     experiment_plants_labels_pdf,
     experiment_plants_packet,
 )
+from .groups_views import (
+    complete_groups_packet,
+    experiment_groups_apply,
+    experiment_groups_packet,
+    experiment_groups_preview,
+    experiment_groups_recipe_update,
+    experiment_groups_recipes,
+    experiment_groups_status,
+)
 from .baseline_views import (
     complete_baseline_packet,
     experiment_baseline_lock,
@@ -138,6 +147,41 @@ urlpatterns = [
         "api/v1/experiments/<uuid:experiment_id>/packets/baseline/complete/",
         complete_baseline_packet,
         name="complete-baseline-packet",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/groups/status",
+        experiment_groups_status,
+        name="experiment-groups-status",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/groups/recipes",
+        experiment_groups_recipes,
+        name="experiment-groups-recipes",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/groups/recipes/<uuid:recipe_id>",
+        experiment_groups_recipe_update,
+        name="experiment-groups-recipe-update",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/groups/preview",
+        experiment_groups_preview,
+        name="experiment-groups-preview",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/groups/apply",
+        experiment_groups_apply,
+        name="experiment-groups-apply",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/packets/groups/",
+        experiment_groups_packet,
+        name="experiment-groups-packet",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/packets/groups/complete/",
+        complete_groups_packet,
+        name="complete-groups-packet",
     ),
     path("api/v1/", include(router.urls)),
     path("api/admin/users", admin_users, name="admin-users"),

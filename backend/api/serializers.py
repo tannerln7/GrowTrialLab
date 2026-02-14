@@ -119,10 +119,17 @@ class PlantDetailExperimentSerializer(serializers.ModelSerializer):
         fields = ["id", "name"]
 
 
+class PlantDetailRecipeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Recipe
+        fields = ["id", "code", "name"]
+
+
 class PlantDetailSerializer(serializers.ModelSerializer):
     uuid = serializers.UUIDField(source="id", read_only=True)
     species = PlantDetailSpeciesSerializer(read_only=True)
     experiment = PlantDetailExperimentSerializer(read_only=True)
+    assigned_recipe = PlantDetailRecipeSerializer(read_only=True)
 
     class Meta:
         model = Plant
@@ -134,6 +141,7 @@ class PlantDetailSerializer(serializers.ModelSerializer):
             "status",
             "baseline_notes",
             "experiment",
+            "assigned_recipe",
             "created_at",
             "updated_at",
         ]
@@ -184,6 +192,34 @@ class PlantsPacketSerializer(serializers.Serializer):
 class BaselinePacketSerializer(serializers.Serializer):
     template_id = serializers.UUIDField(required=False)
     template_version = serializers.IntegerField(required=False, min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class GroupRecipeCreateSerializer(serializers.Serializer):
+    code = serializers.RegexField(regex=r"^R\d+$")
+    name = serializers.CharField(required=True, allow_blank=False)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class GroupRecipeUpdateSerializer(serializers.Serializer):
+    name = serializers.CharField(required=False, allow_blank=False)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError("At least one field is required.")
+        return attrs
+
+
+class GroupsPreviewSerializer(serializers.Serializer):
+    seed = serializers.IntegerField(required=False, min_value=1, max_value=2_147_483_647)
+
+
+class GroupsApplySerializer(serializers.Serializer):
+    seed = serializers.IntegerField(required=True, min_value=1, max_value=2_147_483_647)
+
+
+class GroupsPacketSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
 
 

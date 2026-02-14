@@ -98,7 +98,7 @@ class PlantViewSet(ExperimentFilteredViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         if self.action == "retrieve":
-            queryset = queryset.select_related("species", "experiment")
+            queryset = queryset.select_related("species", "experiment", "assigned_recipe")
         return queryset
 
     def get_serializer_class(self):
