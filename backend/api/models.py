@@ -46,6 +46,28 @@ class Species(UUIDModel):
         return self.name
 
 
+class MetricTemplate(UUIDModel):
+    category = models.CharField(max_length=64)
+    version = models.IntegerField(default=1)
+    fields = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["category", "version"], name="unique_metric_template_category_version"
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.category:
+            self.category = self.category.strip().lower()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.category}:v{self.version}"
+
+
 class Experiment(UUIDModel):
     class Status(models.TextChoices):
         DRAFT = "draft", "draft"
