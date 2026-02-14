@@ -57,6 +57,7 @@ class SpeciesViewSet(ExperimentFilteredViewSet):
 class ExperimentViewSet(ExperimentFilteredViewSet):
     queryset = Experiment.objects.all().order_by("-created_at")
     serializer_class = ExperimentSerializer
+    experiment_filter_field = "id"
 
 
 class RecipeViewSet(ExperimentFilteredViewSet):
