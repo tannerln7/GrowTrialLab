@@ -1,14 +1,4 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+@import "../src/styles/theme.css";
 
 html,
 body {
@@ -17,9 +7,9 @@ body {
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -31,12 +21,31 @@ body {
 }
 
 a {
-  color: inherit;
+  color: var(--primary);
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: var(--text);
+}
+
+button,
+input,
+textarea,
+select,
+a {
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }

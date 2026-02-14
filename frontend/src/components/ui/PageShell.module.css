@@ -1,0 +1,60 @@
+.page {
+  min-height: 100vh;
+  background: var(--bg);
+  padding: 1rem;
+}
+
+.main {
+  width: min(1040px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 0.95rem;
+}
+
+.stickyOffset {
+  padding-bottom: 5.25rem;
+}
+
+.header {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0.95rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.titleWrap {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.titleWrap h1 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.titleWrap p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding: 1.25rem;
+  }
+
+  .main {
+    gap: 1rem;
+  }
+
+  .header {
+    padding: 1rem 1.1rem;
+  }
+}

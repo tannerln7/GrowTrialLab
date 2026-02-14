@@ -1,0 +1,35 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: clip;
+}
+
+.header {
+  padding: 0.9rem;
+  border-bottom: 1px solid var(--divider);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  justify-content: space-between;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.header p {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.body {
+  padding: 0.9rem;
+}

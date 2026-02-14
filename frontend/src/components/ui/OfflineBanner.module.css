@@ -1,0 +1,10 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface-elevated));
+  color: var(--text);
+  padding: 0.6rem 0.8rem;
+}

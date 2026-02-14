@@ -1,0 +1,39 @@
+.mobileCards {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.desktopTableWrap {
+  display: none;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.72rem;
+  border-bottom: 1px solid var(--divider);
+}
+
+.table th {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+@media (min-width: 768px) {
+  .mobileCards {
+    display: none;
+  }
+
+  .desktopTableWrap {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+}
