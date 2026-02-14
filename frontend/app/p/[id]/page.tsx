@@ -75,6 +75,8 @@ export default function PlantQrPage() {
     }
     return null;
   }, [searchParams]);
+  const overviewHref =
+    overviewFromParam || (plant ? `/experiments/${plant.experiment.id}/overview` : "/experiments");
 
   useEffect(() => {
     async function loadPlant() {
@@ -145,7 +147,14 @@ export default function PlantQrPage() {
 
   if (notInvited) {
     return (
-      <PageShell title="Plant Details">
+      <PageShell
+        title="Plant Details"
+        actions={
+          <Link className={styles.buttonPrimary} href={overviewHref}>
+            ← Overview
+          </Link>
+        }
+      >
         <SectionCard>
           <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
         </SectionCard>
@@ -155,7 +164,14 @@ export default function PlantQrPage() {
 
   if (notFound) {
     return (
-      <PageShell title="Plant Details">
+      <PageShell
+        title="Plant Details"
+        actions={
+          <Link className={styles.buttonPrimary} href={overviewHref}>
+            ← Overview
+          </Link>
+        }
+      >
         <SectionCard>
           <IllustrationPlaceholder
             inventoryId="ILL-203"
@@ -169,20 +185,15 @@ export default function PlantQrPage() {
   }
 
   return (
-    <PageShell title="Plant Details" subtitle={plantUuid || "Unknown plant"}>
-      <SectionCard>
-        <div className={styles.actions}>
-          <Link
-            className={styles.buttonPrimary}
-            href={
-              overviewFromParam ||
-              (plant ? `/experiments/${plant.experiment.id}/overview` : "/experiments")
-            }
-          >
-            ← Overview
-          </Link>
-        </div>
-      </SectionCard>
+    <PageShell
+      title="Plant Details"
+      subtitle={plantUuid || "Unknown plant"}
+      actions={
+        <Link className={styles.buttonPrimary} href={overviewHref}>
+          ← Overview
+        </Link>
+      }
+    >
       <SectionCard>
         {loading ? <p className={styles.mutedText}>Loading plant details...</p> : null}
         {error ? <p className={styles.errorText}>{error}</p> : null}
