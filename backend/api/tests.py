@@ -183,6 +183,26 @@ class Packet2PlantsTests(TestCase):
         self.assertTrue(response.content.startswith(b"%PDF"))
         self.assertGreater(len(response.content), 1200)
 
+    @override_settings(PUBLIC_BASE_URL="https://growtriallab.example.com")
+    def test_labels_pdf_encodes_public_base_url(self):
+        experiment = Experiment.objects.create(name="Labels URL")
+        species = Species.objects.create(name="Nepenthes alata", category="nepenthes")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="NP-001")
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/plants/labels.pdf?mode=all")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"https://growtriallab.example.com/p/", response.content)
+        self.assertIn(str(plant.id).encode("utf-8"), response.content)
+
+    def test_labels_pdf_prints_plant_id_text(self):
+        experiment = Experiment.objects.create(name="Labels Text")
+        species = Species.objects.create(name="Drosera capensis", category="drosera")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="NP-001")
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/plants/labels.pdf?mode=all")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"NP-001", response.content)
+
     def test_packet_2_complete_requires_plants(self):
         experiment = Experiment.objects.create(name="Packet 2")
         fail_response = self.client.post(
@@ -199,3 +219,24 @@ class Packet2PlantsTests(TestCase):
         self.assertEqual(success_response.status_code, 200)
         payload = success_response.json()
         self.assertIn(PACKET_PLANTS, payload["completed_packets"])
+
+    def test_plant_detail_route_returns_nested_payload(self):
+        experiment = Experiment.objects.create(name="Plant Detail")
+        species = Species.objects.create(name="Pinguicula gigantea", category="pinguicula")
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="PG-010",
+            cultivar="Giant Form",
+            baseline_notes="Healthy baseline",
+        )
+
+        response = self.client.get(f"/api/v1/plants/{plant.id}/")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["uuid"], str(plant.id))
+        self.assertEqual(payload["plant_id"], "PG-010")
+        self.assertEqual(payload["species"]["name"], "Pinguicula gigantea")
+        self.assertEqual(payload["species"]["category"], "pinguicula")
+        self.assertEqual(payload["experiment"]["id"], str(experiment.id))
+        self.assertEqual(payload["experiment"]["name"], "Plant Detail")
