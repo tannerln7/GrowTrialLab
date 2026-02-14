@@ -15,7 +15,7 @@ Status convention:
 ## Current Status Summary
 The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Packet framework is in place and Packet 1 (Environment) and Packet 2 (Plants) are implemented end-to-end with API and UI.
 
-Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Packet 3 baseline MVP is now implemented with template-driven metrics, baseline capture UI, bin assignment, and baseline locking.
+Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Packet 3 baseline MVP is now implemented with template-driven metrics, baseline capture UI, bin assignment, and UI-level baseline locking.
 
 The largest remaining V1 work is Packet 4-7 workflows, production-hardening/security/deployment details, and operational guardrails (backups, stricter packet-lock governance, reporting/export paths).
 
@@ -72,13 +72,16 @@ The largest remaining V1 work is Packet 4-7 workflows, production-hardening/secu
 - [x] Metric template model seeded with baseline defaults (owner: Codex)
   - Refs: `5571d379`
   - Routes: `GET /api/v1/metric-templates/`, `GET /api/v1/metric-templates/{id}/`.
-- [x] Packet 3 baseline APIs and lock integrity rules (owner: Codex)
+- [x] Packet 3 baseline APIs and lock state workflow (owner: Codex)
   - Refs: `2f919969`, `d0467ff4`
   - Routes: `GET /api/v1/experiments/{id}/baseline/status`, `GET/POST /api/v1/plants/{uuid}/baseline`, `POST /api/v1/experiments/{id}/baseline/lock`, `PUT /api/v1/experiments/{id}/packets/baseline/`, `POST /api/v1/experiments/{id}/packets/baseline/complete/`.
-  - Notes: Baseline lock blocks bin and week-0 baseline edits for non-admin users.
+  - Notes: Baseline lock state is retained for UX/workflow signaling and packet progression.
 - [x] Packet 3 frontend baseline workflow (owner: Codex)
   - Refs: `4e599540`
   - Routes: `/experiments/{id}/setup` (Packet 3 section), `/experiments/{id}/baseline`, `/p/{uuid}` baseline shortcut.
+- [x] Baseline lock semantics switched to UI-only guardrail (owner: Codex)
+  - Refs: `de058638`, `1cf9c9e6`, `e68610fc`
+  - Notes: Backend no longer returns lock-based 403 for baseline/bin edits; baseline page is read-only by default when locked and supports local unlock/re-lock.
 
 ## Remaining Milestones
 
@@ -102,7 +105,7 @@ The largest remaining V1 work is Packet 4-7 workflows, production-hardening/secu
   - Notes: currently audit is minimal/log-style.
 
 ### Setup Wizard (Packets 1–8)
-- [ ] (in progress) Keep Packet 1/2/3 stable while adding packet lock progression rules (owner: Codex)
+- [ ] (in progress) Keep Packet 1/2/3 stable while refining packet lock governance (owner: Codex)
   - Route: `PATCH /api/v1/experiments/{id}/setup-state/`.
 - [ ] (in progress) Strengthen Packet 3 completion rule from MVP threshold to all-plants baseline coverage (owner: Codex)
   - Notes: Current MVP requires at least 1 baseline capture + all bins assigned.
@@ -166,7 +169,7 @@ The largest remaining V1 work is Packet 4-7 workflows, production-hardening/secu
 
 ## Next 3 Prompts Plan
 1. Packet 4 MVP: group/randomization setup flow without full statistical engine.
-2. Packet lock governance: explicit admin unlock endpoint + audit trace for lock bypass.
+2. Packet lock governance: define whether backend-enforced locks/audit trail are required for post-MVP integrity.
 3. Packet 7 weekly ritual MVP: weekly session, feeding events, and adverse event flow.
 
 ## Deferred Items (Explicitly Not in V1)

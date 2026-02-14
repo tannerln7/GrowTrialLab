@@ -55,10 +55,11 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Keeps baseline capture structured while reusing the existing metrics pipeline.
 - Refs: `5571d379`, `2f919969`, `d0467ff4`.
 
-### 2026-02-14: Packet 3 enforces lock semantics for baseline/bin edits
-- Decision: Completing/locking baseline sets packet lock state and blocks baseline/bin edits for non-admin users unless admin override (`?unlock=true`) is used.
-- Rationale: Preserves experiment integrity after baseline capture without introducing full unlock workflow yet.
-- Refs: `2f919969`, `d0467ff4`.
+### 2026-02-14: Packet 3 lock is a UI-only guardrail in v1
+- Decision: Keep baseline lock state and lock endpoints for workflow signaling, but do not enforce lock-based write denial in backend baseline/bin APIs.
+- Rationale: Reduces v1 complexity and avoids backend unlock override paths while preserving UX-level accidental-edit protection.
+- Refs: `de058638`, `1cf9c9e6`, `e68610fc`.
+- Caution: Audit-grade integrity will require backend-enforced lock rules in a later phase.
 
 ### 2026-02-14: Baseline UX uses dedicated capture page plus wizard summary
 - Decision: Implement `/experiments/{id}/baseline` for save-and-next capture flow and keep `/experiments/{id}/setup` Packet 3 as status/control surface.
