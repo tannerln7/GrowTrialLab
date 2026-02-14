@@ -101,6 +101,7 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [x] Groups frontend flow with preview/apply and UI-only lock guardrail (owner: Codex)
   - Refs: `ea4373b7`
   - Routes: `/experiments/{id}/assignment`, `/experiments/{id}/overview`.
+  - Notes: Recipes are editable during setup; assignment preview/apply stays gated until bootstrap setup is complete.
 - [x] Experiment overview roster/work queue endpoint and UI (owner: Codex)
   - Refs: `51a32d99`, `65f84632`, `12517df6`
   - Routes: `GET /api/v1/experiments/{id}/overview/plants`, `/experiments/{id}/overview`.
@@ -112,7 +113,7 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [x] Experiment status summary endpoint for bootstrap/readiness gating (owner: Codex)
   - Refs: `ee000fab`, `c8b7db72`, `d302abd6`
   - Route: `GET /api/v1/experiments/{id}/status/summary`.
-  - Notes: Setup completeness checks plants/blocks/recipes only; readiness counts track baseline/bin + assignment gaps on active plants.
+  - Notes: Setup completeness checks plants/blocks/recipes only; readiness counts track baseline/bin + assignment gaps on active plants and are refreshed after assignment apply.
 - [x] Bootstrap-only setup checklist + dedicated slots and assignment pages (owner: Codex)
   - Refs: `f2b49938`, `a181325a`, `c61be2e7`
   - Routes: `/experiments/{id}/setup`, `/experiments/{id}/slots`, `/experiments/{id}/assignment`.
