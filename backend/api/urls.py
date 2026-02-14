@@ -36,6 +36,7 @@ from .tents_views import (
     tent_detail,
 )
 from .rotation_views import experiment_rotation_log, experiment_rotation_summary
+from .schedule_views import experiment_schedule_plan, experiment_schedules, schedule_detail
 from .baseline_views import (
     complete_baseline_packet,
     experiment_baseline_lock,
@@ -243,6 +244,21 @@ urlpatterns = [
         "api/v1/experiments/<uuid:experiment_id>/rotation/log",
         experiment_rotation_log,
         name="experiment-rotation-log",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/schedules",
+        experiment_schedules,
+        name="experiment-schedules",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/schedules/plan",
+        experiment_schedule_plan,
+        name="experiment-schedules-plan",
+    ),
+    path(
+        "api/v1/schedules/<uuid:schedule_id>",
+        schedule_detail,
+        name="schedule-detail",
     ),
     path(
         "api/v1/experiments/<uuid:experiment_id>/trays",

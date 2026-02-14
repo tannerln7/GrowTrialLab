@@ -7,6 +7,7 @@ from rest_framework.response import Response
 
 from .baseline import BASELINE_WEEK_NUMBER
 from .models import FeedingEvent, Photo, Plant, PlantWeeklyMetric
+from .schedules import plan_for_experiment
 from .status_summary import compute_setup_status
 from .tray_assignment import placement_info, plant_tray_placement, resolved_assigned_recipe
 
@@ -77,6 +78,24 @@ def plant_cockpit(request, plant_id: UUID):
         chain_label = f"Replacement of {replaces.plant_id or str(replaces.id)}"
     elif replaced_by:
         chain_label = "Has replacement"
+    schedule_plan = plan_for_experiment(plant.experiment, days=3, plant_id=str(plant.id))
+    scheduled_upcoming = []
+    for slot in schedule_plan["slots"]:
+        for item in slot["actions"]:
+            scheduled_upcoming.append(
+                {
+                    "date": slot["date"],
+                    "timeframe": slot["timeframe"],
+                    "exact_time": slot["exact_time"],
+                    "title": item["title"],
+                    "action_type": item["action_type"],
+                    "blocked_reasons": item["blocked_reasons"],
+                }
+            )
+            if len(scheduled_upcoming) >= 3:
+                break
+        if len(scheduled_upcoming) >= 3:
+            break
 
     return Response(
         {
@@ -121,6 +140,7 @@ def plant_cockpit(request, plant_id: UUID):
                 "replaced_by_uuid": replaced_by_uuid,
                 "replaces_uuid": replaces_uuid,
                 "chain_label": chain_label,
+                "scheduled_upcoming": scheduled_upcoming,
             },
             "links": {
                 "experiment_home": experiment_home,

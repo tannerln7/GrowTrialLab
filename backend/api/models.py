@@ -297,6 +297,81 @@ class Tent(UUIDModel):
         return f"{self.experiment.pk}:{self.name}{suffix}"
 
 
+class ScheduleAction(UUIDModel):
+    class ActionType(models.TextChoices):
+        FEED = "FEED", "Feed"
+        ROTATE = "ROTATE", "Rotate"
+        PHOTO = "PHOTO", "Photo"
+        METRICS = "METRICS", "Metrics"
+        NOTE = "NOTE", "Note"
+        CUSTOM = "CUSTOM", "Custom"
+
+    experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="schedule_actions")
+    title = models.CharField(max_length=255)
+    action_type = models.CharField(max_length=16, choices=ActionType.choices)
+    description = models.TextField(blank=True)
+    enabled = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class ScheduleRule(UUIDModel):
+    class RuleType(models.TextChoices):
+        DAILY = "DAILY", "Daily"
+        WEEKLY = "WEEKLY", "Weekly"
+        CUSTOM_DAYS_INTERVAL = "CUSTOM_DAYS_INTERVAL", "Custom days interval"
+
+    class Timeframe(models.TextChoices):
+        MORNING = "MORNING", "Morning"
+        AFTERNOON = "AFTERNOON", "Afternoon"
+        EVENING = "EVENING", "Evening"
+        NIGHT = "NIGHT", "Night"
+
+    schedule_action = models.ForeignKey(
+        ScheduleAction,
+        on_delete=models.CASCADE,
+        related_name="rules",
+    )
+    rule_type = models.CharField(max_length=24, choices=RuleType.choices)
+    interval_days = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+    )
+    weekdays = models.JSONField(default=list, blank=True)
+    timeframe = models.CharField(max_length=16, choices=Timeframe.choices, default=Timeframe.MORNING)
+    exact_time = models.TimeField(null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class ScheduleScope(UUIDModel):
+    class ScopeType(models.TextChoices):
+        TENT = "TENT", "Tent"
+        TRAY = "TRAY", "Tray"
+        PLANT = "PLANT", "Plant"
+
+    schedule_action = models.ForeignKey(
+        ScheduleAction,
+        on_delete=models.CASCADE,
+        related_name="scopes",
+    )
+    scope_type = models.CharField(max_length=16, choices=ScopeType.choices)
+    scope_id = models.UUIDField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["schedule_action", "scope_type", "scope_id"],
+                name="unique_schedule_scope_target",
+            )
+        ]
+
+
 class RotationLog(UUIDModel):
     experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="rotation_logs")
     tray = models.ForeignKey(Tray, on_delete=models.CASCADE, related_name="rotation_logs")

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from .baseline import BASELINE_WEEK_NUMBER
 from .models import Block, Experiment, Plant, PlantWeeklyMetric, Recipe, Tent
+from .schedules import plan_for_experiment
 from .tent_restrictions import tent_allows_species
 from .tray_assignment import experiment_tray_placements
 
@@ -76,6 +77,8 @@ def experiment_status_summary_payload(experiment: Experiment) -> dict:
         and needs_tray_recipe == 0
         and needs_tent_restriction == 0
     )
+    schedule_plan = plan_for_experiment(experiment, days=14)
+
     return {
         "setup": {
             "is_complete": setup.is_complete,
@@ -102,5 +105,9 @@ def experiment_status_summary_payload(experiment: Experiment) -> dict:
                 "needs_tray_recipe": needs_tray_recipe,
                 "needs_tent_restriction": needs_tent_restriction,
             },
+        },
+        "schedule": {
+            "next_scheduled_slot": schedule_plan["next_slot"],
+            "due_counts_today": schedule_plan["due_counts_today"],
         },
     }

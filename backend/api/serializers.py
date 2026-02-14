@@ -13,6 +13,9 @@ from .models import (
     PlantWeeklyMetric,
     Recipe,
     RotationLog,
+    ScheduleAction,
+    ScheduleRule,
+    ScheduleScope,
     Species,
     Tent,
     Tray,
@@ -242,6 +245,80 @@ class PlantReplaceSerializer(serializers.Serializer):
     mark_original_removed = serializers.BooleanField(required=False, default=True)
     removed_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     removed_at = serializers.DateTimeField(required=False, allow_null=True)
+
+
+class ScheduleRuleInputSerializer(serializers.Serializer):
+    rule_type = serializers.ChoiceField(choices=ScheduleRule.RuleType.choices)
+    interval_days = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    weekdays = serializers.ListField(
+        child=serializers.ChoiceField(
+            choices=["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+        ),
+        required=False,
+        allow_empty=True,
+    )
+    timeframe = serializers.ChoiceField(choices=ScheduleRule.Timeframe.choices)
+    exact_time = serializers.TimeField(required=False, allow_null=True)
+    start_date = serializers.DateField(required=False, allow_null=True)
+    end_date = serializers.DateField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        rule_type = attrs.get("rule_type")
+        interval_days = attrs.get("interval_days")
+        weekdays = attrs.get("weekdays", [])
+        start_date = attrs.get("start_date")
+        end_date = attrs.get("end_date")
+
+        if rule_type == ScheduleRule.RuleType.WEEKLY and not weekdays:
+            raise serializers.ValidationError("weekdays is required for WEEKLY rules.")
+        if rule_type == ScheduleRule.RuleType.CUSTOM_DAYS_INTERVAL and not interval_days:
+            raise serializers.ValidationError("interval_days is required for CUSTOM_DAYS_INTERVAL rules.")
+        if rule_type in {ScheduleRule.RuleType.DAILY, ScheduleRule.RuleType.WEEKLY}:
+            attrs["interval_days"] = None
+        if rule_type != ScheduleRule.RuleType.WEEKLY:
+            attrs["weekdays"] = []
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError("end_date must be on or after start_date.")
+        return attrs
+
+
+class ScheduleScopeInputSerializer(serializers.Serializer):
+    scope_type = serializers.ChoiceField(choices=ScheduleScope.ScopeType.choices)
+    scope_id = serializers.UUIDField()
+
+
+class ScheduleActionCreateSerializer(serializers.Serializer):
+    title = serializers.CharField(required=True, allow_blank=False, max_length=255)
+    action_type = serializers.ChoiceField(choices=ScheduleAction.ActionType.choices)
+    description = serializers.CharField(required=False, allow_blank=True)
+    enabled = serializers.BooleanField(required=False, default=True)
+    rules = ScheduleRuleInputSerializer(many=True)
+    scopes = ScheduleScopeInputSerializer(many=True)
+
+    def validate(self, attrs):
+        if len(attrs.get("rules", [])) == 0:
+            raise serializers.ValidationError("rules cannot be empty.")
+        if len(attrs.get("scopes", [])) == 0:
+            raise serializers.ValidationError("scopes cannot be empty.")
+        return attrs
+
+
+class ScheduleActionUpdateSerializer(serializers.Serializer):
+    title = serializers.CharField(required=False, allow_blank=False, max_length=255)
+    action_type = serializers.ChoiceField(choices=ScheduleAction.ActionType.choices, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    enabled = serializers.BooleanField(required=False)
+    rules = ScheduleRuleInputSerializer(many=True, required=False)
+    scopes = ScheduleScopeInputSerializer(many=True, required=False)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError("At least one field is required.")
+        if "rules" in attrs and len(attrs["rules"]) == 0:
+            raise serializers.ValidationError("rules cannot be empty.")
+        if "scopes" in attrs and len(attrs["scopes"]) == 0:
+            raise serializers.ValidationError("scopes cannot be empty.")
+        return attrs
 
 
 class MetricTemplateSerializer(serializers.ModelSerializer):

@@ -18,6 +18,9 @@ from api.models import (
     PlantWeeklyMetric,
     Recipe,
     RotationLog,
+    ScheduleAction,
+    ScheduleRule,
+    ScheduleScope,
     Species,
     Tent,
     Tray,
@@ -477,6 +480,9 @@ class ExperimentStatusSummaryTests(TestCase):
         self.assertEqual(payload["lifecycle"]["state"], Experiment.LifecycleState.DRAFT)
         self.assertIsNone(payload["lifecycle"]["started_at"])
         self.assertIsNone(payload["lifecycle"]["stopped_at"])
+        self.assertIn("schedule", payload)
+        self.assertIn("due_counts_today", payload["schedule"])
+        self.assertIn("next_scheduled_slot", payload["schedule"])
 
     def test_status_summary_marks_setup_complete_with_plants_blocks_and_valid_recipes(self):
         experiment = Experiment.objects.create(name="Setup Complete")
@@ -1231,6 +1237,201 @@ class PlacementApiTests(TestCase):
     DEV_EMAIL="admin@example.com",
     AUTH_MODE="invite_only",
 )
+class ScheduleApiTests(TestCase):
+    def test_create_schedule_requires_rules_and_scopes(self):
+        experiment = Experiment.objects.create(name="Schedule Missing Rules/Scopes")
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/schedules",
+            data={
+                "title": "Invalid schedule",
+                "action_type": "FEED",
+                "rules": [],
+                "scopes": [],
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        error_text = str(response.json())
+        self.assertTrue("rules" in error_text or "scopes" in error_text)
+
+    def test_create_list_patch_delete_schedule(self):
+        experiment = Experiment.objects.create(name="Schedule CRUD")
+        tent = Tent.objects.get(experiment=experiment, code="T1")
+        block = Block.objects.create(experiment=experiment, tent=tent, name="B1", description="slot")
+        tray = Tray.objects.create(experiment=experiment, name="TR1", block=block, capacity=4)
+        species = Species.objects.create(name="Nepenthes schedule", category="nepenthes")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="NP-901")
+        TrayPlant.objects.create(tray=tray, plant=plant, order_index=0)
+
+        create_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/schedules",
+            data={
+                "title": "Feed - Tent T1 - Mon Afternoon",
+                "action_type": "FEED",
+                "description": "Weekly feed",
+                "enabled": True,
+                "rules": [
+                    {
+                        "rule_type": "WEEKLY",
+                        "weekdays": ["MON"],
+                        "timeframe": "AFTERNOON",
+                    },
+                    {
+                        "rule_type": "WEEKLY",
+                        "weekdays": ["WED"],
+                        "timeframe": "NIGHT",
+                    },
+                ],
+                "scopes": [{"scope_type": "TENT", "scope_id": str(tent.id)}],
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(create_response.status_code, 201)
+        schedule_id = create_response.json()["schedule"]["id"]
+        self.assertEqual(len(create_response.json()["schedule"]["rules"]), 2)
+
+        list_response = self.client.get(f"/api/v1/experiments/{experiment.id}/schedules")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(len(list_response.json()["schedules"]), 1)
+
+        patch_response = self.client.patch(
+            f"/api/v1/schedules/{schedule_id}",
+            data={
+                "enabled": False,
+                "scopes": [{"scope_type": "TRAY", "scope_id": str(tray.id)}],
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(patch_response.status_code, 200)
+        payload = patch_response.json()["schedule"]
+        self.assertFalse(payload["enabled"])
+        self.assertEqual(payload["scopes"][0]["scope_type"], "TRAY")
+
+        delete_response = self.client.delete(f"/api/v1/schedules/{schedule_id}")
+        self.assertEqual(delete_response.status_code, 204)
+        self.assertFalse(ScheduleAction.objects.filter(id=schedule_id).exists())
+
+    def test_delete_schedule_blocked_while_running(self):
+        experiment = Experiment.objects.create(
+            name="Schedule Delete Running",
+            lifecycle_state=Experiment.LifecycleState.RUNNING,
+        )
+        action = ScheduleAction.objects.create(
+            experiment=experiment,
+            title="Rotate trays",
+            action_type=ScheduleAction.ActionType.ROTATE,
+        )
+        delete_response = self.client.delete(f"/api/v1/schedules/{action.id}")
+        self.assertEqual(delete_response.status_code, 409)
+
+    def test_schedule_plan_groups_slots_deterministically(self):
+        experiment = Experiment.objects.create(name="Schedule Plan Grouping")
+        tent = Tent.objects.get(experiment=experiment, code="T1")
+        block = Block.objects.create(experiment=experiment, tent=tent, name="B1", description="slot")
+        tray = Tray.objects.create(experiment=experiment, name="TR1", block=block, capacity=4)
+        species = Species.objects.create(name="Drosera schedule grouping", category="drosera")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="DR-901")
+        TrayPlant.objects.create(tray=tray, plant=plant, order_index=0)
+        start_date = timezone.localdate()
+
+        action_feed = ScheduleAction.objects.create(
+            experiment=experiment,
+            title="Feed Tent",
+            action_type=ScheduleAction.ActionType.FEED,
+        )
+        ScheduleRule.objects.create(
+            schedule_action=action_feed,
+            rule_type=ScheduleRule.RuleType.DAILY,
+            timeframe=ScheduleRule.Timeframe.AFTERNOON,
+            start_date=start_date,
+        )
+        ScheduleScope.objects.create(
+            schedule_action=action_feed,
+            scope_type=ScheduleScope.ScopeType.TENT,
+            scope_id=tent.id,
+        )
+
+        action_photo = ScheduleAction.objects.create(
+            experiment=experiment,
+            title="Photo Tent",
+            action_type=ScheduleAction.ActionType.PHOTO,
+        )
+        ScheduleRule.objects.create(
+            schedule_action=action_photo,
+            rule_type=ScheduleRule.RuleType.DAILY,
+            timeframe=ScheduleRule.Timeframe.AFTERNOON,
+            start_date=start_date,
+        )
+        ScheduleScope.objects.create(
+            schedule_action=action_photo,
+            scope_type=ScheduleScope.ScopeType.TENT,
+            scope_id=tent.id,
+        )
+
+        action_exact = ScheduleAction.objects.create(
+            experiment=experiment,
+            title="Metrics Exact",
+            action_type=ScheduleAction.ActionType.METRICS,
+        )
+        ScheduleRule.objects.create(
+            schedule_action=action_exact,
+            rule_type=ScheduleRule.RuleType.DAILY,
+            timeframe=ScheduleRule.Timeframe.MORNING,
+            exact_time="14:30:00",
+            start_date=start_date,
+        )
+        ScheduleScope.objects.create(
+            schedule_action=action_exact,
+            scope_type=ScheduleScope.ScopeType.PLANT,
+            scope_id=plant.id,
+        )
+
+        plan_response = self.client.get(f"/api/v1/experiments/{experiment.id}/schedules/plan?days=1")
+        self.assertEqual(plan_response.status_code, 200)
+        slots = plan_response.json()["slots"]
+        self.assertEqual(len(slots), 2)
+
+        timeframe_slot = next(slot for slot in slots if slot["timeframe"] == "AFTERNOON")
+        self.assertEqual(len(timeframe_slot["actions"]), 2)
+        self.assertEqual(
+            [item["action_type"] for item in timeframe_slot["actions"]],
+            ["FEED", "PHOTO"],
+        )
+        exact_slot = next(slot for slot in slots if slot["exact_time"] == "14:30:00")
+        self.assertEqual(exact_slot["actions"][0]["title"], "Metrics Exact")
+
+    def test_schedule_scope_must_belong_to_experiment(self):
+        experiment = Experiment.objects.create(name="Schedule Scope Validation")
+        other_experiment = Experiment.objects.create(name="Other Scope")
+        other_tent = Tent.objects.get(experiment=other_experiment, code="T1")
+
+        create_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/schedules",
+            data={
+                "title": "Invalid Scope",
+                "action_type": "PHOTO",
+                "rules": [
+                    {
+                        "rule_type": "DAILY",
+                        "timeframe": "MORNING",
+                    }
+                ],
+                "scopes": [{"scope_type": "TENT", "scope_id": str(other_tent.id)}],
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(create_response.status_code, 400)
+
+
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
+)
 class RotationApiTests(TestCase):
     def test_rotation_summary_returns_trays_and_recent_logs(self):
         experiment = Experiment.objects.create(
@@ -1650,6 +1851,53 @@ class PlantCockpitTests(TestCase):
         self.assertEqual(derived["tray_code"], "TR1")
         self.assertEqual(derived["tray_capacity"], 4)
         self.assertEqual(derived["tray_current_count"], 1)
+
+    def test_cockpit_includes_scheduled_upcoming_actions(self):
+        experiment = Experiment.objects.create(name="Cockpit Scheduled")
+        tent = Tent.objects.get(experiment=experiment, code="T1")
+        block = Block.objects.create(experiment=experiment, tent=tent, name="B1", description="slot")
+        tray = Tray.objects.create(experiment=experiment, block=block, name="TR1", capacity=2)
+        recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment")
+        tray.assigned_recipe = recipe
+        tray.save(update_fields=["assigned_recipe"])
+        species = Species.objects.create(name="Sarracenia leucophylla", category="sarracenia")
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="SR-010",
+            status=Plant.Status.ACTIVE,
+            bin="A",
+        )
+        TrayPlant.objects.create(tray=tray, plant=plant, order_index=0)
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=plant,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4},
+        )
+        action = ScheduleAction.objects.create(
+            experiment=experiment,
+            title="Feed tent",
+            action_type=ScheduleAction.ActionType.FEED,
+        )
+        ScheduleRule.objects.create(
+            schedule_action=action,
+            rule_type=ScheduleRule.RuleType.DAILY,
+            timeframe=ScheduleRule.Timeframe.AFTERNOON,
+            start_date=timezone.localdate(),
+        )
+        ScheduleScope.objects.create(
+            schedule_action=action,
+            scope_type=ScheduleScope.ScopeType.PLANT,
+            scope_id=plant.id,
+        )
+
+        response = self.client.get(f"/api/v1/plants/{plant.id}/cockpit")
+        self.assertEqual(response.status_code, 200)
+        upcoming = response.json()["derived"]["scheduled_upcoming"]
+        self.assertGreaterEqual(len(upcoming), 1)
+        self.assertEqual(upcoming[0]["title"], "Feed tent")
 
 
 @override_settings(
