@@ -155,7 +155,7 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Routes: `GET /api/v1/experiments/{id}/placement/summary`, `POST /api/v1/experiments/{id}/placement/auto`, `POST /api/v1/experiments/{id}/trays`, `PATCH /api/v1/trays/{id}/`, `POST /api/v1/trays/{id}/plants`, `DELETE /api/v1/trays/{id}/plants/{tray_plant_id}`, `/experiments/{id}/placement`.
   - Notes: Enforces one-tray-per-plant, tray-level recipe assignment, removed-plant placement rejection, and running-state placement mutation locks.
 - [x] Multi-tent hierarchy and species restriction enforcement (owner: Codex)
-  - Refs: pending this prompt commit
+  - Refs: `cd9e2cf6`, `4e74e10d`, `8157c551`
   - Routes: `GET/POST /api/v1/experiments/{id}/tents`, `PATCH/DELETE /api/v1/tents/{id}`, `GET/POST /api/v1/tents/{id}/blocks`, `POST /api/v1/tents/{id}/blocks/defaults`, `GET /api/v1/experiments/{id}/placement/summary`, `POST /api/v1/trays/{id}/plants`, `POST /api/v1/experiments/{id}/rotation/log`.
   - Notes: Blocks now belong to tents; destination-tent species restrictions are enforced for tray placement and tray moves. Status summary/start readiness now include tent presence and tent-restriction compliance.
 - [x] Rotation MVP with tray movement logs and recent history (owner: Codex)

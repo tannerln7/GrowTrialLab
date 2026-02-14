@@ -167,7 +167,7 @@ This file records architecture/product decisions and why they were made.
 ### 2026-02-14: Multi-tent hierarchy is first-class and restrictions are backend-enforced
 - Decision: Physical hierarchy is now `Tent -> Block -> Tray -> Plant`; blocks belong to tents and experiments can manage multiple tents. Tent-level `allowed_species` restrictions are enforced server-side for both `POST /api/v1/trays/{tray_id}/plants` and `POST /api/v1/experiments/{id}/rotation/log` destination moves.
 - Rationale: Multi-tent operations require explicit structure and hard validation to prevent accidental placement/moves into incompatible environments.
-- Refs: pending this prompt commit.
+- Refs: `cd9e2cf6`, `4e74e10d`, `8157c551`.
 - Invariants:
   - Empty `tent.allowed_species` means unrestricted; non-empty means only listed species allowed.
   - Restrictions apply when a tray is in a block/tent; unplaced trays are not restriction-checked until placement/move.
