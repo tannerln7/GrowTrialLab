@@ -1,7 +1,9 @@
 from unittest.mock import patch
+from datetime import timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from api.baseline import BASELINE_WEEK_NUMBER
 from api.models import (
@@ -9,6 +11,7 @@ from api.models import (
     Block,
     Experiment,
     ExperimentSetupState,
+    FeedingEvent,
     MetricTemplate,
     Photo,
     Plant,
@@ -842,6 +845,114 @@ class RotationApiTests(TestCase):
     ADMIN_EMAIL="admin@example.com",
     DEV_EMAIL="admin@example.com",
     AUTH_MODE="invite_only",
+)
+class FeedingApiTests(TestCase):
+    def test_feed_rejected_when_experiment_not_running(self):
+        experiment = Experiment.objects.create(
+            name="Feed Not Running",
+            lifecycle_state=Experiment.LifecycleState.DRAFT,
+        )
+        species = Species.objects.create(name="Nepenthes lowii red", category="nepenthes")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="NP-701")
+
+        response = self.client.post(
+            f"/api/v1/plants/{plant.id}/feed",
+            data={"amount_text": "3 drops"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"],
+            "Feeding is available only while an experiment is running.",
+        )
+
+    def test_feed_creates_event_and_recent_endpoint_lists_it(self):
+        experiment = Experiment.objects.create(
+            name="Feed Recent",
+            lifecycle_state=Experiment.LifecycleState.RUNNING,
+        )
+        species = Species.objects.create(name="Drosera alba", category="drosera")
+        recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="DR-711")
+
+        feed_response = self.client.post(
+            f"/api/v1/plants/{plant.id}/feed",
+            data={"recipe_id": str(recipe.id), "amount_text": "1 mL", "note": "manual test"},
+            content_type="application/json",
+        )
+        self.assertEqual(feed_response.status_code, 201)
+        self.assertEqual(feed_response.json()["amount_text"], "1 mL")
+        self.assertEqual(feed_response.json()["recipe_id"], str(recipe.id))
+
+        recent_response = self.client.get(f"/api/v1/plants/{plant.id}/feeding/recent")
+        self.assertEqual(recent_response.status_code, 200)
+        events = recent_response.json()["events"]
+        self.assertGreaterEqual(len(events), 1)
+        self.assertEqual(events[0]["amount_text"], "1 mL")
+        self.assertEqual(events[0]["recipe_code"], "R0")
+
+    def test_feeding_queue_remaining_and_ordering(self):
+        experiment = Experiment.objects.create(
+            name="Feed Queue",
+            lifecycle_state=Experiment.LifecycleState.RUNNING,
+        )
+        species = Species.objects.create(name="Pinguicula x", category="pinguicula")
+        p1 = Plant.objects.create(experiment=experiment, species=species, plant_id="PG-001")
+        p2 = Plant.objects.create(experiment=experiment, species=species, plant_id="PG-002")
+        p3 = Plant.objects.create(experiment=experiment, species=species, plant_id="PG-003")
+        p4 = Plant.objects.create(experiment=experiment, species=species, plant_id="PG-004")
+        Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="PG-999",
+            status=Plant.Status.DEAD,
+        )
+
+        old_20_days = timezone.now() - timedelta(days=20)
+        old_10_days = timezone.now() - timedelta(days=10)
+        recent_1_day = timezone.now() - timedelta(days=1)
+
+        FeedingEvent.objects.create(
+            experiment=experiment,
+            plant=p4,
+            amount_text="2 drops",
+            occurred_at=old_20_days,
+            created_by_email="admin@example.com",
+        )
+        FeedingEvent.objects.create(
+            experiment=experiment,
+            plant=p1,
+            amount_text="2 drops",
+            occurred_at=old_10_days,
+            created_by_email="admin@example.com",
+        )
+        FeedingEvent.objects.create(
+            experiment=experiment,
+            plant=p3,
+            amount_text="2 drops",
+            occurred_at=recent_1_day,
+            created_by_email="admin@example.com",
+        )
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/feeding/queue")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["remaining_count"], 3)
+        self.assertEqual(payload["window_days"], 7)
+
+        plant_ids = [item["plant_id"] for item in payload["plants"]]
+        self.assertEqual(plant_ids[:4], ["PG-002", "PG-004", "PG-001", "PG-003"])
+        needs_flags = [item["needs_feeding"] for item in payload["plants"][:4]]
+        self.assertEqual(needs_flags, [True, True, True, False])
+
+
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
     MEDIA_ROOT="/tmp/growtriallab-test-media",
 )
 class PlantCockpitTests(TestCase):
@@ -862,12 +973,22 @@ class PlantCockpitTests(TestCase):
             week_number=BASELINE_WEEK_NUMBER,
             metrics={"health_score": 4},
         )
+        last_fed_at = timezone.now() - timedelta(days=2)
+        FeedingEvent.objects.create(
+            experiment=experiment,
+            plant=plant,
+            recipe=recipe,
+            amount_text="2 drops",
+            occurred_at=last_fed_at,
+            created_by_email="admin@example.com",
+        )
 
         response = self.client.get(f"/api/v1/plants/{plant.id}/cockpit")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload["derived"]["has_baseline"])
         self.assertEqual(payload["derived"]["assigned_recipe_code"], "R1")
+        self.assertEqual(payload["derived"]["last_fed_at"], last_fed_at.isoformat())
         self.assertEqual(payload["plant"]["plant_id"], "NP-301")
         self.assertEqual(
             payload["links"]["baseline_capture"],
