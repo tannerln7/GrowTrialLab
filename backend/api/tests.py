@@ -15,6 +15,8 @@ from api.models import (
     PlantWeeklyMetric,
     Recipe,
     Species,
+    Tray,
+    TrayPlant,
 )
 from api.setup_packets import (
     PACKET_BASELINE,
@@ -421,6 +423,10 @@ class ExperimentStatusSummaryTests(TestCase):
         self.assertTrue(payload["setup"]["missing"]["blocks"])
         self.assertTrue(payload["setup"]["missing"]["recipes"])
         self.assertFalse(payload["readiness"]["is_ready"])
+        self.assertFalse(payload["readiness"]["ready_to_start"])
+        self.assertEqual(payload["lifecycle"]["state"], Experiment.LifecycleState.DRAFT)
+        self.assertIsNone(payload["lifecycle"]["started_at"])
+        self.assertIsNone(payload["lifecycle"]["stopped_at"])
 
     def test_status_summary_marks_setup_complete_with_plants_blocks_and_valid_recipes(self):
         experiment = Experiment.objects.create(name="Setup Complete")
@@ -494,6 +500,7 @@ class ExperimentStatusSummaryTests(TestCase):
         payload = response.json()
         self.assertTrue(payload["setup"]["is_complete"])
         self.assertFalse(payload["readiness"]["is_ready"])
+        self.assertFalse(payload["readiness"]["ready_to_start"])
         self.assertEqual(payload["readiness"]["counts"]["active_plants"], 3)
         self.assertEqual(payload["readiness"]["counts"]["needs_baseline"], 2)
         self.assertEqual(payload["readiness"]["counts"]["needs_assignment"], 2)
@@ -534,6 +541,212 @@ class ExperimentStatusSummaryTests(TestCase):
         after_response = self.client.get(f"/api/v1/experiments/{experiment.id}/status/summary")
         self.assertEqual(after_response.status_code, 200)
         self.assertEqual(after_response.json()["readiness"]["counts"]["needs_assignment"], 0)
+
+
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
+)
+class ExperimentLifecycleTests(TestCase):
+    def test_experiment_defaults_to_draft_lifecycle(self):
+        experiment = Experiment.objects.create(name="Lifecycle Draft")
+        self.assertEqual(experiment.lifecycle_state, Experiment.LifecycleState.DRAFT)
+        self.assertIsNone(experiment.started_at)
+        self.assertIsNone(experiment.stopped_at)
+
+    def test_start_fails_when_not_ready(self):
+        experiment = Experiment.objects.create(name="Lifecycle Start Fail")
+        species = Species.objects.create(name="Nepenthes ampullaria green", category="nepenthes")
+        Block.objects.create(experiment=experiment, name="B1", description="slot")
+        Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="NP-001", bin=None)
+
+        response = self.client.post(f"/api/v1/experiments/{experiment.id}/start")
+        self.assertEqual(response.status_code, 409)
+        payload = response.json()
+        self.assertEqual(payload["detail"], "Experiment is not ready to start.")
+        self.assertFalse(payload["ready_to_start"])
+        self.assertEqual(payload["counts"]["needs_baseline"], 1)
+        self.assertEqual(payload["counts"]["needs_assignment"], 1)
+
+        experiment.refresh_from_db()
+        self.assertEqual(experiment.lifecycle_state, Experiment.LifecycleState.DRAFT)
+        self.assertIsNone(experiment.started_at)
+
+    def test_start_succeeds_when_ready(self):
+        experiment = Experiment.objects.create(name="Lifecycle Start Success")
+        species = Species.objects.create(name="Drosera adelae green", category="drosera")
+        recipe0 = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment")
+        Block.objects.create(experiment=experiment, name="B1", description="slot")
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="DR-001",
+            bin="A",
+            assigned_recipe=recipe0,
+            status=Plant.Status.ACTIVE,
+        )
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=plant,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4},
+        )
+
+        response = self.client.post(f"/api/v1/experiments/{experiment.id}/start")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["readiness"]["ready_to_start"])
+        self.assertEqual(payload["lifecycle"]["state"], Experiment.LifecycleState.RUNNING)
+        self.assertIsNotNone(payload["lifecycle"]["started_at"])
+        self.assertIsNone(payload["lifecycle"]["stopped_at"])
+
+        experiment.refresh_from_db()
+        self.assertEqual(experiment.lifecycle_state, Experiment.LifecycleState.RUNNING)
+        self.assertIsNotNone(experiment.started_at)
+        self.assertIsNone(experiment.stopped_at)
+
+    def test_stop_sets_stopped_state(self):
+        experiment = Experiment.objects.create(
+            name="Lifecycle Stop",
+            lifecycle_state=Experiment.LifecycleState.RUNNING,
+        )
+        species = Species.objects.create(name="Pinguicula esseriana x", category="pinguicula")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="PG-001")
+
+        response = self.client.post(f"/api/v1/experiments/{experiment.id}/stop")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["lifecycle"]["state"], Experiment.LifecycleState.STOPPED)
+        self.assertIsNotNone(payload["lifecycle"]["stopped_at"])
+
+        experiment.refresh_from_db()
+        self.assertEqual(experiment.lifecycle_state, Experiment.LifecycleState.STOPPED)
+        self.assertIsNotNone(experiment.stopped_at)
+
+
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
+)
+class PlacementApiTests(TestCase):
+    def test_placement_summary_returns_unplaced_count(self):
+        experiment = Experiment.objects.create(name="Placement Summary")
+        species = Species.objects.create(name="Sarracenia flava", category="sarracenia")
+        recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        tray = Tray.objects.create(experiment=experiment, name="T1")
+        placed = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="SA-001",
+            status=Plant.Status.ACTIVE,
+            assigned_recipe=recipe,
+        )
+        Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="SA-002",
+            status=Plant.Status.ACTIVE,
+            assigned_recipe=recipe,
+        )
+        TrayPlant.objects.create(tray=tray, plant=placed, order_index=0)
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/placement/summary")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["unplaced_active_plants_count"], 1)
+        self.assertEqual(len(payload["trays"]), 1)
+        self.assertEqual(payload["trays"][0]["plant_count"], 1)
+
+    def test_add_plant_to_tray_reduces_unplaced(self):
+        experiment = Experiment.objects.create(name="Placement Add")
+        species = Species.objects.create(name="Nepenthes jacquelineae", category="nepenthes")
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-010",
+            status=Plant.Status.ACTIVE,
+        )
+        tray_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/trays",
+            data={"name": "T1"},
+            content_type="application/json",
+        )
+        self.assertEqual(tray_response.status_code, 201)
+        tray_id = tray_response.json()["id"]
+
+        add_response = self.client.post(
+            f"/api/v1/trays/{tray_id}/plants",
+            data={"plant_id": str(plant.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(add_response.status_code, 201)
+
+        summary_response = self.client.get(f"/api/v1/experiments/{experiment.id}/placement/summary")
+        self.assertEqual(summary_response.status_code, 200)
+        self.assertEqual(summary_response.json()["unplaced_active_plants_count"], 0)
+
+    def test_cannot_place_same_plant_in_two_trays(self):
+        experiment = Experiment.objects.create(name="Placement Duplicate")
+        species = Species.objects.create(name="Drosera regia", category="drosera")
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="DR-301",
+            status=Plant.Status.ACTIVE,
+        )
+        tray_one = Tray.objects.create(experiment=experiment, name="T1")
+        tray_two = Tray.objects.create(experiment=experiment, name="T2")
+
+        first_response = self.client.post(
+            f"/api/v1/trays/{tray_one.id}/plants",
+            data={"plant_id": str(plant.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(first_response.status_code, 201)
+
+        second_response = self.client.post(
+            f"/api/v1/trays/{tray_two.id}/plants",
+            data={"plant_id": str(plant.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(second_response.status_code, 400)
+        self.assertEqual(
+            second_response.json()["detail"],
+            "Plant is already placed in another tray.",
+        )
+
+    def test_removed_plant_cannot_be_placed(self):
+        experiment = Experiment.objects.create(name="Placement Removed")
+        species = Species.objects.create(name="Flytrap Typical Clone", category="flytrap")
+        removed_plant = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="VF-400",
+            status=Plant.Status.REMOVED,
+        )
+        tray = Tray.objects.create(experiment=experiment, name="T1")
+
+        response = self.client.post(
+            f"/api/v1/trays/{tray.id}/plants",
+            data={"plant_id": str(removed_plant.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"],
+            "Removed plants cannot be placed in trays.",
+        )
 
 
 @override_settings(
