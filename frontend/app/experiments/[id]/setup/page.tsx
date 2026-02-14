@@ -16,7 +16,7 @@ import SectionCard from "@/src/components/ui/SectionCard";
 import styles from "../../experiments.module.css";
 
 type ChecklistItem = {
-  id: "plants" | "blocks" | "recipes";
+  id: "plants" | "tents_blocks" | "recipes";
   title: string;
   complete: boolean;
   href: string;
@@ -37,7 +37,6 @@ export default function ExperimentSetupPage() {
   }, [params]);
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [notInvited, setNotInvited] = useState(false);
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState("");
@@ -89,33 +88,6 @@ export default function ExperimentSetupPage() {
     void load();
   }, [experimentId, loadStatus, router]);
 
-  async function createDefaultBlocks() {
-    setSaving(true);
-    setError("");
-    try {
-      const response = await backendFetch(
-        `/api/v1/experiments/${experimentId}/blocks/defaults`,
-        { method: "POST" },
-      );
-      if (!response.ok) {
-        setError("Unable to create default blocks.");
-        return;
-      }
-      const summary = await loadStatus();
-      if (summary.setup.is_complete) {
-        router.replace(`/experiments/${experimentId}/overview`);
-      }
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to create default blocks.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (notInvited) {
     return (
       <PageShell title="Setup">
@@ -135,9 +107,9 @@ export default function ExperimentSetupPage() {
       actionLabel: "Go to plants",
     },
     {
-      id: "blocks",
-      title: "Blocks / Slots",
-      complete: !statusSummary?.setup.missing.blocks,
+      id: "tents_blocks",
+      title: "Tents + Blocks (Slots)",
+      complete: !statusSummary?.setup.missing.tents && !statusSummary?.setup.missing.blocks,
       href: `/experiments/${experimentId}/slots`,
       actionLabel: "Go to slots",
     },
@@ -177,16 +149,6 @@ export default function ExperimentSetupPage() {
                   <Link className={styles.buttonPrimary} href={item.href}>
                     {item.actionLabel}
                   </Link>
-                  {item.id === "blocks" && !item.complete ? (
-                    <button
-                      className={styles.buttonSecondary}
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void createDefaultBlocks()}
-                    >
-                      {saving ? "Creating..." : "Create default blocks"}
-                    </button>
-                  ) : null}
                 </div>
               </article>
             ))}

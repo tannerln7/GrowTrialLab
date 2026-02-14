@@ -152,6 +152,16 @@
   color: var(--text);
 }
 
+.checkboxGroup {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 0.5rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
 .tileGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

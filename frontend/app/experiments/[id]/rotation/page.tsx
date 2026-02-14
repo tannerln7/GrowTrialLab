@@ -42,6 +42,17 @@ type RotationSummary = {
 type BlockOption = {
   id: string;
   name: string;
+  label: string;
+};
+
+type TentResponse = {
+  id: string;
+  name: string;
+  code: string;
+  blocks: Array<{
+    id: string;
+    name: string;
+  }>;
 };
 
 function formatDateTime(value: string): string {
@@ -81,10 +92,10 @@ export default function RotationPage() {
   const running = statusSummary?.lifecycle.state === "running";
 
   const loadSummary = useCallback(async () => {
-    const [statusResponse, rotationResponse, blocksResponse] = await Promise.all([
+    const [statusResponse, rotationResponse, tentsResponse] = await Promise.all([
       fetchExperimentStatusSummary(experimentId),
       backendFetch(`/api/v1/experiments/${experimentId}/rotation/summary`),
-      backendFetch(`/api/v1/experiments/${experimentId}/blocks/`),
+      backendFetch(`/api/v1/experiments/${experimentId}/tents`),
     ]);
     if (!statusResponse) {
       throw new Error("Unable to load experiment status.");
@@ -92,12 +103,21 @@ export default function RotationPage() {
     if (!rotationResponse.ok) {
       throw new Error("Unable to load rotation summary.");
     }
-    if (!blocksResponse.ok) {
-      throw new Error("Unable to load blocks.");
+    if (!tentsResponse.ok) {
+      throw new Error("Unable to load tents.");
     }
     setStatusSummary(statusResponse);
     setSummary((await rotationResponse.json()) as RotationSummary);
-    setBlocks((await blocksResponse.json()) as BlockOption[]);
+    const tents = (await tentsResponse.json()) as TentResponse[];
+    setBlocks(
+      tents.flatMap((tent) =>
+        tent.blocks.map((block) => ({
+          id: block.id,
+          name: block.name,
+          label: `${tent.name} / ${block.name}`,
+        })),
+      ),
+    );
   }, [experimentId]);
 
   useEffect(() => {
@@ -252,7 +272,7 @@ export default function RotationPage() {
                   <option value="">None / Unassigned</option>
                   {blocks.map((block) => (
                     <option key={block.id} value={block.id}>
-                      {block.name}
+                      {block.label}
                     </option>
                   ))}
                 </select>

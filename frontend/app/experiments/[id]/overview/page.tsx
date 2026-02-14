@@ -433,7 +433,7 @@ export default function ExperimentOverviewPage() {
           {!summary.readiness.ready_to_start ? (
             <div className={styles.stack}>
               <p className={styles.inlineNote}>
-                Start is disabled until setup, baseline, placement, and tray recipe readiness are complete.
+                Start is disabled until setup, baseline, placement, tray recipe readiness, and tent restrictions are satisfied.
               </p>
               <div className={styles.actions}>
                 {!summary.setup.is_complete ? (
@@ -449,6 +449,11 @@ export default function ExperimentOverviewPage() {
                 {summary.readiness.counts.needs_assignment > 0 ? (
                   <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/placement`}>
                     Manage trays & placement
+                  </Link>
+                ) : null}
+                {summary.readiness.counts.needs_tent_restriction > 0 ? (
+                  <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/placement`}>
+                    Resolve tent restrictions
                   </Link>
                 ) : null}
               </div>
@@ -468,7 +473,11 @@ export default function ExperimentOverviewPage() {
               <p className={styles.mutedText}>
                 Not ready: {summary.readiness.counts.needs_baseline} plant(s) need baseline,{" "}
                 {summary.readiness.counts.needs_placement} need placement,{" "}
-                {summary.readiness.counts.needs_tray_recipe} need tray recipes.
+                {summary.readiness.counts.needs_tray_recipe} need tray recipes
+                {summary.readiness.counts.needs_tent_restriction > 0
+                  ? `, ${summary.readiness.counts.needs_tent_restriction} violate tent restrictions`
+                  : ""}
+                .
               </p>
               <div className={styles.actions}>
                 <Link className={styles.buttonPrimary} href={baselineActionHref}>

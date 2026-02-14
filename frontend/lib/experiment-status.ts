@@ -5,6 +5,7 @@ export type ExperimentStatusSummary = {
     is_complete: boolean;
     missing: {
       plants: boolean;
+      tents: boolean;
       blocks: boolean;
       recipes: boolean;
     };
@@ -23,6 +24,7 @@ export type ExperimentStatusSummary = {
       needs_assignment: number;
       needs_placement: number;
       needs_tray_recipe: number;
+      needs_tent_restriction: number;
     };
   };
 };
