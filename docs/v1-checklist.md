@@ -126,6 +126,10 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Refs: `6e26cb27`, `2ff247c6`, `3ae322ad`
   - Routes: `GET /api/v1/plants/{uuid}/cockpit`, `/p/{uuid}`.
   - Notes: Cockpit adds sticky status strip, prioritized Now panel, inline photo upload, and recent activity preview while preserving safe back-to-overview behavior.
+- [x] Plant replacement workflow with remove/replace chain links (owner: Codex)
+  - Refs: `20032471`, `eea577e4`, `153922e9`, `e0800082`, `74506afa`, `325a7667`, `9169ace1`
+  - Routes: `POST /api/v1/plants/{uuid}/replace`, `GET /api/v1/plants/{uuid}/cockpit`, `GET /api/v1/experiments/{id}/overview/plants`.
+  - Notes: Replacement creates a new plant record/UUID, marks original as `removed`, keeps chain links (`old -> new` and `new -> old`), inherits assignment by default, and requires new baseline capture.
 
 ## Remaining Milestones
 

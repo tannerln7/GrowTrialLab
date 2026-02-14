@@ -107,6 +107,12 @@ This file records architecture/product decisions and why they were made.
 - Refs: `6e26cb27`, `2ff247c6`, `3ae322ad`.
 - Notes: Safe back behavior (`from` sanitization + fallback) is preserved, with fallback now using setup-vs-overview home routing from bootstrap completeness (`ee000fab`, `a181325a`).
 
+### 2026-02-14: Plant replacement uses remove-and-replace chain with new UUID record
+- Decision: Add guided replacement flow via `POST /api/v1/plants/{uuid}/replace` that creates a new plant record (new UUID), links chain pointers (`replaced_by`/reverse `replaces`), marks original plant `removed`, and defaults to inheriting assignment while requiring fresh baseline capture.
+- Rationale: Real-world plant loss/replacement is common; chain-linked replacements preserve experiment continuity without mutating historical organism records.
+- Refs: `20032471`, `eea577e4`, `153922e9`, `e0800082`, `74506afa`, `325a7667`, `9169ace1`.
+- Notes: Cockpit and overview now expose replacement links for navigation (`old -> new`, `new -> old`) and removed plants are excluded from active readiness queues.
+
 ### 2026-02-14: Assignment moved to dedicated route and decoupled from baseline gating
 - Decision: Use `/experiments/{id}/assignment` for recipe editing + preview/apply, and allow assignment even when baseline is incomplete.
 - Rationale: Baseline and assignment are readiness actions coordinated by overview, not setup prerequisites.
