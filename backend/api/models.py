@@ -3,6 +3,7 @@ import uuid
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 from .setup_packets import PACKET_ENVIRONMENT
 
@@ -239,17 +240,24 @@ class Block(UUIDModel):
 
 class RotationLog(UUIDModel):
     experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="rotation_logs")
-    week_number = models.IntegerField()
     tray = models.ForeignKey(Tray, on_delete=models.CASCADE, related_name="rotation_logs")
-    block = models.ForeignKey(Block, on_delete=models.CASCADE, related_name="rotation_logs")
-    rotated_at = models.DateTimeField()
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["experiment", "week_number", "tray"], name="unique_weekly_tray_rotation"
-            )
-        ]
+    from_block = models.ForeignKey(
+        Block,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rotation_logs_from",
+    )
+    to_block = models.ForeignKey(
+        Block,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rotation_logs_to",
+    )
+    occurred_at = models.DateTimeField(default=timezone.now)
+    note = models.TextField(blank=True)
+    created_by_email = models.EmailField(blank=True)
 
 
 class WeeklySession(UUIDModel):

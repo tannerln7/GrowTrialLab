@@ -28,6 +28,7 @@ from .placement_views import (
     tray_add_plant,
     tray_remove_plant,
 )
+from .rotation_views import experiment_rotation_log, experiment_rotation_summary
 from .baseline_views import (
     complete_baseline_packet,
     experiment_baseline_lock,
@@ -184,6 +185,16 @@ urlpatterns = [
         "api/v1/experiments/<uuid:experiment_id>/placement/summary",
         experiment_placement_summary,
         name="experiment-placement-summary",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/rotation/summary",
+        experiment_rotation_summary,
+        name="experiment-rotation-summary",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/rotation/log",
+        experiment_rotation_log,
+        name="experiment-rotation-log",
     ),
     path(
         "api/v1/experiments/<uuid:experiment_id>/trays",

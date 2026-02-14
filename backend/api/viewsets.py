@@ -123,7 +123,7 @@ class BlockViewSet(ExperimentFilteredViewSet):
 
 
 class RotationLogViewSet(ExperimentFilteredViewSet):
-    queryset = RotationLog.objects.all().order_by("week_number", "tray_id")
+    queryset = RotationLog.objects.all().order_by("-occurred_at", "tray_id")
     serializer_class = RotationLogSerializer
 
 
