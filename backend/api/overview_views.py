@@ -7,7 +7,12 @@ from rest_framework.response import Response
 
 from .baseline import BASELINE_WEEK_NUMBER
 from .models import Experiment, Plant, PlantWeeklyMetric
-from .tray_assignment import experiment_tray_placements, placement_info, resolved_assigned_recipe
+from .tray_assignment import (
+    experiment_tray_current_counts,
+    experiment_tray_placements,
+    placement_info,
+    resolved_assigned_recipe,
+)
 
 
 def _require_app_user(request):
@@ -37,6 +42,7 @@ def experiment_overview_plants(request, experiment_id: UUID):
         .order_by("plant_id", "created_at")
     )
     tray_placements = experiment_tray_placements(experiment.id)
+    tray_current_counts = experiment_tray_current_counts(experiment.id)
     baseline_plant_ids = {
         str(item)
         for item in PlantWeeklyMetric.objects.filter(
@@ -56,7 +62,12 @@ def experiment_overview_plants(request, experiment_id: UUID):
 
     for plant in plants:
         tray_placement = tray_placements.get(str(plant.id))
-        placement = placement_info(tray_placement)
+        placement = placement_info(
+            tray_placement,
+            tray_current_count=tray_current_counts.get(str(tray_placement.tray.id))
+            if tray_placement
+            else None,
+        )
         assigned_recipe = resolved_assigned_recipe(plant, tray_placement, allow_fallback=True)
         has_baseline = str(plant.id) in baseline_plant_ids
         is_active = plant.status == Plant.Status.ACTIVE
@@ -89,8 +100,18 @@ def experiment_overview_plants(request, experiment_id: UUID):
                 "assigned_recipe_name": assigned_recipe.name if assigned_recipe else None,
                 "placed_tray_id": placement.tray_id if placement else None,
                 "placed_tray_name": placement.tray_name if placement else None,
+                "tray_id": placement.tray_id if placement else None,
+                "tray_name": placement.tray_name if placement else None,
+                "tray_code": placement.tray_code if placement else None,
+                "tray_capacity": placement.tray_capacity if placement else None,
+                "tray_current_count": placement.tray_current_count if placement else None,
                 "placed_block_id": placement.block_id if placement else None,
                 "placed_block_name": placement.block_name if placement else None,
+                "block_id": placement.block_id if placement else None,
+                "block_name": placement.block_name if placement else None,
+                "tent_id": placement.tent_id if placement else None,
+                "tent_code": placement.tent_code if placement else None,
+                "tent_name": placement.tent_name if placement else None,
                 "has_baseline": has_baseline,
                 "replaced_by_uuid": str(plant.replaced_by.id) if plant.replaced_by else None,
             }

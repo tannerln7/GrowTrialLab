@@ -427,6 +427,30 @@ class ExperimentOverviewTests(TestCase):
         self.assertTrue(plants_by_uuid[str(with_baseline.id)]["has_baseline"])
         self.assertFalse(plants_by_uuid[str(without_baseline.id)]["has_baseline"])
 
+    def test_overview_endpoint_includes_tent_block_tray_location_fields(self):
+        experiment = Experiment.objects.create(name="Overview Location")
+        species = Species.objects.create(name="Nepenthes ampullaria green", category="nepenthes")
+        tent = Tent.objects.get(experiment=experiment)
+        block = Block.objects.create(experiment=experiment, tent=tent, name="B1", description="Left")
+        tray = Tray.objects.create(experiment=experiment, block=block, name="TR2", capacity=6)
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="NP-777")
+        TrayPlant.objects.create(tray=tray, plant=plant, order_index=0)
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/overview/plants")
+        self.assertEqual(response.status_code, 200)
+        payload = next(item for item in response.json()["plants"] if item["uuid"] == str(plant.id))
+
+        self.assertEqual(payload["tent_id"], str(tent.id))
+        self.assertEqual(payload["tent_code"], "T1")
+        self.assertEqual(payload["tent_name"], "Tent 1")
+        self.assertEqual(payload["block_id"], str(block.id))
+        self.assertEqual(payload["block_name"], "B1")
+        self.assertEqual(payload["tray_id"], str(tray.id))
+        self.assertEqual(payload["tray_name"], "TR2")
+        self.assertEqual(payload["tray_code"], "TR2")
+        self.assertEqual(payload["tray_capacity"], 6)
+        self.assertEqual(payload["tray_current_count"], 1)
+
 
 @override_settings(
     DEBUG=True,
@@ -1566,6 +1590,29 @@ class PlantCockpitTests(TestCase):
         self.assertIsNone(payload["derived"]["assigned_recipe_code"])
         self.assertIsNone(payload["derived"]["assigned_recipe_name"])
         self.assertEqual(payload["recent_photos"], [])
+
+    def test_cockpit_endpoint_includes_location_fields(self):
+        experiment = Experiment.objects.create(name="Cockpit Location")
+        species = Species.objects.create(name="Drosera capillaris", category="drosera")
+        tent = Tent.objects.get(experiment=experiment)
+        block = Block.objects.create(experiment=experiment, tent=tent, name="B2", description="")
+        tray = Tray.objects.create(experiment=experiment, block=block, name="TR1", capacity=4)
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="DR-004")
+        TrayPlant.objects.create(tray=tray, plant=plant, order_index=0)
+
+        response = self.client.get(f"/api/v1/plants/{plant.id}/cockpit")
+        self.assertEqual(response.status_code, 200)
+        derived = response.json()["derived"]
+        self.assertEqual(derived["tent_id"], str(tent.id))
+        self.assertEqual(derived["tent_code"], "T1")
+        self.assertEqual(derived["tent_name"], "Tent 1")
+        self.assertEqual(derived["block_id"], str(block.id))
+        self.assertEqual(derived["block_name"], "B2")
+        self.assertEqual(derived["tray_id"], str(tray.id))
+        self.assertEqual(derived["tray_name"], "TR1")
+        self.assertEqual(derived["tray_code"], "TR1")
+        self.assertEqual(derived["tray_capacity"], 4)
+        self.assertEqual(derived["tray_current_count"], 1)
 
 
 @override_settings(

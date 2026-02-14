@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from django.db.models import Count
+
 from .models import Plant, Recipe, TrayPlant
 
 
@@ -9,8 +11,14 @@ from .models import Plant, Recipe, TrayPlant
 class TrayPlacementInfo:
     tray_id: str
     tray_name: str
+    tray_code: str
+    tray_capacity: int
+    tray_current_count: int
     block_id: str | None
     block_name: str | None
+    tent_id: str | None
+    tent_code: str | None
+    tent_name: str | None
 
 
 def plant_tray_placement(plant: Plant) -> TrayPlant | None:
@@ -29,6 +37,15 @@ def experiment_tray_placements(experiment_id) -> dict[str, TrayPlant]:
     return {str(item.plant.id): item for item in placements}
 
 
+def experiment_tray_current_counts(experiment_id) -> dict[str, int]:
+    counts = (
+        TrayPlant.objects.filter(tray__experiment_id=experiment_id)
+        .values("tray_id")
+        .annotate(total=Count("id"))
+    )
+    return {str(item["tray_id"]): int(item["total"]) for item in counts}
+
+
 def resolved_assigned_recipe(
     plant: Plant,
     tray_placement: TrayPlant | None,
@@ -42,15 +59,32 @@ def resolved_assigned_recipe(
     return None
 
 
-def placement_info(tray_placement: TrayPlant | None) -> TrayPlacementInfo | None:
+def placement_info(
+    tray_placement: TrayPlant | None,
+    *,
+    tray_current_count: int | None = None,
+) -> TrayPlacementInfo | None:
     if tray_placement is None:
         return None
     tray = tray_placement.tray
+    block = tray.block
+    tent = block.tent if block else None
+    current_count = (
+        tray_current_count
+        if tray_current_count is not None
+        else tray.tray_plants.count()
+    )
     return TrayPlacementInfo(
         tray_id=str(tray.id),
         tray_name=tray.name,
-        block_id=str(tray.block.id) if tray.block else None,
-        block_name=tray.block.name if tray.block else None,
+        tray_code=tray.name,
+        tray_capacity=tray.capacity,
+        tray_current_count=current_count,
+        block_id=str(block.id) if block else None,
+        block_name=block.name if block else None,
+        tent_id=str(tent.id) if tent else None,
+        tent_code=tent.code if tent else None,
+        tent_name=tent.name if tent else None,
     )
 
 
