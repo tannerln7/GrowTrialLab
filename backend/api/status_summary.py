@@ -64,8 +64,14 @@ def experiment_status_summary_payload(experiment: Experiment) -> dict:
                 "recipes": setup.missing_recipes,
             },
         },
+        "lifecycle": {
+            "state": experiment.lifecycle_state,
+            "started_at": experiment.started_at.isoformat() if experiment.started_at else None,
+            "stopped_at": experiment.stopped_at.isoformat() if experiment.stopped_at else None,
+        },
         "readiness": {
             "is_ready": readiness_ready,
+            "ready_to_start": readiness_ready,
             "counts": {
                 "active_plants": len(active_plants),
                 "needs_baseline": needs_baseline,

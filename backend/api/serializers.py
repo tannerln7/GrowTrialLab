@@ -255,6 +255,22 @@ class TraySerializer(serializers.ModelSerializer):
 
 
 class TrayPlantSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        tray = attrs.get("tray") or (self.instance.tray if self.instance else None)
+        plant = attrs.get("plant") or (self.instance.plant if self.instance else None)
+        if tray and plant and tray.experiment_id != plant.experiment_id:
+            raise serializers.ValidationError("Plant and tray must belong to the same experiment.")
+        if plant and plant.status == Plant.Status.REMOVED:
+            raise serializers.ValidationError("Removed plants cannot be placed in trays.")
+
+        if plant:
+            existing_qs = TrayPlant.objects.filter(plant=plant)
+            if self.instance:
+                existing_qs = existing_qs.exclude(id=self.instance.id)
+            if existing_qs.exists():
+                raise serializers.ValidationError("Plant is already placed in another tray.")
+        return attrs
+
     class Meta:
         model = TrayPlant
         fields = "__all__"

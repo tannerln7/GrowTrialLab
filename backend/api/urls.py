@@ -20,8 +20,14 @@ from .groups_views import (
     experiment_groups_recipes,
     experiment_groups_status,
 )
-from .status_views import experiment_status_summary
+from .status_views import experiment_start, experiment_status_summary, experiment_stop
 from .overview_views import experiment_overview_plants
+from .placement_views import (
+    experiment_placement_summary,
+    experiment_trays,
+    tray_add_plant,
+    tray_remove_plant,
+)
 from .baseline_views import (
     complete_baseline_packet,
     experiment_baseline_lock,
@@ -175,9 +181,29 @@ urlpatterns = [
         name="experiment-overview-plants",
     ),
     path(
+        "api/v1/experiments/<uuid:experiment_id>/placement/summary",
+        experiment_placement_summary,
+        name="experiment-placement-summary",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/trays",
+        experiment_trays,
+        name="experiment-trays",
+    ),
+    path(
         "api/v1/experiments/<uuid:experiment_id>/status/summary",
         experiment_status_summary,
         name="experiment-status-summary",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/start",
+        experiment_start,
+        name="experiment-start",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/stop",
+        experiment_stop,
+        name="experiment-stop",
     ),
     path(
         "api/v1/plants/<uuid:plant_id>/cockpit",
@@ -193,6 +219,16 @@ urlpatterns = [
         "api/v1/experiments/<uuid:experiment_id>/groups/recipes",
         experiment_groups_recipes,
         name="experiment-groups-recipes",
+    ),
+    path(
+        "api/v1/trays/<uuid:tray_id>/plants",
+        tray_add_plant,
+        name="tray-add-plant",
+    ),
+    path(
+        "api/v1/trays/<uuid:tray_id>/plants/<uuid:tray_plant_id>",
+        tray_remove_plant,
+        name="tray-remove-plant",
     ),
     path(
         "api/v1/experiments/<uuid:experiment_id>/groups/recipes/<uuid:recipe_id>",
