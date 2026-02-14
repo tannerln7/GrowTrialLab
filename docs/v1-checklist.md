@@ -158,6 +158,10 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Refs: `cd9e2cf6`, `4e74e10d`, `8157c551`
   - Routes: `GET/POST /api/v1/experiments/{id}/tents`, `PATCH/DELETE /api/v1/tents/{id}`, `GET/POST /api/v1/tents/{id}/blocks`, `POST /api/v1/tents/{id}/blocks/defaults`, `GET /api/v1/experiments/{id}/placement/summary`, `POST /api/v1/trays/{id}/plants`, `POST /api/v1/experiments/{id}/rotation/log`.
   - Notes: Blocks now belong to tents; destination-tent species restrictions are enforced for tray placement and tray moves. Status summary/start readiness now include tent presence and tent-restriction compliance.
+- [x] Placement/rotation polish pass: valid-option filtering, tray capacity, and deterministic auto-place diagnostics (owner: Codex)
+  - Refs: `35513ef9`, `ee65db44`, `edcc4142`
+  - Routes: `POST /api/v1/experiments/{id}/placement/auto`, `GET /api/v1/experiments/{id}/placement/summary`, `POST /api/v1/experiments/{id}/trays`, `POST /api/v1/trays/{id}/plants`, `PATCH /api/v1/trays/{id}/`, `/experiments/{id}/placement`, `/experiments/{id}/rotation`, `/experiments/{id}/slots`, `/experiments/{id}/plants`.
+  - Notes: Tray capacity (`Tray.capacity`) is now enforced, placement/rotation destination selectors are restriction-filtered, auto-place returns structured unplaceable diagnostics, and create flows now prefill suggested IDs (`TN*`, `B*`, `TR*`, category-prefixed plant IDs).
 - [x] Rotation MVP with tray movement logs and recent history (owner: Codex)
   - Refs: `3b52663c`, `9798c9fe`, `ec06d079`, `b80218ae`
   - Routes: `GET /api/v1/experiments/{id}/rotation/summary`, `POST /api/v1/experiments/{id}/rotation/log`, `/experiments/{id}/rotation`.

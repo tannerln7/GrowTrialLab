@@ -173,6 +173,19 @@ This file records architecture/product decisions and why they were made.
   - Restrictions apply when a tray is in a block/tent; unplaced trays are not restriction-checked until placement/move.
   - `GET /api/v1/experiments/{id}/status/summary` now includes tent-aware readiness (`needs_tent_restriction`) and setup requires tents + blocks.
 
+### 2026-02-14: Placement choices are now restriction-aware and tray-capacity-aware by default
+- Decision: Placement and rotation UIs now show only valid destination options (tented blocks + restriction-compatible blocks), while backend enforces the same rules with explicit 409s. Tray capacity is first-class (`Tray.capacity`) and enforced on placement writes.
+- Rationale: Operators should not be asked to choose impossible options; invalid choices are filtered out up front, with inline “why blocked” hints when no valid destination exists.
+- Refs: `35513ef9`, `ee65db44`, `edcc4142`.
+- Invariants:
+  - `POST /api/v1/trays/{tray_id}/plants` returns `409` when tray is full (`Tray is full (capacity N).`) and still enforces tent restrictions.
+  - `PATCH /api/v1/trays/{id}/` validates destination block compatibility against tray contents.
+  - `POST /api/v1/experiments/{id}/placement/auto` is deterministic and now returns structured unplaceable diagnostics (`reason_counts`, `unplaceable_plants`) instead of opaque failures.
+- UX alignment:
+  - Placement/rotation pickers exclude non-compatible blocks.
+  - Add-plant tray pickers are filtered by tent restrictions and tray capacity.
+  - Create forms prefill suggested IDs (`TN*`, `B*`, `TR*`, and category-derived plant IDs).
+
 ### 2026-02-14: Legacy assignment compatibility remains temporarily
 - Decision: Keep Groups endpoints and `Plant.assigned_recipe` writes for backward compatibility while new readiness/feeding flows rely on tray-derived assignment.
 - Rationale: Avoids risky endpoint churn while migration to tray-canonical behavior is completed.
