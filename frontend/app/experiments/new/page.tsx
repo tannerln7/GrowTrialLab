@@ -59,7 +59,7 @@ export default function NewExperimentPage() {
       }
 
       const data = (await response.json()) as { id: string };
-      router.push(`/experiments/${data.id}/overview`);
+      router.push(`/experiments/${data.id}`);
     } catch (requestError) {
       const normalizedError = normalizeBackendError(requestError);
       if (normalizedError.kind === "offline") {

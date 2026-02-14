@@ -5,10 +5,15 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError } from "@/lib/backend";
+import {
+  fetchExperimentStatusSummary,
+  type ExperimentStatusSummary,
+} from "@/lib/experiment-status";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
+
 import styles from "../../experiments.module.css";
 
 type FilterId =
@@ -43,17 +48,6 @@ type OverviewCounts = {
 type OverviewResponse = {
   counts: OverviewCounts;
   plants: OverviewPlant[];
-};
-
-type SetupProgress = {
-  id: string;
-  status: "done" | "current" | "todo";
-};
-
-type SetupState = {
-  current_packet: string;
-  completed_packets: string[];
-  packet_progress: SetupProgress[];
 };
 
 const FILTERS: Array<{ id: FilterId; label: string }> = [
@@ -99,7 +93,7 @@ export default function ExperimentOverviewPage() {
   const [error, setError] = useState("");
   const [offline, setOffline] = useState(false);
   const [experimentName, setExperimentName] = useState("");
-  const [setupState, setSetupState] = useState<SetupState | null>(null);
+  const [summary, setSummary] = useState<ExperimentStatusSummary | null>(null);
   const [data, setData] = useState<OverviewResponse>({
     counts: {
       total: 0,
@@ -117,9 +111,11 @@ export default function ExperimentOverviewPage() {
       if (!experimentId) {
         return;
       }
+
       setLoading(true);
       setError("");
       setNotInvited(false);
+
       try {
         const meResponse = await backendFetch("/api/me");
         if (meResponse.status === 403) {
@@ -127,10 +123,19 @@ export default function ExperimentOverviewPage() {
           return;
         }
 
-        const [overviewResponse, experimentResponse, setupStateResponse] = await Promise.all([
+        const statusSummary = await fetchExperimentStatusSummary(experimentId);
+        if (!statusSummary) {
+          setError("Unable to load overview status.");
+          return;
+        }
+        if (!statusSummary.setup.is_complete) {
+          router.replace(`/experiments/${experimentId}/setup`);
+          return;
+        }
+
+        const [overviewResponse, experimentResponse] = await Promise.all([
           backendFetch(`/api/v1/experiments/${experimentId}/overview/plants`),
           backendFetch(`/api/v1/experiments/${experimentId}/`),
-          backendFetch(`/api/v1/experiments/${experimentId}/setup-state/`),
         ]);
 
         if (!overviewResponse.ok) {
@@ -138,15 +143,12 @@ export default function ExperimentOverviewPage() {
           return;
         }
 
+        setSummary(statusSummary);
         const overviewPayload = (await overviewResponse.json()) as OverviewResponse;
         setData(overviewPayload);
         if (experimentResponse.ok) {
           const experimentPayload = (await experimentResponse.json()) as { name?: string };
           setExperimentName(experimentPayload.name ?? "");
-        }
-        if (setupStateResponse.ok) {
-          const setupStatePayload = (await setupStateResponse.json()) as SetupState;
-          setSetupState(setupStatePayload);
         }
         setOffline(false);
       } catch (requestError) {
@@ -161,7 +163,7 @@ export default function ExperimentOverviewPage() {
     }
 
     void load();
-  }, [experimentId]);
+  }, [experimentId, router]);
 
   function updateQuery(nextFilter: FilterId, nextQ: string) {
     const next = new URLSearchParams(searchParams.toString());
@@ -182,7 +184,7 @@ export default function ExperimentOverviewPage() {
   const filteredPlants = useMemo(() => {
     const normalizedQuery = queryValue.trim().toLowerCase();
     return data.plants.filter((plant) => {
-      const needsBaseline = plant.status === "active" && !plant.has_baseline;
+      const needsBaseline = plant.status === "active" && (!plant.has_baseline || !plant.bin);
       const needsBin = plant.status === "active" && !plant.bin;
       const needsAssignment = plant.status === "active" && !plant.assigned_recipe_code;
 
@@ -217,19 +219,13 @@ export default function ExperimentOverviewPage() {
     return `/experiments/${experimentId}/overview${query ? `?${query}` : ""}`;
   }, [searchParams, experimentId]);
 
-  const pendingPlantIdCount = useMemo(
-    () =>
-      data.plants.filter((plant) => !plant.plant_id.trim()).length,
+  const firstMissingBaselinePlant = useMemo(
+    () => data.plants.find((plant) => plant.status === "active" && (!plant.has_baseline || !plant.bin)),
     [data.plants],
   );
-  const setupComplete = useMemo(() => {
-    if (!setupState) {
-      return false;
-    }
-    const requiredSetupSteps = ["plants", "environment", "baseline", "groups"];
-    const completed = new Set(setupState.completed_packets);
-    return requiredSetupSteps.every((step) => completed.has(step));
-  }, [setupState]);
+  const baselineActionHref = firstMissingBaselinePlant
+    ? `/experiments/${experimentId}/baseline?plant=${firstMissingBaselinePlant.uuid}`
+    : `/experiments/${experimentId}/baseline`;
 
   function plantNeedsLabels(plant: OverviewPlant): string[] {
     const needs: string[] = [];
@@ -253,7 +249,7 @@ export default function ExperimentOverviewPage() {
       return `/experiments/${experimentId}/baseline?plant=${plant.uuid}`;
     }
     if (!plant.assigned_recipe_code) {
-      return `/experiments/${experimentId}/setup?tab=assignment`;
+      return `/experiments/${experimentId}/assignment`;
     }
     return null;
   }
@@ -293,52 +289,36 @@ export default function ExperimentOverviewPage() {
         </p>
       </SectionCard>
 
-      <SectionCard title="Setup">
-        <div className={styles.actions}>
-          {!setupComplete ? (
-            <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/setup`}>
-              Continue setup
-            </Link>
-          ) : null}
-          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/setup`}>
-            Open setup
-          </Link>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Now Actions">
-        <div className={styles.actions}>
-          {data.counts.needs_baseline > 0 ? (
-            <Link
-              className={styles.buttonPrimary}
-              href={`/experiments/${experimentId}/setup?step=baseline`}
-            >
-              Finish baseline ({data.counts.needs_baseline})
-            </Link>
-          ) : null}
-          {data.counts.needs_assignment > 0 ? (
-            <Link
-              className={styles.buttonPrimary}
-              href={`/experiments/${experimentId}/setup?tab=assignment`}
-            >
-              Finish assignment ({data.counts.needs_assignment})
-            </Link>
-          ) : null}
-          {pendingPlantIdCount > 0 ? (
-            <Link
-              className={styles.buttonSecondary}
-              href={`/experiments/${experimentId}/setup?step=plants`}
-            >
-              Generate/Print labels ({pendingPlantIdCount})
-            </Link>
-          ) : null}
-          {data.counts.needs_baseline === 0 &&
-          data.counts.needs_assignment === 0 &&
-          pendingPlantIdCount === 0 ? (
-            <p className={styles.mutedText}>No immediate setup actions pending.</p>
-          ) : null}
-        </div>
-      </SectionCard>
+      {summary ? (
+        <SectionCard title="Readiness">
+          {summary.readiness.is_ready ? (
+            <div className={styles.stack}>
+              <p className={styles.successText}>Ready to start</p>
+              <button className={styles.buttonSecondary} type="button" disabled>
+                Start (coming soon)
+              </button>
+            </div>
+          ) : (
+            <div className={styles.stack}>
+              <p className={styles.mutedText}>
+                Not ready: {summary.readiness.counts.needs_baseline} plant(s) need baseline, {" "}
+                {summary.readiness.counts.needs_assignment} need assignment.
+              </p>
+              <div className={styles.actions}>
+                <Link className={styles.buttonPrimary} href={baselineActionHref}>
+                  Capture baselines
+                </Link>
+                <Link
+                  className={styles.buttonSecondary}
+                  href={`/experiments/${experimentId}/assignment`}
+                >
+                  Run assignment
+                </Link>
+              </div>
+            </div>
+          )}
+        </SectionCard>
+      ) : null}
 
       <SectionCard title="Status Filters">
         <div className={styles.tileGrid}>
@@ -395,9 +375,7 @@ export default function ExperimentOverviewPage() {
                 key: "plant_id",
                 label: "Plant ID",
                 render: (plant) => (
-                  <Link
-                    href={`/p/${plant.uuid}?from=${encodeURIComponent(overviewPathWithFilters)}`}
-                  >
+                  <Link href={`/p/${plant.uuid}?from=${encodeURIComponent(overviewPathWithFilters)}`}>
                     {plant.plant_id || "(pending)"}
                   </Link>
                 ),
@@ -442,9 +420,7 @@ export default function ExperimentOverviewPage() {
                 <div className={styles.cardKeyValue}>
                   <span>Plant ID</span>
                   <strong>
-                    <Link
-                      href={`/p/${plant.uuid}?from=${encodeURIComponent(overviewPathWithFilters)}`}
-                    >
+                    <Link href={`/p/${plant.uuid}?from=${encodeURIComponent(overviewPathWithFilters)}`}>
                       {plant.plant_id || "(pending)"}
                     </Link>
                   </strong>
@@ -476,21 +452,14 @@ export default function ExperimentOverviewPage() {
             }}
             emptyState={
               data.plants.length === 0 ? (
-                <div className={styles.stack}>
-                  <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
-                  <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/setup`}>
-                    Go to Plants step
-                  </Link>
-                </div>
+                <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
               ) : (
                 <p className={styles.mutedText}>No plants match the current filter.</p>
               )
             }
           />
         ) : null}
-        {offline ? (
-          <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" />
-        ) : null}
+        {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
       </SectionCard>
     </PageShell>
   );

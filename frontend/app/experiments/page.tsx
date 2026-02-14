@@ -108,7 +108,7 @@ export default function ExperimentsPage() {
                 key: "overview",
                 label: "Overview",
                 render: (item) => (
-                  <Link href={`/experiments/${item.id}/overview`}>Open overview</Link>
+                  <Link href={`/experiments/${item.id}`}>Open experiment</Link>
                 ),
               },
             ]}
@@ -118,7 +118,7 @@ export default function ExperimentsPage() {
                 <strong>{item.name}</strong>
                 <span>Status</span>
                 <strong>{item.status}</strong>
-                <Link href={`/experiments/${item.id}/overview`}>Open overview</Link>
+                <Link href={`/experiments/${item.id}`}>Open experiment</Link>
               </div>
             )}
             emptyState={
