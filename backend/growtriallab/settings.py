@@ -116,4 +116,9 @@ ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@example.com").strip().lower()
 AUTH_MODE = os.environ.get("AUTH_MODE", "invite_only").strip().lower()
 DEV_EMAIL = os.environ.get("DEV_EMAIL", ADMIN_EMAIL).strip().lower()
 
+REST_FRAMEWORK = {
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 25,
+}
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
