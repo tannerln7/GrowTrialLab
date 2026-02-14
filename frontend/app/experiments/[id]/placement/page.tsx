@@ -625,7 +625,7 @@ export default function PlacementPage() {
                 disabled={saving || placementLocked}
                 onClick={() => void autoPlacePlants()}
               >
-                Auto-place (balance by bin)
+                Auto-place (balance by grade)
               </button>
             </div>
             {autoPlaceDiagnostics ? (
@@ -680,7 +680,7 @@ export default function PlacementPage() {
                   ),
                 },
                 { key: "species", label: "Species", render: (plant) => plant.species_name },
-                { key: "bin", label: "Bin", render: (plant) => plant.bin || "Missing" },
+                { key: "bin", label: "Grade", render: (plant) => plant.bin || "Missing" },
                 {
                   key: "action",
                   label: "Action",
@@ -741,7 +741,7 @@ export default function PlacementPage() {
                     </strong>
                     <span>Species</span>
                     <strong>{plant.species_name}</strong>
-                    <span>Bin</span>
+                    <span>Grade</span>
                     <strong>{plant.bin || "Missing"}</strong>
                     <select
                       className={styles.select}
@@ -1242,7 +1242,7 @@ export default function PlacementPage() {
                           },
                           {
                             key: "bin",
-                            label: "Bin",
+                            label: "Grade",
                             render: (plant) => plant.bin || "Missing",
                           },
                           {
@@ -1278,7 +1278,7 @@ export default function PlacementPage() {
                             </strong>
                             <span>Species</span>
                             <strong>{plant.species_name}</strong>
-                            <span>Bin</span>
+                            <span>Grade</span>
                             <strong>{plant.bin || "Missing"}</strong>
                             <span>Tray recipe</span>
                             <strong>

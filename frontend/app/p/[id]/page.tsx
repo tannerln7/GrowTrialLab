@@ -57,8 +57,18 @@ type PlantCockpit = {
     assigned_recipe_name: string | null;
     placed_tray_id: string | null;
     placed_tray_name: string | null;
+    tray_id: string | null;
+    tray_name: string | null;
+    tray_code: string | null;
+    tray_capacity: number | null;
+    tray_current_count: number | null;
     placed_block_id: string | null;
     placed_block_name: string | null;
+    block_id: string | null;
+    block_name: string | null;
+    tent_id: string | null;
+    tent_code: string | null;
+    tent_name: string | null;
     last_fed_at: string | null;
     replaced_by_uuid: string | null;
     replaces_uuid: string | null;
@@ -166,6 +176,18 @@ function uploadTagToApiTag(tag: UploadTag): string {
   return tag;
 }
 
+function trayOccupancyLabel(cockpit: PlantCockpit): string {
+  if (
+    cockpit.derived.tray_current_count === null ||
+    cockpit.derived.tray_capacity === null ||
+    !Number.isFinite(cockpit.derived.tray_current_count) ||
+    !Number.isFinite(cockpit.derived.tray_capacity)
+  ) {
+    return "";
+  }
+  return ` (${cockpit.derived.tray_current_count}/${cockpit.derived.tray_capacity})`;
+}
+
 function buildNowAction(cockpit: PlantCockpit | null): NowAction {
   if (!cockpit) {
     return {
@@ -186,7 +208,7 @@ function buildNowAction(cockpit: PlantCockpit | null): NowAction {
   if (!cockpit.derived.has_baseline || !cockpit.plant.bin) {
     return {
       title: "Baseline needed",
-      detail: "Record baseline metrics and assign a bin before assignment.",
+      detail: "Record baseline metrics and assign a grade before assignment.",
       href: cockpit.links.baseline_capture,
       buttonLabel: "Record baseline",
       icon: ClipboardPlus,
@@ -205,7 +227,7 @@ function buildNowAction(cockpit: PlantCockpit | null): NowAction {
 
   return {
     title: "Setup complete",
-    detail: "Baseline, bin, and assignment are all set for this plant.",
+    detail: "Baseline, grade, and assignment are all set for this plant.",
     icon: Tag,
   };
 }
@@ -523,13 +545,23 @@ export default function PlantQrPage() {
               </div>
               <div className={styles.badges}>
                 <span className={styles.badge}>Status: {cockpit.plant.status}</span>
-                <span className={styles.badge}>Bin: {cockpit.plant.bin || "No bin"}</span>
+                <span className={styles.badge}>Grade: {cockpit.plant.bin || "Missing"}</span>
                 <span className={styles.badge}>
-                  Tray: {cockpit.derived.placed_tray_name || "Unplaced"}
+                  Tent: {cockpit.derived.tent_code || cockpit.derived.tent_name || "Unplaced"}
+                </span>
+                <span className={styles.badge}>Block: {cockpit.derived.block_name || "Unplaced"}</span>
+                <span className={styles.badge}>
+                  Tray:{" "}
+                  {cockpit.derived.tray_code ||
+                    cockpit.derived.tray_name ||
+                    cockpit.derived.placed_tray_name ||
+                    "Unplaced"}
+                  {trayOccupancyLabel(cockpit)}
                 </span>
                 <span className={styles.badge}>
                   Recipe: {cockpit.derived.assigned_recipe_code || "Missing"}
                 </span>
+                {!cockpit.derived.tray_id ? <span className={styles.badge}>Unplaced</span> : null}
               </div>
             </div>
           </SectionCard>
@@ -850,7 +882,7 @@ export default function PlantQrPage() {
                   checked={inheritBin}
                   onChange={(event) => setInheritBin(event.target.checked)}
                 />
-                <span>Inherit bin assignment</span>
+                <span>Inherit grade assignment</span>
               </label>
               <label className={sharedStyles.checkboxRow}>
                 <input type="checkbox" checked readOnly />

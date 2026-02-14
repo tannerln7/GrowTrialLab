@@ -742,7 +742,7 @@ export default function AssignmentPage() {
               items={byBinRows}
               getKey={(item) => item.bin}
               columns={[
-                { key: "bin", label: "Bin", render: (item) => item.bin },
+                { key: "bin", label: "Grade", render: (item) => item.bin },
                 {
                   key: "counts",
                   label: "Recipe Split",
@@ -751,7 +751,7 @@ export default function AssignmentPage() {
               ]}
               renderMobileCard={(item) => (
                 <div className={styles.cardKeyValue}>
-                  <span>Bin</span>
+                  <span>Grade</span>
                   <strong>{item.bin}</strong>
                   <span>Recipe split</span>
                   <strong>{item.counts || "-"}</strong>

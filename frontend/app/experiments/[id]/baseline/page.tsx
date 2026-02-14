@@ -571,7 +571,7 @@ export default function BaselineCapturePage() {
 
       {baselineQueue && !preselectedPlantId && remainingCount === 0 ? (
         <SectionCard title="All baselines complete">
-          <p className={styles.successText}>All active plants have baseline metrics and bin assignments.</p>
+          <p className={styles.successText}>All active plants have baseline metrics and grade assignments.</p>
           <div className={styles.actions}>
             <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
               Back to Overview
@@ -604,7 +604,7 @@ export default function BaselineCapturePage() {
                 },
                 {
                   key: "bin",
-                  label: "Bin",
+                  label: "Grade",
                   render: (plant) => (plant.has_bin ? "Assigned" : "Missing"),
                 },
               ]}
@@ -616,7 +616,7 @@ export default function BaselineCapturePage() {
                   <strong>{plant.species_name}</strong>
                   <span>Baseline</span>
                   <strong>{plant.has_baseline ? "Done" : "Missing"}</strong>
-                  <span>Bin</span>
+                  <span>Grade</span>
                   <strong>{plant.has_bin ? "Assigned" : "Missing"}</strong>
                   <button
                     className={styles.buttonSecondary}
@@ -639,7 +639,7 @@ export default function BaselineCapturePage() {
                   <strong>{selectedPlant.species_name}</strong>
                   <span>Category</span>
                   <strong>{selectedPlant.species_category || "-"}</strong>
-                  <span>Current Bin (UI)</span>
+                  <span>Current Grade (UI)</span>
                   <strong>{selectedBin || selectedPlant.bin || "Unassigned"}</strong>
                 </div>
 
@@ -713,7 +713,7 @@ export default function BaselineCapturePage() {
                 })}
 
                 <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Bin Assignment</span>
+                  <span className={styles.fieldLabel}>Grade Assignment</span>
                   <div className={styles.actions}>
                     {(["A", "B", "C"] as const).map((binValue) => (
                       <button
@@ -727,7 +727,7 @@ export default function BaselineCapturePage() {
                         }
                         onClick={() => setSelectedBin(binValue)}
                       >
-                        Bin {binValue}
+                        Grade {binValue}
                       </button>
                     ))}
                   </div>

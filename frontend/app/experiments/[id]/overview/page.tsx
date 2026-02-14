@@ -38,8 +38,18 @@ type OverviewPlant = {
   assigned_recipe_name: string | null;
   placed_tray_id: string | null;
   placed_tray_name: string | null;
+  tray_id: string | null;
+  tray_name: string | null;
+  tray_code: string | null;
+  tray_capacity: number | null;
+  tray_current_count: number | null;
   placed_block_id: string | null;
   placed_block_name: string | null;
+  block_id: string | null;
+  block_name: string | null;
+  tent_id: string | null;
+  tent_code: string | null;
+  tent_name: string | null;
   has_baseline: boolean;
   replaced_by_uuid: string | null;
 };
@@ -63,12 +73,53 @@ type OverviewResponse = {
 const FILTERS: Array<{ id: FilterId; label: string }> = [
   { id: "all", label: "All" },
   { id: "needs_baseline", label: "Needs Baseline" },
-  { id: "needs_bin", label: "Needs Bin" },
+  { id: "needs_bin", label: "Needs Grade" },
   { id: "needs_placement", label: "Needs Placement" },
   { id: "needs_tray_recipe", label: "Needs Tray Recipe" },
   { id: "active", label: "Active" },
   { id: "removed", label: "Removed" },
 ];
+
+type PlantGroup = {
+  key: string;
+  title: string;
+  plants: OverviewPlant[];
+  sortOrder: number;
+};
+
+function tentSortLabel(plant: OverviewPlant): string {
+  return (plant.tent_code || plant.tent_name || "").trim().toLowerCase();
+}
+
+function traySortLabel(plant: OverviewPlant): string {
+  return (plant.tray_code || plant.tray_name || plant.placed_tray_name || "").trim().toLowerCase();
+}
+
+function plantSortLabel(plant: OverviewPlant): string {
+  return (plant.plant_id || "").trim().toLowerCase();
+}
+
+function occupancyLabel(plant: OverviewPlant): string {
+  if (
+    plant.tray_current_count === null ||
+    plant.tray_capacity === null ||
+    !Number.isFinite(plant.tray_current_count) ||
+    !Number.isFinite(plant.tray_capacity)
+  ) {
+    return "";
+  }
+  return ` (${plant.tray_current_count}/${plant.tray_capacity})`;
+}
+
+function locationLabel(plant: OverviewPlant): string {
+  if (!plant.tent_id || !plant.tray_id) {
+    return "Unplaced";
+  }
+  const tentLabel = plant.tent_code || plant.tent_name || "Tent";
+  const blockLabel = plant.block_name || "No block";
+  const trayLabel = plant.tray_code || plant.tray_name || plant.placed_tray_name || "Tray";
+  return `${tentLabel} > ${blockLabel} > ${trayLabel}${occupancyLabel(plant)}`;
+}
 
 export default function ExperimentOverviewPage() {
   const params = useParams();
@@ -270,7 +321,7 @@ export default function ExperimentOverviewPage() {
     const normalizedQuery = queryValue.trim().toLowerCase();
     return data.plants.filter((plant) => {
       const needsBaseline = plant.status === "active" && (!plant.has_baseline || !plant.bin);
-      const needsBin = plant.status === "active" && !plant.bin;
+      const needsGrade = plant.status === "active" && !plant.bin;
       const needsPlacement = plant.status === "active" && !plant.placed_tray_id;
       const needsTrayRecipe =
         plant.status === "active" && !!plant.placed_tray_id && !plant.assigned_recipe_id;
@@ -279,7 +330,7 @@ export default function ExperimentOverviewPage() {
       if (activeFilter === "needs_baseline") {
         matchesFilter = needsBaseline;
       } else if (activeFilter === "needs_bin") {
-        matchesFilter = needsBin;
+        matchesFilter = needsGrade;
       } else if (activeFilter === "needs_placement") {
         matchesFilter = needsPlacement;
       } else if (activeFilter === "needs_tray_recipe") {
@@ -303,6 +354,63 @@ export default function ExperimentOverviewPage() {
     });
   }, [data.plants, activeFilter, queryValue]);
 
+  const sortedFilteredPlants = useMemo(() => {
+    return [...filteredPlants].sort((left, right) => {
+      const leftUnplaced = left.tent_id ? 0 : 1;
+      const rightUnplaced = right.tent_id ? 0 : 1;
+      if (leftUnplaced !== rightUnplaced) {
+        return leftUnplaced - rightUnplaced;
+      }
+
+      const tentCompare = tentSortLabel(left).localeCompare(tentSortLabel(right));
+      if (tentCompare !== 0) {
+        return tentCompare;
+      }
+
+      const leftTrayMissing = left.tray_id ? 0 : 1;
+      const rightTrayMissing = right.tray_id ? 0 : 1;
+      if (leftTrayMissing !== rightTrayMissing) {
+        return leftTrayMissing - rightTrayMissing;
+      }
+
+      const trayCompare = traySortLabel(left).localeCompare(traySortLabel(right));
+      if (trayCompare !== 0) {
+        return trayCompare;
+      }
+
+      const plantCompare = plantSortLabel(left).localeCompare(plantSortLabel(right));
+      if (plantCompare !== 0) {
+        return plantCompare;
+      }
+
+      return left.uuid.localeCompare(right.uuid);
+    });
+  }, [filteredPlants]);
+
+  const groupedPlants = useMemo<PlantGroup[]>(() => {
+    const map = new Map<string, PlantGroup>();
+    for (const plant of sortedFilteredPlants) {
+      const unplaced = !plant.tent_id || !plant.tray_id;
+      const key = unplaced ? "unplaced" : (plant.tent_id as string);
+      const title = unplaced
+        ? "Unplaced"
+        : `Tent ${plant.tent_code || plant.tent_name || "Unknown"}`;
+      const sortOrder = unplaced ? 1 : 0;
+      const current = map.get(key);
+      if (current) {
+        current.plants.push(plant);
+      } else {
+        map.set(key, { key, title, plants: [plant], sortOrder });
+      }
+    }
+    return Array.from(map.values()).sort((left, right) => {
+      if (left.sortOrder !== right.sortOrder) {
+        return left.sortOrder - right.sortOrder;
+      }
+      return left.title.localeCompare(right.title);
+    });
+  }, [sortedFilteredPlants]);
+
   const overviewPathWithFilters = useMemo(() => {
     const query = searchParams.toString();
     return `/experiments/${experimentId}/overview${query ? `?${query}` : ""}`;
@@ -317,7 +425,7 @@ export default function ExperimentOverviewPage() {
       needs.push("Needs Baseline");
     }
     if (plant.status === "active" && !plant.bin) {
-      needs.push("Needs Bin");
+      needs.push("Needs Grade");
     }
     if (plant.status === "active" && !plant.placed_tray_id) {
       needs.push("Needs Placement");
@@ -587,116 +695,122 @@ export default function ExperimentOverviewPage() {
         {error ? <p className={styles.errorText}>{error}</p> : null}
 
         {!loading && !error ? (
-          <ResponsiveList
-            items={filteredPlants}
-            getKey={(plant) => plant.uuid}
-            columns={[
-              {
-                key: "plant_id",
-                label: "Plant ID",
-                render: (plant) => (
-                  <Link href={`/p/${plant.uuid}?from=${encodeURIComponent(overviewPathWithFilters)}`}>
-                    {plant.plant_id || "(pending)"}
-                  </Link>
-                ),
-              },
-              {
-                key: "species",
-                label: "Species",
-                render: (plant) =>
-                  `${plant.species_name}${plant.species_category ? ` (${plant.species_category})` : ""}`,
-              },
-              {
-                key: "status",
-                label: "Status",
-                render: (plant) => plant.status,
-              },
-              {
-                key: "bin",
-                label: "Bin",
-                render: (plant) => plant.bin || "Missing",
-              },
-              {
-                key: "group",
-                label: "Recipe",
-                render: (plant) => plant.assigned_recipe_code || "Missing",
-              },
-              {
-                key: "tray",
-                label: "Tray",
-                render: (plant) => plant.placed_tray_name || "Unplaced",
-              },
-              {
-                key: "action",
-                label: "Action",
-                render: (plant) => {
-                  const href = quickActionHref(plant);
-                  if (!href) {
-                    return "Open";
-                  }
-                  return <Link href={href}>{quickActionLabel(plant)}</Link>;
-                },
-              },
-            ]}
-            renderMobileCard={(plant) => {
-              const needs = plantNeedsLabels(plant);
-              const quickHref = quickActionHref(plant);
-              return (
-                <div className={styles.cardKeyValue}>
-                  <span>Plant ID</span>
-                  <strong>
-                    <Link href={`/p/${plant.uuid}?from=${encodeURIComponent(overviewPathWithFilters)}`}>
-                      {plant.plant_id || "(pending)"}
-                    </Link>
-                  </strong>
-                  <span>Species</span>
-                  <strong>
-                    {plant.species_name}
-                    {plant.species_category ? ` (${plant.species_category})` : ""}
-                  </strong>
-                  <span>Status</span>
-                  <strong>{plant.status}</strong>
-                  {plant.status !== "active" && plant.replaced_by_uuid ? (
-                    <>
-                      <span>Replacement</span>
-                      <strong>
-                        <Link
-                          href={`/p/${plant.replaced_by_uuid}?from=${encodeURIComponent(overviewPathWithFilters)}`}
-                        >
-                          Open replacement
-                        </Link>
-                      </strong>
-                    </>
-                  ) : null}
-                  <span>Bin</span>
-                  <strong>{plant.bin || "Missing"}</strong>
-                  <span>Recipe</span>
-                  <strong>{plant.assigned_recipe_code || "Missing"}</strong>
-                  <span>Tray</span>
-                  <strong>{plant.placed_tray_name || "Unplaced"}</strong>
-                  <div className={styles.badgeRow}>
-                    {needs.map((label) => (
-                      <span className={styles.badgeWarn} key={label}>
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                  {quickHref ? (
-                    <Link className={styles.buttonSecondary} href={quickHref}>
-                      {quickActionLabel(plant)}
-                    </Link>
-                  ) : null}
+          data.plants.length === 0 ? (
+            <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
+          ) : groupedPlants.length === 0 ? (
+            <p className={styles.mutedText}>No plants match the current filter.</p>
+          ) : (
+            <div className={styles.stack}>
+              {groupedPlants.map((group) => (
+                <div key={group.key} className={styles.groupSection}>
+                  <p className={styles.groupHeading}>{group.title}</p>
+                  <ResponsiveList
+                    items={group.plants}
+                    getKey={(plant) => plant.uuid}
+                    columns={[
+                      {
+                        key: "plant_id",
+                        label: "Plant ID",
+                        render: (plant) => (
+                          <Link href={`/p/${plant.uuid}?from=${encodeURIComponent(overviewPathWithFilters)}`}>
+                            {plant.plant_id || "(pending)"}
+                          </Link>
+                        ),
+                      },
+                      {
+                        key: "species",
+                        label: "Species",
+                        render: (plant) =>
+                          `${plant.species_name}${plant.species_category ? ` (${plant.species_category})` : ""}`,
+                      },
+                      {
+                        key: "status",
+                        label: "Status",
+                        render: (plant) => plant.status,
+                      },
+                      {
+                        key: "grade",
+                        label: "Grade",
+                        render: (plant) => plant.bin || "Missing",
+                      },
+                      {
+                        key: "recipe",
+                        label: "Recipe",
+                        render: (plant) => plant.assigned_recipe_code || "Missing",
+                      },
+                      {
+                        key: "location",
+                        label: "Location",
+                        render: (plant) => locationLabel(plant),
+                      },
+                      {
+                        key: "action",
+                        label: "Action",
+                        render: (plant) => {
+                          const href = quickActionHref(plant);
+                          if (!href) {
+                            return "Open";
+                          }
+                          return <Link href={href}>{quickActionLabel(plant)}</Link>;
+                        },
+                      },
+                    ]}
+                    renderMobileCard={(plant) => {
+                      const needs = plantNeedsLabels(plant);
+                      const quickHref = quickActionHref(plant);
+                      return (
+                        <div className={styles.cardKeyValue}>
+                          <span>Plant ID</span>
+                          <strong>
+                            <Link href={`/p/${plant.uuid}?from=${encodeURIComponent(overviewPathWithFilters)}`}>
+                              {plant.plant_id || "(pending)"}
+                            </Link>
+                          </strong>
+                          <span>Species</span>
+                          <strong>
+                            {plant.species_name}
+                            {plant.species_category ? ` (${plant.species_category})` : ""}
+                          </strong>
+                          <span>Status</span>
+                          <strong>{plant.status}</strong>
+                          {plant.status !== "active" && plant.replaced_by_uuid ? (
+                            <>
+                              <span>Replacement</span>
+                              <strong>
+                                <Link
+                                  href={`/p/${plant.replaced_by_uuid}?from=${encodeURIComponent(overviewPathWithFilters)}`}
+                                >
+                                  Open replacement
+                                </Link>
+                              </strong>
+                            </>
+                          ) : null}
+                          <span>Grade</span>
+                          <strong>{plant.bin || "Missing"}</strong>
+                          <span>Recipe</span>
+                          <strong>{plant.assigned_recipe_code || "Missing"}</strong>
+                          <span>Location</span>
+                          <strong title={locationLabel(plant)}>{locationLabel(plant)}</strong>
+                          <div className={styles.badgeRow}>
+                            {needs.map((label) => (
+                              <span className={styles.badgeWarn} key={label}>
+                                {label}
+                              </span>
+                            ))}
+                          </div>
+                          {quickHref ? (
+                            <Link className={styles.buttonSecondary} href={quickHref}>
+                              {quickActionLabel(plant)}
+                            </Link>
+                          ) : null}
+                        </div>
+                      );
+                    }}
+                  />
                 </div>
-              );
-            }}
-            emptyState={
-              data.plants.length === 0 ? (
-                <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
-              ) : (
-                <p className={styles.mutedText}>No plants match the current filter.</p>
-              )
-            }
-          />
+              ))}
+            </div>
+          )
         ) : null}
         {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
       </SectionCard>
