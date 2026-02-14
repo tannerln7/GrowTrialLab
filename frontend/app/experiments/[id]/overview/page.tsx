@@ -87,6 +87,7 @@ export default function ExperimentOverviewPage() {
     return "all";
   }, [searchParams]);
   const queryValue = searchParams.get("q") ?? "";
+  const refreshToken = searchParams.get("refresh");
 
   const [loading, setLoading] = useState(true);
   const [notInvited, setNotInvited] = useState(false);
@@ -163,10 +164,11 @@ export default function ExperimentOverviewPage() {
     }
 
     void load();
-  }, [experimentId, router]);
+  }, [experimentId, refreshToken, router]);
 
   function updateQuery(nextFilter: FilterId, nextQ: string) {
     const next = new URLSearchParams(searchParams.toString());
+    next.delete("refresh");
     if (nextFilter === "all") {
       next.delete("filter");
     } else {
