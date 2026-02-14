@@ -3,6 +3,7 @@ import { ReactNode } from "react";
 import styles from "./SectionCard.module.css";
 
 type SectionCardProps = {
+  className?: string;
   title?: string;
   subtitle?: string;
   actions?: ReactNode;
@@ -10,13 +11,15 @@ type SectionCardProps = {
 };
 
 export default function SectionCard({
+  className,
   title,
   subtitle,
   actions,
   children,
 }: SectionCardProps) {
+  const cardClassName = className ? `${styles.card} ${className}` : styles.card;
   return (
-    <section className={styles.card}>
+    <section className={cardClassName}>
       {title || subtitle || actions ? (
         <header className={styles.header}>
           <div>
