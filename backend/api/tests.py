@@ -498,6 +498,43 @@ class ExperimentStatusSummaryTests(TestCase):
         self.assertEqual(payload["readiness"]["counts"]["needs_baseline"], 2)
         self.assertEqual(payload["readiness"]["counts"]["needs_assignment"], 2)
 
+    def test_status_summary_needs_assignment_drops_after_apply(self):
+        experiment = Experiment.objects.create(name="Readiness Assignment Apply")
+        species = Species.objects.create(name="Nepenthes veitchii", category="nepenthes")
+        Block.objects.create(experiment=experiment, name="B1", description="slot")
+        Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+
+        Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-101",
+            bin="A",
+            assigned_recipe=None,
+        )
+        Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-102",
+            bin="B",
+            assigned_recipe=None,
+        )
+
+        before_response = self.client.get(f"/api/v1/experiments/{experiment.id}/status/summary")
+        self.assertEqual(before_response.status_code, 200)
+        self.assertEqual(before_response.json()["readiness"]["counts"]["needs_assignment"], 2)
+
+        apply_response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/groups/apply",
+            data={"seed": 77},
+            content_type="application/json",
+        )
+        self.assertEqual(apply_response.status_code, 200)
+
+        after_response = self.client.get(f"/api/v1/experiments/{experiment.id}/status/summary")
+        self.assertEqual(after_response.status_code, 200)
+        self.assertEqual(after_response.json()["readiness"]["counts"]["needs_assignment"], 0)
+
 
 @override_settings(
     DEBUG=True,
