@@ -143,9 +143,12 @@ export default function FeedingPage() {
   }, [queue, selectedPlantId]);
   const canSaveAndNext = (queue?.remaining_count ?? 0) > 0;
 
-  const selectPlant = useCallback(
+  const updatePlantQuery = useCallback(
     (plantId: string | null) => {
-      setSelectedPlantId(plantId);
+      const currentPlant = searchParams.get("plant");
+      if ((currentPlant ?? null) === plantId) {
+        return;
+      }
       const nextParams = new URLSearchParams(searchParams.toString());
       if (plantId) {
         nextParams.set("plant", plantId);
@@ -156,6 +159,16 @@ export default function FeedingPage() {
       router.replace(`/experiments/${experimentId}/feeding${query ? `?${query}` : ""}`);
     },
     [experimentId, router, searchParams],
+  );
+
+  const selectPlant = useCallback(
+    (plantId: string | null, options?: { syncUrl?: boolean }) => {
+      setSelectedPlantId(plantId);
+      if (options?.syncUrl !== false) {
+        updatePlantQuery(plantId);
+      }
+    },
+    [updatePlantQuery],
   );
 
   const loadQueue = useCallback(async () => {
@@ -212,7 +225,7 @@ export default function FeedingPage() {
 
         const [queuePayload] = await Promise.all([loadQueue(), loadRecipes()]);
         if (preselectedPlantId) {
-          selectPlant(preselectedPlantId);
+          setSelectedPlantId(preselectedPlantId);
         } else if (queuePayload.remaining_count > 0) {
           const nextPlant = pickNextNeedingFeed(queuePayload, null);
           if (nextPlant) {
