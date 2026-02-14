@@ -27,6 +27,15 @@ export type ExperimentStatusSummary = {
       needs_tent_restriction: number;
     };
   };
+  schedule: {
+    next_scheduled_slot: {
+      date: string;
+      timeframe: string | null;
+      exact_time: string | null;
+      actions_count: number;
+    } | null;
+    due_counts_today: number;
+  };
 };
 
 export async function fetchExperimentStatusSummary(

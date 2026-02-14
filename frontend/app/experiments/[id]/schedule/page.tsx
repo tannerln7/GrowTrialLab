@@ -1,0 +1,1163 @@
+"use client";
+
+import Link from "next/link";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { backendFetch, normalizeBackendError } from "@/lib/backend";
+import {
+  fetchExperimentStatusSummary,
+  type ExperimentStatusSummary,
+} from "@/lib/experiment-status";
+import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import PageShell from "@/src/components/ui/PageShell";
+import SectionCard from "@/src/components/ui/SectionCard";
+
+import styles from "../../experiments.module.css";
+
+type Timeframe = "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT";
+type RuleType = "DAILY" | "WEEKLY" | "CUSTOM_DAYS_INTERVAL";
+type ScopeType = "TENT" | "TRAY" | "PLANT";
+type ActionType = "FEED" | "ROTATE" | "PHOTO" | "METRICS" | "NOTE" | "CUSTOM";
+
+type ScheduleRule = {
+  id: string;
+  rule_type: RuleType;
+  interval_days: number | null;
+  weekdays: string[];
+  timeframe: Timeframe;
+  exact_time: string | null;
+  start_date: string | null;
+  end_date: string | null;
+};
+
+type ScheduleScope = {
+  id: string;
+  scope_type: ScopeType;
+  scope_id: string;
+  label: string;
+};
+
+type ScheduleAction = {
+  id: string;
+  title: string;
+  action_type: ActionType;
+  description: string;
+  enabled: boolean;
+  rules: ScheduleRule[];
+  scopes: ScheduleScope[];
+  current_blockers: string[];
+};
+
+type ScheduleSlotAction = {
+  schedule_id: string;
+  title: string;
+  action_type: ActionType;
+  description: string;
+  scope_summary: string;
+  scope_labels: string[];
+  blocked_reasons: string[];
+};
+
+type SchedulePlan = {
+  days: number;
+  start_date: string;
+  end_date: string;
+  due_counts_today: number;
+  slots: Array<{
+    date: string;
+    timeframe: Timeframe | null;
+    exact_time: string | null;
+    slot_label: string;
+    actions: ScheduleSlotAction[];
+  }>;
+};
+
+type PlacementSummary = {
+  tents: Array<{
+    tent_id: string;
+    name: string;
+    code: string;
+    allowed_species_count: number;
+    allowed_species: Array<{ id: string; name: string; category: string }>;
+  }>;
+  trays: Array<{
+    tray_id: string;
+    tray_name: string;
+    tent_id: string | null;
+    tent_name: string | null;
+    assigned_recipe_id: string | null;
+    assigned_recipe_code: string | null;
+    assigned_recipe_name: string | null;
+    current_count: number;
+    capacity: number;
+  }>;
+};
+
+type OverviewPlant = {
+  uuid: string;
+  plant_id: string;
+  species_name: string;
+  species_category: string;
+  status: string;
+  assigned_recipe_id: string | null;
+  assigned_recipe_code: string | null;
+  placed_tray_id: string | null;
+  tray_name: string | null;
+  tray_code: string | null;
+  block_name: string | null;
+  tent_id: string | null;
+  tent_code: string | null;
+  tent_name: string | null;
+};
+
+const ACTION_TYPE_OPTIONS: Array<{ value: ActionType; label: string }> = [
+  { value: "FEED", label: "Feed" },
+  { value: "ROTATE", label: "Rotate" },
+  { value: "PHOTO", label: "Photo" },
+  { value: "METRICS", label: "Weekly Metrics" },
+  { value: "NOTE", label: "Note" },
+  { value: "CUSTOM", label: "Custom" },
+];
+
+const TIMEFRAME_OPTIONS: Array<{ value: Timeframe; label: string }> = [
+  { value: "MORNING", label: "Morning" },
+  { value: "AFTERNOON", label: "Afternoon" },
+  { value: "EVENING", label: "Evening" },
+  { value: "NIGHT", label: "Night" },
+];
+
+const WEEKDAY_OPTIONS = [
+  { value: "MON", label: "Mon" },
+  { value: "TUE", label: "Tue" },
+  { value: "WED", label: "Wed" },
+  { value: "THU", label: "Thu" },
+  { value: "FRI", label: "Fri" },
+  { value: "SAT", label: "Sat" },
+  { value: "SUN", label: "Sun" },
+];
+
+type WeeklyRuleEditor = {
+  weekday: string;
+  timeframe: Timeframe;
+  exact_time: string;
+};
+
+function formatSlotTitle(dateValue: string, timeframe: string | null, exactTime: string | null): string {
+  const parsed = new Date(`${dateValue}T00:00:00`);
+  const day = Number.isNaN(parsed.getTime())
+    ? dateValue
+    : parsed.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+  if (exactTime) {
+    return `${day} — ${exactTime.slice(0, 5)}`;
+  }
+  if (timeframe) {
+    return `${day} — ${timeframe[0]}${timeframe.slice(1).toLowerCase()}`;
+  }
+  return day;
+}
+
+function summarizeRule(rule: ScheduleRule): string {
+  if (rule.rule_type === "WEEKLY") {
+    const weekday = rule.weekdays[0] ?? "Day";
+    return `${weekday} ${rule.exact_time ? rule.exact_time.slice(0, 5) : rule.timeframe.toLowerCase()}`;
+  }
+  if (rule.rule_type === "CUSTOM_DAYS_INTERVAL") {
+    return `Every ${rule.interval_days ?? "?"} days ${rule.exact_time ? rule.exact_time.slice(0, 5) : rule.timeframe.toLowerCase()}`;
+  }
+  return `Daily ${rule.exact_time ? rule.exact_time.slice(0, 5) : rule.timeframe.toLowerCase()}`;
+}
+
+function actionTypeLabel(actionType: ActionType): string {
+  return ACTION_TYPE_OPTIONS.find((item) => item.value === actionType)?.label ?? actionType;
+}
+
+function compactAllowedSpeciesLabel(tent: PlacementSummary["tents"][number]): string {
+  if (tent.allowed_species_count === 0) {
+    return "Any species";
+  }
+  if (tent.allowed_species.length === 0) {
+    return `${tent.allowed_species_count} allowed species`;
+  }
+  const topNames = tent.allowed_species.slice(0, 2).map((species) => species.name);
+  if (tent.allowed_species.length > 2) {
+    return `${topNames.join(", ")} +${tent.allowed_species.length - 2}`;
+  }
+  return topNames.join(", ");
+}
+
+function trayRestrictionHint(
+  tray: PlacementSummary["trays"][number],
+  tentById: Map<string, PlacementSummary["tents"][number]>,
+): string {
+  if (!tray.tent_id) {
+    return "";
+  }
+  const trayTent = tentById.get(tray.tent_id);
+  if (!trayTent || trayTent.allowed_species_count === 0) {
+    return "";
+  }
+  return compactAllowedSpeciesLabel(trayTent);
+}
+
+export default function ExperimentSchedulePage() {
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const experimentId = useMemo(() => {
+    if (typeof params.id === "string") {
+      return params.id;
+    }
+    if (Array.isArray(params.id)) {
+      return params.id[0] ?? "";
+    }
+    return "";
+  }, [params]);
+  const plantFilter = searchParams.get("plant");
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [notInvited, setNotInvited] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [summary, setSummary] = useState<ExperimentStatusSummary | null>(null);
+  const [daysWindow, setDaysWindow] = useState<7 | 14>(7);
+  const [plan, setPlan] = useState<SchedulePlan | null>(null);
+  const [actions, setActions] = useState<ScheduleAction[]>([]);
+  const [placementSummary, setPlacementSummary] = useState<PlacementSummary | null>(null);
+  const [overviewPlants, setOverviewPlants] = useState<OverviewPlant[]>([]);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [actionType, setActionType] = useState<ActionType>("FEED");
+  const [title, setTitle] = useState("");
+  const [titleDirty, setTitleDirty] = useState(false);
+  const [description, setDescription] = useState("");
+  const [enabled, setEnabled] = useState(true);
+  const [recurrenceMode, setRecurrenceMode] = useState<"weekly" | "interval" | "daily">("weekly");
+  const [weeklyRules, setWeeklyRules] = useState<WeeklyRuleEditor[]>([
+    { weekday: "MON", timeframe: "AFTERNOON", exact_time: "" },
+  ]);
+  const [intervalDays, setIntervalDays] = useState(7);
+  const [intervalTimeframe, setIntervalTimeframe] = useState<Timeframe>("AFTERNOON");
+  const [intervalExactTime, setIntervalExactTime] = useState("");
+  const [dailyTimeframe, setDailyTimeframe] = useState<Timeframe>("MORNING");
+  const [dailyExactTime, setDailyExactTime] = useState("");
+  const [scopeType, setScopeType] = useState<ScopeType>("TENT");
+  const [selectedScopeIds, setSelectedScopeIds] = useState<string[]>([]);
+
+  const tentById = useMemo(() => {
+    const map = new Map<string, PlacementSummary["tents"][number]>();
+    for (const tent of placementSummary?.tents || []) {
+      map.set(tent.tent_id, tent);
+    }
+    return map;
+  }, [placementSummary?.tents]);
+
+  const trayById = useMemo(() => {
+    const map = new Map<string, PlacementSummary["trays"][number]>();
+    for (const tray of placementSummary?.trays || []) {
+      map.set(tray.tray_id, tray);
+    }
+    return map;
+  }, [placementSummary?.trays]);
+
+  const activePlants = useMemo(
+    () => overviewPlants.filter((plant) => plant.status === "active"),
+    [overviewPlants],
+  );
+
+  const recurrenceLabel = useMemo(() => {
+    if (recurrenceMode === "weekly") {
+      const firstRule = weeklyRules[0];
+      if (!firstRule) {
+        return "Weekly";
+      }
+      const weekday = WEEKDAY_OPTIONS.find((item) => item.value === firstRule.weekday)?.label ?? firstRule.weekday;
+      const timeLabel = firstRule.exact_time || firstRule.timeframe.toLowerCase();
+      return `${weekday} ${timeLabel}`;
+    }
+    if (recurrenceMode === "interval") {
+      return `Every ${intervalDays} days ${intervalExactTime || intervalTimeframe.toLowerCase()}`;
+    }
+    return `Daily ${dailyExactTime || dailyTimeframe.toLowerCase()}`;
+  }, [dailyExactTime, dailyTimeframe, intervalDays, intervalExactTime, intervalTimeframe, recurrenceMode, weeklyRules]);
+
+  const scopeSuggestionLabel = useMemo(() => {
+    const firstScope = selectedScopeIds[0];
+    if (!firstScope) {
+      return "Experiment";
+    }
+    if (scopeType === "TENT") {
+      const tent = tentById.get(firstScope);
+      return tent ? `Tent ${tent.code || tent.name}` : "Tent";
+    }
+    if (scopeType === "TRAY") {
+      const tray = trayById.get(firstScope);
+      return tray ? `Tray ${tray.tray_name}` : "Tray";
+    }
+    const plant = activePlants.find((item) => item.uuid === firstScope);
+    return plant ? `Plant ${plant.plant_id || plant.uuid}` : "Plant";
+  }, [activePlants, scopeType, selectedScopeIds, tentById, trayById]);
+
+  const suggestedTitle = useMemo(
+    () => `${actionTypeLabel(actionType)} - ${scopeSuggestionLabel} - ${recurrenceLabel}`,
+    [actionType, recurrenceLabel, scopeSuggestionLabel],
+  );
+
+  useEffect(() => {
+    if (!titleDirty) {
+      setTitle(suggestedTitle);
+    }
+  }, [suggestedTitle, titleDirty]);
+
+  const feedWarnings = useMemo(() => {
+    if (actionType !== "FEED") {
+      return [];
+    }
+    const warnings: string[] = [];
+    if (summary?.lifecycle.state !== "running") {
+      warnings.push("Blocked: Experiment not running");
+    }
+
+    const targetIds = new Set<string>();
+    if (scopeType === "PLANT") {
+      for (const id of selectedScopeIds) {
+        targetIds.add(id);
+      }
+    } else if (scopeType === "TRAY") {
+      for (const trayId of selectedScopeIds) {
+        for (const plant of activePlants) {
+          if (plant.placed_tray_id === trayId) {
+            targetIds.add(plant.uuid);
+          }
+        }
+      }
+    } else {
+      for (const tentId of selectedScopeIds) {
+        for (const plant of activePlants) {
+          if (plant.tent_id === tentId) {
+            targetIds.add(plant.uuid);
+          }
+        }
+      }
+    }
+
+    let hasUnplaced = false;
+    let hasMissingRecipe = false;
+    for (const plant of activePlants) {
+      if (!targetIds.has(plant.uuid)) {
+        continue;
+      }
+      if (!plant.placed_tray_id) {
+        hasUnplaced = true;
+      } else if (!plant.assigned_recipe_id) {
+        hasMissingRecipe = true;
+      }
+    }
+    if (hasUnplaced) {
+      warnings.push("Blocked: Unplaced");
+    }
+    if (hasMissingRecipe) {
+      warnings.push("Blocked: Needs tray recipe");
+    }
+    return warnings;
+  }, [actionType, activePlants, scopeType, selectedScopeIds, summary?.lifecycle.state]);
+
+  const loadScheduleData = useCallback(async () => {
+    const planQuery = new URLSearchParams({
+      days: String(daysWindow),
+    });
+    if (plantFilter) {
+      planQuery.set("plant_id", plantFilter);
+    }
+
+    const [statusPayload, schedulesResponse, planResponse, placementResponse, overviewResponse] =
+      await Promise.all([
+        fetchExperimentStatusSummary(experimentId),
+        backendFetch(`/api/v1/experiments/${experimentId}/schedules`),
+        backendFetch(`/api/v1/experiments/${experimentId}/schedules/plan?${planQuery.toString()}`),
+        backendFetch(`/api/v1/experiments/${experimentId}/placement/summary`),
+        backendFetch(`/api/v1/experiments/${experimentId}/overview/plants`),
+      ]);
+
+    if (!statusPayload) {
+      throw new Error("Unable to load status summary.");
+    }
+    setSummary(statusPayload);
+    if (!statusPayload.setup.is_complete) {
+      router.replace(`/experiments/${experimentId}/setup`);
+      return;
+    }
+
+    if (!schedulesResponse.ok || !planResponse.ok || !placementResponse.ok || !overviewResponse.ok) {
+      throw new Error("Unable to load schedules.");
+    }
+
+    const schedulesPayload = (await schedulesResponse.json()) as { schedules: ScheduleAction[] };
+    const planPayload = (await planResponse.json()) as SchedulePlan;
+    const placementPayload = (await placementResponse.json()) as PlacementSummary;
+    const overviewPayload = (await overviewResponse.json()) as { plants: OverviewPlant[] };
+
+    setActions(schedulesPayload.schedules);
+    setPlan(planPayload);
+    setPlacementSummary(placementPayload);
+    setOverviewPlants(overviewPayload.plants);
+  }, [daysWindow, experimentId, plantFilter, router]);
+
+  useEffect(() => {
+    async function load() {
+      if (!experimentId) {
+        return;
+      }
+      setLoading(true);
+      setError("");
+      setNotInvited(false);
+      try {
+        const meResponse = await backendFetch("/api/me");
+        if (meResponse.status === 403) {
+          setNotInvited(true);
+          return;
+        }
+        await loadScheduleData();
+        setOffline(false);
+      } catch (requestError) {
+        const normalized = normalizeBackendError(requestError);
+        if (normalized.kind === "offline") {
+          setOffline(true);
+        }
+        setError("Unable to load schedule page.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void load();
+  }, [experimentId, loadScheduleData]);
+
+  function resetForm() {
+    setEditingId(null);
+    setActionType("FEED");
+    setTitle("");
+    setTitleDirty(false);
+    setDescription("");
+    setEnabled(true);
+    setRecurrenceMode("weekly");
+    setWeeklyRules([{ weekday: "MON", timeframe: "AFTERNOON", exact_time: "" }]);
+    setIntervalDays(7);
+    setIntervalTimeframe("AFTERNOON");
+    setIntervalExactTime("");
+    setDailyTimeframe("MORNING");
+    setDailyExactTime("");
+    setScopeType("TENT");
+    setSelectedScopeIds([]);
+  }
+
+  function startEdit(action: ScheduleAction) {
+    setEditingId(action.id);
+    setActionType(action.action_type);
+    setTitle(action.title);
+    setTitleDirty(true);
+    setDescription(action.description || "");
+    setEnabled(action.enabled);
+
+    if (action.rules.length > 0 && action.rules.every((rule) => rule.rule_type === "WEEKLY")) {
+      setRecurrenceMode("weekly");
+      setWeeklyRules(
+        action.rules.map((rule) => ({
+          weekday: rule.weekdays[0] || "MON",
+          timeframe: rule.timeframe,
+          exact_time: rule.exact_time ? rule.exact_time.slice(0, 5) : "",
+        })),
+      );
+    } else if (action.rules.length === 1 && action.rules[0].rule_type === "CUSTOM_DAYS_INTERVAL") {
+      setRecurrenceMode("interval");
+      setIntervalDays(action.rules[0].interval_days || 7);
+      setIntervalTimeframe(action.rules[0].timeframe);
+      setIntervalExactTime(action.rules[0].exact_time ? action.rules[0].exact_time.slice(0, 5) : "");
+    } else if (action.rules.length > 0) {
+      setRecurrenceMode("daily");
+      setDailyTimeframe(action.rules[0].timeframe);
+      setDailyExactTime(action.rules[0].exact_time ? action.rules[0].exact_time.slice(0, 5) : "");
+    }
+
+    if (action.scopes.length > 0) {
+      setScopeType(action.scopes[0].scope_type);
+      setSelectedScopeIds(action.scopes.map((scope) => scope.scope_id));
+    }
+  }
+
+  function buildRulesPayload() {
+    if (recurrenceMode === "weekly") {
+      return weeklyRules.map((rule) => ({
+        rule_type: "WEEKLY",
+        weekdays: [rule.weekday],
+        timeframe: rule.timeframe,
+        exact_time: rule.exact_time || null,
+      }));
+    }
+    if (recurrenceMode === "interval") {
+      return [
+        {
+          rule_type: "CUSTOM_DAYS_INTERVAL",
+          interval_days: intervalDays,
+          weekdays: [],
+          timeframe: intervalTimeframe,
+          exact_time: intervalExactTime || null,
+        },
+      ];
+    }
+    return [
+      {
+        rule_type: "DAILY",
+        weekdays: [],
+        timeframe: dailyTimeframe,
+        exact_time: dailyExactTime || null,
+      },
+    ];
+  }
+
+  async function saveScheduleAction() {
+    if (!title.trim()) {
+      setError("Title is required.");
+      return;
+    }
+    if (selectedScopeIds.length === 0) {
+      setError("Select at least one scope.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const payload = {
+        title: title.trim(),
+        action_type: actionType,
+        description: description.trim(),
+        enabled,
+        rules: buildRulesPayload(),
+        scopes: selectedScopeIds.map((scopeId) => ({
+          scope_type: scopeType,
+          scope_id: scopeId,
+        })),
+      };
+      const response = await backendFetch(
+        editingId ? `/api/v1/schedules/${editingId}` : `/api/v1/experiments/${experimentId}/schedules`,
+        {
+          method: editingId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+      const responsePayload = await response.json();
+      if (!response.ok) {
+        const errors = Array.isArray(responsePayload.errors) ? responsePayload.errors.join(" ") : "";
+        setError(responsePayload.detail || errors || "Unable to save schedule.");
+        return;
+      }
+      setNotice(editingId ? "Schedule updated." : "Schedule created.");
+      resetForm();
+      await loadScheduleData();
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to save schedule.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleEnabled(action: ScheduleAction) {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await backendFetch(`/api/v1/schedules/${action.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !action.enabled }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setError(payload.detail || "Unable to update schedule state.");
+        return;
+      }
+      await loadScheduleData();
+    } catch (requestError) {
+      setError(normalizeBackendError(requestError).message || "Unable to update schedule state.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteScheduleAction(actionId: string) {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await backendFetch(`/api/v1/schedules/${actionId}`, { method: "DELETE" });
+      if (!response.ok) {
+        const payload = (await response.json()) as { detail?: string };
+        setError(payload.detail || "Unable to delete schedule.");
+        return;
+      }
+      setNotice("Schedule deleted.");
+      if (editingId === actionId) {
+        resetForm();
+      }
+      await loadScheduleData();
+    } catch (requestError) {
+      setError(normalizeBackendError(requestError).message || "Unable to delete schedule.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function toggleScopeSelection(scopeId: string) {
+    setSelectedScopeIds((current) =>
+      current.includes(scopeId) ? current.filter((item) => item !== scopeId) : [...current, scopeId],
+    );
+  }
+
+  const traysGroupedByTent = useMemo(() => {
+    const groups = new Map<string, Array<PlacementSummary["trays"][number]>>();
+    for (const tray of placementSummary?.trays || []) {
+      const tent = tray.tent_id ? tentById.get(tray.tent_id) : null;
+      const key = tent ? `Tent ${tent.code || tent.name}` : "Unplaced";
+      const current = groups.get(key) || [];
+      current.push(tray);
+      groups.set(key, current);
+    }
+    return Array.from(groups.entries()).sort((left, right) => left[0].localeCompare(right[0]));
+  }, [placementSummary?.trays, tentById]);
+
+  const plantsGroupedByLocation = useMemo(() => {
+    const groups = new Map<string, OverviewPlant[]>();
+    for (const plant of activePlants) {
+      const tentLabel = plant.tent_code || plant.tent_name || "Unplaced";
+      const trayLabel = plant.tray_code || plant.tray_name || "Unplaced";
+      const key = plant.placed_tray_id
+        ? `Tent ${tentLabel} > Tray ${trayLabel}`
+        : "Unplaced";
+      const current = groups.get(key) || [];
+      current.push(plant);
+      groups.set(key, current);
+    }
+    return Array.from(groups.entries()).sort((left, right) => left[0].localeCompare(right[0]));
+  }, [activePlants]);
+
+  if (notInvited) {
+    return (
+      <PageShell title="Schedule">
+        <SectionCard>
+          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
+        </SectionCard>
+      </PageShell>
+    );
+  }
+
+  return (
+    <PageShell
+      title="Schedule"
+      subtitle={plantFilter ? "Filtered for selected plant" : "Recurring actions plan"}
+      actions={
+        <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/overview`}>
+          ← Overview
+        </Link>
+      }
+    >
+      {loading ? <p className={styles.mutedText}>Loading schedules...</p> : null}
+      {error ? <p className={styles.errorText}>{error}</p> : null}
+      {notice ? <p className={styles.successText}>{notice}</p> : null}
+      {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
+
+      <SectionCard title="Upcoming plan">
+        <div className={styles.actions}>
+          <button
+            className={daysWindow === 7 ? styles.buttonPrimary : styles.buttonSecondary}
+            type="button"
+            onClick={() => setDaysWindow(7)}
+          >
+            7 days
+          </button>
+          <button
+            className={daysWindow === 14 ? styles.buttonPrimary : styles.buttonSecondary}
+            type="button"
+            onClick={() => setDaysWindow(14)}
+          >
+            14 days
+          </button>
+        </div>
+        {plan?.slots.length ? (
+          <div className={styles.blocksList}>
+            {plan.slots.map((slot) => (
+              <article className={styles.blockRow} key={`${slot.date}-${slot.exact_time || slot.timeframe}`}>
+                <strong>{formatSlotTitle(slot.date, slot.timeframe, slot.exact_time)}</strong>
+                <div className={styles.stack}>
+                  {slot.actions.map((item) => (
+                    <div className={styles.cardKeyValue} key={`${slot.date}-${item.schedule_id}-${item.title}`}>
+                      <span>{item.title}</span>
+                      <strong>{item.scope_summary || "No scope"}</strong>
+                      {item.blocked_reasons.length > 0 ? (
+                        <div className={styles.badgeRow}>
+                          {item.blocked_reasons.map((reason) => (
+                            <span className={styles.badgeWarn} key={reason}>
+                              {reason}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.mutedText}>No upcoming scheduled actions in this window.</p>
+        )}
+      </SectionCard>
+
+      <SectionCard title={editingId ? "Edit action" : "Create action"}>
+        <div className={styles.formGrid}>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Action type</span>
+            <select
+              className={styles.select}
+              value={actionType}
+              onChange={(event) => setActionType(event.target.value as ActionType)}
+              disabled={saving}
+            >
+              {ACTION_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Title</span>
+            <input
+              className={styles.input}
+              value={title}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                setTitleDirty(true);
+              }}
+              disabled={saving}
+            />
+            <span className={styles.inlineNote}>Suggestion: {suggestedTitle}</span>
+          </label>
+
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Description (optional)</span>
+            <textarea
+              className={styles.textarea}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              disabled={saving}
+            />
+          </label>
+
+          <label className={styles.checkboxRow}>
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(event) => setEnabled(event.target.checked)}
+              disabled={saving}
+            />
+            <span>Enabled</span>
+          </label>
+
+          <div className={styles.actions}>
+            <button
+              className={recurrenceMode === "weekly" ? styles.buttonPrimary : styles.buttonSecondary}
+              type="button"
+              onClick={() => setRecurrenceMode("weekly")}
+            >
+              Weekly pattern
+            </button>
+            <button
+              className={recurrenceMode === "interval" ? styles.buttonPrimary : styles.buttonSecondary}
+              type="button"
+              onClick={() => setRecurrenceMode("interval")}
+            >
+              Every X days
+            </button>
+            <button
+              className={recurrenceMode === "daily" ? styles.buttonPrimary : styles.buttonSecondary}
+              type="button"
+              onClick={() => setRecurrenceMode("daily")}
+            >
+              Daily
+            </button>
+          </div>
+
+          {recurrenceMode === "weekly" ? (
+            <div className={styles.blocksList}>
+              {weeklyRules.map((rule, index) => (
+                <article className={styles.blockRow} key={`${rule.weekday}-${index}`}>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Weekday</span>
+                    <select
+                      className={styles.select}
+                      value={rule.weekday}
+                      onChange={(event) =>
+                        setWeeklyRules((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, weekday: event.target.value } : item,
+                          ),
+                        )
+                      }
+                    >
+                      {WEEKDAY_OPTIONS.map((weekday) => (
+                        <option key={weekday.value} value={weekday.value}>
+                          {weekday.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Timeframe</span>
+                    <select
+                      className={styles.select}
+                      value={rule.timeframe}
+                      onChange={(event) =>
+                        setWeeklyRules((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, timeframe: event.target.value as Timeframe }
+                              : item,
+                          ),
+                        )
+                      }
+                    >
+                      {TIMEFRAME_OPTIONS.map((timeframe) => (
+                        <option key={timeframe.value} value={timeframe.value}>
+                          {timeframe.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Exact time (optional)</span>
+                    <input
+                      className={styles.input}
+                      type="time"
+                      value={rule.exact_time}
+                      onChange={(event) =>
+                        setWeeklyRules((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, exact_time: event.target.value } : item,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                  <div className={styles.actions}>
+                    {weeklyRules.length > 1 ? (
+                      <button
+                        className={styles.buttonSecondary}
+                        type="button"
+                        onClick={() =>
+                          setWeeklyRules((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                        }
+                      >
+                        Remove rule
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+              <button
+                className={styles.buttonSecondary}
+                type="button"
+                onClick={() =>
+                  setWeeklyRules((current) => [
+                    ...current,
+                    { weekday: "MON", timeframe: "MORNING", exact_time: "" },
+                  ])
+                }
+              >
+                Add weekly rule
+              </button>
+            </div>
+          ) : null}
+
+          {recurrenceMode === "interval" ? (
+            <div className={styles.formGrid}>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Interval days</span>
+                <input
+                  className={styles.input}
+                  type="number"
+                  min={1}
+                  value={intervalDays}
+                  onChange={(event) => setIntervalDays(Math.max(1, Number(event.target.value) || 1))}
+                />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Timeframe</span>
+                <select
+                  className={styles.select}
+                  value={intervalTimeframe}
+                  onChange={(event) => setIntervalTimeframe(event.target.value as Timeframe)}
+                >
+                  {TIMEFRAME_OPTIONS.map((timeframe) => (
+                    <option key={timeframe.value} value={timeframe.value}>
+                      {timeframe.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Exact time (optional)</span>
+                <input
+                  className={styles.input}
+                  type="time"
+                  value={intervalExactTime}
+                  onChange={(event) => setIntervalExactTime(event.target.value)}
+                />
+              </label>
+            </div>
+          ) : null}
+
+          {recurrenceMode === "daily" ? (
+            <div className={styles.formGrid}>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Timeframe</span>
+                <select
+                  className={styles.select}
+                  value={dailyTimeframe}
+                  onChange={(event) => setDailyTimeframe(event.target.value as Timeframe)}
+                >
+                  {TIMEFRAME_OPTIONS.map((timeframe) => (
+                    <option key={timeframe.value} value={timeframe.value}>
+                      {timeframe.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Exact time (optional)</span>
+                <input
+                  className={styles.input}
+                  type="time"
+                  value={dailyExactTime}
+                  onChange={(event) => setDailyExactTime(event.target.value)}
+                />
+              </label>
+            </div>
+          ) : null}
+
+          <div className={styles.actions}>
+            <button
+              className={scopeType === "TENT" ? styles.buttonPrimary : styles.buttonSecondary}
+              type="button"
+              onClick={() => {
+                setScopeType("TENT");
+                setSelectedScopeIds([]);
+              }}
+            >
+              Tents
+            </button>
+            <button
+              className={scopeType === "TRAY" ? styles.buttonPrimary : styles.buttonSecondary}
+              type="button"
+              onClick={() => {
+                setScopeType("TRAY");
+                setSelectedScopeIds([]);
+              }}
+            >
+              Trays
+            </button>
+            <button
+              className={scopeType === "PLANT" ? styles.buttonPrimary : styles.buttonSecondary}
+              type="button"
+              onClick={() => {
+                setScopeType("PLANT");
+                setSelectedScopeIds([]);
+              }}
+            >
+              Plants
+            </button>
+          </div>
+
+          {scopeType === "TENT" ? (
+            <div className={styles.blocksList}>
+              {placementSummary?.tents.map((tent) => (
+                <label className={styles.checkboxRow} key={tent.tent_id}>
+                  <input
+                    type="checkbox"
+                    checked={selectedScopeIds.includes(tent.tent_id)}
+                    onChange={() => toggleScopeSelection(tent.tent_id)}
+                  />
+                  <span>
+                    Tent {tent.code || tent.name} ({compactAllowedSpeciesLabel(tent)})
+                  </span>
+                </label>
+              ))}
+              {placementSummary?.tents.length === 0 ? (
+                <p className={styles.inlineNote}>No tents available yet. Add tents in Slots.</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {scopeType === "TRAY" ? (
+            <div className={styles.blocksList}>
+              {traysGroupedByTent.map(([group, trays]) => (
+                <article className={styles.blockRow} key={group}>
+                  <strong>{group}</strong>
+                  {trays.map((tray) => (
+                    <label className={styles.checkboxRow} key={tray.tray_id}>
+                      <input
+                        type="checkbox"
+                        checked={selectedScopeIds.includes(tray.tray_id)}
+                        onChange={() => toggleScopeSelection(tray.tray_id)}
+                      />
+                      <span>
+                        Tray {tray.tray_name} ({tray.current_count}/{tray.capacity}){" "}
+                        {tray.assigned_recipe_code
+                          ? `· ${tray.assigned_recipe_code}`
+                          : "· Missing tray recipe"}
+                        {trayRestrictionHint(tray, tentById)
+                          ? ` · ${trayRestrictionHint(tray, tentById)}`
+                          : ""}
+                      </span>
+                    </label>
+                  ))}
+                </article>
+              ))}
+              {(placementSummary?.trays.length || 0) === 0 ? (
+                <p className={styles.inlineNote}>No trays available yet. Add trays in Placement.</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {scopeType === "PLANT" ? (
+            <div className={styles.blocksList}>
+              {plantsGroupedByLocation.map(([group, plants]) => (
+                <article className={styles.blockRow} key={group}>
+                  <strong>{group}</strong>
+                  {plants.map((plant) => (
+                    <label className={styles.checkboxRow} key={plant.uuid}>
+                      <input
+                        type="checkbox"
+                        checked={selectedScopeIds.includes(plant.uuid)}
+                        onChange={() => toggleScopeSelection(plant.uuid)}
+                      />
+                      <span>
+                        {plant.plant_id || "(pending)"} · {plant.species_name} ·{" "}
+                        {plant.tray_code || plant.tray_name || "Unplaced"}
+                      </span>
+                    </label>
+                  ))}
+                </article>
+              ))}
+              {activePlants.length === 0 ? (
+                <p className={styles.inlineNote}>No active plants available for scheduling.</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {feedWarnings.length > 0 ? (
+            <div className={styles.badgeRow}>
+              {feedWarnings.map((warning) => (
+                <span className={styles.badgeWarn} key={warning}>
+                  {warning}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <div className={styles.actions}>
+            <button
+              className={styles.buttonPrimary}
+              type="button"
+              disabled={saving}
+              onClick={() => void saveScheduleAction()}
+            >
+              {saving ? "Saving..." : editingId ? "Update action" : "Create action"}
+            </button>
+            {editingId ? (
+              <button
+                className={styles.buttonSecondary}
+                type="button"
+                disabled={saving}
+                onClick={resetForm}
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Existing actions">
+        {actions.length === 0 ? (
+          <p className={styles.mutedText}>No schedule actions yet.</p>
+        ) : (
+          <div className={styles.blocksList}>
+            {actions.map((action) => (
+              <article className={styles.blockRow} key={action.id}>
+                <div className={styles.actions}>
+                  <strong>{action.title}</strong>
+                  <span className={styles.mutedText}>{actionTypeLabel(action.action_type)}</span>
+                </div>
+                <p className={styles.mutedText}>
+                  {action.rules.map((rule) => summarizeRule(rule)).join(" · ")}
+                </p>
+                <p className={styles.mutedText}>
+                  {action.scopes.map((scope) => scope.label).join(", ")}
+                </p>
+                {action.current_blockers.length > 0 ? (
+                  <div className={styles.badgeRow}>
+                    {action.current_blockers.map((reason) => (
+                      <span className={styles.badgeWarn} key={reason}>
+                        {reason}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                <div className={styles.actions}>
+                  <label className={styles.checkboxRow}>
+                    <input
+                      type="checkbox"
+                      checked={action.enabled}
+                      disabled={saving}
+                      onChange={() => void toggleEnabled(action)}
+                    />
+                    <span>Enabled</span>
+                  </label>
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => startEdit(action)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className={styles.buttonDanger}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void deleteScheduleAction(action.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+    </PageShell>
+  );
+}

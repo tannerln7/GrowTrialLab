@@ -120,6 +120,24 @@ function locationLabel(plant: OverviewPlant): string {
   return `Block ${blockName} > Tray ${trayName}${occupancyLabel(plant)}`;
 }
 
+function formatScheduleSlot(
+  slot: ExperimentStatusSummary["schedule"]["next_scheduled_slot"],
+): string {
+  if (!slot) {
+    return "No upcoming scheduled actions.";
+  }
+  const parsed = new Date(`${slot.date}T00:00:00`);
+  const day = Number.isNaN(parsed.getTime())
+    ? slot.date
+    : parsed.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+  const moment = slot.exact_time ? slot.exact_time.slice(0, 5) : slot.timeframe?.toLowerCase() || "time";
+  return `${day} · ${moment} (${slot.actions_count} action${slot.actions_count === 1 ? "" : "s"})`;
+}
+
 export default function ExperimentOverviewPage() {
   const params = useParams();
   const router = useRouter();
@@ -417,6 +435,7 @@ export default function ExperimentOverviewPage() {
 
   const baselineActionHref = `/experiments/${experimentId}/baseline`;
   const feedingActionHref = `/experiments/${experimentId}/feeding`;
+  const scheduleActionHref = `/experiments/${experimentId}/schedule`;
 
   function plantNeedsLabels(plant: OverviewPlant): string[] {
     const needs: string[] = [];
@@ -533,10 +552,17 @@ export default function ExperimentOverviewPage() {
             <Link className={styles.buttonSecondary} href={feedingActionHref}>
               Feeding
             </Link>
+            <Link className={styles.buttonSecondary} href={scheduleActionHref}>
+              Schedule
+            </Link>
           </div>
           {summary.lifecycle.state !== "running" ? (
             <p className={styles.inlineNote}>Start to enable rotation and feeding logging.</p>
           ) : null}
+          <p className={styles.inlineNote}>
+            Schedule: {formatScheduleSlot(summary.schedule.next_scheduled_slot)} Today due:{" "}
+            {summary.schedule.due_counts_today}
+          </p>
           {!summary.readiness.ready_to_start ? (
             <div className={styles.stack}>
               <p className={styles.inlineNote}>

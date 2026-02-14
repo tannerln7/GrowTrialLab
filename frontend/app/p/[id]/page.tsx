@@ -73,6 +73,14 @@ type PlantCockpit = {
     replaced_by_uuid: string | null;
     replaces_uuid: string | null;
     chain_label: string | null;
+    scheduled_upcoming: Array<{
+      date: string;
+      timeframe: string | null;
+      exact_time: string | null;
+      title: string;
+      action_type: string;
+      blocked_reasons: string[];
+    }>;
   };
   links: {
     experiment_home: string;
@@ -176,6 +184,20 @@ function uploadTagToApiTag(tag: UploadTag): string {
   return tag;
 }
 
+function formatScheduleSlot(dateValue: string, timeframe: string | null, exactTime: string | null): string {
+  const parsed = new Date(`${dateValue}T00:00:00`);
+  const day = Number.isNaN(parsed.getTime())
+    ? dateValue
+    : parsed.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  if (exactTime) {
+    return `${day} · ${exactTime.slice(0, 5)}`;
+  }
+  if (timeframe) {
+    return `${day} · ${timeframe.toLowerCase()}`;
+  }
+  return day;
+}
+
 function trayOccupancyLabel(cockpit: PlantCockpit): string {
   if (
     cockpit.derived.tray_current_count === null ||
@@ -276,6 +298,9 @@ export default function PlantQrPage() {
     ? `/experiments/${cockpit.plant.experiment.id}/feeding?plant=${cockpit.plant.uuid}&from=${encodeURIComponent(
         overviewHref,
       )}`
+    : null;
+  const scheduleHref = cockpit
+    ? `/experiments/${cockpit.plant.experiment.id}/schedule?plant=${cockpit.plant.uuid}`
     : null;
   const replacementCreated = searchParams.get("replacementCreated") === "1";
 
@@ -803,6 +828,35 @@ export default function PlantQrPage() {
                 />
               }
             />
+          </SectionCard>
+
+          <SectionCard title="Scheduled">
+            {cockpit.derived.scheduled_upcoming.length === 0 ? (
+              <p className={sharedStyles.mutedText}>No upcoming scheduled actions for this plant.</p>
+            ) : (
+              <div className={sharedStyles.stack}>
+                {cockpit.derived.scheduled_upcoming.map((item, index) => (
+                  <div className={styles.activityRow} key={`${item.title}-${item.date}-${index}`}>
+                    <Tag size={16} />
+                    <span>
+                      {item.title} ({formatScheduleSlot(item.date, item.timeframe, item.exact_time)})
+                    </span>
+                    {item.blocked_reasons.map((reason) => (
+                      <span className={sharedStyles.badgeWarn} key={reason}>
+                        {reason}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+            {scheduleHref ? (
+              <div className={sharedStyles.actions}>
+                <Link className={sharedStyles.buttonSecondary} href={scheduleHref}>
+                  Open Schedule
+                </Link>
+              </div>
+            ) : null}
           </SectionCard>
 
           <StickyActionBar>
