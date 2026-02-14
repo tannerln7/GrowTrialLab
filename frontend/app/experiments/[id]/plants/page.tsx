@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, backendUrl, normalizeBackendError } from "@/lib/backend";
+import { suggestPlantId } from "@/lib/id-suggestions";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
@@ -51,6 +52,17 @@ export default function ExperimentPlantsPage() {
 
   const [csvText, setCsvText] = useState("");
   const [csvFile, setCsvFile] = useState<File | null>(null);
+
+  const suggestedPlantId = useMemo(
+    () => suggestPlantId(plants.map((plant) => plant.plant_id).filter((id) => id), manualCategory),
+    [manualCategory, plants],
+  );
+
+  useEffect(() => {
+    if (!manualPlantId.trim()) {
+      setManualPlantId(suggestedPlantId);
+    }
+  }, [manualPlantId, suggestedPlantId]);
 
   const loadPlants = useCallback(async () => {
     const response = await backendFetch(`/api/v1/experiments/${experimentId}/plants/`);
@@ -144,7 +156,10 @@ export default function ExperimentPlantsPage() {
         });
 
         if (!response.ok) {
-          const payload = (await response.json()) as { detail?: string };
+          const payload = (await response.json()) as { detail?: string; suggested_plant_id?: string };
+          if (payload.suggested_plant_id) {
+            setManualPlantId(payload.suggested_plant_id);
+          }
           setError(payload.detail || "Unable to add plant.");
           return;
         }
@@ -323,7 +338,7 @@ export default function ExperimentPlantsPage() {
               className={styles.input}
               value={manualPlantId}
               onChange={(event) => setManualPlantId(event.target.value)}
-              placeholder="NP-001"
+              placeholder={suggestedPlantId}
             />
           </label>
           <label className={styles.field}>

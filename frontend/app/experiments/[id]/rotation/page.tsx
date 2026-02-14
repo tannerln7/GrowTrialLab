@@ -21,6 +21,7 @@ type RotationTray = {
   tray_name: string;
   current_block_id: string | null;
   current_block_name: string | null;
+  current_tent_name: string | null;
   plant_count: number;
 };
 
@@ -43,15 +44,30 @@ type BlockOption = {
   id: string;
   name: string;
   label: string;
+  allowedSpeciesIds: Set<string> | null;
 };
 
 type TentResponse = {
   id: string;
   name: string;
   code: string;
+  allowed_species: Array<{
+    id: string;
+  }>;
   blocks: Array<{
     id: string;
     name: string;
+  }>;
+};
+
+type PlacementSummary = {
+  trays: Array<{
+    tray_id: string;
+    plants: Array<{
+      species_id: string;
+      species_name: string;
+      species_category: string;
+    }>;
   }>;
 };
 
@@ -85,17 +101,37 @@ export default function RotationPage() {
   const [statusSummary, setStatusSummary] = useState<ExperimentStatusSummary | null>(null);
   const [summary, setSummary] = useState<RotationSummary | null>(null);
   const [blocks, setBlocks] = useState<BlockOption[]>([]);
+  const [traySpeciesById, setTraySpeciesById] = useState<Record<string, string[]>>({});
   const [selectedTrayId, setSelectedTrayId] = useState("");
   const [selectedToBlockId, setSelectedToBlockId] = useState("");
   const [note, setNote] = useState("");
 
   const running = statusSummary?.lifecycle.state === "running";
 
+  const compatibleBlocksForSelectedTray = useMemo(() => {
+    if (!selectedTrayId) {
+      return blocks;
+    }
+    const speciesIds = traySpeciesById[selectedTrayId] || [];
+    if (speciesIds.length === 0) {
+      return blocks;
+    }
+    return blocks.filter((block) => {
+      if (block.allowedSpeciesIds === null) {
+        return true;
+      }
+      return speciesIds.every((speciesId) => block.allowedSpeciesIds?.has(speciesId));
+    });
+  }, [blocks, selectedTrayId, traySpeciesById]);
+
+  const selectedTrayBlocked = selectedTrayId !== "" && compatibleBlocksForSelectedTray.length === 0;
+
   const loadSummary = useCallback(async () => {
-    const [statusResponse, rotationResponse, tentsResponse] = await Promise.all([
+    const [statusResponse, rotationResponse, tentsResponse, placementResponse] = await Promise.all([
       fetchExperimentStatusSummary(experimentId),
       backendFetch(`/api/v1/experiments/${experimentId}/rotation/summary`),
       backendFetch(`/api/v1/experiments/${experimentId}/tents`),
+      backendFetch(`/api/v1/experiments/${experimentId}/placement/summary`),
     ]);
     if (!statusResponse) {
       throw new Error("Unable to load experiment status.");
@@ -106,15 +142,28 @@ export default function RotationPage() {
     if (!tentsResponse.ok) {
       throw new Error("Unable to load tents.");
     }
+    if (!placementResponse.ok) {
+      throw new Error("Unable to load placement summary.");
+    }
     setStatusSummary(statusResponse);
     setSummary((await rotationResponse.json()) as RotationSummary);
     const tents = (await tentsResponse.json()) as TentResponse[];
+    const placementPayload = (await placementResponse.json()) as PlacementSummary;
+    const nextTraySpeciesById: Record<string, string[]> = {};
+    for (const tray of placementPayload.trays) {
+      nextTraySpeciesById[tray.tray_id] = Array.from(new Set(tray.plants.map((plant) => plant.species_id)));
+    }
+    setTraySpeciesById(nextTraySpeciesById);
     setBlocks(
       tents.flatMap((tent) =>
         tent.blocks.map((block) => ({
           id: block.id,
           name: block.name,
           label: `${tent.name} / ${block.name}`,
+          allowedSpeciesIds:
+            tent.allowed_species.length === 0
+              ? null
+              : new Set(tent.allowed_species.map((species) => species.id)),
         })),
       ),
     );
@@ -163,6 +212,14 @@ export default function RotationPage() {
   async function submitLogMove() {
     if (!selectedTrayId) {
       setError("Select a tray first.");
+      return;
+    }
+    if (selectedToBlockId && !compatibleBlocksForSelectedTray.some((block) => block.id === selectedToBlockId)) {
+      setError("Selected destination block is not compatible with this tray's plants.");
+      return;
+    }
+    if (selectedTrayBlocked) {
+      setError("No compatible destination blocks for this tray.");
       return;
     }
 
@@ -270,12 +327,18 @@ export default function RotationPage() {
                   onChange={(event) => setSelectedToBlockId(event.target.value)}
                 >
                   <option value="">None / Unassigned</option>
-                  {blocks.map((block) => (
+                  {compatibleBlocksForSelectedTray.map((block) => (
                     <option key={block.id} value={block.id}>
                       {block.label}
                     </option>
                   ))}
                 </select>
+                {selectedTrayBlocked ? (
+                  <p className={styles.inlineNote}>
+                    No compatible destination blocks for this tray. This tray contains plants not allowed in restricted tents.
+                    <Link href={`/experiments/${experimentId}/slots`}> Adjust tent restrictions</Link>.
+                  </p>
+                ) : null}
               </label>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Note (optional)</span>
@@ -288,7 +351,7 @@ export default function RotationPage() {
               <button
                 className={styles.buttonPrimary}
                 type="button"
-                disabled={saving || !selectedTrayId}
+                disabled={saving || !selectedTrayId || selectedTrayBlocked}
                 onClick={() => void submitLogMove()}
               >
                 {saving ? "Logging..." : "Log move"}
@@ -308,7 +371,10 @@ export default function RotationPage() {
                 {
                   key: "block",
                   label: "Current Block",
-                  render: (tray) => tray.current_block_name || "Unassigned",
+                  render: (tray) =>
+                    tray.current_block_name
+                      ? `${tray.current_tent_name || "Tent"} / ${tray.current_block_name}`
+                      : "Unassigned",
                 },
                 { key: "count", label: "Plants", render: (tray) => tray.plant_count },
                 {
@@ -320,7 +386,7 @@ export default function RotationPage() {
                       type="button"
                       onClick={() => {
                         setSelectedTrayId(tray.tray_id);
-                        setSelectedToBlockId(tray.current_block_id || "");
+                        setSelectedToBlockId("");
                       }}
                     >
                       Move
@@ -341,7 +407,7 @@ export default function RotationPage() {
                     type="button"
                     onClick={() => {
                       setSelectedTrayId(tray.tray_id);
-                      setSelectedToBlockId(tray.current_block_id || "");
+                      setSelectedToBlockId("");
                     }}
                   >
                     Move

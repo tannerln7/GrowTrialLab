@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { suggestBlockName, suggestTentCode, suggestTentName } from "@/lib/id-suggestions";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
@@ -67,6 +68,15 @@ export default function ExperimentSlotsPage() {
     return species.filter((item) => item.name.toLowerCase().includes(q));
   }, [species, speciesSearch]);
 
+  const tentNameSuggestion = useMemo(
+    () => suggestTentName(tents.map((item) => item.name)),
+    [tents],
+  );
+  const tentCodeSuggestion = useMemo(
+    () => suggestTentCode(tents.map((item) => item.code)),
+    [tents],
+  );
+
   const loadData = useCallback(async () => {
     const [tentsResponse, speciesResponse] = await Promise.all([
       backendFetch(`/api/v1/experiments/${experimentId}/tents`),
@@ -115,8 +125,22 @@ export default function ExperimentSlotsPage() {
     void load();
   }, [experimentId, loadData]);
 
-  async function createTent() {
+  useEffect(() => {
     if (!newTentName.trim()) {
+      setNewTentName(tentNameSuggestion);
+    }
+  }, [newTentName, tentNameSuggestion]);
+
+  useEffect(() => {
+    if (!newTentCode.trim()) {
+      setNewTentCode(tentCodeSuggestion);
+    }
+  }, [newTentCode, tentCodeSuggestion]);
+
+  async function createTent() {
+    const tentName = newTentName.trim() || tentNameSuggestion;
+    const tentCode = newTentCode.trim() || tentCodeSuggestion;
+    if (!tentName) {
       setError("Tent name is required.");
       return;
     }
@@ -128,13 +152,23 @@ export default function ExperimentSlotsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: newTentName.trim(),
-          code: newTentCode.trim(),
+          name: tentName,
+          code: tentCode,
           allowed_species: [],
         }),
       });
-      const payload = (await response.json()) as { detail?: string };
+      const payload = (await response.json()) as {
+        detail?: string;
+        suggested_name?: string;
+        suggested_code?: string;
+      };
       if (!response.ok) {
+        if (payload.suggested_name) {
+          setNewTentName(payload.suggested_name);
+        }
+        if (payload.suggested_code) {
+          setNewTentCode(payload.suggested_code);
+        }
         setError(payload.detail || "Unable to create tent.");
         return;
       }
@@ -239,7 +273,9 @@ export default function ExperimentSlotsPage() {
   }
 
   async function createBlock(tentId: string) {
-    const blockName = (newBlockNameByTent[tentId] || "").trim();
+    const tent = tents.find((item) => item.id === tentId);
+    const suggestedName = suggestBlockName(tent?.blocks.map((item) => item.name) || []);
+    const blockName = (newBlockNameByTent[tentId] || suggestedName).trim();
     if (!blockName) {
       setError("Block name is required.");
       return;
@@ -256,13 +292,20 @@ export default function ExperimentSlotsPage() {
           description: (newBlockDescByTent[tentId] || "").trim(),
         }),
       });
-      const payload = (await response.json()) as { detail?: string };
+      const payload = (await response.json()) as { detail?: string; suggested_name?: string };
       if (!response.ok) {
+        if (payload.suggested_name) {
+          setNewBlockNameByTent((current) => ({ ...current, [tentId]: payload.suggested_name || "" }));
+        }
         setError(payload.detail || "Unable to create block.");
         return;
       }
       setNotice("Block created.");
-      setNewBlockNameByTent((current) => ({ ...current, [tentId]: "" }));
+      setNewBlockNameByTent((current) => {
+        const next = { ...current };
+        delete next[tentId];
+        return next;
+      });
       setNewBlockDescByTent((current) => ({ ...current, [tentId]: "" }));
       await loadData();
     } catch (requestError) {
@@ -363,7 +406,7 @@ export default function ExperimentSlotsPage() {
               className={styles.input}
               value={newTentName}
               onChange={(event) => setNewTentName(event.target.value)}
-              placeholder="Tent 1"
+              placeholder={tentNameSuggestion}
             />
           </label>
           <label className={styles.field}>
@@ -372,7 +415,7 @@ export default function ExperimentSlotsPage() {
               className={styles.input}
               value={newTentCode}
               onChange={(event) => setNewTentCode(event.target.value)}
-              placeholder="T1"
+              placeholder={tentCodeSuggestion}
             />
           </label>
           <button className={styles.buttonPrimary} type="button" disabled={saving} onClick={() => void createTent()}>
@@ -483,8 +526,11 @@ export default function ExperimentSlotsPage() {
                     <span className={styles.fieldLabel}>New block name</span>
                     <input
                       className={styles.input}
-                      value={newBlockNameByTent[tent.id] || ""}
-                      placeholder="B1"
+                      value={
+                        newBlockNameByTent[tent.id] ??
+                        suggestBlockName(tent.blocks.map((item) => item.name))
+                      }
+                      placeholder={suggestBlockName(tent.blocks.map((item) => item.name))}
                       onChange={(event) =>
                         setNewBlockNameByTent((current) => ({ ...current, [tent.id]: event.target.value }))
                       }

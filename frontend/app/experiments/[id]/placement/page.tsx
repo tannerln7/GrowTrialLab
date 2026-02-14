@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { suggestTrayName } from "@/lib/id-suggestions";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
@@ -19,7 +20,9 @@ import styles from "../../experiments.module.css";
 type PlacementPlant = {
   uuid: string;
   plant_id: string;
+  species_id: string;
   species_name: string;
+  species_category: string;
   bin: string | null;
   status: string;
 };
@@ -28,7 +31,9 @@ type TrayPlant = {
   tray_plant_id: string;
   uuid: string;
   plant_id: string;
+  species_id: string;
   species_name: string;
+  species_category: string;
   bin: string | null;
   status: string;
   assigned_recipe_code: string | null;
@@ -45,6 +50,8 @@ type PlacementTray = {
   assigned_recipe_id: string | null;
   assigned_recipe_code: string | null;
   assigned_recipe_name: string | null;
+  capacity: number;
+  current_count: number;
   placed_count: number;
   plants: TrayPlant[];
 };
@@ -75,6 +82,8 @@ type PlacementSummary = {
   unplaced_trays: Array<{
     tray_id: string;
     tray_name: string;
+    capacity: number;
+    current_count: number;
     assigned_recipe_id: string | null;
     assigned_recipe_code: string | null;
   }>;
@@ -82,6 +91,9 @@ type PlacementSummary = {
 
 type BlockOption = {
   id: string;
+  tentId: string;
+  tentName: string;
+  allowedSpeciesIds: Set<string> | null;
   name: string;
   label: string;
 };
@@ -92,8 +104,31 @@ type RecipeOption = {
   name: string;
 };
 
+type AutoPlaceDiagnostics = {
+  remaining_unplaced_plants: number;
+  reason_counts?: Record<string, number>;
+  unplaceable_plants?: Array<{
+    uuid: string;
+    plant_id: string;
+    species_name: string;
+    species_category: string;
+    reason: string;
+  }>;
+};
+
 const RUNNING_LOCK_MESSAGE =
   "Placement cannot be edited while the experiment is running. Stop the experiment to change placement.";
+
+const AUTO_PLACE_REASON_LABELS: Record<string, string> = {
+  no_compatible_trays: "No compatible trays",
+  compatible_trays_full: "Compatible trays are full",
+  restriction_conflict: "Tent restriction conflict",
+  no_tented_blocks: "No tent blocks available",
+};
+
+function formatAutoPlaceReason(reason: string): string {
+  return AUTO_PLACE_REASON_LABELS[reason] || reason;
+}
 
 export default function PlacementPage() {
   const params = useParams();
@@ -118,14 +153,21 @@ export default function PlacementPage() {
   const [summary, setSummary] = useState<PlacementSummary | null>(null);
   const [blocks, setBlocks] = useState<BlockOption[]>([]);
   const [recipes, setRecipes] = useState<RecipeOption[]>([]);
+  const [autoPlaceDiagnostics, setAutoPlaceDiagnostics] = useState<AutoPlaceDiagnostics | null>(null);
   const [expandedTrays, setExpandedTrays] = useState<Record<string, boolean>>({});
   const [traySelectionByPlant, setTraySelectionByPlant] = useState<Record<string, string>>({});
   const [blockSelectionByTray, setBlockSelectionByTray] = useState<Record<string, string>>({});
   const [newTrayName, setNewTrayName] = useState("");
   const [newTrayBlockId, setNewTrayBlockId] = useState("");
   const [newTrayRecipeId, setNewTrayRecipeId] = useState("");
+  const [newTrayCapacity, setNewTrayCapacity] = useState(1);
 
   const placementLocked = statusSummary?.lifecycle.state === "running";
+
+  const trayNameSuggestion = useMemo(
+    () => suggestTrayName((summary?.trays || []).map((tray) => tray.tray_name)),
+    [summary?.trays],
+  );
 
   const loadPlacement = useCallback(async () => {
     const [summaryResponse, recipesResponse] = await Promise.all([
@@ -145,6 +187,12 @@ export default function PlacementPage() {
       summaryPayload.tents.flatMap((tent) =>
         tent.blocks.map((block) => ({
           id: block.block_id,
+          tentId: tent.tent_id,
+          tentName: tent.name,
+          allowedSpeciesIds:
+            tent.allowed_species.length === 0
+              ? null
+              : new Set(tent.allowed_species.map((species) => species.id)),
           name: block.name,
           label: `${tent.name} / ${block.name}`,
         })),
@@ -153,6 +201,82 @@ export default function PlacementPage() {
     setRecipes(unwrapList<RecipeOption>(recipesPayload));
     return summaryPayload;
   }, [experimentId]);
+
+  useEffect(() => {
+    if (!newTrayName.trim() && trayNameSuggestion) {
+      setNewTrayName(trayNameSuggestion);
+    }
+  }, [newTrayName, trayNameSuggestion]);
+
+  const trayById = useMemo(() => {
+    const map = new Map<string, PlacementTray>();
+    for (const tray of summary?.trays || []) {
+      map.set(tray.tray_id, tray);
+    }
+    return map;
+  }, [summary?.trays]);
+
+  const blockById = useMemo(() => {
+    const map = new Map<string, BlockOption>();
+    for (const block of blocks) {
+      map.set(block.id, block);
+    }
+    return map;
+  }, [blocks]);
+
+  const hasTentedBlocks = blocks.length > 0;
+
+  const speciesAllowedByBlock = useCallback(
+    (speciesId: string, blockId: string | null): boolean => {
+      if (!blockId) {
+        return true;
+      }
+      const block = blockById.get(blockId);
+      if (!block) {
+        return false;
+      }
+      if (block.allowedSpeciesIds === null) {
+        return true;
+      }
+      return block.allowedSpeciesIds.has(speciesId);
+    },
+    [blockById],
+  );
+
+  const trayRemainingCapacity = useCallback(
+    (tray: PlacementTray): number => Math.max(0, tray.capacity - tray.current_count),
+    [],
+  );
+
+  const compatibleBlockIdsByTray = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const tray of summary?.trays || []) {
+      const compatible = blocks
+        .filter((block) =>
+          tray.plants.every((plant) => speciesAllowedByBlock(plant.species_id, block.id)),
+        )
+        .map((block) => block.id);
+      map.set(tray.tray_id, compatible);
+    }
+    return map;
+  }, [blocks, summary?.trays, speciesAllowedByBlock]);
+
+  const compatibleTrayIdsByPlant = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const plant of summary?.unplaced_plants || []) {
+      const compatible = (summary?.trays || [])
+        .filter((tray) => trayRemainingCapacity(tray) > 0)
+        .filter((tray) => {
+          if (!tray.block_id) {
+            return true;
+          }
+          return speciesAllowedByBlock(plant.species_id, tray.block_id);
+        })
+        .map((tray) => tray.tray_id);
+      map.set(plant.uuid, compatible);
+    }
+    return map;
+  }, [summary?.trays, summary?.unplaced_plants, speciesAllowedByBlock, trayRemainingCapacity]);
 
   useEffect(() => {
     async function load() {
@@ -198,31 +322,42 @@ export default function PlacementPage() {
       setError(RUNNING_LOCK_MESSAGE);
       return;
     }
-    if (!newTrayName.trim()) {
+    const trayName = newTrayName.trim() || trayNameSuggestion;
+    if (!trayName) {
       setError("Tray name is required.");
+      return;
+    }
+    if (newTrayCapacity < 1) {
+      setError("Tray capacity must be at least 1.");
       return;
     }
     setSaving(true);
     setError("");
     setNotice("");
+    setAutoPlaceDiagnostics(null);
     try {
       const response = await backendFetch(`/api/v1/experiments/${experimentId}/trays`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: newTrayName.trim(),
+          name: trayName,
           block_id: newTrayBlockId || null,
           assigned_recipe_id: newTrayRecipeId || null,
+          capacity: newTrayCapacity,
         }),
       });
       if (!response.ok) {
-        const payload = (await response.json()) as { detail?: string };
+        const payload = (await response.json()) as { detail?: string; suggested_name?: string };
+        if (payload.suggested_name) {
+          setNewTrayName(payload.suggested_name);
+        }
         setError(payload.detail || "Unable to create tray.");
         return;
       }
       setNewTrayName("");
       setNewTrayBlockId("");
       setNewTrayRecipeId("");
+      setNewTrayCapacity(1);
       setNotice("Tray created.");
       await loadPlacement();
     } catch (requestError) {
@@ -244,6 +379,7 @@ export default function PlacementPage() {
     setSaving(true);
     setError("");
     setNotice("");
+    setAutoPlaceDiagnostics(null);
     try {
       const response = await backendFetch(`/api/v1/trays/${tray.tray_id}/`, {
         method: "PATCH",
@@ -252,6 +388,7 @@ export default function PlacementPage() {
           name: tray.tray_name,
           block: tray.block_id || null,
           assigned_recipe: tray.assigned_recipe_id || null,
+          capacity: tray.capacity,
         }),
       });
       if (!response.ok) {
@@ -282,9 +419,15 @@ export default function PlacementPage() {
       setError("Select a tray first.");
       return;
     }
+    const compatibleTrayIds = compatibleTrayIdsByPlant.get(plantUuid) || [];
+    if (!compatibleTrayIds.includes(trayId)) {
+      setError("Selected tray is not compatible for this plant under current tent restrictions/capacity.");
+      return;
+    }
     setSaving(true);
     setError("");
     setNotice("");
+    setAutoPlaceDiagnostics(null);
     try {
       const response = await backendFetch(`/api/v1/trays/${trayId}/plants`, {
         method: "POST",
@@ -324,9 +467,15 @@ export default function PlacementPage() {
       setError("Select a destination block for the tray.");
       return;
     }
+    const compatibleBlocks = compatibleBlockIdsByTray.get(trayId) || [];
+    if (!compatibleBlocks.includes(blockId)) {
+      setError("Selected block is not compatible with this tray's plants.");
+      return;
+    }
     setSaving(true);
     setError("");
     setNotice("");
+    setAutoPlaceDiagnostics(null);
     try {
       const response = await backendFetch(`/api/v1/trays/${trayId}/`, {
         method: "PATCH",
@@ -359,6 +508,7 @@ export default function PlacementPage() {
     setSaving(true);
     setError("");
     setNotice("");
+    setAutoPlaceDiagnostics(null);
     try {
       const response = await backendFetch(`/api/v1/trays/${trayId}/plants/${trayPlantId}`, {
         method: "DELETE",
@@ -389,6 +539,7 @@ export default function PlacementPage() {
     setSaving(true);
     setError("");
     setNotice("");
+    setAutoPlaceDiagnostics(null);
     try {
       const response = await backendFetch(`/api/v1/experiments/${experimentId}/placement/auto`, {
         method: "POST",
@@ -398,8 +549,21 @@ export default function PlacementPage() {
           clear_existing: true,
         }),
       });
-      const payload = (await response.json()) as { detail?: string; placed_count?: number };
+      const payload = (await response.json()) as {
+        detail?: string;
+        placed_count?: number;
+        remaining_unplaced_plants?: number;
+        reason_counts?: Record<string, number>;
+        unplaceable_plants?: AutoPlaceDiagnostics["unplaceable_plants"];
+      };
       if (!response.ok) {
+        if (response.status === 409 && typeof payload.remaining_unplaced_plants === "number") {
+          setAutoPlaceDiagnostics({
+            remaining_unplaced_plants: payload.remaining_unplaced_plants,
+            reason_counts: payload.reason_counts,
+            unplaceable_plants: payload.unplaceable_plants,
+          });
+        }
         setError(payload.detail || "Unable to auto-place plants.");
         return;
       }
@@ -464,6 +628,46 @@ export default function PlacementPage() {
                 Auto-place (balance by bin)
               </button>
             </div>
+            {autoPlaceDiagnostics ? (
+              <article className={styles.blockRow}>
+                <strong>Could not auto-place everything</strong>
+                <p className={styles.mutedText}>
+                  Remaining unplaced plants: {autoPlaceDiagnostics.remaining_unplaced_plants}
+                </p>
+                {autoPlaceDiagnostics.reason_counts ? (
+                  <div className={styles.badgeRow}>
+                    {Object.entries(autoPlaceDiagnostics.reason_counts).map(([reason, count]) => (
+                      <span className={styles.badgeWarn} key={reason}>
+                        {formatAutoPlaceReason(reason)}: {count}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {autoPlaceDiagnostics.unplaceable_plants?.length ? (
+                  <div className={styles.stack}>
+                    {autoPlaceDiagnostics.unplaceable_plants.slice(0, 10).map((plant) => (
+                      <span className={styles.mutedText} key={plant.uuid}>
+                        {plant.plant_id || "(pending)"} - {plant.species_name} ({formatAutoPlaceReason(plant.reason)})
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                <div className={styles.actions}>
+                  <a className={styles.buttonSecondary} href="#trays">
+                    Create tray
+                  </a>
+                  <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/slots`}>
+                    Create tent blocks
+                  </Link>
+                  <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/slots`}>
+                    Change tent restriction
+                  </Link>
+                  <a className={styles.buttonSecondary} href="#trays">
+                    Add capacity
+                  </a>
+                </div>
+              </article>
+            ) : null}
             <ResponsiveList
               items={summary.unplaced_plants}
               getKey={(plant) => plant.uuid}
@@ -480,76 +684,102 @@ export default function PlacementPage() {
                 {
                   key: "action",
                   label: "Action",
-                  render: (plant) => (
-                    <div className={styles.actions}>
-                      <select
-                        className={styles.select}
-                        value={traySelectionByPlant[plant.uuid] || ""}
-                        onChange={(event) =>
-                          setTraySelectionByPlant((current) => ({
-                            ...current,
-                            [plant.uuid]: event.target.value,
-                          }))
-                        }
-                        disabled={saving || placementLocked}
-                      >
-                        <option value="">Select tray</option>
-                        {summary.trays.map((tray) => (
-                          <option key={tray.tray_id} value={tray.tray_id}>
-                            {tray.tent_name ? `${tray.tray_name} (${tray.tent_name})` : tray.tray_name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        className={styles.buttonSecondary}
-                        type="button"
-                        disabled={saving || placementLocked || summary.trays.length === 0}
-                        onClick={() => void addPlantToTray(plant.uuid)}
-                      >
-                        Add to tray
-                      </button>
-                    </div>
-                  ),
+                  render: (plant) => {
+                    const compatibleTrayIds = compatibleTrayIdsByPlant.get(plant.uuid) || [];
+                    const compatibleTrays = summary.trays.filter((tray) => compatibleTrayIds.includes(tray.tray_id));
+                    const selectedTray = trayById.get(traySelectionByPlant[plant.uuid] || "");
+                    return (
+                      <div className={styles.actions}>
+                        <select
+                          className={styles.select}
+                          value={traySelectionByPlant[plant.uuid] || ""}
+                          onChange={(event) =>
+                            setTraySelectionByPlant((current) => ({
+                              ...current,
+                              [plant.uuid]: event.target.value,
+                            }))
+                          }
+                          disabled={saving || placementLocked || compatibleTrays.length === 0}
+                        >
+                          <option value="">Select tray</option>
+                          {compatibleTrays.map((tray) => (
+                            <option key={tray.tray_id} value={tray.tray_id}>
+                              {tray.tent_name ? `${tray.tray_name} (${tray.tent_name})` : tray.tray_name} ({tray.current_count}/{tray.capacity})
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className={styles.buttonSecondary}
+                          type="button"
+                          disabled={saving || placementLocked || compatibleTrays.length === 0}
+                          onClick={() => void addPlantToTray(plant.uuid)}
+                        >
+                          Add to tray
+                        </button>
+                        {compatibleTrays.length === 0 ? (
+                          <span className={styles.inlineNote}>Not allowed by tent restriction or all compatible trays are full.</span>
+                        ) : null}
+                        {selectedTray?.block_id ? (
+                          <span className={styles.inlineNote}>
+                            Filtered by Tent {selectedTray.tent_name || selectedTray.block_name} restrictions.
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  },
                 },
               ]}
-              renderMobileCard={(plant) => (
-                <div className={styles.cardKeyValue}>
-                  <span>Plant ID</span>
-                  <strong>
-                    <Link href={`/p/${plant.uuid}`}>{plant.plant_id || "(pending)"}</Link>
-                  </strong>
-                  <span>Species</span>
-                  <strong>{plant.species_name}</strong>
-                  <span>Bin</span>
-                  <strong>{plant.bin || "Missing"}</strong>
-                  <select
-                    className={styles.select}
-                    value={traySelectionByPlant[plant.uuid] || ""}
-                    onChange={(event) =>
-                      setTraySelectionByPlant((current) => ({
-                        ...current,
-                        [plant.uuid]: event.target.value,
-                      }))
-                    }
-                    disabled={saving || placementLocked}
-                  >
-                    <option value="">Select tray</option>
-                    {summary.trays.map((tray) => (
-                      <option key={tray.tray_id} value={tray.tray_id}>
-                        {tray.tent_name ? `${tray.tray_name} (${tray.tent_name})` : tray.tray_name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    className={styles.buttonSecondary}
-                    type="button"
-                    disabled={saving || placementLocked || summary.trays.length === 0}
-                    onClick={() => void addPlantToTray(plant.uuid)}
-                  >
-                    Add to tray
-                  </button>
-                </div>
-              )}
+              renderMobileCard={(plant) => {
+                const compatibleTrayIds = compatibleTrayIdsByPlant.get(plant.uuid) || [];
+                const compatibleTrays = summary.trays.filter((tray) => compatibleTrayIds.includes(tray.tray_id));
+                const selectedTray = trayById.get(traySelectionByPlant[plant.uuid] || "");
+                return (
+                  <div className={styles.cardKeyValue}>
+                    <span>Plant ID</span>
+                    <strong>
+                      <Link href={`/p/${plant.uuid}`}>{plant.plant_id || "(pending)"}</Link>
+                    </strong>
+                    <span>Species</span>
+                    <strong>{plant.species_name}</strong>
+                    <span>Bin</span>
+                    <strong>{plant.bin || "Missing"}</strong>
+                    <select
+                      className={styles.select}
+                      value={traySelectionByPlant[plant.uuid] || ""}
+                      onChange={(event) =>
+                        setTraySelectionByPlant((current) => ({
+                          ...current,
+                          [plant.uuid]: event.target.value,
+                        }))
+                      }
+                      disabled={saving || placementLocked || compatibleTrays.length === 0}
+                    >
+                      <option value="">Select tray</option>
+                      {compatibleTrays.map((tray) => (
+                        <option key={tray.tray_id} value={tray.tray_id}>
+                          {tray.tent_name ? `${tray.tray_name} (${tray.tent_name})` : tray.tray_name} ({tray.current_count}/{tray.capacity})
+                        </option>
+                      ))}
+                    </select>
+                    {compatibleTrays.length === 0 ? (
+                      <span className={styles.inlineNote}>Not allowed by tent restriction or all compatible trays are full.</span>
+                    ) : null}
+                    {selectedTray?.block_id ? (
+                      <span className={styles.inlineNote}>
+                        Filtered by Tent {selectedTray.tent_name || selectedTray.block_name} restrictions.
+                      </span>
+                    ) : null}
+                    <button
+                      className={styles.buttonSecondary}
+                      type="button"
+                      disabled={saving || placementLocked || compatibleTrays.length === 0}
+                      onClick={() => void addPlantToTray(plant.uuid)}
+                    >
+                      Add to tray
+                    </button>
+                  </div>
+                );
+              }}
               emptyState={
                 <p className={styles.mutedText}>
                   {summary.unplaced_plants_count === 0
@@ -617,6 +847,15 @@ export default function PlacementPage() {
           </SectionCard>
 
           <SectionCard title="Unplaced Trays">
+            {summary.unplaced_trays.length > 0 && !hasTentedBlocks ? (
+              <article className={styles.blockRow}>
+                <strong>No tent blocks available.</strong>
+                <p className={styles.inlineNote}>Create at least one tent block before placing trays.</p>
+                <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/slots`}>
+                  Create tent blocks
+                </Link>
+              </article>
+            ) : null}
             {summary.unplaced_trays.length === 0 ? (
               <p className={styles.mutedText}>All trays are placed in blocks.</p>
             ) : (
@@ -626,6 +865,11 @@ export default function PlacementPage() {
                 columns={[
                   { key: "tray", label: "Tray", render: (tray) => tray.tray_name },
                   {
+                    key: "occupancy",
+                    label: "Occupancy",
+                    render: (tray) => `${tray.current_count}/${tray.capacity}`,
+                  },
+                  {
                     key: "recipe",
                     label: "Tray recipe",
                     render: (tray) => tray.assigned_recipe_code || "Missing",
@@ -633,83 +877,152 @@ export default function PlacementPage() {
                   {
                     key: "target",
                     label: "Destination block",
-                    render: (tray) => (
-                      <div className={styles.actions}>
-                        <select
-                          className={styles.select}
-                          value={blockSelectionByTray[tray.tray_id] || ""}
-                          onChange={(event) =>
-                            setBlockSelectionByTray((current) => ({
-                              ...current,
-                              [tray.tray_id]: event.target.value,
-                            }))
-                          }
-                        >
-                          <option value="">Select block</option>
-                          {blocks.map((block) => (
-                            <option key={block.id} value={block.id}>
-                              {block.label}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          className={styles.buttonSecondary}
-                          type="button"
-                          disabled={saving || placementLocked}
-                          onClick={() => void placeTrayIntoBlock(tray.tray_id)}
-                        >
-                          Place tray
-                        </button>
-                      </div>
-                    ),
+                    render: (tray) => {
+                      const trayDetail = trayById.get(tray.tray_id);
+                      const compatibleBlocks = blocks.filter((block) =>
+                        (compatibleBlockIdsByTray.get(tray.tray_id) || []).includes(block.id),
+                      );
+                      return (
+                        <div className={styles.actions}>
+                          <select
+                            className={styles.select}
+                            value={blockSelectionByTray[tray.tray_id] || ""}
+                            onChange={(event) =>
+                              setBlockSelectionByTray((current) => ({
+                                ...current,
+                                [tray.tray_id]: event.target.value,
+                              }))
+                            }
+                            disabled={compatibleBlocks.length === 0}
+                          >
+                            <option value="">Select block</option>
+                            {compatibleBlocks.map((block) => (
+                              <option key={block.id} value={block.id}>
+                                {block.label}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            className={styles.buttonSecondary}
+                            type="button"
+                            disabled={saving || placementLocked || compatibleBlocks.length === 0}
+                            onClick={() => void placeTrayIntoBlock(tray.tray_id)}
+                          >
+                            Place tray
+                          </button>
+                          {compatibleBlocks.length === 0 ? (
+                            <span className={styles.inlineNote}>
+                              No compatible destination blocks for this tray. This tray contains plants not allowed in restricted tents.
+                              <Link href={`/experiments/${experimentId}/slots`}> Adjust tent restrictions</Link>.
+                              {trayDetail?.plants.length
+                                ? ` Offending species: ${Array.from(
+                                    new Set(trayDetail.plants.map((item) => item.species_name)),
+                                  )
+                                    .slice(0, 3)
+                                    .join(", ")}.`
+                                : ""}
+                            </span>
+                          ) : null}
+                        </div>
+                      );
+                    },
                   },
                 ]}
-                renderMobileCard={(tray) => (
-                  <div className={styles.cardKeyValue}>
-                    <span>Tray</span>
-                    <strong>{tray.tray_name}</strong>
-                    <span>Tray recipe</span>
-                    <strong>{tray.assigned_recipe_code || "Missing"}</strong>
-                    <select
-                      className={styles.select}
-                      value={blockSelectionByTray[tray.tray_id] || ""}
-                      onChange={(event) =>
-                        setBlockSelectionByTray((current) => ({
-                          ...current,
-                          [tray.tray_id]: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">Select block</option>
-                      {blocks.map((block) => (
-                        <option key={block.id} value={block.id}>
-                          {block.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      className={styles.buttonSecondary}
-                      type="button"
-                      disabled={saving || placementLocked}
-                      onClick={() => void placeTrayIntoBlock(tray.tray_id)}
-                    >
-                      Place tray
-                    </button>
-                  </div>
-                )}
+                renderMobileCard={(tray) => {
+                  const trayDetail = trayById.get(tray.tray_id);
+                  const compatibleBlocks = blocks.filter((block) =>
+                    (compatibleBlockIdsByTray.get(tray.tray_id) || []).includes(block.id),
+                  );
+                  return (
+                    <div className={styles.cardKeyValue}>
+                      <span>Tray</span>
+                      <strong>{tray.tray_name}</strong>
+                      <span>Occupancy</span>
+                      <strong>{tray.current_count}/{tray.capacity}</strong>
+                      <span>Tray recipe</span>
+                      <strong>{tray.assigned_recipe_code || "Missing"}</strong>
+                      <select
+                        className={styles.select}
+                        value={blockSelectionByTray[tray.tray_id] || ""}
+                        onChange={(event) =>
+                          setBlockSelectionByTray((current) => ({
+                            ...current,
+                            [tray.tray_id]: event.target.value,
+                          }))
+                        }
+                        disabled={compatibleBlocks.length === 0}
+                      >
+                        <option value="">Select block</option>
+                        {compatibleBlocks.map((block) => (
+                          <option key={block.id} value={block.id}>
+                            {block.label}
+                          </option>
+                        ))}
+                      </select>
+                      {compatibleBlocks.length === 0 ? (
+                        <span className={styles.inlineNote}>
+                          No compatible destination blocks for this tray.
+                          <Link href={`/experiments/${experimentId}/slots`}> Adjust tent restrictions</Link>.
+                          {trayDetail?.plants.length
+                            ? ` Offending species: ${Array.from(
+                                new Set(trayDetail.plants.map((item) => item.species_name)),
+                              )
+                                .slice(0, 3)
+                                .join(", ")}.`
+                            : ""}
+                        </span>
+                      ) : null}
+                      <button
+                        className={styles.buttonSecondary}
+                        type="button"
+                        disabled={saving || placementLocked || compatibleBlocks.length === 0}
+                        onClick={() => void placeTrayIntoBlock(tray.tray_id)}
+                      >
+                        Place tray
+                      </button>
+                    </div>
+                  );
+                }}
               />
             )}
           </SectionCard>
 
           <SectionCard title="Trays">
+            <div id="trays" />
             <div className={styles.formGrid}>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Tray name</span>
                 <input
                   className={styles.input}
                   value={newTrayName}
-                  placeholder="T1"
+                  placeholder={trayNameSuggestion}
                   onChange={(event) => setNewTrayName(event.target.value)}
+                  disabled={saving || placementLocked}
+                />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>How many plants fit in this tray?</span>
+                <div className={styles.actions}>
+                  {[1, 2, 4, 6, 8].map((capacity) => (
+                    <button
+                      key={capacity}
+                      className={styles.buttonSecondary}
+                      type="button"
+                      disabled={saving || placementLocked}
+                      onClick={() => setNewTrayCapacity(capacity)}
+                    >
+                      {capacity}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  className={styles.input}
+                  type="number"
+                  min={1}
+                  value={newTrayCapacity}
+                  onChange={(event) =>
+                    setNewTrayCapacity(Math.max(1, Number(event.target.value) || 1))
+                  }
                   disabled={saving || placementLocked}
                 />
               </label>
@@ -763,7 +1076,7 @@ export default function PlacementPage() {
                     <div className={styles.actions}>
                       <strong>{tray.tray_name}</strong>
                       <span className={styles.mutedText}>{tray.tent_name || "Unplaced tent"}</span>
-                      <span className={styles.mutedText}>{tray.placed_count} placed</span>
+                      <span className={styles.mutedText}>{tray.current_count}/{tray.capacity} occupied</span>
                     </div>
                     <label className={styles.field}>
                       <span className={styles.fieldLabel}>Name</span>
@@ -781,6 +1094,32 @@ export default function PlacementPage() {
                               trays: current.trays.map((item) =>
                                 item.tray_id === tray.tray_id
                                   ? { ...item, tray_name: event.target.value }
+                                  : item,
+                              ),
+                            };
+                          })
+                        }
+                      />
+                    </label>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Capacity</span>
+                      <input
+                        className={styles.input}
+                        type="number"
+                        min={1}
+                        value={tray.capacity}
+                        disabled={saving || placementLocked}
+                        onChange={(event) =>
+                          setSummary((current) => {
+                            if (!current) {
+                              return current;
+                            }
+                            const nextValue = Math.max(1, Number(event.target.value) || 1);
+                            return {
+                              ...current,
+                              trays: current.trays.map((item) =>
+                                item.tray_id === tray.tray_id
+                                  ? { ...item, capacity: nextValue }
                                   : item,
                               ),
                             };
@@ -811,12 +1150,20 @@ export default function PlacementPage() {
                         }
                       >
                         <option value="">No block</option>
-                        {blocks.map((block) => (
+                        {blocks
+                          .filter((block) => (compatibleBlockIdsByTray.get(tray.tray_id) || []).includes(block.id))
+                          .map((block) => (
                           <option key={block.id} value={block.id}>
                             {block.label}
                           </option>
-                        ))}
+                          ))}
                       </select>
+                      {tray.plants.length > 0 &&
+                      (compatibleBlockIdsByTray.get(tray.tray_id) || []).length === 0 ? (
+                        <p className={styles.inlineNote}>
+                          No compatible destination blocks for this tray.
+                        </p>
+                      ) : null}
                     </label>
                     <label className={styles.field}>
                       <span className={styles.fieldLabel}>Tray recipe</span>
