@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError } from "@/lib/backend";
@@ -63,6 +63,7 @@ type GroupsPreviewResponse = {
 
 export default function AssignmentPage() {
   const params = useParams();
+  const router = useRouter();
   const experimentId = useMemo(() => {
     if (typeof params.id === "string") {
       return params.id;
@@ -92,6 +93,7 @@ export default function AssignmentPage() {
     Array<{ plant_uuid: string; proposed_recipe_code: string }>
   >([]);
   const [previewSummary, setPreviewSummary] = useState<GroupSummary | null>(null);
+  const [postApplySummary, setPostApplySummary] = useState<GroupSummary | null>(null);
 
   const [groupsEditingUnlocked, setGroupsEditingUnlocked] = useState(false);
   const [showGroupsUnlockModal, setShowGroupsUnlockModal] = useState(false);
@@ -100,6 +102,18 @@ export default function AssignmentPage() {
   const setupComplete = Boolean(statusSummary?.setup.is_complete);
   const groupsReadOnly = Boolean(groupsStatus?.groups_locked) && !groupsEditingUnlocked;
   const recipeCodeValid = /^R\d+$/.test(newRecipeCode.trim());
+  const hasR0Recipe = (groupsStatus?.recipes ?? []).some((recipe) => recipe.code === "R0");
+  const hasMinimumRecipes = (groupsStatus?.recipes ?? []).length >= 2;
+  const hasActivePlants = (groupsStatus?.summary.total_plants ?? 0) > 0;
+  const applyReady = setupComplete && hasR0Recipe && hasMinimumRecipes && hasActivePlants;
+  const unassignedCount = groupsStatus?.summary.unassigned ?? 0;
+  const activePlantCount = groupsStatus?.summary.total_plants ?? 0;
+  const hasPostApplyDone = postApplySummary !== null;
+  const doneHref = `/experiments/${experimentId}/overview?refresh=${Date.now()}`;
+  const previewRows = Object.entries(previewSummary?.counts_by_recipe_code ?? {}).map(([code, count]) => ({
+    code,
+    count,
+  }));
   const recipeRows = Object.entries(
     previewSummary?.counts_by_recipe_code ?? groupsStatus?.summary.counts_by_recipe_code ?? {},
   ).map(([code, count]) => ({ code, count }));
@@ -305,6 +319,7 @@ export default function AssignmentPage() {
       setGroupsSeedInput(String(preview.seed));
       setPreviewAssignments(preview.proposed_assignments);
       setPreviewSummary(preview.summary);
+      setPostApplySummary(null);
       setNotice(`Preview ready with seed ${preview.seed}.`);
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
@@ -351,7 +366,12 @@ export default function AssignmentPage() {
       setPreviewSeed(payload.seed);
       setPreviewSummary(payload.summary);
       setPreviewAssignments([]);
+      setPostApplySummary(payload.summary);
       setNotice(`Applied assignment with seed ${payload.seed}.`);
+      const refreshedSummary = await fetchExperimentStatusSummary(experimentId);
+      if (refreshedSummary) {
+        setStatusSummary(refreshedSummary);
+      }
       await fetchGroupsStatus();
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
@@ -418,22 +438,33 @@ export default function AssignmentPage() {
       {notice ? <p className={styles.successText}>{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
-      {!loading && !setupComplete ? (
-        <SectionCard title="Setup Required">
-          <p className={styles.mutedText}>
-            Complete bootstrap setup (plants, slots, recipes) before running assignment.
-          </p>
-          <div className={styles.actions}>
-            <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/setup`}>
-              Go to setup
-            </Link>
-          </div>
+      {!loading && groupsStatus ? (
+        <SectionCard title="Assignment Status">
+          <p className={styles.mutedText}>Unassigned active plants: {unassignedCount}</p>
+          <p className={styles.mutedText}>Total active plants: {activePlantCount}</p>
+          {unassignedCount === 0 && activePlantCount > 0 ? (
+            <div className={styles.stack}>
+              <p className={styles.successText}>All plants assigned.</p>
+              <button
+                className={styles.buttonPrimary}
+                type="button"
+                onClick={() => router.push(doneHref)}
+              >
+                Back to Overview
+              </button>
+            </div>
+          ) : null}
         </SectionCard>
       ) : null}
 
       {!loading && groupsStatus ? (
         <>
           <SectionCard title="Recipes" subtitle="Define control and treatment recipes (R0, R1, ...)">
+            {!setupComplete ? (
+              <p className={styles.inlineNote}>
+                Recipes are part of setup. Assignments are applied after setup is complete.
+              </p>
+            ) : null}
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Notes</span>
               <textarea
@@ -549,81 +580,131 @@ export default function AssignmentPage() {
             </div>
           </SectionCard>
 
+          <SectionCard title="Preview Distribution" subtitle="Planned assignment counts by recipe">
+            {previewRows.length > 0 ? (
+              <ResponsiveList
+                items={previewRows}
+                getKey={(item) => item.code}
+                columns={[
+                  { key: "recipe", label: "Recipe", render: (item) => item.code },
+                  { key: "count", label: "Planned Count", render: (item) => item.count },
+                ]}
+                renderMobileCard={(item) => (
+                  <div className={styles.cardKeyValue}>
+                    <span>Recipe</span>
+                    <strong>{item.code}</strong>
+                    <span>Planned count</span>
+                    <strong>{item.count}</strong>
+                  </div>
+                )}
+              />
+            ) : (
+              <p className={styles.mutedText}>Preview assignment to see planned distribution.</p>
+            )}
+          </SectionCard>
+
           <SectionCard title="Assignment" subtitle="Preview and apply stratified assignment">
             {!setupComplete ? (
               <p className={styles.inlineNote}>
                 Complete plants and slots in setup before running assignment preview/apply.
               </p>
             ) : null}
-            <div className={styles.formGrid}>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Seed (optional)</span>
-                <input
-                  className={styles.input}
-                  type="number"
-                  min={1}
-                  value={groupsSeedInput}
-                  disabled={groupsReadOnly || !setupComplete}
-                  onChange={(event) => setGroupsSeedInput(event.target.value)}
-                />
-              </label>
-            </div>
+            {!hasR0Recipe || !hasMinimumRecipes ? (
+              <p className={styles.inlineNote}>
+                Add recipes with codes R0 and at least one treatment (R1+) before applying.
+              </p>
+            ) : null}
+            {!hasActivePlants ? (
+              <p className={styles.inlineNote}>Add active plants before applying assignment.</p>
+            ) : null}
+            {hasPostApplyDone ? (
+              <div className={styles.stack}>
+                <p className={styles.successText}>
+                  Assigned {postApplySummary.assigned} plants. Unassigned remaining:{" "}
+                  {postApplySummary.unassigned}.
+                </p>
+                <button
+                  className={styles.buttonPrimary}
+                  type="button"
+                  onClick={() => router.push(doneHref)}
+                >
+                  Done → Overview
+                </button>
+              </div>
+            ) : null}
+            {!hasPostApplyDone ? (
+              <>
+                <div className={styles.formGrid}>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Seed (optional)</span>
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={1}
+                      value={groupsSeedInput}
+                      disabled={groupsReadOnly || !applyReady}
+                      onChange={(event) => setGroupsSeedInput(event.target.value)}
+                    />
+                  </label>
+                </div>
 
-            <div className={styles.actions}>
-              <button
-                className={styles.buttonPrimary}
-                type="button"
-                disabled={saving || groupsReadOnly || !setupComplete}
-                onClick={() => void previewGroups()}
-              >
-                Preview assignment
-              </button>
-              <button
-                className={styles.buttonSecondary}
-                type="button"
-                disabled={saving || groupsReadOnly || !setupComplete}
-                onClick={() => void applyGroups()}
-              >
-                Apply assignment
-              </button>
-              <button
-                className={styles.buttonSecondary}
-                type="button"
-                disabled={saving || groupsReadOnly || !setupComplete}
-                onClick={() => {
-                  setGroupsSeedInput("");
-                  setPreviewSeed(null);
-                  setPreviewAssignments([]);
-                  void previewGroups(true);
-                }}
-              >
-                Reroll
-              </button>
-              {groupsStatus?.groups_locked ? (
-                groupsReadOnly ? (
+                <div className={styles.actions}>
                   <button
-                    className={styles.buttonSecondary}
+                    className={styles.buttonPrimary}
                     type="button"
-                    onClick={() => setShowGroupsUnlockModal(true)}
+                    disabled={saving || groupsReadOnly || !applyReady}
+                    onClick={() => void previewGroups()}
                   >
-                    Unlock editing
+                    Preview assignment
                   </button>
-                ) : (
                   <button
                     className={styles.buttonSecondary}
                     type="button"
+                    disabled={saving || groupsReadOnly || !applyReady}
+                    onClick={() => void applyGroups()}
+                  >
+                    Apply assignment
+                  </button>
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    disabled={saving || groupsReadOnly || !applyReady}
                     onClick={() => {
-                      setGroupsEditingUnlocked(false);
-                      setGroupsUnlockConfirmed(false);
+                      setGroupsSeedInput("");
+                      setPreviewSeed(null);
+                      setPreviewAssignments([]);
+                      void previewGroups(true);
                     }}
                   >
-                    Re-lock
+                    Reroll
                   </button>
-                )
-              ) : null}
-            </div>
-            {previewSeed ? (
-              <p className={styles.mutedText}>Preview seed: {previewSeed}</p>
+                  {groupsStatus?.groups_locked ? (
+                    groupsReadOnly ? (
+                      <button
+                        className={styles.buttonSecondary}
+                        type="button"
+                        onClick={() => setShowGroupsUnlockModal(true)}
+                      >
+                        Unlock editing
+                      </button>
+                    ) : (
+                      <button
+                        className={styles.buttonSecondary}
+                        type="button"
+                        onClick={() => {
+                          setGroupsEditingUnlocked(false);
+                          setGroupsUnlockConfirmed(false);
+                        }}
+                      >
+                        Re-lock
+                      </button>
+                    )
+                  ) : null}
+                </div>
+                {previewSeed ? (
+                  <p className={styles.mutedText}>Preview seed: {previewSeed}</p>
+                ) : null}
+              </>
             ) : null}
             {groupsStatus?.groups_locked ? (
               <p className={styles.inlineNote}>
@@ -699,25 +780,37 @@ export default function AssignmentPage() {
           </SectionCard>
 
           <StickyActionBar>
-            <button
-              className={styles.buttonPrimary}
-              type="button"
-              disabled={saving || groupsReadOnly}
-              onClick={() => void saveGroupsPacket()}
-            >
-              Save
-            </button>
-            <button
-              className={styles.buttonSecondary}
-              type="button"
-              disabled={saving || !setupComplete}
-              onClick={() => void lockAssignmentUi()}
-            >
-              {saving ? "Locking..." : "Lock UI guardrail"}
-            </button>
-            <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/overview`}>
-              Done → Overview
-            </Link>
+            {hasPostApplyDone ? (
+              <button
+                className={styles.buttonPrimary}
+                type="button"
+                onClick={() => router.push(doneHref)}
+              >
+                Done → Overview
+              </button>
+            ) : (
+              <>
+                <button
+                  className={styles.buttonPrimary}
+                  type="button"
+                  disabled={saving || groupsReadOnly}
+                  onClick={() => void saveGroupsPacket()}
+                >
+                  Save
+                </button>
+                <button
+                  className={styles.buttonSecondary}
+                  type="button"
+                  disabled={saving || !setupComplete}
+                  onClick={() => void lockAssignmentUi()}
+                >
+                  {saving ? "Locking..." : "Lock UI guardrail"}
+                </button>
+                <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/overview`}>
+                  Done → Overview
+                </Link>
+              </>
+            )}
           </StickyActionBar>
         </>
       ) : null}
