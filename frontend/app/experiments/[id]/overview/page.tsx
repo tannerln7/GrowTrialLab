@@ -396,7 +396,16 @@ export default function ExperimentOverviewPage() {
                 Stop
               </button>
             ) : null}
+            <Link
+              className={styles.buttonSecondary}
+              href={`/experiments/${experimentId}/rotation`}
+            >
+              Rotation
+            </Link>
           </div>
+          {summary.lifecycle.state !== "running" ? (
+            <p className={styles.inlineNote}>Start to enable rotation logging.</p>
+          ) : null}
           {!summary.readiness.ready_to_start ? (
             <div className={styles.stack}>
               <p className={styles.inlineNote}>
@@ -455,6 +464,12 @@ export default function ExperimentOverviewPage() {
                 >
                   Placement
                 </Link>
+                <Link
+                  className={styles.buttonSecondary}
+                  href={`/experiments/${experimentId}/rotation`}
+                >
+                  Rotation
+                </Link>
               </div>
             </div>
           )}
@@ -465,6 +480,9 @@ export default function ExperimentOverviewPage() {
           <div className={styles.actions}>
             <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/placement`}>
               Placement
+            </Link>
+            <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/rotation`}>
+              Rotation
             </Link>
           </div>
         </SectionCard>
