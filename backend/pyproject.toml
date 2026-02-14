@@ -9,4 +9,5 @@ dependencies = [
     "django-cors-headers>=4.9.0",
     "djangorestframework>=3.16.1",
     "psycopg[binary]>=3.3.2",
+    "pyjwt[crypto]>=2.11.0",
 ]

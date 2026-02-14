@@ -22,7 +22,12 @@ services:
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,host.docker.internal}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://host.docker.internal:3000}
       DATABASE_URL: ${DATABASE_URL:-postgresql://growtriallab:growtriallab@db:5432/growtriallab}
-    command: sh -c "uv run python manage.py migrate && uv run python manage.py runserver 0.0.0.0:8000"
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN:-}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      AUTH_MODE: ${AUTH_MODE:-invite_only}
+      DEV_EMAIL: ${DEV_EMAIL:-admin@example.com}
+    command: sh -c "uv run python manage.py migrate && uv run python manage.py bootstrap_admin_user && uv run python manage.py runserver 0.0.0.0:8000"
     ports:
       - "8000:8000"
     volumes:

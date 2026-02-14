@@ -16,4 +16,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uv run python manage.py migrate && uv run python manage.py runserver 0.0.0.0:8000"]
+CMD ["sh", "-c", "uv run python manage.py migrate && uv run python manage.py bootstrap_admin_user && uv run python manage.py runserver 0.0.0.0:8000"]
