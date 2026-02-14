@@ -658,6 +658,101 @@ class Packet3BaselineTests(TestCase):
         self.assertTrue(setup_state.packet_data.get(PACKET_BASELINE, {}).get("locked"))
 
 
+@override_settings(
+    DEBUG=True,
+    CF_ACCESS_TEAM_DOMAIN="your-team.cloudflareaccess.com",
+    CF_ACCESS_AUD="REPLACE_ME",
+    ADMIN_EMAIL="admin@example.com",
+    DEV_EMAIL="admin@example.com",
+    AUTH_MODE="invite_only",
+)
+class BaselineQueueTests(TestCase):
+    def test_queue_returns_remaining_count_for_active_plants(self):
+        experiment = Experiment.objects.create(name="Baseline Queue Count")
+        species = Species.objects.create(name="Nepenthes ampullaria", category="nepenthes")
+        complete = Plant.objects.create(experiment=experiment, species=species, plant_id="NP-001", bin="A")
+        needs_metric = Plant.objects.create(experiment=experiment, species=species, plant_id="NP-002", bin="B")
+        needs_bin = Plant.objects.create(experiment=experiment, species=species, plant_id="NP-003", bin=None)
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=complete,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4, "coloration_score": 4, "pest_signs": False},
+        )
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=needs_bin,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4, "coloration_score": 3, "pest_signs": False},
+        )
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/baseline/queue")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["remaining_count"], 2)
+        returned_ids = {item["uuid"] for item in payload["plants"]}
+        self.assertEqual(returned_ids, {str(complete.id), str(needs_metric.id), str(needs_bin.id)})
+
+    def test_queue_orders_missing_baseline_or_bin_first(self):
+        experiment = Experiment.objects.create(name="Baseline Queue Order Needs")
+        species = Species.objects.create(name="Drosera capensis", category="drosera")
+        missing = Plant.objects.create(experiment=experiment, species=species, plant_id="DR-010", bin="A")
+        complete = Plant.objects.create(experiment=experiment, species=species, plant_id="DR-001", bin="B")
+        PlantWeeklyMetric.objects.create(
+            experiment=experiment,
+            plant=complete,
+            week_number=BASELINE_WEEK_NUMBER,
+            metrics={"health_score": 4, "coloration_score": 4, "pest_signs": False},
+        )
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/baseline/queue")
+        self.assertEqual(response.status_code, 200)
+        queue = response.json()["plants"]
+        self.assertGreaterEqual(len(queue), 2)
+        self.assertEqual(queue[0]["uuid"], str(missing.id))
+        self.assertEqual(queue[1]["uuid"], str(complete.id))
+
+    def test_queue_excludes_non_active_plants(self):
+        experiment = Experiment.objects.create(name="Baseline Queue Active Only")
+        species = Species.objects.create(name="Flytrap B52", category="flytrap")
+        active = Plant.objects.create(experiment=experiment, species=species, plant_id="VF-001", bin=None)
+        inactive = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="VF-002",
+            bin=None,
+            status=Plant.Status.INACTIVE,
+        )
+        dead = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="VF-003",
+            bin=None,
+            status=Plant.Status.DEAD,
+        )
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/baseline/queue")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["remaining_count"], 1)
+        returned_ids = [item["uuid"] for item in payload["plants"]]
+        self.assertEqual(returned_ids, [str(active.id)])
+        self.assertNotIn(str(inactive.id), returned_ids)
+        self.assertNotIn(str(dead.id), returned_ids)
+
+    def test_queue_orders_by_plant_id_when_present(self):
+        experiment = Experiment.objects.create(name="Baseline Queue Plant ID Sort")
+        species = Species.objects.create(name="Pinguicula gigantea", category="pinguicula")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="PG-010", bin="A")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="PG-002", bin="A")
+        Plant.objects.create(experiment=experiment, species=species, plant_id="PG-001", bin="A")
+
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/baseline/queue")
+        self.assertEqual(response.status_code, 200)
+        returned_ids = [item["plant_id"] for item in response.json()["plants"]]
+        self.assertEqual(returned_ids, ["PG-001", "PG-002", "PG-010"])
+
+
 class Packet3BaselineLockTests(TestCase):
     @override_settings(
         DEBUG=True,
