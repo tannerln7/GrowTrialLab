@@ -60,20 +60,22 @@ def _get_or_create_setup_state(experiment: Experiment):
 
 
 def _ensure_default_blocks(experiment: Experiment):
-    if Block.objects.filter(experiment=experiment).exists():
-        return
     defaults = [
         ("B1", "Front-left position"),
         ("B2", "Front-right position"),
         ("B3", "Back-left position"),
         ("B4", "Back-right position"),
     ]
+    created_count = 0
     for name, description in defaults:
-        Block.objects.get_or_create(
+        _, created = Block.objects.get_or_create(
             experiment=experiment,
             name=name,
             defaults={"description": description},
         )
+        if created:
+            created_count += 1
+    return created_count
 
 
 @api_view(["GET", "PATCH"])
@@ -182,7 +184,6 @@ def experiment_blocks(request, experiment_id: UUID):
         return Response({"detail": "Experiment not found."}, status=404)
 
     if request.method == "GET":
-        _ensure_default_blocks(experiment)
         serializer = BlockSerializer(Block.objects.filter(experiment=experiment).order_by("name"), many=True)
         return Response(serializer.data)
 
@@ -190,6 +191,27 @@ def experiment_blocks(request, experiment_id: UUID):
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response(serializer.data, status=201)
+
+
+@api_view(["POST"])
+def experiment_blocks_defaults(request, experiment_id: UUID):
+    rejection = _require_app_user(request)
+    if rejection:
+        return rejection
+
+    experiment = _get_experiment(experiment_id)
+    if experiment is None:
+        return Response({"detail": "Experiment not found."}, status=404)
+
+    created_count = _ensure_default_blocks(experiment)
+    blocks = Block.objects.filter(experiment=experiment).order_by("name")
+    serializer = BlockSerializer(blocks, many=True)
+    return Response(
+        {
+            "created_count": created_count,
+            "blocks": serializer.data,
+        }
+    )
 
 
 def _serialize_user(app_user: AppUser):

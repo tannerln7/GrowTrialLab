@@ -134,12 +134,37 @@ class ExperimentSetupTests(TestCase):
         self.assertIn(PACKET_ENVIRONMENT, state.completed_packets)
         self.assertEqual(state.current_packet, PACKET_PLANTS)
 
-    def test_blocks_endpoint_creates_defaults_when_empty(self):
+    def test_blocks_get_returns_empty_without_side_effects(self):
         experiment = Experiment.objects.create(name="Blocks Defaults")
         response = self.client.get(f"/api/v1/experiments/{experiment.id}/blocks/")
         self.assertEqual(response.status_code, 200)
-        names = [item["name"] for item in response.json()]
+        self.assertEqual(response.json(), [])
+        self.assertEqual(Block.objects.filter(experiment=experiment).count(), 0)
+
+    def test_blocks_defaults_endpoint_creates_defaults(self):
+        experiment = Experiment.objects.create(name="Blocks Defaults")
+        response = self.client.post(f"/api/v1/experiments/{experiment.id}/blocks/defaults")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["created_count"], 4)
+        names = [item["name"] for item in payload["blocks"]]
         self.assertEqual(names, ["B1", "B2", "B3", "B4"])
+        self.assertEqual(Block.objects.filter(experiment=experiment).count(), 4)
+
+    def test_blocks_defaults_endpoint_is_idempotent(self):
+        experiment = Experiment.objects.create(name="Blocks Idempotent")
+
+        first_response = self.client.post(f"/api/v1/experiments/{experiment.id}/blocks/defaults")
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(first_response.json()["created_count"], 4)
+
+        second_response = self.client.post(f"/api/v1/experiments/{experiment.id}/blocks/defaults")
+        self.assertEqual(second_response.status_code, 200)
+        second_payload = second_response.json()
+        self.assertEqual(second_payload["created_count"], 0)
+        names = [item["name"] for item in second_payload["blocks"]]
+        self.assertEqual(names, ["B1", "B2", "B3", "B4"])
+        self.assertEqual(Block.objects.filter(experiment=experiment).count(), 4)
 
 
 @override_settings(

@@ -33,6 +33,7 @@ from .views import (
     admin_users,
     complete_environment_packet,
     experiment_blocks,
+    experiment_blocks_defaults,
     experiment_environment_packet,
     experiment_setup_state,
     healthz,
@@ -95,6 +96,11 @@ urlpatterns = [
         "api/v1/experiments/<uuid:experiment_id>/blocks/",
         experiment_blocks,
         name="experiment-blocks",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/blocks/defaults",
+        experiment_blocks_defaults,
+        name="experiment-blocks-defaults",
     ),
     path(
         "api/v1/experiments/<uuid:experiment_id>/plants/",
