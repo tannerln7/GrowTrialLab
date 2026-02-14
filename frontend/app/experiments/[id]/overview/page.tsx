@@ -34,6 +34,7 @@ type OverviewPlant = {
   bin: string | null;
   assigned_recipe_code: string | null;
   has_baseline: boolean;
+  replaced_by_uuid: string | null;
 };
 
 type OverviewCounts = {
@@ -239,6 +240,9 @@ export default function ExperimentOverviewPage() {
 
   function quickActionHref(plant: OverviewPlant): string | null {
     if (plant.status !== "active") {
+      if (plant.replaced_by_uuid) {
+        return `/p/${plant.replaced_by_uuid}?from=${encodeURIComponent(overviewPathWithFilters)}`;
+      }
       return null;
     }
     if (!plant.has_baseline || !plant.bin) {
@@ -251,6 +255,9 @@ export default function ExperimentOverviewPage() {
   }
 
   function quickActionLabel(plant: OverviewPlant): string {
+    if (plant.status !== "active" && plant.replaced_by_uuid) {
+      return "Replacement →";
+    }
     if (!plant.has_baseline || !plant.bin) {
       return "Baseline";
     }
@@ -427,6 +434,18 @@ export default function ExperimentOverviewPage() {
                   </strong>
                   <span>Status</span>
                   <strong>{plant.status}</strong>
+                  {plant.status !== "active" && plant.replaced_by_uuid ? (
+                    <>
+                      <span>Replacement</span>
+                      <strong>
+                        <Link
+                          href={`/p/${plant.replaced_by_uuid}?from=${encodeURIComponent(overviewPathWithFilters)}`}
+                        >
+                          Open replacement
+                        </Link>
+                      </strong>
+                    </>
+                  ) : null}
                   <span>Bin</span>
                   <strong>{plant.bin || "Missing"}</strong>
                   <span>Group</span>
