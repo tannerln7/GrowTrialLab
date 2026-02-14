@@ -56,9 +56,9 @@ def experiment_placement_summary(request, experiment_id: UUID):
                 {
                     "tray_id": str(tray.id),
                     "name": tray.name,
-                    "block_id": str(tray.block_id) if tray.block_id else None,
+                    "block_id": str(tray.block.id) if tray.block else None,
                     "block_name": tray.block.name if tray.block else None,
-                    "plant_count": tray.tray_plants.count(),
+                    "plant_count": TrayPlant.objects.filter(tray=tray).count(),
                     "plants": [
                         {
                             "tray_plant_id": str(tray_plant.id),
@@ -72,7 +72,9 @@ def experiment_placement_summary(request, experiment_id: UUID):
                                 else None
                             ),
                         }
-                        for tray_plant in tray.tray_plants.order_by("order_index", "id")
+                        for tray_plant in TrayPlant.objects.filter(tray=tray)
+                        .select_related("plant__species", "plant__assigned_recipe")
+                        .order_by("order_index", "id")
                     ],
                 }
                 for tray in trays
@@ -125,7 +127,7 @@ def experiment_trays(request, experiment_id: UUID):
             "id": str(tray.id),
             "experiment": str(experiment.id),
             "name": tray.name,
-            "block": str(tray.block_id) if tray.block_id else None,
+            "block": str(tray.block.id) if tray.block else None,
             "notes": tray.notes,
         },
         status=201,
@@ -149,7 +151,7 @@ def tray_add_plant(request, tray_id: UUID):
     plant = Plant.objects.filter(id=plant_id).select_related("species", "assigned_recipe").first()
     if plant is None:
         return Response({"detail": "Plant not found."}, status=404)
-    if plant.experiment_id != tray.experiment_id:
+    if plant.experiment.id != tray.experiment.id:
         return Response({"detail": "Plant and tray must belong to the same experiment."}, status=400)
     if plant.status == Plant.Status.REMOVED:
         return Response({"detail": "Removed plants cannot be placed in trays."}, status=400)
