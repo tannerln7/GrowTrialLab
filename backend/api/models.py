@@ -78,7 +78,7 @@ class Recipe(UUIDModel):
         ]
 
     def __str__(self):
-        return f"{self.experiment_id}:{self.code}"
+        return f"{self.experiment.pk}:{self.code}"
 
 
 class BatchLot(UUIDModel):
@@ -98,7 +98,7 @@ class BatchLot(UUIDModel):
         ]
 
     def __str__(self):
-        return f"{self.experiment_id}:{self.lot_code}"
+        return f"{self.experiment.pk}:{self.lot_code}"
 
 
 class Plant(UUIDModel):
@@ -131,7 +131,7 @@ class Plant(UUIDModel):
         ]
 
     def __str__(self):
-        return f"{self.experiment_id}:{self.plant_id}"
+        return f"{self.experiment.pk}:{self.plant_id}"
 
 
 class Tray(UUIDModel):
@@ -146,7 +146,7 @@ class Tray(UUIDModel):
         ]
 
     def __str__(self):
-        return f"{self.experiment_id}:{self.name}"
+        return f"{self.experiment.pk}:{self.name}"
 
 
 class TrayPlant(UUIDModel):
@@ -172,7 +172,7 @@ class Block(UUIDModel):
         ]
 
     def __str__(self):
-        return f"{self.experiment_id}:{self.name}"
+        return f"{self.experiment.pk}:{self.name}"
 
 
 class RotationLog(UUIDModel):

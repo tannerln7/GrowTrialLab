@@ -29,7 +29,7 @@ def me(request):
 
 def _serialize_user(app_user: AppUser):
     return {
-        "id": app_user.id,
+        "id": app_user.pk,
         "email": app_user.email,
         "role": app_user.role,
         "status": app_user.status,

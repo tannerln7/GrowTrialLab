@@ -4,6 +4,7 @@ import urllib.request
 from threading import Lock
 
 import jwt
+from jwt.algorithms import RSAAlgorithm
 
 
 class CloudflareJWTError(Exception):
@@ -33,7 +34,7 @@ class CloudflareJWTVerifier:
             kid = jwk.get("kid")
             if not kid:
                 continue
-            keys[kid] = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+            keys[kid] = RSAAlgorithm.from_jwk(json.dumps(jwk))
         return keys
 
     def _refresh_keys_if_needed(self, force: bool = False):
