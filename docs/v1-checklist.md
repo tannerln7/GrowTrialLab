@@ -13,7 +13,7 @@ Status convention:
 - `[ ] (in progress)` currently active but not complete
 
 ## Current Status Summary
-The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. The setup step framework is in place and Plants + Environments are implemented end-to-end with API and UI.
+The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Setup is now bootstrap-only (Plants, Blocks/Slots, Recipes), and readiness workflows (baseline + assignment) are centered in Overview and dedicated pages.
 
 Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Baseline and Groups/Assignment are implemented with UI-only lock semantics, and `/p/{uuid}` now functions as a mobile-first plant cockpit/task launcher.
 
@@ -99,9 +99,17 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Routes: `GET /api/v1/experiments/{id}/overview/plants`, `/experiments/{id}/overview`.
   - Notes: Includes aggregate counts and filterable plant queue (Needs Baseline/Bin/Assignment, Active, Removed) with mobile cards.
 - [x] Hub-and-spoke experiment navigation centered on Overview (owner: Codex)
-  - Refs: `310f00b5`, `41599236`, `669ae104`, `7005524b`
-  - Routes: `/experiments/{id}` redirects to `/experiments/{id}/overview`; setup/baseline/plants/cockpit use prominent `← Overview` return links.
-  - Notes: Overview now includes setup/now-actions menu and per-plant quick actions; assignment path is launched from overview when needed.
+  - Refs: `310f00b5`, `41599236`, `669ae104`, `7005524b`, `f2b49938`, `c61be2e7`
+  - Routes: `/experiments/{id}` now routes to `/setup` until bootstrap is complete, then to `/overview`; subpages keep prominent `← Overview` return links.
+  - Notes: `/setup` is hidden after bootstrap completion and overview drives readiness actions.
+- [x] Experiment status summary endpoint for bootstrap/readiness gating (owner: Codex)
+  - Refs: `ee000fab`, `c8b7db72`, `d302abd6`
+  - Route: `GET /api/v1/experiments/{id}/status/summary`.
+  - Notes: Setup completeness checks plants/blocks/recipes only; readiness counts track baseline/bin + assignment gaps on active plants.
+- [x] Bootstrap-only setup checklist + dedicated slots and assignment pages (owner: Codex)
+  - Refs: `f2b49938`, `a181325a`, `c61be2e7`
+  - Routes: `/experiments/{id}/setup`, `/experiments/{id}/slots`, `/experiments/{id}/assignment`.
+  - Notes: Baseline capture and assignment apply are no longer in setup.
 - [x] Plant action pages support safe return to experiment overview with filter preservation (owner: Codex)
   - Refs: `2e911442`, `226d9654`
   - Routes: `/p/{uuid}?from=...`.
@@ -133,7 +141,7 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Notes: currently audit is minimal/log-style.
 
 ### Setup Wizard (Steps)
-- [ ] (in progress) Keep Plants/Environments/Baseline/Groups stable while refining step lock governance (owner: Codex)
+- [ ] (in progress) Evaluate whether legacy setup-state packet progression is still needed post-bootstrap refactor (owner: Codex)
   - Route: `PATCH /api/v1/experiments/{id}/setup-state/`.
 - [ ] (in progress) Strengthen Baseline completion rule from MVP threshold to all-plants baseline coverage (owner: Codex)
   - Notes: Current MVP requires at least 1 baseline capture + all bins assigned.
@@ -160,10 +168,10 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [x] Persist assignment outputs and lock post-confirmation (owner: Codex)
   - Refs: `a6b19d01`, `ea4373b7`
 - [ ] Decide if Groups lock should remain UI-only or move to backend enforcement post-v1 (owner: manual)
-- [x] Assignment UX refactor: self-contained Recipes + Assignment with prerequisite blocking and Done-to-overview flow (owner: Codex)
-  - Refs: `7005524b`
-  - Route: `/experiments/{id}/setup?tab=assignment`.
-  - Notes: If active plants are missing baseline/bin, assignment actions are blocked with explicit message and `Back to Overview`.
+- [x] Assignment UX moved to dedicated page with Done-to-overview flow (owner: Codex)
+  - Refs: `a181325a`
+  - Route: `/experiments/{id}/assignment`.
+  - Notes: Assignment is allowed independently of baseline completion; lock remains a UI-only guardrail.
 
 ### Placement/Rotation (Future Steps)
 - [ ] Build tray composition UX using `Tray` + `TrayPlant` (owner: Codex)

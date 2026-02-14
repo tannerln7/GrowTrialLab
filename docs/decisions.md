@@ -92,6 +92,12 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Mobile QR and roster workflows are faster when operators always orient from one hub instead of navigating a page graph.
 - Refs: `310f00b5`, `41599236`, `669ae104`.
 
+### 2026-02-14: Setup is bootstrap-only and hidden after completion
+- Decision: Reduce setup to three bootstrap checks only (Plants, Blocks/Slots, Recipes). Once complete, `/experiments/{id}/setup` redirects to overview and no normal navigation links point back to setup.
+- Rationale: Operators should complete setup quickly, then work from overview readiness actions instead of a long multi-step wizard.
+- Refs: `f2b49938`, `c61be2e7`.
+- API support: `GET /api/v1/experiments/{id}/status/summary` (`ee000fab`, `c8b7db72`, `d302abd6`).
+
 ### 2026-02-14: Plant action pages use explicit safe return links to overview
 - Decision: Plant pages accept a `from` query value for back navigation, but only honor relative experiment paths (`/experiments/...`); otherwise fallback to the plant experiment overview.
 - Rationale: Preserves work-queue filters when navigating from overview without introducing open redirect risk.
@@ -101,12 +107,12 @@ This file records architecture/product decisions and why they were made.
 - Decision: Upgrade plant pages to consume `GET /api/v1/plants/{uuid}/cockpit` and show a mobile-first cockpit with sticky plant context, prioritized next action links, inline photo upload, and recent activity.
 - Rationale: QR scan workflows need immediate action guidance without extra navigation; cockpit keeps operators in one-handed flow while reusing existing Baseline/Assignment routes.
 - Refs: `6e26cb27`, `2ff247c6`, `3ae322ad`.
-- Notes: Safe back-to-overview behavior (`from` sanitization + fallback) is preserved.
+- Notes: Safe back behavior (`from` sanitization + fallback) is preserved, with fallback now using setup-vs-overview home routing from bootstrap completeness (`ee000fab`, `a181325a`).
 
-### 2026-02-14: Assignment setup UX is prerequisite-aware and self-contained
-- Decision: In `?tab=assignment`, surface Recipes + Assignment together, block assignment controls when active plants are missing baseline/bin, and provide explicit `Done → Overview` completion path after apply.
-- Rationale: Reduces operator confusion and unnecessary page switching while keeping assignment flow deterministic.
-- Refs: `7005524b`.
+### 2026-02-14: Assignment moved to dedicated route and decoupled from baseline gating
+- Decision: Use `/experiments/{id}/assignment` for recipe editing + preview/apply, and allow assignment even when baseline is incomplete.
+- Rationale: Baseline and assignment are readiness actions coordinated by overview, not setup prerequisites.
+- Refs: `a181325a`, `c61be2e7`.
 
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
