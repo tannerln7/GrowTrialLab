@@ -39,6 +39,17 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Decouples labels from mutable display IDs and supports future public/internal resolver route.
 - Refs: `a8766e1f`.
 
+### 2026-02-14: Plant QR labels resolve to in-app `/p/{uuid}` and print Plant ID text
+- Decision: Add frontend route `/p/[id]` backed by `GET /api/v1/plants/{uuid}/`; label QR encodes absolute URL and printed line shows Plant ID (or pending), not URL.
+- Rationale: Scanning a label should open a usable in-app details page while keeping printed labels human-readable.
+- Refs: `7352300e`, `66824a6e`, `c8aa364c`.
+
+### 2026-02-14: Absolute label URLs use `PUBLIC_BASE_URL` with localhost fallback
+- Decision: Build QR URLs from `PUBLIC_BASE_URL` when valid; fallback to `http://localhost:3000` when missing/invalid.
+- Rationale: Keeps local dev functional without extra setup, while allowing production QR labels to resolve externally.
+- Refs: `66824a6e`.
+- Caution: Production must set `PUBLIC_BASE_URL` or printed QR codes will point to localhost.
+
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
 - Rationale: Clear persistence boundary and easy backup target.

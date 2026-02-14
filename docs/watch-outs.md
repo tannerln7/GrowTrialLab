@@ -4,7 +4,7 @@ Important risks and "must remember later" items.
 
 | Severity | When to Address | Watch-Out | Suggested Approach |
 | --- | --- | --- | --- |
-| high | Packet 2 follow-up / pre-v1 ship | QR links currently encode `/p/{plant_uuid}` but resolver route is not implemented. | Add frontend/backend resolver route (`/p/[uuid]` or backend redirect endpoint), validate authorization expectations, and support optional `PUBLIC_BASE_URL` for absolute QR URLs in PDF labels. |
+| high | pre-v1 ship | QR route is implemented, but production labels can still point to localhost if `PUBLIC_BASE_URL` is unset/invalid. | Enforce `PUBLIC_BASE_URL` in production deploy config and validate generated labels against the real domain before release. |
 | high | pre-v1 ship | Cloudflare Access prod hardening can regress security if debug bypass remains active. | Require `DJANGO_DEBUG=0`, real `CF_ACCESS_TEAM_DOMAIN`, real `CF_ACCESS_AUD`, verify `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, secure cookies, and decide if `/healthz` should stay public. |
 | high | pre-v1 ship | Backups/restores are not formalized for DB + uploads. | Add scripted DB dump and `data/uploads` archive export, plus documented restore drill with validation checks. |
 | high | Packet 3 start | Metric JSON can become inconsistent across experiments. | Define metric templates/schema (required keys/types/ranges) before expanding baseline capture UI/API. |

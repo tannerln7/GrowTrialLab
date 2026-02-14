@@ -15,7 +15,7 @@ Status convention:
 ## Current Status Summary
 The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Packet framework is in place and Packet 1 (Environment) and Packet 2 (Plants) are implemented end-to-end with API and UI.
 
-Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). The largest remaining V1 work is implementing Packet 3-7 workflows, tightening production-hardening/security/deployment details, and completing operational guardrails (backups, metrics templates, packet integrity rules, exports/reporting).
+Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels now resolve to an in-app plant page and labels encode absolute URLs. The largest remaining V1 work is implementing Packet 3-7 workflows, tightening production-hardening/security/deployment details, and completing operational guardrails (backups, metrics templates, packet integrity rules, exports/reporting).
 
 ## Completed Milestones
 - [x] Monorepo scaffold and local compose runtime (owner: Codex)
@@ -60,6 +60,13 @@ Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/
 - [x] PWA baseline with manifest/icons/custom SW and offline route (owner: Codex)
   - Refs: `f4e4b310`, `fe398ba3`, `e932c093`
   - Routes/files: `/manifest.webmanifest`, `/sw.js`, `/offline`, `ServiceWorkerRegistration`.
+- [x] Plant QR resolve page and plant detail API retrieval (owner: Codex)
+  - Refs: `7352300e`, `c8aa364c`
+  - Routes: `/p/{uuid}` frontend route, `GET /api/v1/plants/{uuid}/`.
+- [x] Labels export uses absolute QR URLs and prints Plant ID text (owner: Codex)
+  - Refs: `66824a6e`, `c8aa364c`
+  - Routes/env: `GET /api/v1/experiments/{id}/plants/labels.pdf`, `PUBLIC_BASE_URL`.
+  - Notes: Production must set `PUBLIC_BASE_URL`; fallback is `http://localhost:3000`.
 
 ## Remaining Milestones
 
