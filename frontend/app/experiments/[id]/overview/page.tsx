@@ -292,6 +292,7 @@ export default function ExperimentOverviewPage() {
   }, [searchParams, experimentId]);
 
   const baselineActionHref = `/experiments/${experimentId}/baseline`;
+  const feedingActionHref = `/experiments/${experimentId}/feeding`;
 
   function plantNeedsLabels(plant: OverviewPlant): string[] {
     const needs: string[] = [];
@@ -402,9 +403,12 @@ export default function ExperimentOverviewPage() {
             >
               Rotation
             </Link>
+            <Link className={styles.buttonSecondary} href={feedingActionHref}>
+              Feeding
+            </Link>
           </div>
           {summary.lifecycle.state !== "running" ? (
-            <p className={styles.inlineNote}>Start to enable rotation logging.</p>
+            <p className={styles.inlineNote}>Start to enable rotation and feeding logging.</p>
           ) : null}
           {!summary.readiness.ready_to_start ? (
             <div className={styles.stack}>
@@ -470,6 +474,9 @@ export default function ExperimentOverviewPage() {
                 >
                   Rotation
                 </Link>
+                <Link className={styles.buttonSecondary} href={feedingActionHref}>
+                  Feeding
+                </Link>
               </div>
             </div>
           )}
@@ -484,7 +491,13 @@ export default function ExperimentOverviewPage() {
             <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/rotation`}>
               Rotation
             </Link>
+            <Link className={styles.buttonSecondary} href={feedingActionHref}>
+              Feeding
+            </Link>
           </div>
+          {summary.lifecycle.state !== "running" ? (
+            <p className={styles.inlineNote}>Start to enable feeding.</p>
+          ) : null}
         </SectionCard>
       ) : null}
 

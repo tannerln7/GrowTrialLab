@@ -53,6 +53,7 @@ type PlantCockpit = {
   derived: {
     has_baseline: boolean;
     assigned_recipe_code: string | null;
+    last_fed_at: string | null;
     replaced_by_uuid: string | null;
     replaces_uuid: string | null;
     chain_label: string | null;
@@ -130,6 +131,25 @@ function formatShortDate(value: string): string {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatLastFedAge(value: string | null): string {
+  if (!value) {
+    return "Never";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "Unknown";
+  }
+  const diffMs = Date.now() - parsed.getTime();
+  const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  if (diffDays === 0) {
+    return "Today";
+  }
+  if (diffDays === 1) {
+    return "1 day ago";
+  }
+  return `${diffDays} days ago`;
 }
 
 function uploadTagToApiTag(tag: UploadTag): string {
@@ -223,6 +243,11 @@ export default function PlantQrPage() {
   );
   const overviewHref =
     overviewFromParam || cockpit?.links.experiment_home || "/experiments";
+  const feedingHref = cockpit
+    ? `/experiments/${cockpit.plant.experiment.id}/feeding?plant=${cockpit.plant.uuid}&from=${encodeURIComponent(
+        overviewHref,
+      )}`
+    : null;
   const replacementCreated = searchParams.get("replacementCreated") === "1";
 
   const nowAction = useMemo(() => buildNowAction(cockpit), [cockpit]);
@@ -561,24 +586,34 @@ export default function PlantQrPage() {
                   Removed plants are read-only. Use chain links to review related plants.
                 </p>
               ) : nowAction.href && nowAction.buttonLabel ? (
-                <Link className={sharedStyles.buttonPrimary} href={nowAction.href}>
-                  {nowAction.buttonLabel}
-                </Link>
+                <div className={sharedStyles.actions}>
+                  <Link className={sharedStyles.buttonPrimary} href={nowAction.href}>
+                    {nowAction.buttonLabel}
+                  </Link>
+                  {feedingHref ? (
+                    <Link className={sharedStyles.buttonSecondary} href={feedingHref}>
+                      Feed
+                    </Link>
+                  ) : null}
+                </div>
               ) : (
-                <ul className={styles.comingSoonList}>
-                  <li>
-                    <span>Feed plant</span>
-                    <span className={styles.comingSoonTag}>Coming soon</span>
-                  </li>
-                  <li>
-                    <span>Record weekly metrics</span>
-                    <span className={styles.comingSoonTag}>Coming soon</span>
-                  </li>
-                  <li>
-                    <span>Take weekly photo</span>
-                    <span className={styles.comingSoonTag}>Coming soon</span>
-                  </li>
-                </ul>
+                <div className={sharedStyles.stack}>
+                  {feedingHref ? (
+                    <Link className={sharedStyles.buttonPrimary} href={feedingHref}>
+                      Feed
+                    </Link>
+                  ) : null}
+                  <ul className={styles.comingSoonList}>
+                    <li>
+                      <span>Record weekly metrics</span>
+                      <span className={styles.comingSoonTag}>Coming soon</span>
+                    </li>
+                    <li>
+                      <span>Take weekly photo</span>
+                      <span className={styles.comingSoonTag}>Coming soon</span>
+                    </li>
+                  </ul>
+                </div>
               )}
             </div>
           </SectionCard>
@@ -670,6 +705,10 @@ export default function PlantQrPage() {
             <div className={styles.activityRow}>
               <AlertCircle size={16} />
               <span>Baseline: {cockpit.derived.has_baseline ? "Complete" : "Missing"}</span>
+            </div>
+            <div className={styles.activityRow}>
+              <FlaskConical size={16} />
+              <span>Last fed: {formatLastFedAge(cockpit.derived.last_fed_at)}</span>
             </div>
             <ResponsiveList
               items={cockpit.recent_photos}
