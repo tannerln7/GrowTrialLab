@@ -16,6 +16,12 @@
   gap: 1rem;
 }
 
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 .button {
   width: fit-content;
   border: 0;
@@ -29,6 +35,10 @@
 .button:disabled {
   opacity: 0.7;
   cursor: wait;
+}
+
+.me {
+  margin: 0;
 }
 
 .output {
