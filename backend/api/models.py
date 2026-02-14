@@ -3,6 +3,8 @@ import uuid
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+from .setup_packets import PACKET_ENVIRONMENT
+
 
 class AppUser(models.Model):
     class Role(models.TextChoices):
@@ -64,6 +66,15 @@ class Experiment(UUIDModel):
 
     def __str__(self):
         return self.name
+
+
+class ExperimentSetupState(UUIDModel):
+    experiment = models.OneToOneField(Experiment, on_delete=models.CASCADE, related_name="setup_state")
+    current_packet = models.CharField(max_length=32, default=PACKET_ENVIRONMENT)
+    completed_packets = models.JSONField(default=list, blank=True)
+    locked_packets = models.JSONField(default=list, blank=True)
+    packet_data = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class Recipe(UUIDModel):
