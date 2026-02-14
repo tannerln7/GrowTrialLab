@@ -1,11 +1,14 @@
 from rest_framework import viewsets
+from rest_framework.exceptions import PermissionDenied
 
+from .baseline import BASELINE_WEEK_NUMBER, is_baseline_locked, is_unlock_request
 from .models import (
     AdverseEvent,
     BatchLot,
     Block,
     Experiment,
     FeedingEvent,
+    MetricTemplate,
     Photo,
     Plant,
     PlantWeeklyMetric,
@@ -16,13 +19,14 @@ from .models import (
     TrayPlant,
     WeeklySession,
 )
-from .permissions import HasAppUserPermission
+from .permissions import HasAdminAppUserPermission, HasAppUserPermission
 from .serializers import (
     AdverseEventSerializer,
     BatchLotSerializer,
     BlockSerializer,
     ExperimentSerializer,
     FeedingEventSerializer,
+    MetricTemplateSerializer,
     PhotoSerializer,
     PlantDetailSerializer,
     PlantSerializer,
@@ -53,6 +57,24 @@ class SpeciesViewSet(ExperimentFilteredViewSet):
     queryset = Species.objects.all().order_by("name")
     serializer_class = SpeciesSerializer
     experiment_filter_field = None
+
+
+class MetricTemplateViewSet(viewsets.ModelViewSet):
+    queryset = MetricTemplate.objects.all().order_by("category", "-version", "-created_at")
+    serializer_class = MetricTemplateSerializer
+    permission_classes = [HasAppUserPermission]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        category = (self.request.query_params.get("category") or "").strip().lower()
+        if category:
+            queryset = queryset.filter(category=category)
+        return queryset
+
+    def get_permissions(self):
+        if self.action in {"create", "update", "partial_update", "destroy"}:
+            return [HasAdminAppUserPermission()]
+        return [HasAppUserPermission()]
 
 
 class ExperimentViewSet(ExperimentFilteredViewSet):
@@ -86,6 +108,18 @@ class PlantViewSet(ExperimentFilteredViewSet):
             return PlantDetailSerializer
         return super().get_serializer_class()
 
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        new_bin = serializer.validated_data.get("bin")
+        bin_change_requested = "bin" in serializer.validated_data and new_bin != instance.bin
+        if (
+            bin_change_requested
+            and is_baseline_locked(instance.experiment)
+            and not is_unlock_request(self.request)
+        ):
+            raise PermissionDenied("Baseline is locked. Admin unlock is required.")
+        serializer.save()
+
 
 class TrayViewSet(ExperimentFilteredViewSet):
     queryset = Tray.objects.all().order_by("name")
@@ -116,6 +150,25 @@ class WeeklySessionViewSet(ExperimentFilteredViewSet):
 class PlantWeeklyMetricViewSet(ExperimentFilteredViewSet):
     queryset = PlantWeeklyMetric.objects.all().order_by("week_number", "plant_id")
     serializer_class = PlantWeeklyMetricSerializer
+
+    def _assert_unlocked(self, experiment, week_number):
+        if week_number == BASELINE_WEEK_NUMBER and is_baseline_locked(experiment) and not is_unlock_request(
+            self.request
+        ):
+            raise PermissionDenied("Baseline is locked. Admin unlock is required.")
+
+    def perform_create(self, serializer):
+        experiment = serializer.validated_data["experiment"]
+        week_number = serializer.validated_data.get("week_number")
+        self._assert_unlocked(experiment, week_number)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        experiment = serializer.validated_data.get("experiment", instance.experiment)
+        week_number = serializer.validated_data.get("week_number", instance.week_number)
+        self._assert_unlocked(experiment, week_number)
+        serializer.save()
 
 
 class FeedingEventViewSet(ExperimentFilteredViewSet):

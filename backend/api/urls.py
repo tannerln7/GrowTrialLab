@@ -9,6 +9,13 @@ from .plants_views import (
     experiment_plants_labels_pdf,
     experiment_plants_packet,
 )
+from .baseline_views import (
+    complete_baseline_packet,
+    experiment_baseline_lock,
+    experiment_baseline_packet,
+    experiment_baseline_status,
+    plant_baseline,
+)
 from .views import (
     admin_user_update,
     admin_users,
@@ -25,6 +32,7 @@ from .viewsets import (
     BlockViewSet,
     ExperimentViewSet,
     FeedingEventViewSet,
+    MetricTemplateViewSet,
     PhotoViewSet,
     PlantViewSet,
     PlantWeeklyMetricViewSet,
@@ -38,6 +46,7 @@ from .viewsets import (
 
 router = DefaultRouter()
 router.register("species", SpeciesViewSet, basename="species")
+router.register("metric-templates", MetricTemplateViewSet, basename="metric-templates")
 router.register("experiments", ExperimentViewSet, basename="experiments")
 router.register("recipes", RecipeViewSet, basename="recipes")
 router.register("lots", BatchLotViewSet, basename="lots")
@@ -104,6 +113,31 @@ urlpatterns = [
         "api/v1/experiments/<uuid:experiment_id>/packets/plants/complete/",
         complete_plants_packet,
         name="complete-plants-packet",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/baseline/status",
+        experiment_baseline_status,
+        name="experiment-baseline-status",
+    ),
+    path(
+        "api/v1/plants/<uuid:plant_id>/baseline",
+        plant_baseline,
+        name="plant-baseline",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/baseline/lock",
+        experiment_baseline_lock,
+        name="experiment-baseline-lock",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/packets/baseline/",
+        experiment_baseline_packet,
+        name="experiment-baseline-packet",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/packets/baseline/complete/",
+        complete_baseline_packet,
+        name="complete-baseline-packet",
     ),
     path("api/v1/", include(router.urls)),
     path("api/admin/users", admin_users, name="admin-users"),

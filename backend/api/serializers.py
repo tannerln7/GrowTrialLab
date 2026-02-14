@@ -7,6 +7,7 @@ from .models import (
     Experiment,
     ExperimentSetupState,
     FeedingEvent,
+    MetricTemplate,
     Photo,
     Plant,
     PlantWeeklyMetric,
@@ -151,6 +152,7 @@ class ExperimentPlantSerializer(serializers.ModelSerializer):
             "species_name",
             "species_category",
             "plant_id",
+            "bin",
             "cultivar",
             "status",
             "baseline_notes",
@@ -177,6 +179,25 @@ class ExperimentPlantCreateSerializer(serializers.Serializer):
 
 class PlantsPacketSerializer(serializers.Serializer):
     id_format_notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class BaselinePacketSerializer(serializers.Serializer):
+    template_id = serializers.UUIDField(required=False)
+    template_version = serializers.IntegerField(required=False, min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class PlantBaselineSaveSerializer(serializers.Serializer):
+    metrics = serializers.JSONField(required=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    bin = serializers.ChoiceField(choices=Plant.Bin.choices, required=False)
+
+
+class MetricTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MetricTemplate
+        fields = "__all__"
+
 
 class TraySerializer(serializers.ModelSerializer):
     class Meta:
