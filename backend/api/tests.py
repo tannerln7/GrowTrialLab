@@ -365,6 +365,10 @@ class ExperimentOverviewTests(TestCase):
         uuids = {item["uuid"] for item in payload["plants"]}
         self.assertIn(str(plant_ready.id), uuids)
         self.assertIn(str(plant_needs_all.id), uuids)
+        ready_payload = next(item for item in payload["plants"] if item["uuid"] == str(plant_ready.id))
+        self.assertEqual(ready_payload["assigned_recipe_id"], str(recipe.id))
+        self.assertEqual(ready_payload["assigned_recipe_code"], "R0")
+        self.assertEqual(ready_payload["assigned_recipe_name"], "Control")
         self.assertNotIn(
             str(
                 Plant.objects.get(
@@ -873,16 +877,23 @@ class FeedingApiTests(TestCase):
         )
         species = Species.objects.create(name="Drosera alba", category="drosera")
         recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
-        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="DR-711")
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="DR-711",
+            assigned_recipe=recipe,
+        )
 
         feed_response = self.client.post(
             f"/api/v1/plants/{plant.id}/feed",
-            data={"recipe_id": str(recipe.id), "amount_text": "1 mL", "note": "manual test"},
+            data={"amount_text": "1 mL", "note": "manual test"},
             content_type="application/json",
         )
         self.assertEqual(feed_response.status_code, 201)
         self.assertEqual(feed_response.json()["amount_text"], "1 mL")
         self.assertEqual(feed_response.json()["recipe_id"], str(recipe.id))
+        self.assertEqual(feed_response.json()["recipe_code"], "R0")
+        self.assertEqual(feed_response.json()["recipe_name"], "Control")
 
         recent_response = self.client.get(f"/api/v1/plants/{plant.id}/feeding/recent")
         self.assertEqual(recent_response.status_code, 200)
@@ -891,16 +902,71 @@ class FeedingApiTests(TestCase):
         self.assertEqual(events[0]["amount_text"], "1 mL")
         self.assertEqual(events[0]["recipe_code"], "R0")
 
+    def test_feed_rejected_when_plant_unassigned(self):
+        experiment = Experiment.objects.create(
+            name="Feed Unassigned",
+            lifecycle_state=Experiment.LifecycleState.RUNNING,
+        )
+        species = Species.objects.create(name="Drosera unassigned", category="drosera")
+        plant = Plant.objects.create(experiment=experiment, species=species, plant_id="DR-799")
+
+        response = self.client.post(
+            f"/api/v1/plants/{plant.id}/feed",
+            data={"amount_text": "1 mL"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"],
+            "This plant has no recipe assignment yet. Assign recipes before feeding.",
+        )
+
+    def test_feed_rejected_when_recipe_mismatch(self):
+        experiment = Experiment.objects.create(
+            name="Feed Recipe Mismatch",
+            lifecycle_state=Experiment.LifecycleState.RUNNING,
+        )
+        species = Species.objects.create(name="Drosera mismatch", category="drosera")
+        assigned = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        other = Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+        plant = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="DR-712",
+            assigned_recipe=assigned,
+        )
+
+        response = self.client.post(
+            f"/api/v1/plants/{plant.id}/feed",
+            data={"recipe_id": str(other.id), "amount_text": "2 drops"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"],
+            "Feeding must use the plant's assigned recipe.",
+        )
+
     def test_feeding_queue_remaining_and_ordering(self):
         experiment = Experiment.objects.create(
             name="Feed Queue",
             lifecycle_state=Experiment.LifecycleState.RUNNING,
         )
         species = Species.objects.create(name="Pinguicula x", category="pinguicula")
-        p1 = Plant.objects.create(experiment=experiment, species=species, plant_id="PG-001")
-        p2 = Plant.objects.create(experiment=experiment, species=species, plant_id="PG-002")
-        p3 = Plant.objects.create(experiment=experiment, species=species, plant_id="PG-003")
-        p4 = Plant.objects.create(experiment=experiment, species=species, plant_id="PG-004")
+        r0 = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        r1 = Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+        p1 = Plant.objects.create(
+            experiment=experiment, species=species, plant_id="PG-001", assigned_recipe=r0
+        )
+        p2 = Plant.objects.create(
+            experiment=experiment, species=species, plant_id="PG-002", assigned_recipe=r1
+        )
+        p3 = Plant.objects.create(
+            experiment=experiment, species=species, plant_id="PG-003", assigned_recipe=r1
+        )
+        p4 = Plant.objects.create(
+            experiment=experiment, species=species, plant_id="PG-004", assigned_recipe=r0
+        )
         Plant.objects.create(
             experiment=experiment,
             species=species,
@@ -939,6 +1005,9 @@ class FeedingApiTests(TestCase):
         payload = response.json()
         self.assertEqual(payload["remaining_count"], 3)
         self.assertEqual(payload["window_days"], 7)
+        self.assertEqual(payload["plants"][0]["assigned_recipe_code"], "R1")
+        self.assertEqual(payload["plants"][0]["assigned_recipe_name"], "Treatment 1")
+        self.assertEqual(payload["plants"][0]["assigned_recipe_id"], str(r1.id))
 
         plant_ids = [item["plant_id"] for item in payload["plants"]]
         self.assertEqual(plant_ids[:4], ["PG-002", "PG-004", "PG-001", "PG-003"])
@@ -987,7 +1056,9 @@ class PlantCockpitTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload["derived"]["has_baseline"])
+        self.assertEqual(payload["derived"]["assigned_recipe_id"], str(recipe.id))
         self.assertEqual(payload["derived"]["assigned_recipe_code"], "R1")
+        self.assertEqual(payload["derived"]["assigned_recipe_name"], "Treatment 1")
         self.assertEqual(payload["derived"]["last_fed_at"], last_fed_at.isoformat())
         self.assertEqual(payload["plant"]["plant_id"], "NP-301")
         self.assertEqual(
@@ -1030,7 +1101,9 @@ class PlantCockpitTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertFalse(payload["derived"]["has_baseline"])
+        self.assertIsNone(payload["derived"]["assigned_recipe_id"])
         self.assertIsNone(payload["derived"]["assigned_recipe_code"])
+        self.assertIsNone(payload["derived"]["assigned_recipe_name"])
         self.assertEqual(payload["recent_photos"], [])
 
 
@@ -1497,6 +1570,14 @@ class Packet4GroupsTests(TestCase):
             assigned_recipe__isnull=False,
         ).count()
         self.assertEqual(assigned_count, len(plants))
+        assigned_recipes = list(
+            Plant.objects.filter(id__in=[plant.id for plant in plants]).values_list(
+                "assigned_recipe__code", flat=True
+            )
+        )
+        self.assertTrue(all(code in {"R0", "R1"} for code in assigned_recipes))
+        self.assertTrue(any(code == "R0" for code in assigned_recipes))
+        self.assertTrue(any(code == "R1" for code in assigned_recipes))
 
         setup_state = ExperimentSetupState.objects.get(experiment=experiment)
         groups_payload = setup_state.packet_data.get(PACKET_GROUPS, {})
@@ -1504,6 +1585,32 @@ class Packet4GroupsTests(TestCase):
         self.assertEqual(groups_payload.get("seed"), seed)
         self.assertIn("applied_at", groups_payload)
         self.assertEqual(groups_payload.get("locked"), False)
+
+    def test_apply_excludes_removed_plants_from_assignment(self):
+        experiment = Experiment.objects.create(name="Groups Apply Active Only")
+        active_plants = self._create_binned_plants(experiment)
+        removed = Plant.objects.create(
+            experiment=experiment,
+            species=active_plants[0].species,
+            plant_id="NP-999",
+            bin="A",
+            status=Plant.Status.REMOVED,
+        )
+        Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/groups/apply",
+            data={"seed": 99},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            Plant.objects.filter(id__in=[plant.id for plant in active_plants], assigned_recipe__isnull=False).count(),
+            len(active_plants),
+        )
+        removed.refresh_from_db()
+        self.assertIsNone(removed.assigned_recipe)
 
     def test_complete_groups_packet_requires_assignments_and_locks_ui_state(self):
         experiment = Experiment.objects.create(name="Groups Complete")
