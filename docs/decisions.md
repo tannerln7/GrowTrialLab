@@ -8,7 +8,7 @@ This file records architecture/product decisions and why they were made.
   - Redirect to `/experiments/{id}/setup` until bootstrap setup is complete.
   - Redirect to `/experiments/{id}/overview` once bootstrap setup is complete.
 - Canonical bootstrap setup scope: Plants, Tents+Blocks/Slots, Recipes only.
-- Canonical readiness flows: `/experiments/{id}/baseline`, `/experiments/{id}/placement`, `/experiments/{id}/rotation`, and `/experiments/{id}/feeding`, launched from Overview.
+- Canonical readiness flows: `/experiments/{id}/baseline`, `/experiments/{id}/placement`, `/experiments/{id}/rotation`, `/experiments/{id}/feeding`, and `/experiments/{id}/schedule`, launched from Overview.
 - Assignment page remains available for legacy recipe/group tooling, but tray-level placement is now the canonical recipe-assignment source for operations (`Tray.assigned_recipe`).
 - Lifecycle prerequisite policy: deletion gating and strict immutability are deferred until lifecycle primitives (`draft`/`running`/`stopped`) exist.
 - Terminology policy: API/DB key `bin` remains stable, but user-facing UI copy uses **Grade**.
@@ -154,6 +154,18 @@ This file records architecture/product decisions and why they were made.
 - Refs: `90aa50fb`, `af3c5c71`, `6146269d`.
 - Invariants: Backend feed writes enforce lifecycle `running` (`409` when draft/stopped); queue uses a fixed 7-day needs-feeding window for v1.
 - Deferred hooks: lot/batch integration and richer dose structure are intentionally deferred.
+
+### 2026-02-14: Scheduling MVP is timeframe-first and grouped by execution slot
+- Decision: Add first-class schedule entities (`ScheduleAction`, `ScheduleRule`, `ScheduleScope`) and expose `GET/POST /api/v1/experiments/{id}/schedules`, `PATCH/DELETE /api/v1/schedules/{id}`, and `GET /api/v1/experiments/{id}/schedules/plan`.
+- Rationale: Operators need a simple recurring-action planner that supports weekly patterns and interval rules without introducing background job infrastructure in v1.
+- Invariants:
+  - Plan grouping key is `date + exact_time` (when set) or `date + timeframe`; exact-time actions do not merge into generic timeframe buckets.
+  - Slot actions are deterministically ordered by `action_type` then `title`.
+  - Schedules guide operator work; they do not auto-execute and they do not bypass lifecycle gates on feed/rotation execution endpoints.
+- UX alignment:
+  - `/experiments/{id}/schedule` is overview-launched and mobile-first.
+  - Scope pickers are grouped by physical location (Tent/Tray/Plant) with restriction and occupancy context.
+  - Feed schedules surface blockers (`Needs tray recipe`, `Unplaced`, `Experiment not running`) instead of silently failing at save time.
 
 ### 2026-02-14: Trays are the canonical assignment unit; feeding is locked to tray recipe
 - Decision: Canonical assignment for operations is derived from placement (`TrayPlant -> Tray.assigned_recipe`), not from a separate per-plant assignment field. `Plant.assigned_recipe` is retained only as compatibility fallback where needed.

@@ -24,6 +24,7 @@ Status convention:
   - Placement: `/experiments/{id}/placement`
   - Rotation: `/experiments/{id}/rotation`
   - Feeding: `/experiments/{id}/feeding`
+  - Schedule: `/experiments/{id}/schedule`
 - Terminology note: API/DB field `bin` remains unchanged for compatibility, but UI presents it as **Grade** to avoid confusion with physical tray/bin containers.
 - Assignment route (`/experiments/{id}/assignment`) remains for legacy recipe/group tooling, but tray placement (`Tray.assigned_recipe`) is the canonical recipe-assignment source for start/readiness/feeding.
 - Experiment lifecycle is being introduced as a prerequisite for future delete-gating/immutability:
@@ -39,7 +40,7 @@ Status convention:
 ## Current Status Summary
 The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Setup is now bootstrap-only (Plants, Tents+Blocks/Slots, Recipes), and readiness workflows (baseline + placement/tray recipes + feeding) are centered in Overview and dedicated pages.
 
-Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Baseline and Groups/Assignment are implemented with UI-only lock semantics, and `/p/{uuid}` now functions as a mobile-first plant cockpit/task launcher.
+Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Baseline and Groups/Assignment are implemented with UI-only lock semantics, `/p/{uuid}` now functions as a mobile-first plant cockpit/task launcher, and Scheduling MVP provides timeframe-based recurring action planning with grouped upcoming slots.
 
 The largest remaining V1 work is lifecycle hardening (immutability/deletion policies), production-hardening/security/deployment details, and operational guardrails (backups, stricter step-lock governance, reporting/export paths).
 
@@ -174,6 +175,10 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Refs: `90aa50fb`, `af3c5c71`, `6146269d`
   - Routes: `GET /api/v1/experiments/{id}/feeding/queue`, `POST /api/v1/plants/{uuid}/feed`, `GET /api/v1/plants/{uuid}/feeding/recent`, `/experiments/{id}/feeding`.
   - Notes: Feeding writes are lifecycle-gated to `running` (backend `409` outside running); queue uses a 7-day needs-first window and Plant Cockpit now exposes last-fed hint + quick feed launch.
+- [x] Scheduling MVP with timeframe-based recurring action planning (owner: Codex)
+  - Refs: `de03652d`, `4a775bfe`
+  - Routes: `GET/POST /api/v1/experiments/{id}/schedules`, `PATCH/DELETE /api/v1/schedules/{id}`, `GET /api/v1/experiments/{id}/schedules/plan`, `/experiments/{id}/schedule`.
+  - Notes: Plan view groups actions by date + exact time (or timeframe bucket), keeps deterministic ordering, and surfaces blocker badges (`experiment not running`, `needs tray recipe`, `unplaced`) without auto-executing actions.
 - [x] Tray-canonical assignment + recipe-locked feeding/readiness (owner: Codex)
   - Refs: `fec05082`, `a3fd3a1d`
   - Routes: `GET /api/v1/experiments/{id}/status/summary`, `GET /api/v1/experiments/{id}/overview/plants`, `GET /api/v1/plants/{uuid}/cockpit`, `GET /api/v1/experiments/{id}/feeding/queue`, `POST /api/v1/plants/{uuid}/feed`, `POST /api/v1/experiments/{id}/placement/auto`, `PATCH /api/v1/trays/{id}/`.
@@ -248,6 +253,11 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - API refs: `/api/v1/lots`, `/api/v1/recipes`.
 - [ ] Build weekly execution loop (session checklist + feeding + adverse events + metrics) (owner: Codex)
   - API refs: `/api/v1/weekly-sessions`, `/api/v1/feeding-events`, `/api/v1/adverse-events`, `/api/v1/plant-weekly-metrics`.
+
+### Scheduling
+- [ ] Add schedule execution assist actions (mark complete/skipped from plan slots) (owner: Codex)
+- [ ] Add schedule-specific overview aggregates beyond `due_counts_today` (owner: Codex)
+- [ ] Add optional reminders/notifications policy (owner: manual)
 
 ### Photos & Media Handling
 - [ ] (in progress) Expand photo UX beyond cockpit inline capture (owner: Codex)
