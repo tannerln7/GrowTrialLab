@@ -110,6 +110,9 @@ class PlantViewSet(ExperimentFilteredViewSet):
 
     def perform_update(self, serializer):
         instance = serializer.instance
+        if instance is None:
+            serializer.save()
+            return
         new_bin = serializer.validated_data.get("bin")
         bin_change_requested = "bin" in serializer.validated_data and new_bin != instance.bin
         if (
@@ -165,6 +168,9 @@ class PlantWeeklyMetricViewSet(ExperimentFilteredViewSet):
 
     def perform_update(self, serializer):
         instance = serializer.instance
+        if instance is None:
+            serializer.save()
+            return
         experiment = serializer.validated_data.get("experiment", instance.experiment)
         week_number = serializer.validated_data.get("week_number", instance.week_number)
         self._assert_unlocked(experiment, week_number)
