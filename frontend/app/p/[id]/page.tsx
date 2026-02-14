@@ -25,6 +25,11 @@ type PlantDetail = {
     id: string;
     name: string;
   };
+  assigned_recipe: {
+    id: string;
+    code: string;
+    name: string;
+  } | null;
   created_at: string;
   updated_at: string;
 };
@@ -167,6 +172,8 @@ export default function PlantQrPage() {
               <strong>{plant.cultivar || "-"}</strong>
               <span>Status</span>
               <strong>{plant.status}</strong>
+              <span>Assigned Group</span>
+              <strong>{plant.assigned_recipe?.code || "(unassigned)"}</strong>
             </div>
 
             <div className={styles.actions}>

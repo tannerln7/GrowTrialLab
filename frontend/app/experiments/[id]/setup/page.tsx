@@ -61,6 +61,50 @@ type BaselineStatus = {
   plants: BaselinePlantStatus[];
 };
 
+type GroupRecipe = {
+  id: string;
+  code: string;
+  name: string;
+  notes: string;
+};
+
+type GroupSummary = {
+  total_plants: number;
+  assigned: number;
+  unassigned: number;
+  counts_by_recipe_code: Record<string, number>;
+  counts_by_bin: Record<string, Record<string, number>>;
+  counts_by_category: Record<string, Record<string, number>>;
+};
+
+type GroupsStatus = {
+  baseline_packet_complete: boolean;
+  bins_assigned: number;
+  total_active_plants: number;
+  groups_locked: boolean;
+  packet_complete: boolean;
+  recipes: GroupRecipe[];
+  summary: GroupSummary;
+  packet_data: {
+    notes?: string;
+    seed?: number;
+    algorithm?: string;
+    applied_at?: string;
+    recipe_codes?: string[];
+    locked?: boolean;
+  };
+};
+
+type GroupsPreviewResponse = {
+  seed: number;
+  algorithm: string;
+  proposed_assignments: Array<{
+    plant_uuid: string;
+    proposed_recipe_code: string;
+  }>;
+  summary: GroupSummary;
+};
+
 type EnvironmentForm = {
   tent_name: string;
   light_schedule: string;
@@ -146,6 +190,20 @@ export default function ExperimentSetupPage() {
   const [csvText, setCsvText] = useState("");
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [baselineStatus, setBaselineStatus] = useState<BaselineStatus | null>(null);
+  const [groupsStatus, setGroupsStatus] = useState<GroupsStatus | null>(null);
+  const [groupsNotes, setGroupsNotes] = useState("");
+  const [newRecipeCode, setNewRecipeCode] = useState("R0");
+  const [newRecipeName, setNewRecipeName] = useState("Control");
+  const [newRecipeNotes, setNewRecipeNotes] = useState("");
+  const [groupsSeedInput, setGroupsSeedInput] = useState("");
+  const [previewSeed, setPreviewSeed] = useState<number | null>(null);
+  const [previewAssignments, setPreviewAssignments] = useState<
+    Array<{ plant_uuid: string; proposed_recipe_code: string }>
+  >([]);
+  const [previewSummary, setPreviewSummary] = useState<GroupSummary | null>(null);
+  const [groupsEditingUnlocked, setGroupsEditingUnlocked] = useState(false);
+  const [showGroupsUnlockModal, setShowGroupsUnlockModal] = useState(false);
+  const [groupsUnlockConfirmed, setGroupsUnlockConfirmed] = useState(false);
 
   function handleRequestError(
     requestError: unknown,
@@ -211,6 +269,27 @@ export default function ExperimentSetupPage() {
     setBaselineStatus(data);
   }, [experimentId]);
 
+  const fetchGroupsStatus = useCallback(async () => {
+    const response = await backendFetch(
+      `/api/v1/experiments/${experimentId}/groups/status`,
+    );
+    if (!response.ok) {
+      throw new Error("Unable to load groups status.");
+    }
+    const data = (await response.json()) as GroupsStatus;
+    setGroupsStatus(data);
+    setGroupsNotes(data.packet_data?.notes ?? "");
+    if (typeof data.packet_data?.seed === "number") {
+      setGroupsSeedInput(String(data.packet_data.seed));
+      setPreviewSeed(data.packet_data.seed);
+    }
+    if (!data.groups_locked) {
+      setGroupsEditingUnlocked(false);
+      setShowGroupsUnlockModal(false);
+      setGroupsUnlockConfirmed(false);
+    }
+  }, [experimentId]);
+
   const reloadPageData = useCallback(async () => {
     if (!experimentId) {
       return;
@@ -229,6 +308,7 @@ export default function ExperimentSetupPage() {
         fetchBlocks(),
         fetchPlants(),
         fetchBaselineStatus(),
+        fetchGroupsStatus(),
       ]);
       setOffline(false);
     } catch (requestError) {
@@ -236,7 +316,14 @@ export default function ExperimentSetupPage() {
     } finally {
       setLoading(false);
     }
-  }, [experimentId, fetchSetupState, fetchBlocks, fetchPlants, fetchBaselineStatus]);
+  }, [
+    experimentId,
+    fetchSetupState,
+    fetchBlocks,
+    fetchPlants,
+    fetchBaselineStatus,
+    fetchGroupsStatus,
+  ]);
 
   useEffect(() => {
     void reloadPageData();
@@ -540,6 +627,245 @@ export default function ExperimentSetupPage() {
     }
   }
 
+  function parseSeedInput(): number | null {
+    const trimmed = groupsSeedInput.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const parsed = Number.parseInt(trimmed, 10);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      return null;
+    }
+    return parsed;
+  }
+
+  async function saveGroupsPacket(showNotice = true) {
+    setError("");
+    try {
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/packets/groups/`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notes: groupsNotes }),
+        },
+      );
+      if (!response.ok) {
+        setError("Unable to save groups packet settings.");
+        return false;
+      }
+      if (showNotice) {
+        setNotice("Packet 4 settings saved.");
+      }
+      await fetchSetupState();
+      await fetchGroupsStatus();
+      setOffline(false);
+      return true;
+    } catch (requestError) {
+      setError(
+        handleRequestError(requestError, "Unable to save groups packet settings."),
+      );
+      return false;
+    }
+  }
+
+  async function addGroupRecipe() {
+    const trimmedCode = newRecipeCode.trim();
+    const trimmedName = newRecipeName.trim();
+    if (!/^R\d+$/.test(trimmedCode)) {
+      setError("Recipe code must match R0, R1, R2...");
+      return;
+    }
+    if (!trimmedName) {
+      setError("Recipe name is required.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/groups/recipes`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: trimmedCode,
+            name: trimmedName,
+            notes: newRecipeNotes,
+          }),
+        },
+      );
+      if (!response.ok) {
+        const payload = (await response.json()) as { detail?: string };
+        setError(payload.detail ?? "Unable to add recipe.");
+        return;
+      }
+      setNotice(`Added recipe ${trimmedCode}.`);
+      setNewRecipeCode("");
+      setNewRecipeName("");
+      setNewRecipeNotes("");
+      await fetchGroupsStatus();
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to add recipe."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveRecipe(recipe: GroupRecipe) {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/groups/recipes/${recipe.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: recipe.name,
+            notes: recipe.notes,
+          }),
+        },
+      );
+      if (!response.ok) {
+        const payload = (await response.json()) as { detail?: string };
+        setError(payload.detail ?? `Unable to update ${recipe.code}.`);
+        return;
+      }
+      setNotice(`Saved ${recipe.code}.`);
+      await fetchGroupsStatus();
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, `Unable to update ${recipe.code}.`));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function previewGroups(useFreshSeed = false) {
+    const parsedSeed = parseSeedInput();
+    if (!useFreshSeed && groupsSeedInput.trim() && parsedSeed === null) {
+      setError("Seed must be a positive integer.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/groups/preview`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(useFreshSeed ? {} : parsedSeed ? { seed: parsedSeed } : {}),
+        },
+      );
+      if (!response.ok) {
+        const payload = (await response.json()) as {
+          detail?: string;
+          errors?: string[];
+        };
+        setError(payload.errors?.join(" ") || payload.detail || "Unable to preview assignment.");
+        return;
+      }
+      const data = (await response.json()) as GroupsPreviewResponse;
+      setPreviewSeed(data.seed);
+      setGroupsSeedInput(String(data.seed));
+      setPreviewAssignments(data.proposed_assignments);
+      setPreviewSummary(data.summary);
+      setNotice(`Preview ready with seed ${data.seed}.`);
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to preview assignment."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function applyGroups() {
+    const seedToUse = previewSeed ?? parseSeedInput();
+    if (seedToUse === null) {
+      setError("Preview assignments first or provide a valid seed.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/groups/apply`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ seed: seedToUse }),
+        },
+      );
+      if (!response.ok) {
+        const payload = (await response.json()) as {
+          detail?: string;
+          errors?: string[];
+        };
+        setError(payload.errors?.join(" ") || payload.detail || "Unable to apply assignment.");
+        return;
+      }
+      const data = (await response.json()) as {
+        seed: number;
+        summary: GroupSummary;
+      };
+      setPreviewSeed(data.seed);
+      setGroupsSeedInput(String(data.seed));
+      setPreviewSummary(data.summary);
+      setNotice(`Applied assignment with seed ${data.seed}.`);
+      await fetchGroupsStatus();
+      await fetchPlants();
+      await fetchSetupState();
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to apply assignment."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function completeGroupsPacket() {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const saved = await saveGroupsPacket(false);
+      if (!saved) {
+        return;
+      }
+
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/packets/groups/complete/`,
+        { method: "POST" },
+      );
+      if (!response.ok) {
+        const payload = (await response.json()) as {
+          detail?: string;
+          errors?: string[];
+        };
+        setError(payload.errors?.join(" ") || payload.detail || "Packet 4 is not complete.");
+        return;
+      }
+      await fetchSetupState();
+      await fetchGroupsStatus();
+      setNotice("Packet 4 completed and UI lock enabled.");
+      setOffline(false);
+    } catch (requestError) {
+      setError(handleRequestError(requestError, "Unable to complete packet."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function addPlantsQuick() {
     if (manualQuantity > 1 && manualPlantId.trim()) {
       setError("Manual plant_id can only be used when quantity is 1.");
@@ -666,6 +992,30 @@ export default function ExperimentSetupPage() {
   }
 
   const hasPendingPlantIds = plants.some((plant) => !plant.plant_id);
+  const recipeRows = Object.entries(
+    groupsStatus?.summary.counts_by_recipe_code ?? {},
+  ).map(([code, count]) => ({ code, count }));
+  const byBinRows = Object.entries(groupsStatus?.summary.counts_by_bin ?? {}).map(
+    ([bin, counts]) => ({
+      bin,
+      counts: Object.entries(counts)
+        .map(([code, count]) => `${code}:${count}`)
+        .join("  "),
+    }),
+  );
+  const nextRecipeCodeSuggestion = useMemo(() => {
+    const maxSuffix = (groupsStatus?.recipes ?? []).reduce((max, recipe) => {
+      const numeric = Number.parseInt(recipe.code.replace(/^R/, ""), 10);
+      if (Number.isInteger(numeric)) {
+        return Math.max(max, numeric);
+      }
+      return max;
+    }, -1);
+    const nextSuffix = maxSuffix < 0 ? 0 : maxSuffix + 1;
+    return `R${nextSuffix}`;
+  }, [groupsStatus?.recipes]);
+  const groupsReadOnly = Boolean(groupsStatus?.groups_locked) && !groupsEditingUnlocked;
+  const recipeCodeValid = /^R\d+$/.test(newRecipeCode.trim());
 
   const packetProgress = setupState?.packet_progress ?? FALLBACK_PACKETS;
 
@@ -686,7 +1036,8 @@ export default function ExperimentSetupPage() {
       stickyOffset={
         currentPacket === "environment" ||
         currentPacket === "plants" ||
-        currentPacket === "baseline"
+        currentPacket === "baseline" ||
+        currentPacket === "groups"
       }
       actions={
         <div className={styles.actions}>
@@ -1238,9 +1589,355 @@ export default function ExperimentSetupPage() {
               </>
             ) : null}
 
+            {currentPacket === "groups" ? (
+              <>
+                <SectionCard title="Packet 4: Groups + Randomization">
+                  {groupsStatus ? (
+                    <div className={styles.formGrid}>
+                      <p className={styles.mutedText}>
+                        Baseline packet complete:{" "}
+                        {groupsStatus.baseline_packet_complete ? "Yes" : "No"}
+                      </p>
+                      <p className={styles.mutedText}>
+                        Bin coverage: {groupsStatus.bins_assigned} /{" "}
+                        {groupsStatus.total_active_plants} active plants
+                      </p>
+                      <p className={styles.mutedText}>
+                        Assigned: {groupsStatus.summary.assigned} /{" "}
+                        {groupsStatus.summary.total_plants}
+                      </p>
+                      <p className={styles.mutedText}>
+                        Unassigned: {groupsStatus.summary.unassigned}
+                      </p>
+                      <p className={styles.mutedText}>
+                        Packet complete: {groupsStatus.packet_complete ? "Yes" : "No"}
+                      </p>
+                      {groupsStatus.groups_locked ? (
+                        <p className={styles.successText}>Locked (UI-only guardrail)</p>
+                      ) : null}
+                      <p className={styles.inlineNote}>
+                        Locked prevents accidental edits in the UI. API edits are still allowed.
+                      </p>
+
+                      {groupsStatus.groups_locked ? (
+                        <div className={styles.actions}>
+                          {groupsReadOnly ? (
+                            <button
+                              className={styles.buttonSecondary}
+                              type="button"
+                              onClick={() => setShowGroupsUnlockModal(true)}
+                            >
+                              Unlock editing
+                            </button>
+                          ) : (
+                            <button
+                              className={styles.buttonSecondary}
+                              type="button"
+                              onClick={() => {
+                                setGroupsEditingUnlocked(false);
+                                setGroupsUnlockConfirmed(false);
+                              }}
+                            >
+                              Re-lock
+                            </button>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className={styles.mutedText}>Loading group status...</p>
+                  )}
+                </SectionCard>
+
+                <SectionCard title="Packet Notes">
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Notes</span>
+                    <textarea
+                      className={styles.textarea}
+                      value={groupsNotes}
+                      disabled={groupsReadOnly}
+                      onChange={(event) => setGroupsNotes(event.target.value)}
+                    />
+                  </label>
+                </SectionCard>
+
+                <SectionCard title="Recipe Editor">
+                  <p className={styles.inlineNote}>
+                    Recipes must include R0 (control) and at least one treatment recipe.
+                  </p>
+                  <div className={styles.blocksList}>
+                    {(groupsStatus?.recipes ?? []).map((recipe) => (
+                      <article className={styles.blockRow} key={recipe.id}>
+                        <strong>{recipe.code}</strong>
+                        <label className={styles.field}>
+                          <span className={styles.fieldLabel}>Name</span>
+                          <input
+                            className={styles.input}
+                            value={recipe.name}
+                            disabled={groupsReadOnly}
+                            onChange={(event) =>
+                              setGroupsStatus((prev) => {
+                                if (!prev) {
+                                  return prev;
+                                }
+                                return {
+                                  ...prev,
+                                  recipes: prev.recipes.map((item) =>
+                                    item.id === recipe.id
+                                      ? { ...item, name: event.target.value }
+                                      : item,
+                                  ),
+                                };
+                              })
+                            }
+                          />
+                        </label>
+                        <label className={styles.field}>
+                          <span className={styles.fieldLabel}>Notes</span>
+                          <textarea
+                            className={styles.textarea}
+                            value={recipe.notes}
+                            disabled={groupsReadOnly}
+                            onChange={(event) =>
+                              setGroupsStatus((prev) => {
+                                if (!prev) {
+                                  return prev;
+                                }
+                                return {
+                                  ...prev,
+                                  recipes: prev.recipes.map((item) =>
+                                    item.id === recipe.id
+                                      ? { ...item, notes: event.target.value }
+                                      : item,
+                                  ),
+                                };
+                              })
+                            }
+                          />
+                        </label>
+                        <button
+                          className={styles.buttonSecondary}
+                          type="button"
+                          disabled={saving || groupsReadOnly}
+                          onClick={() => void saveRecipe(recipe)}
+                        >
+                          Save recipe
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+
+                  <div className={styles.formGrid}>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Recipe code</span>
+                      <input
+                        className={styles.input}
+                        placeholder={nextRecipeCodeSuggestion}
+                        value={newRecipeCode}
+                        disabled={groupsReadOnly}
+                        onChange={(event) =>
+                          setNewRecipeCode(event.target.value.toUpperCase())
+                        }
+                      />
+                    </label>
+                    {!recipeCodeValid && newRecipeCode.trim() ? (
+                      <p className={styles.errorText}>Use format R0, R1, R2...</p>
+                    ) : null}
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Name</span>
+                      <input
+                        className={styles.input}
+                        placeholder={
+                          newRecipeCode.trim() === "R0" ? "Control" : "Treatment"
+                        }
+                        value={newRecipeName}
+                        disabled={groupsReadOnly}
+                        onChange={(event) => setNewRecipeName(event.target.value)}
+                      />
+                    </label>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Notes</span>
+                      <textarea
+                        className={styles.textarea}
+                        value={newRecipeNotes}
+                        disabled={groupsReadOnly}
+                        onChange={(event) => setNewRecipeNotes(event.target.value)}
+                      />
+                    </label>
+                    <button
+                      className={styles.buttonSecondary}
+                      type="button"
+                      disabled={saving || groupsReadOnly || !recipeCodeValid}
+                      onClick={() => void addGroupRecipe()}
+                    >
+                      Add recipe
+                    </button>
+                  </div>
+                </SectionCard>
+
+                <SectionCard title="Randomization">
+                  <div className={styles.formGrid}>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Seed (optional)</span>
+                      <input
+                        className={styles.input}
+                        type="number"
+                        min={1}
+                        value={groupsSeedInput}
+                        disabled={groupsReadOnly}
+                        onChange={(event) => setGroupsSeedInput(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <div className={styles.actions}>
+                    <button
+                      className={styles.buttonPrimary}
+                      type="button"
+                      disabled={saving || groupsReadOnly}
+                      onClick={() => void previewGroups()}
+                    >
+                      Preview assignment
+                    </button>
+                    <button
+                      className={styles.buttonSecondary}
+                      type="button"
+                      disabled={saving || groupsReadOnly}
+                      onClick={() => void applyGroups()}
+                    >
+                      Apply assignment
+                    </button>
+                    <button
+                      className={styles.buttonSecondary}
+                      type="button"
+                      disabled={saving || groupsReadOnly}
+                      onClick={() => {
+                        setGroupsSeedInput("");
+                        setPreviewSeed(null);
+                        setPreviewAssignments([]);
+                        void previewGroups(true);
+                      }}
+                    >
+                      Reroll
+                    </button>
+                  </div>
+                  {previewSeed ? (
+                    <p className={styles.mutedText}>Preview seed: {previewSeed}</p>
+                  ) : null}
+                </SectionCard>
+
+                <SectionCard title="Distribution Summary">
+                  {previewSummary ? (
+                    <p className={styles.mutedText}>
+                      Preview totals: {previewSummary.assigned} assigned /{" "}
+                      {previewSummary.total_plants} plants
+                    </p>
+                  ) : null}
+
+                  <ResponsiveList
+                    items={recipeRows}
+                    getKey={(item) => item.code}
+                    columns={[
+                      {
+                        key: "recipe",
+                        label: "Recipe",
+                        render: (item) => item.code,
+                      },
+                      {
+                        key: "count",
+                        label: "Count",
+                        render: (item) => item.count,
+                      },
+                    ]}
+                    renderMobileCard={(item) => (
+                      <div className={styles.cardKeyValue}>
+                        <span>Recipe</span>
+                        <strong>{item.code}</strong>
+                        <span>Count</span>
+                        <strong>{item.count}</strong>
+                      </div>
+                    )}
+                  />
+
+                  <ResponsiveList
+                    items={byBinRows}
+                    getKey={(item) => item.bin}
+                    columns={[
+                      {
+                        key: "bin",
+                        label: "Bin",
+                        render: (item) => item.bin,
+                      },
+                      {
+                        key: "counts",
+                        label: "Recipe Split",
+                        render: (item) => item.counts || "-",
+                      },
+                    ]}
+                    renderMobileCard={(item) => (
+                      <div className={styles.cardKeyValue}>
+                        <span>Bin</span>
+                        <strong>{item.bin}</strong>
+                        <span>Recipe split</span>
+                        <strong>{item.counts || "-"}</strong>
+                      </div>
+                    )}
+                  />
+                </SectionCard>
+
+                {previewAssignments.length > 0 ? (
+                  <SectionCard title="Preview Assignments">
+                    <ResponsiveList
+                      items={previewAssignments}
+                      getKey={(item) => item.plant_uuid}
+                      columns={[
+                        {
+                          key: "plant",
+                          label: "Plant UUID",
+                          render: (item) => item.plant_uuid,
+                        },
+                        {
+                          key: "recipe",
+                          label: "Proposed Group",
+                          render: (item) => item.proposed_recipe_code,
+                        },
+                      ]}
+                      renderMobileCard={(item) => (
+                        <div className={styles.cardKeyValue}>
+                          <span>Plant UUID</span>
+                          <strong>{item.plant_uuid}</strong>
+                          <span>Proposed Group</span>
+                          <strong>{item.proposed_recipe_code}</strong>
+                        </div>
+                      )}
+                    />
+                  </SectionCard>
+                ) : null}
+
+                <StickyActionBar>
+                  <button
+                    className={styles.buttonPrimary}
+                    type="button"
+                    disabled={saving || groupsReadOnly}
+                    onClick={() => void saveGroupsPacket()}
+                  >
+                    Save
+                  </button>
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void completeGroupsPacket()}
+                  >
+                    {saving ? "Completing..." : "Mark Complete"}
+                  </button>
+                </StickyActionBar>
+              </>
+            ) : null}
+
             {currentPacket !== "environment" &&
             currentPacket !== "plants" &&
-            currentPacket !== "baseline" ? (
+            currentPacket !== "baseline" &&
+            currentPacket !== "groups" ? (
               <SectionCard title={currentPacket}>
                 <p className={styles.mutedText}>
                   This packet is not implemented yet. Complete Packet 1 and Packet 2 first.
@@ -1249,6 +1946,61 @@ export default function ExperimentSetupPage() {
             ) : null}
           </div>
         </section>
+      ) : null}
+      {showGroupsUnlockModal ? (
+        <div className={styles.modalBackdrop} role="presentation">
+          <SectionCard title="Unlock group editing">
+            <p className={styles.mutedText}>
+              Unlocking is local to this page session. Use this only when you need to revise
+              assignments.
+            </p>
+            <p className={styles.mutedText}>Examples:</p>
+            <p className={styles.mutedText}>
+              Added or replaced a plant after randomization.
+            </p>
+            <p className={styles.mutedText}>
+              Plant died/was removed and you need to rebalance groups.
+            </p>
+            <p className={styles.mutedText}>
+              Binning error invalidated the original stratification.
+            </p>
+            <p className={styles.mutedText}>
+              Wrong recipe definitions or seed were used.
+            </p>
+            <label className={styles.checkboxRow}>
+              <input
+                type="checkbox"
+                checked={groupsUnlockConfirmed}
+                onChange={(event) => setGroupsUnlockConfirmed(event.target.checked)}
+              />
+              <span>I understand and want to enable editing.</span>
+            </label>
+            <div className={styles.actions}>
+              <button
+                className={styles.buttonSecondary}
+                type="button"
+                onClick={() => {
+                  setShowGroupsUnlockModal(false);
+                  setGroupsUnlockConfirmed(false);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.buttonDanger}
+                type="button"
+                disabled={!groupsUnlockConfirmed}
+                onClick={() => {
+                  setGroupsEditingUnlocked(true);
+                  setShowGroupsUnlockModal(false);
+                  setGroupsUnlockConfirmed(false);
+                }}
+              >
+                Unlock editing
+              </button>
+            </div>
+          </SectionCard>
+        </div>
       ) : null}
     </PageShell>
   );
