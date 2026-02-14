@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError } from "@/lib/backend";
@@ -23,22 +23,20 @@ type PlantRow = {
   status: string;
 };
 
-type BaselinePlantStatus = {
-  id: string;
+type BaselineQueuePlant = {
+  uuid: string;
   plant_id: string;
   species_name: string;
   species_category: string;
-  bin: string | null;
-  baseline_done: boolean;
+  cultivar: string | null;
+  status: string;
+  has_baseline: boolean;
+  has_bin: boolean;
 };
 
-type BaselineStatus = {
-  total_plants: number;
-  baseline_completed: number;
-  bins_assigned: number;
-  photos_count: number;
-  baseline_locked: boolean;
-  plants: BaselinePlantStatus[];
+type BaselineQueueResponse = {
+  remaining_count: number;
+  plants: BaselineQueuePlant[];
 };
 
 type TemplateField = {
@@ -113,26 +111,28 @@ function normalizeTemplateFields(value: unknown): TemplateField[] {
   return fields;
 }
 
-function pickNextPlant(status: BaselineStatus, currentPlantId: string | null): string | null {
-  const prioritize = status.plants.filter((plant) => !plant.baseline_done || !plant.bin);
-  const pool = prioritize.length > 0 ? prioritize : status.plants;
-  if (pool.length === 0) {
+function needsBaseline(plant: BaselineQueuePlant): boolean {
+  return !plant.has_baseline || !plant.has_bin;
+}
+
+function pickNextMissingPlant(
+  queue: BaselineQueueResponse,
+  currentPlantId: string | null,
+): string | null {
+  const missing = queue.plants.filter((plant) => needsBaseline(plant));
+  if (missing.length === 0) {
     return null;
   }
-
   if (!currentPlantId) {
-    return pool[0].id;
+    return missing[0].uuid;
   }
-
-  const currentIndex = pool.findIndex((plant) => plant.id === currentPlantId);
-  if (currentIndex >= 0 && currentIndex + 1 < pool.length) {
-    return pool[currentIndex + 1].id;
-  }
-  return pool[0].id;
+  const next = missing.find((plant) => plant.uuid !== currentPlantId);
+  return next ? next.uuid : missing[0].uuid;
 }
 
 export default function BaselineCapturePage() {
   const params = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const experimentId = useMemo(() => {
@@ -155,7 +155,7 @@ export default function BaselineCapturePage() {
   const [notice, setNotice] = useState("");
 
   const [plants, setPlants] = useState<PlantRow[]>([]);
-  const [baselineStatus, setBaselineStatus] = useState<BaselineStatus | null>(null);
+  const [baselineQueue, setBaselineQueue] = useState<BaselineQueueResponse | null>(null);
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null);
   const [baselineLocked, setBaselineLocked] = useState(false);
   const [editingUnlocked, setEditingUnlocked] = useState(false);
@@ -169,10 +169,38 @@ export default function BaselineCapturePage() {
   const [selectedBin, setSelectedBin] = useState<"A" | "B" | "C" | "">("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
 
-  const selectedPlant = useMemo(
-    () => plants.find((plant) => plant.id === selectedPlantId) ?? null,
-    [plants, selectedPlantId],
+  const selectedPlant = useMemo(() => {
+    const plantFromList = plants.find((plant) => plant.id === selectedPlantId);
+    if (plantFromList) {
+      return plantFromList;
+    }
+    const plantFromQueue = baselineQueue?.plants.find((plant) => plant.uuid === selectedPlantId);
+    if (!plantFromQueue) {
+      return null;
+    }
+    return {
+      id: plantFromQueue.uuid,
+      species_name: plantFromQueue.species_name,
+      species_category: plantFromQueue.species_category,
+      plant_id: plantFromQueue.plant_id,
+      bin: plantFromQueue.has_bin ? "Assigned" : null,
+      cultivar: plantFromQueue.cultivar,
+      status: plantFromQueue.status,
+    };
+  }, [baselineQueue?.plants, plants, selectedPlantId]);
+  const selectedQueuePlant = useMemo(
+    () => baselineQueue?.plants.find((plant) => plant.uuid === selectedPlantId) ?? null,
+    [baselineQueue?.plants, selectedPlantId],
   );
+  const remainingCount = baselineQueue?.remaining_count ?? 0;
+  const upNextPlants = useMemo(() => {
+    if (!baselineQueue) {
+      return [];
+    }
+    return baselineQueue.plants
+      .filter((plant) => needsBaseline(plant) && plant.uuid !== selectedPlantId)
+      .slice(0, 3);
+  }, [baselineQueue, selectedPlantId]);
   const readOnly = baselineLocked && !editingUnlocked;
 
   function handleRequestError(requestError: unknown, fallbackMessage: string): string {
@@ -194,27 +222,34 @@ export default function BaselineCapturePage() {
     return data;
   }, [experimentId]);
 
-  const fetchBaselineStatus = useCallback(async () => {
-    const response = await backendFetch(
-      `/api/v1/experiments/${experimentId}/baseline/status`,
-    );
+  const fetchBaselineQueue = useCallback(async () => {
+    const response = await backendFetch(`/api/v1/experiments/${experimentId}/baseline/queue`);
     if (response.status === 403) {
       setNotInvited(true);
       return null;
     }
     if (!response.ok) {
-      throw new Error("Unable to load baseline status.");
+      throw new Error("Unable to load baseline queue.");
     }
-    const data = (await response.json()) as BaselineStatus;
-    setBaselineStatus(data);
-    setBaselineLocked(data.baseline_locked);
-    if (!data.baseline_locked) {
-      setEditingUnlocked(false);
-      setShowUnlockModal(false);
-      setUnlockConfirmed(false);
-    }
+    const data = (await response.json()) as BaselineQueueResponse;
+    setBaselineQueue(data);
     return data;
   }, [experimentId]);
+
+  const selectPlant = useCallback(
+    (plantId: string | null) => {
+      setSelectedPlantId(plantId);
+      const nextParams = new URLSearchParams(searchParams.toString());
+      if (plantId) {
+        nextParams.set("plant", plantId);
+      } else {
+        nextParams.delete("plant");
+      }
+      const query = nextParams.toString();
+      router.replace(`/experiments/${experimentId}/baseline${query ? `?${query}` : ""}`);
+    },
+    [experimentId, router, searchParams],
+  );
 
   const fetchPlantBaseline = useCallback(async (plantId: string) => {
     const response = await backendFetch(`/api/v1/plants/${plantId}/baseline`);
@@ -259,21 +294,23 @@ export default function BaselineCapturePage() {
           return;
         }
 
-        const [statusData, plantsData] = await Promise.all([
-          fetchBaselineStatus(),
+        const [queueData, plantsData] = await Promise.all([
+          fetchBaselineQueue(),
           fetchPlants(),
         ]);
-        if (!statusData) {
+        if (!queueData) {
           return;
         }
 
-        const preferredPlant =
-          preselectedPlantId && statusData.plants.some((plant) => plant.id === preselectedPlantId)
-            ? preselectedPlantId
-            : pickNextPlant(statusData, null);
-
-        if (preferredPlant && plantsData.some((plant) => plant.id === preferredPlant)) {
-          setSelectedPlantId(preferredPlant);
+        if (preselectedPlantId) {
+          setSelectedPlantId(preselectedPlantId);
+        } else if (queueData.remaining_count > 0) {
+          const firstMissing = pickNextMissingPlant(queueData, null);
+          if (firstMissing) {
+            selectPlant(firstMissing);
+          }
+        } else if (!preselectedPlantId && plantsData.length > 0) {
+          setSelectedPlantId(null);
         }
 
         setOffline(false);
@@ -285,7 +322,7 @@ export default function BaselineCapturePage() {
     }
 
     void loadInitial();
-  }, [experimentId, fetchBaselineStatus, fetchPlants, preselectedPlantId]);
+  }, [experimentId, fetchBaselineQueue, fetchPlants, preselectedPlantId, selectPlant]);
 
   useEffect(() => {
     async function loadSelectedPlantBaseline() {
@@ -361,23 +398,38 @@ export default function BaselineCapturePage() {
       }
 
       await uploadBaselinePhoto(selectedPlantId);
-      const statusData = await fetchBaselineStatus();
+      const queueData = await fetchBaselineQueue();
       await fetchPlants();
       await fetchPlantBaseline(selectedPlantId);
 
-      if (advance && statusData) {
-        const nextPlantId = pickNextPlant(statusData, selectedPlantId);
+      if (advance && queueData) {
+        const nextPlantId = pickNextMissingPlant(queueData, selectedPlantId);
         if (nextPlantId) {
-          setSelectedPlantId(nextPlantId);
+          selectPlant(nextPlantId);
+          setNotice("Baseline saved. Moved to next missing plant.");
+        } else {
+          setNotice("All baselines complete.");
+          selectPlant(null);
+          router.replace(`/experiments/${experimentId}/overview`);
         }
+      } else {
+        setNotice("Baseline saved.");
       }
-
-      setNotice(advance ? "Baseline saved. Moved to next plant." : "Baseline saved.");
       setOffline(false);
     } catch (requestError) {
       setError(handleRequestError(requestError, "Unable to save baseline."));
     } finally {
       setSaving(false);
+    }
+  }
+
+  function jumpToNextMissingBaseline() {
+    if (!baselineQueue) {
+      return;
+    }
+    const nextPlantId = pickNextMissingPlant(baselineQueue, selectedPlantId);
+    if (nextPlantId) {
+      selectPlant(nextPlantId);
     }
   }
 
@@ -445,12 +497,40 @@ export default function BaselineCapturePage() {
       {notice ? <p className={styles.successText}>{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
-      {baselineStatus ? (
-        <SectionCard title="Status">
-          <p className={styles.mutedText}>Plants: {baselineStatus.total_plants}</p>
-          <p className={styles.mutedText}>Baseline done: {baselineStatus.baseline_completed}</p>
-          <p className={styles.mutedText}>Bins assigned: {baselineStatus.bins_assigned}</p>
-          <p className={styles.mutedText}>Baseline photos: {baselineStatus.photos_count}</p>
+      {baselineQueue ? (
+        <SectionCard title="Queue Status">
+          <p className={styles.mutedText}>Remaining baselines: {remainingCount}</p>
+          {selectedQueuePlant?.has_baseline && selectedQueuePlant.has_bin ? (
+            <div className={styles.stack}>
+              <p className={styles.inlineNote}>This plant is complete.</p>
+              {remainingCount > 0 ? (
+                <button
+                  className={styles.buttonSecondary}
+                  type="button"
+                  onClick={jumpToNextMissingBaseline}
+                >
+                  Next missing baseline
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {upNextPlants.length > 0 ? (
+            <details>
+              <summary className={styles.fieldLabel}>Up next</summary>
+              <div className={styles.actions}>
+                {upNextPlants.map((plant) => (
+                  <button
+                    className={styles.buttonSecondary}
+                    key={plant.uuid}
+                    type="button"
+                    onClick={() => selectPlant(plant.uuid)}
+                  >
+                    {plant.plant_id || "(pending)"}
+                  </button>
+                ))}
+              </div>
+            </details>
+          ) : null}
           {baselineLocked ? (
             <>
               <p className={styles.successText}>
@@ -483,18 +563,29 @@ export default function BaselineCapturePage() {
         </SectionCard>
       ) : null}
 
-      {baselineStatus && baselineStatus.total_plants === 0 ? (
+      {baselineQueue && baselineQueue.plants.length === 0 ? (
         <SectionCard title="Plants">
           <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
         </SectionCard>
       ) : null}
 
-      {baselineStatus && baselineStatus.total_plants > 0 ? (
+      {baselineQueue && !preselectedPlantId && remainingCount === 0 ? (
+        <SectionCard title="All baselines complete">
+          <p className={styles.successText}>All active plants have baseline metrics and bin assignments.</p>
+          <div className={styles.actions}>
+            <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+              Back to Overview
+            </Link>
+          </div>
+        </SectionCard>
+      ) : null}
+
+      {baselineQueue && baselineQueue.plants.length > 0 ? (
         <>
           <SectionCard title="Plant Queue">
             <ResponsiveList
-              items={baselineStatus.plants}
-              getKey={(plant) => plant.id}
+              items={baselineQueue.plants}
+              getKey={(plant) => plant.uuid}
               columns={[
                 {
                   key: "plant_id",
@@ -509,12 +600,12 @@ export default function BaselineCapturePage() {
                 {
                   key: "baseline",
                   label: "Baseline",
-                  render: (plant) => (plant.baseline_done ? "Done" : "Missing"),
+                  render: (plant) => (plant.has_baseline ? "Done" : "Missing"),
                 },
                 {
                   key: "bin",
                   label: "Bin",
-                  render: (plant) => plant.bin || "Missing",
+                  render: (plant) => (plant.has_bin ? "Assigned" : "Missing"),
                 },
               ]}
               renderMobileCard={(plant) => (
@@ -524,13 +615,13 @@ export default function BaselineCapturePage() {
                   <span>Species</span>
                   <strong>{plant.species_name}</strong>
                   <span>Baseline</span>
-                  <strong>{plant.baseline_done ? "Done" : "Missing"}</strong>
+                  <strong>{plant.has_baseline ? "Done" : "Missing"}</strong>
                   <span>Bin</span>
-                  <strong>{plant.bin || "Missing"}</strong>
+                  <strong>{plant.has_bin ? "Assigned" : "Missing"}</strong>
                   <button
                     className={styles.buttonSecondary}
                     type="button"
-                    onClick={() => setSelectedPlantId(plant.id)}
+                    onClick={() => selectPlant(plant.uuid)}
                   >
                     Capture this plant
                   </button>
@@ -545,12 +636,12 @@ export default function BaselineCapturePage() {
                 <span>Plant ID</span>
                 <strong>{selectedPlant.plant_id || "(pending)"}</strong>
                 <span>Species</span>
-                <strong>{selectedPlant.species_name}</strong>
-                <span>Category</span>
-                <strong>{selectedPlant.species_category || "-"}</strong>
-                <span>Current Bin</span>
-                <strong>{selectedPlant.bin || "Unassigned"}</strong>
-              </div>
+                  <strong>{selectedPlant.species_name}</strong>
+                  <span>Category</span>
+                  <strong>{selectedPlant.species_category || "-"}</strong>
+                  <span>Current Bin (UI)</span>
+                  <strong>{selectedBin || selectedPlant.bin || "Unassigned"}</strong>
+                </div>
 
               {usingFallbackTemplate ? (
                 <p className={styles.mutedText}>
@@ -678,7 +769,7 @@ export default function BaselineCapturePage() {
             <button
               className={styles.buttonSecondary}
               type="button"
-              disabled={saving || readOnly || !selectedPlantId}
+              disabled={saving || readOnly || !selectedPlantId || remainingCount === 0}
               onClick={() => void saveBaseline(true)}
             >
               {saving ? "Saving..." : "Save & Next"}
