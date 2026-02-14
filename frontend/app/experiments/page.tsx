@@ -73,7 +73,7 @@ export default function ExperimentsPage() {
   return (
     <PageShell
       title="Experiments"
-      subtitle="Create and configure experiments with setup packets."
+      subtitle="Create and configure experiments with guided setup steps."
       actions={
         <div className={styles.actions}>
           <Link className={styles.buttonPrimary} href="/experiments/new">

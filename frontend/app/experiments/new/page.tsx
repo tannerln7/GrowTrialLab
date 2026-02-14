@@ -84,7 +84,7 @@ export default function NewExperimentPage() {
   return (
     <PageShell
       title="New Experiment"
-      subtitle="Start an experiment and continue through setup packets."
+      subtitle="Start an experiment and continue through guided setup steps."
       actions={
         <Link className={styles.buttonSecondary} href="/experiments">
           Cancel

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, backendUrl, normalizeBackendError } from "@/lib/backend";
@@ -13,7 +13,7 @@ import StickyActionBar from "@/src/components/ui/StickyActionBar";
 
 import styles from "../../experiments.module.css";
 
-type PacketProgress = {
+type SetupProgress = {
   id: string;
   name: string;
   status: "done" | "current" | "todo";
@@ -24,7 +24,7 @@ type SetupState = {
   current_packet: string;
   completed_packets: string[];
   packet_data: Record<string, unknown>;
-  packet_progress: PacketProgress[];
+  packet_progress: SetupProgress[];
 };
 
 type Block = {
@@ -125,15 +125,32 @@ const DEFAULT_ENV: EnvironmentForm = {
   notes: "",
 };
 
-const FALLBACK_PACKETS: PacketProgress[] = [
-  { id: "environment", name: "Environment", status: "current", locked: false },
-  { id: "plants", name: "Plants", status: "todo", locked: false },
-  { id: "baseline", name: "Baseline", status: "todo", locked: false },
-  { id: "groups", name: "Groups", status: "todo", locked: false },
-  { id: "trays", name: "Trays", status: "todo", locked: false },
-  { id: "rotation", name: "Rotation", status: "todo", locked: false },
-  { id: "feeding", name: "Feeding", status: "todo", locked: false },
-  { id: "review", name: "Review", status: "todo", locked: false },
+type SetupStepId =
+  | "plants"
+  | "environment"
+  | "baseline"
+  | "recipes"
+  | "assignment"
+  | "placement"
+  | "rotation"
+  | "start";
+
+type SetupStep = {
+  id: SetupStepId;
+  title: string;
+  backendStep: string;
+  placeholder?: boolean;
+};
+
+const SETUP_STEPS: SetupStep[] = [
+  { id: "plants", title: "Plants", backendStep: "plants" },
+  { id: "environment", title: "Environments", backendStep: "environment" },
+  { id: "baseline", title: "Baseline", backendStep: "baseline" },
+  { id: "recipes", title: "Recipes", backendStep: "groups" },
+  { id: "assignment", title: "Assignment", backendStep: "groups" },
+  { id: "placement", title: "Placement", backendStep: "trays", placeholder: true },
+  { id: "rotation", title: "Rotation", backendStep: "rotation", placeholder: true },
+  { id: "start", title: "Start", backendStep: "feeding", placeholder: true },
 ];
 
 function toEnvironmentForm(value: unknown): EnvironmentForm {
@@ -154,6 +171,8 @@ function toEnvironmentForm(value: unknown): EnvironmentForm {
 
 export default function ExperimentSetupPage() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const experimentId = useMemo(() => {
     if (typeof params.id === "string") {
       return params.id;
@@ -172,7 +191,8 @@ export default function ExperimentSetupPage() {
   const [saving, setSaving] = useState(false);
 
   const [setupState, setSetupState] = useState<SetupState | null>(null);
-  const [currentPacket, setCurrentPacket] = useState("environment");
+  const [currentPacket, setCurrentPacket] = useState("plants");
+  const [groupsView, setGroupsView] = useState<"recipes" | "assignment">("recipes");
 
   const [envForm, setEnvForm] = useState<EnvironmentForm>(DEFAULT_ENV);
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -205,6 +225,15 @@ export default function ExperimentSetupPage() {
   const [showGroupsUnlockModal, setShowGroupsUnlockModal] = useState(false);
   const [groupsUnlockConfirmed, setGroupsUnlockConfirmed] = useState(false);
 
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "assignment") {
+      setGroupsView("assignment");
+    } else if (tab === "recipes") {
+      setGroupsView("recipes");
+    }
+  }, [searchParams]);
+
   function handleRequestError(
     requestError: unknown,
     fallbackMessage: string,
@@ -215,6 +244,14 @@ export default function ExperimentSetupPage() {
       return "Backend is unreachable.";
     }
     return fallbackMessage;
+  }
+
+  function setGroupsTab(tab: "recipes" | "assignment") {
+    setGroupsView(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+    const query = params.toString();
+    router.replace(`/experiments/${experimentId}/setup${query ? `?${query}` : ""}`);
   }
 
   const fetchSetupState = useCallback(async () => {
@@ -329,8 +366,20 @@ export default function ExperimentSetupPage() {
     void reloadPageData();
   }, [reloadPageData]);
 
-  async function setPacket(packetId: string) {
-    setCurrentPacket(packetId);
+  async function setStep(stepId: SetupStepId) {
+    const backendStep =
+      stepId === "recipes" || stepId === "assignment"
+        ? "groups"
+        : stepId === "placement"
+          ? "trays"
+          : stepId === "start"
+            ? "feeding"
+            : stepId;
+
+    if (stepId === "recipes" || stepId === "assignment") {
+      setGroupsTab(stepId);
+    }
+    setCurrentPacket(backendStep);
     setError("");
     setNotice("");
 
@@ -340,18 +389,18 @@ export default function ExperimentSetupPage() {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ current_packet: packetId }),
+          body: JSON.stringify({ current_packet: backendStep }),
         },
       );
       if (!response.ok) {
-        setError("Unable to switch packet.");
+        setError("Unable to switch setup step.");
         return;
       }
       const data = (await response.json()) as SetupState;
       setSetupState(data);
       setCurrentPacket(data.current_packet);
     } catch (requestError) {
-      setError(handleRequestError(requestError, "Unable to switch packet."));
+      setError(handleRequestError(requestError, "Unable to switch setup step."));
     }
   }
 
@@ -367,18 +416,18 @@ export default function ExperimentSetupPage() {
         },
       );
       if (!response.ok) {
-        setError("Unable to save environment packet.");
+        setError("Unable to save environment settings.");
         return false;
       }
       if (showNotice) {
-        setNotice("Packet 1 saved.");
+        setNotice("Environments step saved.");
       }
       await fetchSetupState();
       setOffline(false);
       return true;
     } catch (requestError) {
       setError(
-        handleRequestError(requestError, "Unable to save environment packet."),
+        handleRequestError(requestError, "Unable to save environment settings."),
       );
       return false;
     }
@@ -403,17 +452,17 @@ export default function ExperimentSetupPage() {
           detail?: string;
           errors?: string[];
         };
-        setError(data.errors?.join(" ") || data.detail || "Packet 1 is not complete.");
+        setError(data.errors?.join(" ") || data.detail || "Environments step is not complete.");
         return;
       }
 
       const data = (await response.json()) as SetupState;
       setSetupState(data);
       setCurrentPacket(data.current_packet);
-      setNotice("Packet 1 completed.");
+      setNotice("Environments step completed.");
       setOffline(false);
     } catch (requestError) {
-      setError(handleRequestError(requestError, "Unable to complete packet."));
+      setError(handleRequestError(requestError, "Unable to complete step."));
     } finally {
       setSaving(false);
     }
@@ -489,19 +538,19 @@ export default function ExperimentSetupPage() {
         },
       );
       if (!response.ok) {
-        setError("Unable to save plants packet settings.");
+        setError("Unable to save plants settings.");
         return false;
       }
 
       if (showNotice) {
-        setNotice("Packet 2 settings saved.");
+        setNotice("Plants step settings saved.");
       }
       await fetchSetupState();
       setOffline(false);
       return true;
     } catch (requestError) {
       setError(
-        handleRequestError(requestError, "Unable to save plants packet settings."),
+        handleRequestError(requestError, "Unable to save plants settings."),
       );
       return false;
     }
@@ -526,15 +575,15 @@ export default function ExperimentSetupPage() {
           detail?: string;
           errors?: string[];
         };
-        setError(data.errors?.join(" ") || data.detail || "Packet 2 is not complete.");
+        setError(data.errors?.join(" ") || data.detail || "Plants step is not complete.");
         return;
       }
 
       await fetchSetupState();
-      setNotice("Packet 2 completed.");
+      setNotice("Plants step completed.");
       setOffline(false);
     } catch (requestError) {
-      setError(handleRequestError(requestError, "Unable to complete packet."));
+      setError(handleRequestError(requestError, "Unable to complete step."));
     } finally {
       setSaving(false);
     }
@@ -552,11 +601,11 @@ export default function ExperimentSetupPage() {
         },
       );
       if (!response.ok) {
-        setError("Unable to save baseline packet settings.");
+        setError("Unable to save baseline settings.");
         return false;
       }
       if (showNotice) {
-        setNotice("Packet 3 settings saved.");
+        setNotice("Baseline step settings saved.");
       }
       await fetchSetupState();
       await fetchBaselineStatus();
@@ -564,7 +613,7 @@ export default function ExperimentSetupPage() {
       return true;
     } catch (requestError) {
       setError(
-        handleRequestError(requestError, "Unable to save baseline packet settings."),
+        handleRequestError(requestError, "Unable to save baseline settings."),
       );
       return false;
     }
@@ -612,16 +661,16 @@ export default function ExperimentSetupPage() {
           detail?: string;
           errors?: string[];
         };
-        setError(data.errors?.join(" ") || data.detail || "Packet 3 is not complete.");
+        setError(data.errors?.join(" ") || data.detail || "Baseline step is not complete.");
         return;
       }
 
       await fetchSetupState();
       await fetchBaselineStatus();
-      setNotice("Packet 3 completed and baseline locked.");
+      setNotice("Baseline step completed and locked in the UI.");
       setOffline(false);
     } catch (requestError) {
-      setError(handleRequestError(requestError, "Unable to complete packet."));
+      setError(handleRequestError(requestError, "Unable to complete step."));
     } finally {
       setSaving(false);
     }
@@ -651,11 +700,11 @@ export default function ExperimentSetupPage() {
         },
       );
       if (!response.ok) {
-        setError("Unable to save groups packet settings.");
+        setError("Unable to save assignment settings.");
         return false;
       }
       if (showNotice) {
-        setNotice("Packet 4 settings saved.");
+        setNotice("Assignment step settings saved.");
       }
       await fetchSetupState();
       await fetchGroupsStatus();
@@ -663,7 +712,7 @@ export default function ExperimentSetupPage() {
       return true;
     } catch (requestError) {
       setError(
-        handleRequestError(requestError, "Unable to save groups packet settings."),
+        handleRequestError(requestError, "Unable to save assignment settings."),
       );
       return false;
     }
@@ -852,15 +901,15 @@ export default function ExperimentSetupPage() {
           detail?: string;
           errors?: string[];
         };
-        setError(payload.errors?.join(" ") || payload.detail || "Packet 4 is not complete.");
+        setError(payload.errors?.join(" ") || payload.detail || "Assignment step is not complete.");
         return;
       }
       await fetchSetupState();
       await fetchGroupsStatus();
-      setNotice("Packet 4 completed and UI lock enabled.");
+      setNotice("Assignment step completed and locked in the UI.");
       setOffline(false);
     } catch (requestError) {
-      setError(handleRequestError(requestError, "Unable to complete packet."));
+      setError(handleRequestError(requestError, "Unable to complete step."));
     } finally {
       setSaving(false);
     }
@@ -992,6 +1041,10 @@ export default function ExperimentSetupPage() {
   }
 
   const hasPendingPlantIds = plants.some((plant) => !plant.plant_id);
+  const completedSteps = useMemo(
+    () => new Set(setupState?.completed_packets ?? []),
+    [setupState?.completed_packets],
+  );
   const recipeRows = Object.entries(
     groupsStatus?.summary.counts_by_recipe_code ?? {},
   ).map(([code, count]) => ({ code, count }));
@@ -1016,8 +1069,101 @@ export default function ExperimentSetupPage() {
   }, [groupsStatus?.recipes]);
   const groupsReadOnly = Boolean(groupsStatus?.groups_locked) && !groupsEditingUnlocked;
   const recipeCodeValid = /^R\d+$/.test(newRecipeCode.trim());
+  const recipeCodes = (groupsStatus?.recipes ?? []).map((recipe) => recipe.code);
+  const recipesConfigured =
+    recipeCodes.includes("R0") && (groupsStatus?.recipes.length ?? 0) >= 2;
 
-  const packetProgress = setupState?.packet_progress ?? FALLBACK_PACKETS;
+  const currentStep: SetupStepId = useMemo(() => {
+    if (currentPacket === "groups") {
+      return groupsView;
+    }
+    if (currentPacket === "trays") {
+      return "placement";
+    }
+    if (currentPacket === "rotation") {
+      return "rotation";
+    }
+    if (currentPacket === "feeding" || currentPacket === "review") {
+      return "start";
+    }
+    if (currentPacket === "plants" || currentPacket === "environment" || currentPacket === "baseline") {
+      return currentPacket;
+    }
+    return "plants";
+  }, [currentPacket, groupsView]);
+
+  const isStepComplete = useCallback(
+    (stepId: SetupStepId) => {
+      if (stepId === "recipes") {
+        return recipesConfigured;
+      }
+      if (stepId === "assignment") {
+        return completedSteps.has("groups");
+      }
+      if (stepId === "placement") {
+        return completedSteps.has("trays");
+      }
+      if (stepId === "rotation") {
+        return completedSteps.has("rotation");
+      }
+      if (stepId === "start") {
+        return completedSteps.has("feeding") || completedSteps.has("review");
+      }
+      return completedSteps.has(stepId);
+    },
+    [completedSteps, recipesConfigured],
+  );
+
+  const currentStepIndex = SETUP_STEPS.findIndex((step) => step.id === currentStep);
+  const nextStep = currentStepIndex >= 0 ? SETUP_STEPS[currentStepIndex + 1] : null;
+
+  function getStepMissingReason(stepId: SetupStepId): string {
+    if (stepId === "recipes") {
+      return "Add R0 and at least one treatment recipe.";
+    }
+    if (stepId === "assignment") {
+      return "Apply assignments and mark Assignment complete first.";
+    }
+    if (stepId === "placement" || stepId === "rotation" || stepId === "start") {
+      return "This step is coming soon.";
+    }
+    return "Mark this step complete first.";
+  }
+
+  function isStepLocked(stepId: SetupStepId): boolean {
+    if (stepId === "recipes" || stepId === "assignment") {
+      return Boolean(groupsStatus?.groups_locked) && !groupsEditingUnlocked;
+    }
+    return false;
+  }
+
+  function stepStatus(stepId: SetupStepId): "done" | "current" | "todo" {
+    if (isStepComplete(stepId)) {
+      return "done";
+    }
+    if (stepId === currentStep) {
+      return "current";
+    }
+    return "todo";
+  }
+
+  const nextDisabled = !nextStep || !isStepComplete(currentStep) || isStepLocked(currentStep);
+  const nextDisabledReason = nextStep
+    ? nextStep.placeholder
+      ? ""
+      : isStepLocked(currentStep)
+        ? "Unlock editing to continue from this step."
+        : !isStepComplete(currentStep)
+          ? getStepMissingReason(currentStep)
+          : ""
+    : "";
+
+  async function goToNextStep() {
+    if (!nextStep) {
+      return;
+    }
+    await setStep(nextStep.id);
+  }
 
   if (notInvited) {
     return (
@@ -1034,10 +1180,11 @@ export default function ExperimentSetupPage() {
       title="Experiment Setup"
       subtitle={`Experiment: ${experimentId}`}
       stickyOffset={
-        currentPacket === "environment" ||
-        currentPacket === "plants" ||
-        currentPacket === "baseline" ||
-        currentPacket === "groups"
+        currentStep === "environment" ||
+        currentStep === "plants" ||
+        currentStep === "baseline" ||
+        currentStep === "recipes" ||
+        currentStep === "assignment"
       }
       actions={
         <div className={styles.actions}>
@@ -1068,32 +1215,34 @@ export default function ExperimentSetupPage() {
 
       {!loading ? (
         <section className={styles.wizardLayout}>
-          <SectionCard title="Setup Packets">
+          <SectionCard title="Setup Steps">
             <div className={styles.packetNav}>
-              {packetProgress.map((packet) => (
+              {SETUP_STEPS.map((step) => (
                 <button
-                  key={packet.id}
+                  key={step.id}
                   type="button"
                   className={`${styles.packetButton} ${
-                    packet.status === "done"
+                    stepStatus(step.id) === "done"
                       ? styles.packetDone
-                      : packet.id === currentPacket
+                      : step.id === currentStep
                         ? styles.packetCurrent
                         : ""
                   }`}
-                  onClick={() => setPacket(packet.id)}
-                  disabled={packet.locked}
+                  onClick={() => void setStep(step.id)}
                 >
-                  {packet.name}
+                  {step.title}
                 </button>
               ))}
             </div>
           </SectionCard>
 
           <div className={styles.packetPanel}>
-            {currentPacket === "environment" ? (
+            {currentStep === "environment" ? (
               <>
-                <SectionCard title="Packet 1: Environment">
+                <SectionCard
+                  title="Environments"
+                  subtitle="Define where plants will live and how blocks are arranged"
+                >
                   <div className={styles.formGrid}>
                     <label className={styles.field}>
                       <span className={styles.fieldLabel}>Tent name</span>
@@ -1272,13 +1421,26 @@ export default function ExperimentSetupPage() {
                   >
                     {saving ? "Completing..." : "Mark Complete"}
                   </button>
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    disabled={saving || nextDisabled}
+                    onClick={() => void goToNextStep()}
+                    title={nextDisabledReason}
+                  >
+                    Next step
+                  </button>
                 </StickyActionBar>
+                {nextDisabledReason ? <p className={styles.inlineNote}>{nextDisabledReason}</p> : null}
               </>
             ) : null}
 
-            {currentPacket === "plants" ? (
+            {currentStep === "plants" ? (
               <>
-                <SectionCard title="Packet 2: Plants">
+                <SectionCard
+                  title="Plants"
+                  subtitle="Add and label the plants in this experiment"
+                >
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>ID format notes</span>
                     <textarea
@@ -1473,13 +1635,26 @@ export default function ExperimentSetupPage() {
                   >
                     {saving ? "Completing..." : "Mark Complete"}
                   </button>
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    disabled={saving || nextDisabled}
+                    onClick={() => void goToNextStep()}
+                    title={nextDisabledReason}
+                  >
+                    Next step
+                  </button>
                 </StickyActionBar>
+                {nextDisabledReason ? <p className={styles.inlineNote}>{nextDisabledReason}</p> : null}
               </>
             ) : null}
 
-            {currentPacket === "baseline" ? (
+            {currentStep === "baseline" ? (
               <>
-                <SectionCard title="Packet 3: Baseline">
+                <SectionCard
+                  title="Baseline"
+                  subtitle="Record baseline metrics and bin plants"
+                >
                   {baselineStatus ? (
                     <div className={styles.formGrid}>
                       <p className={styles.mutedText}>
@@ -1585,17 +1760,38 @@ export default function ExperimentSetupPage() {
                   >
                     {saving ? "Completing..." : "Mark Complete"}
                   </button>
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    disabled={saving || nextDisabled}
+                    onClick={() => void goToNextStep()}
+                    title={nextDisabledReason}
+                  >
+                    Next step
+                  </button>
                 </StickyActionBar>
+                {nextDisabledReason ? <p className={styles.inlineNote}>{nextDisabledReason}</p> : null}
               </>
             ) : null}
 
-            {currentPacket === "groups" ? (
+            {(currentStep === "recipes" || currentStep === "assignment") ? (
               <>
-                <SectionCard title="Packet 4: Groups + Randomization">
+                <SectionCard
+                  title={
+                    currentStep === "recipes"
+                      ? "Recipes"
+                      : "Assignment"
+                  }
+                  subtitle={
+                    currentStep === "recipes"
+                      ? "Define control and treatment recipes (R0, R1, ...)"
+                      : "Assign plants to recipes using stratified randomization"
+                  }
+                >
                   {groupsStatus ? (
                     <div className={styles.formGrid}>
                       <p className={styles.mutedText}>
-                        Baseline packet complete:{" "}
+                        Baseline step complete:{" "}
                         {groupsStatus.baseline_packet_complete ? "Yes" : "No"}
                       </p>
                       <p className={styles.mutedText}>
@@ -1610,7 +1806,7 @@ export default function ExperimentSetupPage() {
                         Unassigned: {groupsStatus.summary.unassigned}
                       </p>
                       <p className={styles.mutedText}>
-                        Packet complete: {groupsStatus.packet_complete ? "Yes" : "No"}
+                        Assignment complete: {groupsStatus.packet_complete ? "Yes" : "No"}
                       </p>
                       {groupsStatus.groups_locked ? (
                         <p className={styles.successText}>Locked (UI-only guardrail)</p>
@@ -1649,7 +1845,8 @@ export default function ExperimentSetupPage() {
                   )}
                 </SectionCard>
 
-                <SectionCard title="Packet Notes">
+                {currentStep === "recipes" ? (
+                  <SectionCard title="Setup Notes">
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>Notes</span>
                     <textarea
@@ -1659,9 +1856,11 @@ export default function ExperimentSetupPage() {
                       onChange={(event) => setGroupsNotes(event.target.value)}
                     />
                   </label>
-                </SectionCard>
+                  </SectionCard>
+                ) : null}
 
-                <SectionCard title="Recipe Editor">
+                {currentStep === "recipes" ? (
+                  <SectionCard title="Recipe Editor">
                   <p className={styles.inlineNote}>
                     Recipes must include R0 (control) and at least one treatment recipe.
                   </p>
@@ -1773,9 +1972,11 @@ export default function ExperimentSetupPage() {
                       Add recipe
                     </button>
                   </div>
-                </SectionCard>
+                  </SectionCard>
+                ) : null}
 
-                <SectionCard title="Randomization">
+                {currentStep === "assignment" ? (
+                  <SectionCard title="Randomization">
                   <div className={styles.formGrid}>
                     <label className={styles.field}>
                       <span className={styles.fieldLabel}>Seed (optional)</span>
@@ -1823,9 +2024,11 @@ export default function ExperimentSetupPage() {
                   {previewSeed ? (
                     <p className={styles.mutedText}>Preview seed: {previewSeed}</p>
                   ) : null}
-                </SectionCard>
+                  </SectionCard>
+                ) : null}
 
-                <SectionCard title="Distribution Summary">
+                {currentStep === "assignment" ? (
+                  <SectionCard title="Distribution Summary">
                   {previewSummary ? (
                     <p className={styles.mutedText}>
                       Preview totals: {previewSummary.assigned} assigned /{" "}
@@ -1882,9 +2085,10 @@ export default function ExperimentSetupPage() {
                       </div>
                     )}
                   />
-                </SectionCard>
+                  </SectionCard>
+                ) : null}
 
-                {previewAssignments.length > 0 ? (
+                {currentStep === "assignment" && previewAssignments.length > 0 ? (
                   <SectionCard title="Preview Assignments">
                     <ResponsiveList
                       items={previewAssignments}
@@ -1930,18 +2134,28 @@ export default function ExperimentSetupPage() {
                   >
                     {saving ? "Completing..." : "Mark Complete"}
                   </button>
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    disabled={saving || nextDisabled}
+                    onClick={() => void goToNextStep()}
+                    title={nextDisabledReason}
+                  >
+                    Next step
+                  </button>
                 </StickyActionBar>
+                {nextDisabledReason ? <p className={styles.inlineNote}>{nextDisabledReason}</p> : null}
               </>
             ) : null}
 
-            {currentPacket !== "environment" &&
-            currentPacket !== "plants" &&
-            currentPacket !== "baseline" &&
-            currentPacket !== "groups" ? (
-              <SectionCard title={currentPacket}>
-                <p className={styles.mutedText}>
-                  This packet is not implemented yet. Complete Packet 1 and Packet 2 first.
-                </p>
+            {(currentStep === "placement" || currentStep === "rotation" || currentStep === "start") ? (
+              <SectionCard title={SETUP_STEPS.find((step) => step.id === currentStep)?.title || "Coming soon"}>
+                <IllustrationPlaceholder
+                  inventoryId="ILL-002"
+                  kind="generic"
+                  title="Coming soon"
+                  subtitle="This setup step is planned but not implemented yet."
+                />
               </SectionCard>
             ) : null}
           </div>
