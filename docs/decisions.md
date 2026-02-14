@@ -9,6 +9,16 @@ This file records architecture/product decisions and why they were made.
   - Redirect to `/experiments/{id}/overview` once bootstrap setup is complete.
 - Canonical bootstrap setup scope: Plants, Blocks/Slots, Recipes only.
 - Canonical readiness flows: `/experiments/{id}/baseline` and `/experiments/{id}/assignment`, launched from Overview.
+- Lifecycle prerequisite policy: deletion gating and strict immutability are deferred until lifecycle primitives (`draft`/`running`/`stopped`) exist.
+
+## Lifecycle Implications (Planned)
+- Intended freeze scope once an experiment is `running`:
+  - slots/blocks structure, recipes, selected baseline template scope, experiment structural identity, placement structure
+- Intended mutable scope while `running`:
+  - notes, photos, events, remove/replace plant actions, operational annotations
+- Deferred until lifecycle is implemented:
+  - hard delete gating while running
+  - backend-enforced immutability rules tied to lifecycle transitions
 
 ## Decision Entries
 

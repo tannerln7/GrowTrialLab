@@ -21,6 +21,16 @@ Status convention:
 - Readiness work happens from Overview and dedicated pages:
   - Baseline capture: `/experiments/{id}/baseline`
   - Assignment: `/experiments/{id}/assignment`
+  - Placement: `/experiments/{id}/placement` (MVP in progress)
+- Experiment lifecycle is being introduced as a prerequisite for future delete-gating/immutability:
+  - `draft` -> `running` -> `stopped` (archive deferred)
+
+## Lifecycle Implications
+- Future freeze scope once running (deferred policy enforcement after lifecycle lands):
+  - slots/blocks structure, recipes, metric template selection, experiment identity/structure, placement structure
+- Still editable while running (intended):
+  - notes, photos, events, removed/replacement status changes, operational annotations
+- Deletion gating and hard immutability rules are intentionally deferred until lifecycle primitives exist.
 
 ## Current Status Summary
 The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Setup is now bootstrap-only (Plants, Blocks/Slots, Recipes), and readiness workflows (baseline + assignment) are centered in Overview and dedicated pages.
@@ -152,6 +162,12 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [ ] Add minimal audit trail model for key experiment mutations (owner: Codex)
   - Notes: currently audit is minimal/log-style.
 
+### Experiment Lifecycle
+- [ ] (in progress) Add lifecycle state model + start/stop transitions (owner: Codex)
+  - Notes: `draft`/`running`/`stopped` is the prerequisite for future delete gating and immutability enforcement.
+- [ ] Add delete-gating and immutability policy enforcement after lifecycle stabilizes (owner: Codex)
+  - Notes: Deferred intentionally; implement after lifecycle API/UX is in place.
+
 ### Setup Wizard (Steps)
 - [ ] (in progress) Evaluate whether legacy setup-state progression is still needed post-bootstrap refactor (owner: Codex)
   - Route: `PATCH /api/v1/experiments/{id}/setup-state/`.
@@ -224,9 +240,9 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [ ] Define app operational metrics and alert thresholds (owner: manual)
 
 ## Next 3 Prompts Plan
-1. Placement step MVP: tray assignment workflow using existing Tray/TrayPlant models.
+1. Placement step MVP + lifecycle controls: tray composition plus draft/running/stopped transitions.
 2. Rotation step MVP: rotation plan/log workflow tied to blocks and trays.
-3. Step lock governance: define whether backend-enforced locks/audit trail are required for post-MVP integrity.
+3. Step lock and lifecycle governance: decide backend-enforced immutability/deletion rules after start.
 
 ## History / Legacy Appendix
 - Legacy setup naming migration (completed):
