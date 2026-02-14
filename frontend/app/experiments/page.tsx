@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { backendFetch } from "@/lib/backend";
-import AppMarkPlaceholder from "@/src/components/AppMarkPlaceholder";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import PageShell from "@/src/components/ui/PageShell";
+import ResponsiveList from "@/src/components/ui/ResponsiveList";
+import SectionCard from "@/src/components/ui/SectionCard";
 import styles from "./experiments.module.css";
 
 type Experiment = {
@@ -54,67 +56,84 @@ export default function ExperimentsPage() {
 
   if (notInvited) {
     return (
-      <div className={styles.page}>
-        <main className={styles.container}>
-          <AppMarkPlaceholder />
-          <h1>Experiments</h1>
+      <PageShell title="Experiments">
+        <SectionCard>
           <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
-        </main>
-      </div>
+        </SectionCard>
+      </PageShell>
     );
   }
 
   return (
-    <div className={styles.page}>
-      <main className={styles.container}>
-        <header className={styles.header}>
-          <AppMarkPlaceholder />
-          <h1>Experiments</h1>
-          <p className={styles.muted}>
-            Create and configure experiments with setup packets.
-          </p>
-          <div className={styles.actions}>
-            <Link className={styles.button} href="/experiments/new">
-              New experiment
-            </Link>
-            <Link className={styles.secondaryButton} href="/">
-              Back home
-            </Link>
-          </div>
-        </header>
+    <PageShell
+      title="Experiments"
+      subtitle="Create and configure experiments with setup packets."
+      actions={
+        <div className={styles.actions}>
+          <Link className={styles.buttonPrimary} href="/experiments/new">
+            New experiment
+          </Link>
+          <Link className={styles.buttonSecondary} href="/">
+            Back home
+          </Link>
+        </div>
+      }
+    >
+      <SectionCard title="All Experiments">
+        {loading ? <p className={styles.mutedText}>Loading...</p> : null}
+        {error ? <p className={styles.errorText}>{error}</p> : null}
 
-        {loading ? <p>Loading...</p> : null}
-        {error ? <p className={styles.error}>{error}</p> : null}
-
-        {!loading && !error && items.length === 0 ? (
-          <IllustrationPlaceholder inventoryId="ILL-101" kind="noExperiments" />
+        {!loading && !error ? (
+          <ResponsiveList
+            items={items}
+            getKey={(item) => item.id}
+            columns={[
+              {
+                key: "name",
+                label: "Name",
+                render: (item) => item.name,
+              },
+              {
+                key: "status",
+                label: "Status",
+                render: (item) => item.status,
+              },
+              {
+                key: "setup",
+                label: "Setup",
+                render: (item) => (
+                  <Link href={`/experiments/${item.id}/setup`}>Open setup</Link>
+                ),
+              },
+            ]}
+            renderMobileCard={(item) => (
+              <div className={styles.cardKeyValue}>
+                <span>Name</span>
+                <strong>{item.name}</strong>
+                <span>Status</span>
+                <strong>{item.status}</strong>
+                <Link href={`/experiments/${item.id}/setup`}>Open setup</Link>
+              </div>
+            )}
+            emptyState={
+              <IllustrationPlaceholder
+                inventoryId="ILL-101"
+                kind="noExperiments"
+              />
+            }
+          />
         ) : null}
-
-        {!loading && !error && items.length > 0 ? (
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Setup</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((experiment) => (
-                <tr key={experiment.id}>
-                  <td>{experiment.name}</td>
-                  <td>{experiment.status}</td>
-                  <td>
-                    <Link href={`/experiments/${experiment.id}/setup`}>
-                      Open setup
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : null}
-      </main>
-    </div>
+      </SectionCard>
+      <SectionCard>
+        <div className={styles.actions}>
+          <Link className={styles.buttonPrimary} href="/experiments/new">
+            New experiment
+          </Link>
+          <Link className={styles.buttonSecondary} href="/">
+            Back home
+          </Link>
+        </div>
+      </SectionCard>
+    </PageShell>
   );
 }

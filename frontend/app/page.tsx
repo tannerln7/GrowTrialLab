@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { backendFetch } from "@/lib/backend";
-import AppMarkPlaceholder from "@/src/components/AppMarkPlaceholder";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import PageShell from "@/src/components/ui/PageShell";
+import SectionCard from "@/src/components/ui/SectionCard";
 import styles from "./page.module.css";
 
 export default function Home() {
@@ -56,14 +57,21 @@ export default function Home() {
   }
 
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <AppMarkPlaceholder />
-        <h1>GrowTrialLab</h1>
-        <p>Django API + Next.js frontend local dev scaffold.</p>
-        <div className={styles.buttons}>
+    <PageShell
+      title="GrowTrialLab"
+      subtitle="Django API + Next.js frontend local development."
+      actions={
+        <div className={styles.actions}>
+          <Link className={styles.buttonSecondary} href="/experiments">
+            Experiments
+          </Link>
+        </div>
+      }
+    >
+      <SectionCard title="System Checks">
+        <div className={styles.actions}>
           <button
-            className={styles.button}
+            className={styles.buttonPrimary}
             onClick={checkBackendHealth}
             disabled={loading}
             type="button"
@@ -71,24 +79,21 @@ export default function Home() {
             {loading ? "Checking..." : "Check backend health"}
           </button>
           <button
-            className={styles.button}
+            className={styles.buttonSecondary}
             onClick={loadMe}
             disabled={meLoading}
             type="button"
           >
             {meLoading ? "Loading..." : "Load my profile"}
           </button>
-          <Link className={styles.button} href="/experiments">
-            Experiments
-          </Link>
         </div>
         {notInvited ? (
           <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
         ) : (
-          <p className={styles.me}>{meResult}</p>
+          <p className={styles.mutedText}>{meResult}</p>
         )}
         <pre className={styles.output}>{result || "No result yet."}</pre>
-      </main>
-    </div>
+      </SectionCard>
+    </PageShell>
   );
 }

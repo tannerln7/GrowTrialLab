@@ -5,8 +5,10 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { backendFetch, backendUrl } from "@/lib/backend";
-import AppMarkPlaceholder from "@/src/components/AppMarkPlaceholder";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import PageShell from "@/src/components/ui/PageShell";
+import ResponsiveList from "@/src/components/ui/ResponsiveList";
+import SectionCard from "@/src/components/ui/SectionCard";
 import styles from "../../experiments.module.css";
 
 type PlantRow = {
@@ -73,66 +75,83 @@ export default function ExperimentPlantsPage() {
 
   if (notInvited) {
     return (
-      <div className={styles.page}>
-        <main className={styles.container}>
-          <AppMarkPlaceholder />
-          <h1>Plants</h1>
+      <PageShell title="Plants">
+        <SectionCard>
           <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
-        </main>
-      </div>
+        </SectionCard>
+      </PageShell>
     );
   }
 
   return (
-    <div className={styles.page}>
-      <main className={styles.container}>
-        <header className={styles.header}>
-          <AppMarkPlaceholder />
-          <h1>Plants</h1>
-          <p className={styles.muted}>Experiment: {experimentId}</p>
-          <div className={styles.actions}>
-            <button className={styles.button} type="button" onClick={downloadLabels}>
-              Download labels PDF
-            </button>
-            <Link
-              className={styles.secondaryButton}
-              href={`/experiments/${experimentId}/setup`}
-            >
-              Back to setup
-            </Link>
-          </div>
-        </header>
-
-        {loading ? <p>Loading...</p> : null}
-        {error ? <p className={styles.error}>{error}</p> : null}
-
-        {!loading && !error && plants.length === 0 ? (
-          <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
+    <PageShell
+      title="Plants"
+      subtitle={`Experiment: ${experimentId}`}
+      actions={
+        <div className={styles.actions}>
+          <button
+            className={styles.buttonPrimary}
+            type="button"
+            onClick={downloadLabels}
+          >
+            Download labels PDF
+          </button>
+          <Link
+            className={styles.buttonSecondary}
+            href={`/experiments/${experimentId}/setup`}
+          >
+            Back to setup
+          </Link>
+        </div>
+      }
+    >
+      <SectionCard title="Plant Inventory">
+        {loading ? <p className={styles.mutedText}>Loading...</p> : null}
+        {error ? <p className={styles.errorText}>{error}</p> : null}
+        {!loading && !error ? (
+          <ResponsiveList
+            items={plants}
+            getKey={(plant) => plant.id}
+            columns={[
+              {
+                key: "plant_id",
+                label: "Plant ID",
+                render: (plant) => plant.plant_id || "(pending)",
+              },
+              {
+                key: "species",
+                label: "Species",
+                render: (plant) => plant.species_name,
+              },
+              {
+                key: "cultivar",
+                label: "Cultivar",
+                render: (plant) => plant.cultivar || "-",
+              },
+              {
+                key: "status",
+                label: "Status",
+                render: (plant) => plant.status,
+              },
+            ]}
+            renderMobileCard={(plant) => (
+              <div className={styles.cardKeyValue}>
+                <span>Plant ID</span>
+                <strong>{plant.plant_id || "(pending)"}</strong>
+                <span>Species</span>
+                <strong>{plant.species_name}</strong>
+                <span>Cultivar</span>
+                <strong>{plant.cultivar || "-"}</strong>
+                <span>Status</span>
+                <strong>{plant.status}</strong>
+              </div>
+            )}
+            emptyState={
+              <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
+            }
+          />
         ) : null}
-
-        {!loading && !error && plants.length > 0 ? (
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Plant ID</th>
-                <th>Species</th>
-                <th>Cultivar</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {plants.map((plant) => (
-                <tr key={plant.id}>
-                  <td>{plant.plant_id || "(pending)"}</td>
-                  <td>{plant.species_name}</td>
-                  <td>{plant.cultivar || "-"}</td>
-                  <td>{plant.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : null}
-      </main>
-    </div>
+      </SectionCard>
+    </PageShell>
   );
 }

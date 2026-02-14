@@ -5,8 +5,12 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, backendUrl } from "@/lib/backend";
-import AppMarkPlaceholder from "@/src/components/AppMarkPlaceholder";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import PageShell from "@/src/components/ui/PageShell";
+import ResponsiveList from "@/src/components/ui/ResponsiveList";
+import SectionCard from "@/src/components/ui/SectionCard";
+import StickyActionBar from "@/src/components/ui/StickyActionBar";
+
 import styles from "../../experiments.module.css";
 
 type PacketProgress = {
@@ -100,6 +104,7 @@ export default function ExperimentSetupPage() {
   const [notInvited, setNotInvited] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const [setupState, setSetupState] = useState<SetupState | null>(null);
   const [currentPacket, setCurrentPacket] = useState("environment");
@@ -120,8 +125,6 @@ export default function ExperimentSetupPage() {
   const [csvText, setCsvText] = useState("");
   const [csvFile, setCsvFile] = useState<File | null>(null);
 
-  const [saving, setSaving] = useState(false);
-
   const fetchSetupState = useCallback(async () => {
     const response = await backendFetch(
       `/api/v1/experiments/${experimentId}/setup-state/`,
@@ -133,11 +136,11 @@ export default function ExperimentSetupPage() {
     if (!response.ok) {
       throw new Error("Unable to load setup state.");
     }
+
     const data = (await response.json()) as SetupState;
     setSetupState(data);
     setCurrentPacket(data.current_packet);
     setEnvForm(toEnvironmentForm(data.packet_data?.environment));
-
     const plantsData = data.packet_data?.plants as
       | { id_format_notes?: string }
       | undefined;
@@ -188,6 +191,32 @@ export default function ExperimentSetupPage() {
     void reloadPageData();
   }, [reloadPageData]);
 
+  async function setPacket(packetId: string) {
+    setCurrentPacket(packetId);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await backendFetch(
+        `/api/v1/experiments/${experimentId}/setup-state/`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ current_packet: packetId }),
+        },
+      );
+      if (!response.ok) {
+        setError("Unable to switch packet.");
+        return;
+      }
+      const data = (await response.json()) as SetupState;
+      setSetupState(data);
+      setCurrentPacket(data.current_packet);
+    } catch {
+      setError("Unable to switch packet.");
+    }
+  }
+
   async function saveEnvironment(showNotice = true) {
     setError("");
     try {
@@ -216,13 +245,14 @@ export default function ExperimentSetupPage() {
 
   async function markEnvironmentComplete() {
     setSaving(true);
-    setNotice("");
     setError("");
+    setNotice("");
     try {
       const saved = await saveEnvironment(false);
       if (!saved) {
         return;
       }
+
       const response = await backendFetch(
         `/api/v1/experiments/${experimentId}/packets/environment/complete/`,
         { method: "POST" },
@@ -235,6 +265,7 @@ export default function ExperimentSetupPage() {
         setError(data.errors?.join(" ") || data.detail || "Packet 1 is not complete.");
         return;
       }
+
       const data = (await response.json()) as SetupState;
       setSetupState(data);
       setCurrentPacket(data.current_packet);
@@ -246,44 +277,22 @@ export default function ExperimentSetupPage() {
     }
   }
 
-  async function setPacket(packetId: string) {
-    setCurrentPacket(packetId);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(
-        `/api/v1/experiments/${experimentId}/setup-state/`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ current_packet: packetId }),
-        },
-      );
-      if (!response.ok) {
-        setError("Unable to switch packet.");
-        return;
-      }
-      const data = (await response.json()) as SetupState;
-      setSetupState(data);
-      setCurrentPacket(data.current_packet);
-    } catch {
-      setError("Unable to switch packet.");
-    }
-  }
-
   async function saveBlock(block: Block) {
     setError("");
     setNotice("");
+
     try {
       const response = await backendFetch(`/api/v1/blocks/${block.id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description: block.description }),
       });
+
       if (!response.ok) {
         setError(`Unable to save block ${block.name}.`);
         return;
       }
+
       setNotice(`Saved block ${block.name}.`);
       await fetchBlocks();
     } catch {
@@ -294,6 +303,7 @@ export default function ExperimentSetupPage() {
   async function addBlock() {
     setError("");
     setNotice("");
+
     try {
       const response = await backendFetch(
         `/api/v1/experiments/${experimentId}/blocks/`,
@@ -306,10 +316,12 @@ export default function ExperimentSetupPage() {
           }),
         },
       );
+
       if (!response.ok) {
         setError("Unable to add block.");
         return;
       }
+
       setNewBlockName("");
       setNewBlockDescription("");
       setNotice("Block added.");
@@ -334,6 +346,7 @@ export default function ExperimentSetupPage() {
         setError("Unable to save plants packet settings.");
         return false;
       }
+
       if (showNotice) {
         setNotice("Packet 2 settings saved.");
       }
@@ -347,13 +360,14 @@ export default function ExperimentSetupPage() {
 
   async function completePlantsPacket() {
     setSaving(true);
-    setNotice("");
     setError("");
+    setNotice("");
     try {
       const saved = await savePlantsPacket(false);
       if (!saved) {
         return;
       }
+
       const response = await backendFetch(
         `/api/v1/experiments/${experimentId}/packets/plants/complete/`,
         { method: "POST" },
@@ -366,6 +380,7 @@ export default function ExperimentSetupPage() {
         setError(data.errors?.join(" ") || data.detail || "Packet 2 is not complete.");
         return;
       }
+
       await fetchSetupState();
       setNotice("Packet 2 completed.");
     } catch {
@@ -384,6 +399,7 @@ export default function ExperimentSetupPage() {
     setSaving(true);
     setError("");
     setNotice("");
+
     try {
       for (let i = 0; i < manualQuantity; i += 1) {
         const response = await backendFetch(
@@ -422,6 +438,7 @@ export default function ExperimentSetupPage() {
     setSaving(true);
     setError("");
     setNotice("");
+
     try {
       let response: Response;
       if (csvFile) {
@@ -451,9 +468,9 @@ export default function ExperimentSetupPage() {
         return;
       }
 
-      setNotice("CSV import completed.");
       setCsvText("");
       setCsvFile(null);
+      setNotice("CSV import completed.");
       await fetchPlants();
     } catch {
       setError("Unable to import CSV.");
@@ -466,15 +483,18 @@ export default function ExperimentSetupPage() {
     setSaving(true);
     setError("");
     setNotice("");
+
     try {
       const response = await backendFetch(
         `/api/v1/experiments/${experimentId}/plants/generate-ids/`,
         { method: "POST" },
       );
+
       if (!response.ok) {
         setError("Unable to generate IDs.");
         return;
       }
+
       const data = (await response.json()) as { updated_count: number };
       setNotice(`Generated IDs for ${data.updated_count} plant(s).`);
       await fetchPlants();
@@ -494,43 +514,46 @@ export default function ExperimentSetupPage() {
 
   const hasPendingPlantIds = plants.some((plant) => !plant.plant_id);
 
+  const packetProgress = setupState?.packet_progress ?? FALLBACK_PACKETS;
+
   if (notInvited) {
     return (
-      <div className={styles.page}>
-        <main className={styles.container}>
-          <AppMarkPlaceholder />
-          <h1>Experiment setup</h1>
+      <PageShell title="Experiment Setup">
+        <SectionCard>
           <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
-        </main>
-      </div>
+        </SectionCard>
+      </PageShell>
     );
   }
 
   return (
-    <div className={styles.page}>
-      <main className={styles.container}>
-        <header className={styles.header}>
-          <AppMarkPlaceholder />
-          <h1>Experiment setup</h1>
-          <p className={styles.muted}>Experiment: {experimentId}</p>
-          <div className={styles.actions}>
-            <Link className={styles.secondaryButton} href="/experiments">
-              Back to experiments
-            </Link>
-            <Link className={styles.secondaryButton} href={`/experiments/${experimentId}/plants`}>
-              Plants list
-            </Link>
-          </div>
-        </header>
+    <PageShell
+      title="Experiment Setup"
+      subtitle={`Experiment: ${experimentId}`}
+      stickyOffset={currentPacket === "environment" || currentPacket === "plants"}
+      actions={
+        <div className={styles.actions}>
+          <Link className={styles.buttonSecondary} href="/experiments">
+            Back to experiments
+          </Link>
+          <Link
+            className={styles.buttonSecondary}
+            href={`/experiments/${experimentId}/plants`}
+          >
+            Plants list
+          </Link>
+        </div>
+      }
+    >
+      {loading ? <p className={styles.mutedText}>Loading setup...</p> : null}
+      {error ? <p className={styles.errorText}>{error}</p> : null}
+      {notice ? <p className={styles.successText}>{notice}</p> : null}
 
-        {loading ? <p>Loading...</p> : null}
-        {error ? <p className={styles.error}>{error}</p> : null}
-        {notice ? <p className={styles.success}>{notice}</p> : null}
-
-        {!loading ? (
-          <section className={styles.wizardLayout}>
-            <aside className={styles.packetNav}>
-              {(setupState?.packet_progress ?? FALLBACK_PACKETS).map((packet) => (
+      {!loading ? (
+        <section className={styles.wizardLayout}>
+          <SectionCard title="Setup Packets">
+            <div className={styles.packetNav}>
+              {packetProgress.map((packet) => (
                 <button
                   key={packet.id}
                   type="button"
@@ -547,114 +570,117 @@ export default function ExperimentSetupPage() {
                   {packet.name}
                 </button>
               ))}
-            </aside>
+            </div>
+          </SectionCard>
 
-            <section>
-              {currentPacket === "environment" ? (
-                <div className={styles.formGrid}>
-                  <h2>Packet 1: Environment</h2>
+          <div className={styles.packetPanel}>
+            {currentPacket === "environment" ? (
+              <>
+                <SectionCard title="Packet 1: Environment">
+                  <div className={styles.formGrid}>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Tent name</span>
+                      <input
+                        className={styles.input}
+                        value={envForm.tent_name}
+                        onChange={(event) =>
+                          setEnvForm((prev) => ({
+                            ...prev,
+                            tent_name: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
 
-                  <label className={styles.field}>
-                    Tent name
-                    <input
-                      className={styles.input}
-                      value={envForm.tent_name}
-                      onChange={(event) =>
-                        setEnvForm((prev) => ({
-                          ...prev,
-                          tent_name: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Light schedule</span>
+                      <input
+                        className={styles.input}
+                        value={envForm.light_schedule}
+                        onChange={(event) =>
+                          setEnvForm((prev) => ({
+                            ...prev,
+                            light_schedule: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
 
-                  <label className={styles.field}>
-                    Light schedule
-                    <input
-                      className={styles.input}
-                      value={envForm.light_schedule}
-                      onChange={(event) =>
-                        setEnvForm((prev) => ({
-                          ...prev,
-                          light_schedule: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Light height notes</span>
+                      <input
+                        className={styles.input}
+                        value={envForm.light_height_notes}
+                        onChange={(event) =>
+                          setEnvForm((prev) => ({
+                            ...prev,
+                            light_height_notes: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
 
-                  <label className={styles.field}>
-                    Light height notes
-                    <input
-                      className={styles.input}
-                      value={envForm.light_height_notes}
-                      onChange={(event) =>
-                        setEnvForm((prev) => ({
-                          ...prev,
-                          light_height_notes: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Ventilation notes</span>
+                      <textarea
+                        className={styles.textarea}
+                        value={envForm.ventilation_notes}
+                        onChange={(event) =>
+                          setEnvForm((prev) => ({
+                            ...prev,
+                            ventilation_notes: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
 
-                  <label className={styles.field}>
-                    Ventilation notes
-                    <textarea
-                      className={styles.textarea}
-                      value={envForm.ventilation_notes}
-                      onChange={(event) =>
-                        setEnvForm((prev) => ({
-                          ...prev,
-                          ventilation_notes: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Water source</span>
+                      <input
+                        className={styles.input}
+                        value={envForm.water_source}
+                        onChange={(event) =>
+                          setEnvForm((prev) => ({
+                            ...prev,
+                            water_source: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
 
-                  <label className={styles.field}>
-                    Water source
-                    <input
-                      className={styles.input}
-                      value={envForm.water_source}
-                      onChange={(event) =>
-                        setEnvForm((prev) => ({
-                          ...prev,
-                          water_source: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Run-in days</span>
+                      <input
+                        className={styles.input}
+                        type="number"
+                        min={1}
+                        value={envForm.run_in_days}
+                        onChange={(event) =>
+                          setEnvForm((prev) => ({
+                            ...prev,
+                            run_in_days: Number(event.target.value) || 14,
+                          }))
+                        }
+                      />
+                    </label>
 
-                  <label className={styles.field}>
-                    Run-in days
-                    <input
-                      className={styles.input}
-                      type="number"
-                      min={1}
-                      value={envForm.run_in_days}
-                      onChange={(event) =>
-                        setEnvForm((prev) => ({
-                          ...prev,
-                          run_in_days: Number(event.target.value) || 14,
-                        }))
-                      }
-                    />
-                  </label>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Notes</span>
+                      <textarea
+                        className={styles.textarea}
+                        value={envForm.notes}
+                        onChange={(event) =>
+                          setEnvForm((prev) => ({
+                            ...prev,
+                            notes: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                </SectionCard>
 
-                  <label className={styles.field}>
-                    Notes
-                    <textarea
-                      className={styles.textarea}
-                      value={envForm.notes}
-                      onChange={(event) =>
-                        setEnvForm((prev) => ({
-                          ...prev,
-                          notes: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <h3>Blocks</h3>
+                <SectionCard title="Blocks" subtitle="At least 2 blocks required.">
                   <div className={styles.blocksList}>
                     {blocks.map((block) => (
                       <article className={styles.blockRow} key={block.id}>
@@ -673,7 +699,7 @@ export default function ExperimentSetupPage() {
                           }
                         />
                         <button
-                          className={styles.secondaryButton}
+                          className={styles.buttonSecondary}
                           type="button"
                           onClick={() => saveBlock(block)}
                         >
@@ -684,83 +710,72 @@ export default function ExperimentSetupPage() {
                   </div>
 
                   <div className={styles.formGrid}>
-                    <h4>Add block</h4>
-                    <input
-                      className={styles.input}
-                      placeholder="Name (example: B5)"
-                      value={newBlockName}
-                      onChange={(event) => setNewBlockName(event.target.value)}
-                    />
-                    <textarea
-                      className={styles.textarea}
-                      placeholder="Description"
-                      value={newBlockDescription}
-                      onChange={(event) => setNewBlockDescription(event.target.value)}
-                    />
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>New block name</span>
+                      <input
+                        className={styles.input}
+                        placeholder="B5"
+                        value={newBlockName}
+                        onChange={(event) => setNewBlockName(event.target.value)}
+                      />
+                    </label>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Description</span>
+                      <textarea
+                        className={styles.textarea}
+                        placeholder="Placement description"
+                        value={newBlockDescription}
+                        onChange={(event) => setNewBlockDescription(event.target.value)}
+                      />
+                    </label>
                     <button
-                      className={styles.secondaryButton}
+                      className={styles.buttonSecondary}
                       type="button"
                       onClick={addBlock}
                     >
                       Add block
                     </button>
                   </div>
+                </SectionCard>
 
-                  <div className={styles.actions}>
-                    <button
-                      className={styles.button}
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void saveEnvironment()}
-                    >
-                      Save
-                    </button>
-                    <button
-                      className={styles.secondaryButton}
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void markEnvironmentComplete()}
-                    >
-                      {saving ? "Completing..." : "Mark Complete"}
-                    </button>
-                  </div>
-                </div>
-              ) : currentPacket === "plants" ? (
-                <div className={styles.formGrid}>
-                  <h2>Packet 2: Plants</h2>
+                <StickyActionBar>
+                  <button
+                    className={styles.buttonPrimary}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void saveEnvironment()}
+                  >
+                    Save
+                  </button>
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void markEnvironmentComplete()}
+                  >
+                    {saving ? "Completing..." : "Mark Complete"}
+                  </button>
+                </StickyActionBar>
+              </>
+            ) : null}
 
+            {currentPacket === "plants" ? (
+              <>
+                <SectionCard title="Packet 2: Plants">
                   <label className={styles.field}>
-                    ID format notes
+                    <span className={styles.fieldLabel}>ID format notes</span>
                     <textarea
                       className={styles.textarea}
                       value={idFormatNotes}
                       onChange={(event) => setIdFormatNotes(event.target.value)}
                     />
                   </label>
+                </SectionCard>
 
-                  <div className={styles.actions}>
-                    <button
-                      className={styles.button}
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void savePlantsPacket()}
-                    >
-                      Save
-                    </button>
-                    <button
-                      className={styles.secondaryButton}
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void completePlantsPacket()}
-                    >
-                      {saving ? "Completing..." : "Mark Complete"}
-                    </button>
-                  </div>
-
-                  <h3>Add plants (manual)</h3>
+                <SectionCard title="Add Plants (Manual)">
                   <div className={styles.formGrid}>
                     <label className={styles.field}>
-                      Species name
+                      <span className={styles.fieldLabel}>Species name</span>
                       <input
                         className={styles.input}
                         value={manualSpeciesName}
@@ -770,7 +785,7 @@ export default function ExperimentSetupPage() {
                     </label>
 
                     <label className={styles.field}>
-                      Category
+                      <span className={styles.fieldLabel}>Category</span>
                       <input
                         className={styles.input}
                         value={manualCategory}
@@ -780,7 +795,7 @@ export default function ExperimentSetupPage() {
                     </label>
 
                     <label className={styles.field}>
-                      Cultivar
+                      <span className={styles.fieldLabel}>Cultivar</span>
                       <input
                         className={styles.input}
                         value={manualCultivar}
@@ -789,20 +804,18 @@ export default function ExperimentSetupPage() {
                     </label>
 
                     <label className={styles.field}>
-                      Quantity
+                      <span className={styles.fieldLabel}>Quantity</span>
                       <input
                         className={styles.input}
                         type="number"
                         min={1}
                         value={manualQuantity}
-                        onChange={(event) =>
-                          setManualQuantity(Number(event.target.value) || 1)
-                        }
+                        onChange={(event) => setManualQuantity(Number(event.target.value) || 1)}
                       />
                     </label>
 
                     <label className={styles.field}>
-                      Plant ID (optional)
+                      <span className={styles.fieldLabel}>Plant ID (optional)</span>
                       <input
                         className={styles.input}
                         value={manualPlantId}
@@ -812,18 +825,16 @@ export default function ExperimentSetupPage() {
                     </label>
 
                     <label className={styles.field}>
-                      Baseline notes
+                      <span className={styles.fieldLabel}>Baseline notes</span>
                       <textarea
                         className={styles.textarea}
                         value={manualBaselineNotes}
-                        onChange={(event) =>
-                          setManualBaselineNotes(event.target.value)
-                        }
+                        onChange={(event) => setManualBaselineNotes(event.target.value)}
                       />
                     </label>
 
                     <button
-                      className={styles.button}
+                      className={styles.buttonSecondary}
                       type="button"
                       disabled={saving || !manualSpeciesName.trim()}
                       onClick={() => void addPlantsQuick()}
@@ -831,38 +842,43 @@ export default function ExperimentSetupPage() {
                       Add plants
                     </button>
                   </div>
+                </SectionCard>
 
-                  <h3>Bulk import CSV</h3>
-                  <p className={styles.muted}>
+                <SectionCard title="Bulk Import CSV">
+                  <p className={styles.inlineNote}>
                     Columns: species_name, category, cultivar, quantity, plant_id,
                     baseline_notes
                   </p>
-                  <textarea
-                    className={styles.textarea}
-                    value={csvText}
-                    onChange={(event) => setCsvText(event.target.value)}
-                    placeholder={
-                      "species_name,category,cultivar,quantity,plant_id,baseline_notes\\nNepenthes alata,nepenthes,,3,,batch A"
-                    }
-                  />
-                  <input
-                    className={styles.input}
-                    type="file"
-                    accept=".csv,text/csv"
-                    onChange={(event) => setCsvFile(event.target.files?.[0] ?? null)}
-                  />
-                  <button
-                    className={styles.secondaryButton}
-                    type="button"
-                    disabled={saving || (!csvFile && !csvText.trim())}
-                    onClick={() => void importPlantsCsv()}
-                  >
-                    Import CSV
-                  </button>
+                  <div className={styles.formGrid}>
+                    <textarea
+                      className={styles.textarea}
+                      value={csvText}
+                      onChange={(event) => setCsvText(event.target.value)}
+                      placeholder={
+                        "species_name,category,cultivar,quantity,plant_id,baseline_notes\\nNepenthes alata,nepenthes,,3,,batch A"
+                      }
+                    />
+                    <input
+                      className={styles.input}
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={(event) => setCsvFile(event.target.files?.[0] ?? null)}
+                    />
+                    <button
+                      className={styles.buttonSecondary}
+                      type="button"
+                      disabled={saving || (!csvFile && !csvText.trim())}
+                      onClick={() => void importPlantsCsv()}
+                    >
+                      Import CSV
+                    </button>
+                  </div>
+                </SectionCard>
 
+                <SectionCard title="Tools">
                   <div className={styles.actions}>
                     <button
-                      className={styles.secondaryButton}
+                      className={styles.buttonSecondary}
                       type="button"
                       disabled={saving || !hasPendingPlantIds}
                       onClick={() => void generateMissingIds()}
@@ -870,55 +886,90 @@ export default function ExperimentSetupPage() {
                       Generate IDs for pending plants
                     </button>
                     <button
-                      className={styles.secondaryButton}
+                      className={styles.buttonSecondary}
                       type="button"
                       onClick={() => downloadLabels("all")}
                     >
                       Download labels PDF
                     </button>
                   </div>
+                </SectionCard>
 
-                  <h3>Plants</h3>
-                  {plants.length === 0 ? (
-                    <IllustrationPlaceholder
-                      inventoryId="ILL-201"
-                      kind="noPlants"
-                    />
-                  ) : (
-                    <table className={styles.table}>
-                      <thead>
-                        <tr>
-                          <th>Plant ID</th>
-                          <th>Species</th>
-                          <th>Cultivar</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {plants.map((plant) => (
-                          <tr key={plant.id}>
-                            <td>{plant.plant_id || "(pending)"}</td>
-                            <td>{plant.species_name}</td>
-                            <td>{plant.cultivar || "-"}</td>
-                            <td>{plant.status}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              ) : (
-                <div className={styles.formGrid}>
-                  <h2>{currentPacket}</h2>
-                  <p className={styles.muted}>
-                    This packet is not implemented yet. Complete Packet 1 and Packet 2 first.
-                  </p>
-                </div>
-              )}
-            </section>
-          </section>
-        ) : null}
-      </main>
-    </div>
+                <SectionCard title="Plants">
+                  <ResponsiveList
+                    items={plants}
+                    getKey={(plant) => plant.id}
+                    columns={[
+                      {
+                        key: "plant_id",
+                        label: "Plant ID",
+                        render: (plant) => plant.plant_id || "(pending)",
+                      },
+                      {
+                        key: "species",
+                        label: "Species",
+                        render: (plant) => plant.species_name,
+                      },
+                      {
+                        key: "cultivar",
+                        label: "Cultivar",
+                        render: (plant) => plant.cultivar || "-",
+                      },
+                      {
+                        key: "status",
+                        label: "Status",
+                        render: (plant) => plant.status,
+                      },
+                    ]}
+                    renderMobileCard={(plant) => (
+                      <div className={styles.cardKeyValue}>
+                        <span>Plant ID</span>
+                        <strong>{plant.plant_id || "(pending)"}</strong>
+                        <span>Species</span>
+                        <strong>{plant.species_name}</strong>
+                        <span>Cultivar</span>
+                        <strong>{plant.cultivar || "-"}</strong>
+                        <span>Status</span>
+                        <strong>{plant.status}</strong>
+                      </div>
+                    )}
+                    emptyState={
+                      <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
+                    }
+                  />
+                </SectionCard>
+
+                <StickyActionBar>
+                  <button
+                    className={styles.buttonPrimary}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void savePlantsPacket()}
+                  >
+                    Save
+                  </button>
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void completePlantsPacket()}
+                  >
+                    {saving ? "Completing..." : "Mark Complete"}
+                  </button>
+                </StickyActionBar>
+              </>
+            ) : null}
+
+            {currentPacket !== "environment" && currentPacket !== "plants" ? (
+              <SectionCard title={currentPacket}>
+                <p className={styles.mutedText}>
+                  This packet is not implemented yet. Complete Packet 1 and Packet 2 first.
+                </p>
+              </SectionCard>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+    </PageShell>
   );
 }

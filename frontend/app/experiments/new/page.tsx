@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
 import { backendFetch } from "@/lib/backend";
-import AppMarkPlaceholder from "@/src/components/AppMarkPlaceholder";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import PageShell from "@/src/components/ui/PageShell";
+import SectionCard from "@/src/components/ui/SectionCard";
 import styles from "../experiments.module.css";
 
 export default function NewExperimentPage() {
@@ -63,30 +64,28 @@ export default function NewExperimentPage() {
 
   if (notInvited) {
     return (
-      <div className={styles.page}>
-        <main className={styles.container}>
-          <AppMarkPlaceholder />
-          <h1>New experiment</h1>
+      <PageShell title="New Experiment">
+        <SectionCard>
           <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
-        </main>
-      </div>
+        </SectionCard>
+      </PageShell>
     );
   }
 
   return (
-    <div className={styles.page}>
-      <main className={styles.container}>
-        <header className={styles.header}>
-          <AppMarkPlaceholder />
-          <h1>New experiment</h1>
-          <p className={styles.muted}>
-            Start an experiment and continue to setup packets.
-          </p>
-        </header>
-
+    <PageShell
+      title="New Experiment"
+      subtitle="Start an experiment and continue through setup packets."
+      actions={
+        <Link className={styles.buttonSecondary} href="/experiments">
+          Cancel
+        </Link>
+      }
+    >
+      <SectionCard title="Experiment Details">
         <form className={styles.formGrid} onSubmit={onSubmit}>
           <label className={styles.field}>
-            Name
+            <span className={styles.fieldLabel}>Name</span>
             <input
               className={styles.input}
               value={name}
@@ -96,7 +95,7 @@ export default function NewExperimentPage() {
           </label>
 
           <label className={styles.field}>
-            Description
+            <span className={styles.fieldLabel}>Description</span>
             <textarea
               className={styles.textarea}
               value={description}
@@ -105,17 +104,21 @@ export default function NewExperimentPage() {
           </label>
 
           <div className={styles.actions}>
-            <button className={styles.button} disabled={saving} type="submit">
+            <button
+              className={styles.buttonPrimary}
+              disabled={saving}
+              type="submit"
+            >
               {saving ? "Creating..." : "Create experiment"}
             </button>
-            <Link className={styles.secondaryButton} href="/experiments">
+            <Link className={styles.buttonSecondary} href="/experiments">
               Cancel
             </Link>
           </div>
 
-          {error ? <p className={styles.error}>{error}</p> : null}
+          {error ? <p className={styles.errorText}>{error}</p> : null}
         </form>
-      </main>
-    </div>
+      </SectionCard>
+    </PageShell>
   );
 }
