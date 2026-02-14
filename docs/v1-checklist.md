@@ -43,7 +43,7 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Routes: `GET/PATCH /api/v1/experiments/{id}/setup-state/`.
 - [x] Environments step + Blocks APIs and completion validation (owner: Codex)
   - Refs: `80789485`
-  - Routes: `PUT /api/v1/experiments/{id}/packets/environment/`, `POST /api/v1/experiments/{id}/packets/environment/complete/`, `GET/POST /api/v1/experiments/{id}/blocks/`, `PATCH /api/v1/blocks/{id}/`.
+  - Routes: `PUT /api/v1/experiments/{id}/packets/environment/`, `POST /api/v1/experiments/{id}/packets/environment/complete/`, `GET/POST /api/v1/experiments/{id}/blocks/`, `POST /api/v1/experiments/{id}/blocks/defaults`, `PATCH /api/v1/blocks/{id}/`.
 - [x] Wizard shell + Environments frontend (owner: Codex)
   - Refs: `948a8a7a`
   - Routes: `/experiments/{id}/setup`, `/experiments`, `/experiments/new`.
