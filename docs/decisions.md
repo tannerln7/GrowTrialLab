@@ -66,6 +66,17 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Mobile-first focused data entry flow while preserving packet navigation context.
 - Refs: `4e599540`.
 
+### 2026-02-14: Packet 4 uses Recipe as group with deterministic stratified randomization
+- Decision: Reuse `Recipe` as group definition, enforce `R0` + `R1...` codes, and randomize active plants with `stratified_v1` over `(bin, species.category)` using seed-driven deterministic shuffling.
+- Rationale: Avoids extra schema while making group assignment reproducible and balanced within key biological strata.
+- Refs: `a6b19d01`, `990b1c6b`.
+
+### 2026-02-14: Packet 4 lock follows UI-only guardrail semantics
+- Decision: Packet 4 complete sets `packet_data["groups"]["locked"]=true` for UX signaling, but backend apply/edit endpoints remain writable.
+- Rationale: Consistency with Packet 3 v1 lock model and simpler operator workflow.
+- Refs: `a6b19d01`, `ea4373b7`.
+- Caution: Strong integrity controls (auditable lock enforcement) remain a post-v1 hardening item.
+
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
 - Rationale: Clear persistence boundary and easy backup target.

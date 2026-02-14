@@ -15,9 +15,9 @@ Status convention:
 ## Current Status Summary
 The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Packet framework is in place and Packet 1 (Environment) and Packet 2 (Plants) are implemented end-to-end with API and UI.
 
-Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Packet 3 baseline MVP is now implemented with template-driven metrics, baseline capture UI, bin assignment, and UI-level baseline locking.
+Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Packet 3 baseline MVP and Packet 4 groups/randomization are implemented with UI-only lock semantics.
 
-The largest remaining V1 work is Packet 4-7 workflows, production-hardening/security/deployment details, and operational guardrails (backups, stricter packet-lock governance, reporting/export paths).
+The largest remaining V1 work is Packet 5-7 workflows, production-hardening/security/deployment details, and operational guardrails (backups, stricter packet-lock governance, reporting/export paths).
 
 ## Completed Milestones
 - [x] Monorepo scaffold and local compose runtime (owner: Codex)
@@ -63,8 +63,9 @@ The largest remaining V1 work is Packet 4-7 workflows, production-hardening/secu
   - Refs: `f4e4b310`, `fe398ba3`, `e932c093`
   - Routes/files: `/manifest.webmanifest`, `/sw.js`, `/offline`, `ServiceWorkerRegistration`.
 - [x] Plant QR resolve page and plant detail API retrieval (owner: Codex)
-  - Refs: `7352300e`, `c8aa364c`
+  - Refs: `7352300e`, `c8aa364c`, `ea4373b7`
   - Routes: `/p/{uuid}` frontend route, `GET /api/v1/plants/{uuid}/`.
+  - Notes: Plant detail now includes assigned group/recipe when present.
 - [x] Labels export uses absolute QR URLs and prints Plant ID text (owner: Codex)
   - Refs: `66824a6e`, `c8aa364c`
   - Routes/env: `GET /api/v1/experiments/{id}/plants/labels.pdf`, `PUBLIC_BASE_URL`.
@@ -82,6 +83,14 @@ The largest remaining V1 work is Packet 4-7 workflows, production-hardening/secu
 - [x] Baseline lock semantics switched to UI-only guardrail (owner: Codex)
   - Refs: `de058638`, `1cf9c9e6`, `e68610fc`
   - Notes: Backend no longer returns lock-based 403 for baseline/bin edits; baseline page is read-only by default when locked and supports local unlock/re-lock.
+- [x] Packet 4 groups/randomization APIs with deterministic stratified assignment (owner: Codex)
+  - Refs: `a6b19d01`, `990b1c6b`
+  - Routes: `GET /api/v1/experiments/{id}/groups/status`, `POST /api/v1/experiments/{id}/groups/recipes`, `PATCH /api/v1/experiments/{id}/groups/recipes/{recipe_id}`, `POST /api/v1/experiments/{id}/groups/preview`, `POST /api/v1/experiments/{id}/groups/apply`, `PUT /api/v1/experiments/{id}/packets/groups/`, `POST /api/v1/experiments/{id}/packets/groups/complete/`.
+  - Notes: Uses `stratified_v1` with strata `(bin, species.category)` and seed tracking in `packet_data["groups"]`.
+- [x] Packet 4 frontend wizard flow with preview/apply and UI-only lock guardrail (owner: Codex)
+  - Refs: `ea4373b7`
+  - Routes: `/experiments/{id}/setup` (Packet 4 section).
+  - Notes: Read-only-by-default when locked; local unlock/re-lock modal does not call backend unlock endpoints.
 
 ## Remaining Milestones
 
@@ -105,11 +114,10 @@ The largest remaining V1 work is Packet 4-7 workflows, production-hardening/secu
   - Notes: currently audit is minimal/log-style.
 
 ### Setup Wizard (Packets 1–8)
-- [ ] (in progress) Keep Packet 1/2/3 stable while refining packet lock governance (owner: Codex)
+- [ ] (in progress) Keep Packet 1/2/3/4 stable while refining packet lock governance (owner: Codex)
   - Route: `PATCH /api/v1/experiments/{id}/setup-state/`.
 - [ ] (in progress) Strengthen Packet 3 completion rule from MVP threshold to all-plants baseline coverage (owner: Codex)
   - Notes: Current MVP requires at least 1 baseline capture + all bins assigned.
-- [ ] Implement Packet 4 (Groups/randomization setup scaffolding) (owner: Codex)
 - [ ] Implement Packet 5 (Tray assignment scaffolding) (owner: Codex)
 - [ ] Implement Packet 6 (Rotation plan scaffolding) (owner: Codex)
 - [ ] Implement Packet 7 (Feeding protocol + weekly loop scaffolding) (owner: Codex)
@@ -127,8 +135,11 @@ The largest remaining V1 work is Packet 4-7 workflows, production-hardening/secu
 - [ ] Add baseline review/QA pass before packet completion (owner: Codex)
 
 ### Randomization/Groups (Packet 4)
-- [ ] Add group assignment strategy + deterministic seed handling (owner: Codex)
-- [ ] Persist assignment outputs and lock post-confirmation (owner: Codex)
+- [x] Add group assignment strategy + deterministic seed handling (owner: Codex)
+  - Refs: `a6b19d01`, `990b1c6b`
+- [x] Persist assignment outputs and lock post-confirmation (owner: Codex)
+  - Refs: `a6b19d01`, `ea4373b7`
+- [ ] Decide if Packet 4 lock should remain UI-only or move to backend enforcement post-v1 (owner: manual)
 
 ### Trays/Rotation (Packets 5–6)
 - [ ] Build tray composition UX using `Tray` + `TrayPlant` (owner: Codex)
@@ -168,9 +179,9 @@ The largest remaining V1 work is Packet 4-7 workflows, production-hardening/secu
 - [ ] Define app operational metrics and alert thresholds (owner: manual)
 
 ## Next 3 Prompts Plan
-1. Packet 4 MVP: group/randomization setup flow without full statistical engine.
-2. Packet lock governance: define whether backend-enforced locks/audit trail are required for post-MVP integrity.
-3. Packet 7 weekly ritual MVP: weekly session, feeding events, and adverse event flow.
+1. Packet 5 MVP: tray assignment workflow using existing Tray/TrayPlant models.
+2. Packet 6 MVP: rotation plan/log workflow tied to blocks and trays.
+3. Packet lock governance: define whether backend-enforced locks/audit trail are required for post-MVP integrity.
 
 ## Deferred Items (Explicitly Not in V1)
 - [ ] Native mobile apps (iOS/Android) separate from PWA.
