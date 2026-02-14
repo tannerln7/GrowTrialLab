@@ -32,12 +32,12 @@ const KIND_CONFIG: Record<
   noExperiments: {
     icon: FlaskConical,
     title: "No experiments yet",
-    subtitle: "Create your first experiment to start setup packets.",
+    subtitle: "Create your first experiment to begin bootstrap setup.",
   },
   noPlants: {
     icon: Sprout,
     title: "No plants yet",
-    subtitle: "Add plants in Packet 2 to continue setup.",
+    subtitle: "Add plants to continue experiment setup.",
   },
   noPhotos: {
     icon: ImageOff,

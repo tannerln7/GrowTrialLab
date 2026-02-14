@@ -61,9 +61,9 @@ This file records architecture/product decisions and why they were made.
 - Refs: `de058638`, `1cf9c9e6`, `e68610fc`.
 - Caution: Audit-grade integrity will require backend-enforced lock rules in a later phase.
 
-### 2026-02-14: Baseline UX uses dedicated capture page plus wizard summary
-- Decision: Implement `/experiments/{id}/baseline` for save-and-next capture flow and keep `/experiments/{id}/setup` Baseline step as status/control surface.
-- Rationale: Mobile-first focused data entry flow while preserving setup navigation context.
+### 2026-02-14: Baseline UX uses dedicated capture page from overview readiness actions
+- Decision: Implement `/experiments/{id}/baseline` as the baseline capture flow and trigger it from overview readiness and per-plant quick actions.
+- Rationale: Keeps baseline as a post-bootstrap readiness action instead of setup content.
 - Refs: `4e599540`.
 
 ### 2026-02-14: Groups step uses Recipe as group with deterministic stratified randomization
@@ -77,9 +77,9 @@ This file records architecture/product decisions and why they were made.
 - Refs: `a6b19d01`, `ea4373b7`.
 - Caution: Strong integrity controls (auditable lock enforcement) remain a post-v1 hardening item.
 
-### 2026-02-14: Setup wizard uses linear descriptive step names while backend keys remain stable
-- Decision: UI uses step titles (Plants, Environments, Baseline, Recipes, Assignment, Placement, Rotation, Start) and hides user-facing “packet” wording; backend keys and `/packets/*` endpoints remain unchanged for compatibility.
-- Rationale: Improves operator mental model and navigation clarity without data migration risk.
+### 2026-02-14: Setup naming migration kept backend keys stable (later superseded by bootstrap-only setup)
+- Decision: UI moved away from packet naming while backend keys and `/packets/*` endpoints stayed stable for compatibility; later UX simplified to bootstrap-only setup.
+- Rationale: Avoided data migration risk while reducing setup complexity.
 - Refs: `a6b19d01`, `ea4373b7`.
 
 ### 2026-02-14: Experiment Overview is the primary roster/work queue surface
@@ -88,8 +88,8 @@ This file records architecture/product decisions and why they were made.
 - Refs: `51a32d99`, `65f84632`, `12517df6`.
 
 ### 2026-02-14: Experiment navigation follows a hub-and-spoke model
-- Decision: Treat `/experiments/{id}/overview` as the experiment landing hub; route `/experiments/{id}` redirects to overview; subpages use prominent `← Overview` return actions and minimize lateral cross-links.
-- Rationale: Mobile QR and roster workflows are faster when operators always orient from one hub instead of navigating a page graph.
+- Decision: Treat `/experiments/{id}` as canonical entry and redirect to `/setup` until bootstrap completion, then to `/overview`; subpages keep prominent `← Overview` return actions and minimize lateral cross-links.
+- Rationale: Preserves required bootstrap gating while keeping overview as the steady-state hub.
 - Refs: `310f00b5`, `41599236`, `669ae104`.
 
 ### 2026-02-14: Setup is bootstrap-only and hidden after completion

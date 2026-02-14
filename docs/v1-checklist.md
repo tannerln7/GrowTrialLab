@@ -79,7 +79,7 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Notes: Baseline lock state is retained for UX/workflow signaling and step progression.
 - [x] Baseline frontend workflow (owner: Codex)
   - Refs: `4e599540`
-  - Routes: `/experiments/{id}/setup` (Baseline section), `/experiments/{id}/baseline`, `/p/{uuid}` baseline shortcut.
+  - Routes: `/experiments/{id}/baseline`, `/experiments/{id}/overview`, `/p/{uuid}` baseline shortcut.
 - [x] Baseline lock semantics switched to UI-only guardrail (owner: Codex)
   - Refs: `de058638`, `1cf9c9e6`, `e68610fc`
   - Notes: Backend no longer returns lock-based 403 for baseline/bin edits; baseline page is read-only by default when locked and supports local unlock/re-lock.
@@ -89,11 +89,10 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Notes: Uses `stratified_v1` with strata `(bin, species.category)` and seed tracking in `packet_data["groups"]`.
 - [x] Groups frontend flow with preview/apply and UI-only lock guardrail (owner: Codex)
   - Refs: `ea4373b7`
-  - Routes: `/experiments/{id}/setup` (Recipes + Assignment sections).
-- [x] Linear setup UX with descriptive step names and Recipes/Assignment UI split (owner: Codex)
+  - Routes: `/experiments/{id}/assignment`, `/experiments/{id}/overview`.
+- [x] Legacy linear setup naming migration completed, then superseded by bootstrap-only setup (owner: Codex)
   - Refs: `a6b19d01`, `ea4373b7`
-  - Notes: User-facing copy now uses setup steps (Plants, Environments, Baseline, Recipes, Assignment, Placement, Rotation, Start) while backend step keys and `/packets/*` endpoints remain unchanged.
-  - Notes: Read-only-by-default when locked; local unlock/re-lock modal does not call backend unlock endpoints.
+  - Notes: Historical transition preserved backend step keys and `/packets/*` endpoints; current UX no longer exposes packet-style setup navigation.
 - [x] Experiment overview roster/work queue endpoint and UI (owner: Codex)
   - Refs: `51a32d99`, `65f84632`, `12517df6`
   - Routes: `GET /api/v1/experiments/{id}/overview/plants`, `/experiments/{id}/overview`.
@@ -150,7 +149,7 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [ ] Implement Start step scaffolding (owner: Codex)
 
 ### Experiments/Plants UX
-- [ ] (in progress) Improve experiment detail context page linking setup, overview, plants, and outputs (owner: Codex)
+- [ ] (in progress) Improve experiment detail context page linking overview, plants, and outputs (owner: Codex)
   - Routes: `/experiments`, `/experiments/{id}/setup`, `/experiments/{id}/overview`, `/experiments/{id}/plants`.
 - [ ] (in progress) Refine Overview action tiles into a stable operator runbook pattern (owner: Codex)
   - Notes: Keep overview as the single launch point; avoid re-introducing cross-page navigation sprawl.

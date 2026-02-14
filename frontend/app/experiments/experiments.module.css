@@ -102,47 +102,6 @@
   font-size: 0.9rem;
 }
 
-.wizardLayout {
-  display: grid;
-  gap: 0.85rem;
-}
-
-.packetNav {
-  display: flex;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
-}
-
-.packetButton {
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.45rem 0.72rem;
-  background: var(--surface-elevated);
-  color: var(--text);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.packetButton[disabled] {
-  opacity: 0.5;
-}
-
-.packetDone {
-  border-color: color-mix(in srgb, var(--success) 60%, var(--border));
-  color: var(--success);
-}
-
-.packetCurrent {
-  border-color: color-mix(in srgb, var(--primary) 65%, var(--border));
-  background: color-mix(in srgb, var(--primary) 14%, var(--surface-elevated));
-}
-
-.packetPanel {
-  display: grid;
-  gap: 0.85rem;
-}
-
 .blocksList {
   display: grid;
   gap: 0.65rem;
@@ -235,23 +194,6 @@
 }
 
 @media (min-width: 920px) {
-  .wizardLayout {
-    grid-template-columns: 248px 1fr;
-    align-items: start;
-  }
-
-  .packetNav {
-    display: grid;
-    gap: 0.45rem;
-    overflow: visible;
-    padding-bottom: 0;
-  }
-
-  .packetButton {
-    border-radius: 10px;
-    text-align: left;
-  }
-
   .tileGrid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }

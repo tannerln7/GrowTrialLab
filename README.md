@@ -5,6 +5,11 @@ Monorepo scaffold for local development with:
 - Next.js frontend (`frontend/`)
 - Docker Compose runtime (`docker-compose.yml`)
 
+Experiment flow summary:
+- `/experiments/{id}` is the canonical experiment entry route.
+- It redirects to `/experiments/{id}/setup` until bootstrap setup is complete (plants + blocks + recipes).
+- After bootstrap setup, it redirects to `/experiments/{id}/overview` for readiness work (baseline + assignment).
+
 ## Quick start
 
 1. Create a local `.env` from template:
