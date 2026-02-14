@@ -2,6 +2,14 @@
 
 This file records architecture/product decisions and why they were made.
 
+## Current Canonical Flow
+- Canonical client gating and readiness source: `GET /api/v1/experiments/{id}/status/summary`.
+- Canonical entry route: `/experiments/{id}`.
+  - Redirect to `/experiments/{id}/setup` until bootstrap setup is complete.
+  - Redirect to `/experiments/{id}/overview` once bootstrap setup is complete.
+- Canonical bootstrap setup scope: Plants, Blocks/Slots, Recipes only.
+- Canonical readiness flows: `/experiments/{id}/baseline` and `/experiments/{id}/assignment`, launched from Overview.
+
 ## Decision Entries
 
 ### 2026-02-13: Backend stack is Django + DRF on Postgres
@@ -28,11 +36,6 @@ This file records architecture/product decisions and why they were made.
 - Decision: Keep role model minimal for v1.
 - Rationale: Reduced permission complexity while preserving admin operations separation (`/api/admin/*`).
 - Refs: `262849c8`, `5d5ee41d`.
-
-### 2026-02-13: Setup flow modeled as a stable step state machine per experiment
-- Decision: Add `ExperimentSetupState` with stable step keys and per-step data storage.
-- Rationale: Enables incremental wizard implementation with explicit completion progression while preserving backward-compatible API endpoints.
-- Refs: `94f306a2`, `80789485`, `948a8a7a`.
 
 ### 2026-02-13: Plant labels encode stable plant identifier path `/p/{plant_uuid}`
 - Decision: QR payload for labels uses stable UUID path reference.
@@ -76,11 +79,6 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Consistency with baseline v1 lock model and simpler operator workflow.
 - Refs: `a6b19d01`, `ea4373b7`.
 - Caution: Strong integrity controls (auditable lock enforcement) remain a post-v1 hardening item.
-
-### 2026-02-14: Setup naming migration kept backend keys stable (later superseded by bootstrap-only setup)
-- Decision: UI moved away from packet naming while backend keys and `/packets/*` endpoints stayed stable for compatibility; later UX simplified to bootstrap-only setup.
-- Rationale: Avoided data migration risk while reducing setup complexity.
-- Refs: `a6b19d01`, `ea4373b7`.
 
 ### 2026-02-14: Experiment Overview is the primary roster/work queue surface
 - Decision: Add `/experiments/{id}/overview` backed by `GET /api/v1/experiments/{id}/overview/plants` to centralize plant queue triage (needs baseline/bin/assignment, active, removed) and search.
@@ -139,3 +137,16 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Reduce stale/misleading experiment state risk while still enabling offline fallback UX.
 - Refs: `fe398ba3` (`frontend/public/sw.js`).
 - Caution: Cache names/version must be bumped on releases that change shell behavior.
+
+## History / Legacy Appendix
+
+### 2026-02-13: Setup flow modeled as a stable step state machine per experiment
+- Decision: Add `ExperimentSetupState` with stable step keys and per-step data storage.
+- Rationale: Enabled early incremental setup delivery while preserving compatibility.
+- Refs: `94f306a2`, `80789485`, `948a8a7a`.
+- Legacy compatibility details: model fields and payload keys still use `current_packet`, `completed_packets`, `locked_packets`, `packet_data`.
+
+### 2026-02-14: Setup naming migration kept backend keys stable (later superseded by bootstrap-only setup)
+- Decision: UI moved away from packet naming while backend keys and `/packets/*` endpoints stayed stable for compatibility; later UX simplified to bootstrap-only setup.
+- Rationale: Avoided data migration risk while reducing setup complexity.
+- Refs: `a6b19d01`, `ea4373b7`.

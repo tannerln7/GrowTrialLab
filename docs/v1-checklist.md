@@ -12,6 +12,16 @@ Status convention:
 - `[ ]` todo
 - `[ ] (in progress)` currently active but not complete
 
+## Current Canonical Flow
+- Canonical client flow uses `GET /api/v1/experiments/{id}/status/summary` as the source of truth for gating and readiness.
+- Canonical navigation starts at `/experiments/{id}`:
+  - Redirects to `/experiments/{id}/setup` while bootstrap setup is incomplete.
+  - Redirects to `/experiments/{id}/overview` after bootstrap setup is complete.
+- Bootstrap setup is intentionally minimal: Plants, Blocks/Slots, and Recipes.
+- Readiness work happens from Overview and dedicated pages:
+  - Baseline capture: `/experiments/{id}/baseline`
+  - Assignment: `/experiments/{id}/assignment`
+
 ## Current Status Summary
 The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Setup is now bootstrap-only (Plants, Blocks/Slots, Recipes), and readiness workflows (baseline + assignment) are centered in Overview and dedicated pages.
 
@@ -90,9 +100,6 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [x] Groups frontend flow with preview/apply and UI-only lock guardrail (owner: Codex)
   - Refs: `ea4373b7`
   - Routes: `/experiments/{id}/assignment`, `/experiments/{id}/overview`.
-- [x] Legacy linear setup naming migration completed, then superseded by bootstrap-only setup (owner: Codex)
-  - Refs: `a6b19d01`, `ea4373b7`
-  - Notes: Historical transition preserved backend step keys and `/packets/*` endpoints; current UX no longer exposes packet-style setup navigation.
 - [x] Experiment overview roster/work queue endpoint and UI (owner: Codex)
   - Refs: `51a32d99`, `65f84632`, `12517df6`
   - Routes: `GET /api/v1/experiments/{id}/overview/plants`, `/experiments/{id}/overview`.
@@ -140,7 +147,7 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Notes: currently audit is minimal/log-style.
 
 ### Setup Wizard (Steps)
-- [ ] (in progress) Evaluate whether legacy setup-state packet progression is still needed post-bootstrap refactor (owner: Codex)
+- [ ] (in progress) Evaluate whether legacy setup-state progression is still needed post-bootstrap refactor (owner: Codex)
   - Route: `PATCH /api/v1/experiments/{id}/setup-state/`.
 - [ ] (in progress) Strengthen Baseline completion rule from MVP threshold to all-plants baseline coverage (owner: Codex)
   - Notes: Current MVP requires at least 1 baseline capture + all bins assigned.
@@ -214,6 +221,15 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 1. Placement step MVP: tray assignment workflow using existing Tray/TrayPlant models.
 2. Rotation step MVP: rotation plan/log workflow tied to blocks and trays.
 3. Step lock governance: define whether backend-enforced locks/audit trail are required for post-MVP integrity.
+
+## History / Legacy Appendix
+- Legacy setup naming migration (completed):
+  - Refs: `a6b19d01`, `ea4373b7`
+  - Notes: User-facing packet wording was removed while backend compatibility keys/endpoints remained stable.
+- Legacy compatibility contracts still in use:
+  - `ExperimentSetupState` fields such as `current_packet`, `completed_packets`, `locked_packets`, `packet_data`.
+  - Compatibility endpoint family under `/api/v1/experiments/{id}/packets/...`.
+  - Route refs: `/packets/environment`, `/packets/plants`, `/packets/baseline`, `/packets/groups`.
 
 ## Deferred Items (Explicitly Not in V1)
 - [ ] Native mobile apps (iOS/Android) separate from PWA.
