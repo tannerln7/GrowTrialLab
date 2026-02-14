@@ -98,6 +98,10 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
   - Refs: `51a32d99`, `65f84632`, `12517df6`
   - Routes: `GET /api/v1/experiments/{id}/overview/plants`, `/experiments/{id}/overview`.
   - Notes: Includes aggregate counts and filterable plant queue (Needs Baseline/Bin/Assignment, Active, Removed) with mobile cards.
+- [x] Hub-and-spoke experiment navigation centered on Overview (owner: Codex)
+  - Refs: `310f00b5`, `41599236`, `669ae104`, `7005524b`
+  - Routes: `/experiments/{id}` redirects to `/experiments/{id}/overview`; setup/baseline/plants/cockpit use prominent `← Overview` return links.
+  - Notes: Overview now includes setup/now-actions menu and per-plant quick actions; assignment path is launched from overview when needed.
 - [x] Plant action pages support safe return to experiment overview with filter preservation (owner: Codex)
   - Refs: `2e911442`, `226d9654`
   - Routes: `/p/{uuid}?from=...`.
@@ -140,6 +144,8 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 ### Experiments/Plants UX
 - [ ] (in progress) Improve experiment detail context page linking setup, overview, plants, and outputs (owner: Codex)
   - Routes: `/experiments`, `/experiments/{id}/setup`, `/experiments/{id}/overview`, `/experiments/{id}/plants`.
+- [ ] (in progress) Refine Overview action tiles into a stable operator runbook pattern (owner: Codex)
+  - Notes: Keep overview as the single launch point; avoid re-introducing cross-page navigation sprawl.
 - [ ] Add UX affordances for validation errors and partial saves (owner: Codex)
 
 ### Baseline/Binning (Step)
@@ -154,6 +160,10 @@ The largest remaining V1 work is Placement/Rotation/Start step implementation, p
 - [x] Persist assignment outputs and lock post-confirmation (owner: Codex)
   - Refs: `a6b19d01`, `ea4373b7`
 - [ ] Decide if Groups lock should remain UI-only or move to backend enforcement post-v1 (owner: manual)
+- [x] Assignment UX refactor: self-contained Recipes + Assignment with prerequisite blocking and Done-to-overview flow (owner: Codex)
+  - Refs: `7005524b`
+  - Route: `/experiments/{id}/setup?tab=assignment`.
+  - Notes: If active plants are missing baseline/bin, assignment actions are blocked with explicit message and `Back to Overview`.
 
 ### Placement/Rotation (Future Steps)
 - [ ] Build tray composition UX using `Tray` + `TrayPlant` (owner: Codex)

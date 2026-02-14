@@ -87,6 +87,11 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Operators need one mobile-first page to identify what requires action before entering specific step flows.
 - Refs: `51a32d99`, `65f84632`, `12517df6`.
 
+### 2026-02-14: Experiment navigation follows a hub-and-spoke model
+- Decision: Treat `/experiments/{id}/overview` as the experiment landing hub; route `/experiments/{id}` redirects to overview; subpages use prominent `← Overview` return actions and minimize lateral cross-links.
+- Rationale: Mobile QR and roster workflows are faster when operators always orient from one hub instead of navigating a page graph.
+- Refs: `310f00b5`, `41599236`, `669ae104`.
+
 ### 2026-02-14: Plant action pages use explicit safe return links to overview
 - Decision: Plant pages accept a `from` query value for back navigation, but only honor relative experiment paths (`/experiments/...`); otherwise fallback to the plant experiment overview.
 - Rationale: Preserves work-queue filters when navigating from overview without introducing open redirect risk.
@@ -97,6 +102,11 @@ This file records architecture/product decisions and why they were made.
 - Rationale: QR scan workflows need immediate action guidance without extra navigation; cockpit keeps operators in one-handed flow while reusing existing Baseline/Assignment routes.
 - Refs: `6e26cb27`, `2ff247c6`, `3ae322ad`.
 - Notes: Safe back-to-overview behavior (`from` sanitization + fallback) is preserved.
+
+### 2026-02-14: Assignment setup UX is prerequisite-aware and self-contained
+- Decision: In `?tab=assignment`, surface Recipes + Assignment together, block assignment controls when active plants are missing baseline/bin, and provide explicit `Done → Overview` completion path after apply.
+- Rationale: Reduces operator confusion and unnecessary page switching while keeping assignment flow deterministic.
+- Refs: `7005524b`.
 
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
