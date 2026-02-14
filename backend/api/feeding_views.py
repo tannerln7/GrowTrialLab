@@ -7,7 +7,7 @@ from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Experiment, FeedingEvent, Plant, Recipe
+from .models import Experiment, FeedingEvent, Plant
 
 FEEDING_QUEUE_WINDOW_DAYS = 7
 _MIN_DATETIME = datetime.min.replace(tzinfo=dt_timezone.utc)
@@ -48,7 +48,9 @@ def _queue_payload_item(plant: Plant, last_fed_at: datetime | None) -> dict[str,
         "species_name": plant.species.name,
         "species_category": plant.species.category,
         "cultivar": plant.cultivar,
+        "assigned_recipe_id": str(plant.assigned_recipe.id) if plant.assigned_recipe else None,
         "assigned_recipe_code": plant.assigned_recipe.code if plant.assigned_recipe else None,
+        "assigned_recipe_name": plant.assigned_recipe.name if plant.assigned_recipe else None,
         "last_fed_at": last_fed_at.isoformat() if last_fed_at else None,
         "needs_feeding": _needs_feeding(last_fed_at),
     }
@@ -118,13 +120,21 @@ def plant_feed(request, plant_id: UUID):
             {"detail": "Feeding is available only while an experiment is running."},
             status=409,
         )
+    if plant.assigned_recipe is None:
+        return Response(
+            {
+                "detail": "This plant has no recipe assignment yet. Assign recipes before feeding."
+            },
+            status=409,
+        )
 
-    recipe = None
     recipe_id = request.data.get("recipe_id")
     if recipe_id:
-        recipe = Recipe.objects.filter(id=recipe_id, experiment=plant.experiment).first()
-        if recipe is None:
-            return Response({"detail": "Recipe not found for this experiment."}, status=400)
+        if str(recipe_id) != str(plant.assigned_recipe.id):
+            return Response(
+                {"detail": "Feeding must use the plant's assigned recipe."},
+                status=409,
+            )
 
     occurred_at = request.data.get("occurred_at")
     if occurred_at:
@@ -144,7 +154,7 @@ def plant_feed(request, plant_id: UUID):
     event = FeedingEvent.objects.create(
         experiment=plant.experiment,
         plant=plant,
-        recipe=recipe,
+        recipe=plant.assigned_recipe,
         amount_text=amount_text,
         note=note,
         notes=note,
@@ -157,7 +167,9 @@ def plant_feed(request, plant_id: UUID):
             "id": str(event.id),
             "experiment_id": str(event.experiment.id),
             "plant_id": str(event.plant.id),
-            "recipe_id": str(event.recipe.id) if event.recipe else None,
+            "recipe_id": str(event.recipe.id),
+            "recipe_code": event.recipe.code,
+            "recipe_name": event.recipe.name,
             "amount_text": event.amount_text,
             "note": event.note,
             "occurred_at": event.occurred_at.isoformat(),

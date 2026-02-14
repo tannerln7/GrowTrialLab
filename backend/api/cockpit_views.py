@@ -96,7 +96,9 @@ def plant_cockpit(request, plant_id: UUID):
             },
             "derived": {
                 "has_baseline": has_baseline,
+                "assigned_recipe_id": str(plant.assigned_recipe.id) if plant.assigned_recipe else None,
                 "assigned_recipe_code": plant.assigned_recipe.code if plant.assigned_recipe else None,
+                "assigned_recipe_name": plant.assigned_recipe.name if plant.assigned_recipe else None,
                 "last_fed_at": last_fed_at.isoformat() if last_fed_at else None,
                 "replaced_by_uuid": replaced_by_uuid,
                 "replaces_uuid": replaces_uuid,

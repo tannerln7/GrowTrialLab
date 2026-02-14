@@ -73,7 +73,9 @@ def experiment_overview_plants(request, experiment_id: UUID):
                 "cultivar": plant.cultivar,
                 "status": plant.status,
                 "bin": plant.bin,
+                "assigned_recipe_id": str(plant.assigned_recipe.id) if plant.assigned_recipe else None,
                 "assigned_recipe_code": plant.assigned_recipe.code if plant.assigned_recipe else None,
+                "assigned_recipe_name": plant.assigned_recipe.name if plant.assigned_recipe else None,
                 "has_baseline": has_baseline,
                 "replaced_by_uuid": str(plant.replaced_by.id) if plant.replaced_by else None,
             }
