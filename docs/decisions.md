@@ -8,7 +8,7 @@ This file records architecture/product decisions and why they were made.
   - Redirect to `/experiments/{id}/setup` until bootstrap setup is complete.
   - Redirect to `/experiments/{id}/overview` once bootstrap setup is complete.
 - Canonical bootstrap setup scope: Plants, Blocks/Slots, Recipes only.
-- Canonical readiness flows: `/experiments/{id}/baseline` and `/experiments/{id}/assignment`, launched from Overview.
+- Canonical readiness flows: `/experiments/{id}/baseline`, `/experiments/{id}/assignment`, and `/experiments/{id}/feeding`, launched from Overview.
 - Lifecycle prerequisite policy: deletion gating and strict immutability are deferred until lifecycle primitives (`draft`/`running`/`stopped`) exist.
 
 ## Lifecycle Implications (Planned)
@@ -146,10 +146,12 @@ This file records architecture/product decisions and why they were made.
 - Refs: `3b52663c`, `9798c9fe`, `ec06d079`, `b80218ae`.
 - Notes: Rotation logging rejects non-running lifecycle states (`409`) and updates `Tray.block` to the destination block as the canonical current location.
 
-### 2026-02-14: Feeding MVP scope (planned) is running-only event logging with queue UX
-- Decision: Feeding MVP will be launched from Overview and Plant Cockpit, using a 7-day needs-feeding queue and simple feed event entry.
-- Rationale: Operators need fast feed capture in active runs without waiting for lot/batch workflow implementation.
-- Notes: Feeding write endpoints must enforce running lifecycle state and keep lots optional/deferred.
+### 2026-02-14: Feeding MVP is running-only queue logging launched from Overview/Cockpit
+- Decision: Implement feeding workflow on `/experiments/{id}/feeding` plus plant-level `POST /api/v1/plants/{uuid}/feed`, with queue source `GET /api/v1/experiments/{id}/feeding/queue` and history via `GET /api/v1/plants/{uuid}/feeding/recent`.
+- Rationale: Operators need fast, repetitive feed capture in active runs without waiting for lot/batch tooling; queue mode reduces navigation overhead.
+- Refs: `90aa50fb`, `af3c5c71`, `6146269d`.
+- Invariants: Backend feed writes enforce lifecycle `running` (`409` when draft/stopped); queue uses a fixed 7-day needs-feeding window for v1.
+- Deferred hooks: `recipe` remains optional and lot/batch integration is intentionally deferred.
 
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.

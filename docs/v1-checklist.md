@@ -23,6 +23,7 @@ Status convention:
   - Assignment: `/experiments/{id}/assignment`
   - Placement: `/experiments/{id}/placement`
   - Rotation: `/experiments/{id}/rotation`
+  - Feeding: `/experiments/{id}/feeding`
 - Experiment lifecycle is being introduced as a prerequisite for future delete-gating/immutability:
   - `draft` -> `running` -> `stopped` (archive deferred)
 
@@ -153,6 +154,10 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Refs: `3b52663c`, `9798c9fe`, `ec06d079`, `b80218ae`
   - Routes: `GET /api/v1/experiments/{id}/rotation/summary`, `POST /api/v1/experiments/{id}/rotation/log`, `/experiments/{id}/rotation`.
   - Notes: Rotation logging is allowed only for `running` lifecycle state and updates `Tray.block` as the canonical current location.
+- [x] Feeding MVP with running-only queue logging and cockpit entry (owner: Codex)
+  - Refs: `90aa50fb`, `af3c5c71`, `6146269d`
+  - Routes: `GET /api/v1/experiments/{id}/feeding/queue`, `POST /api/v1/plants/{uuid}/feed`, `GET /api/v1/plants/{uuid}/feeding/recent`, `/experiments/{id}/feeding`.
+  - Notes: Feeding writes are lifecycle-gated to `running` (backend `409` outside running); queue uses a 7-day needs-first window and Plant Cockpit now exposes last-fed hint + quick feed launch.
 
 ## Remaining Milestones
 
@@ -219,9 +224,6 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - API refs: `/experiments/{id}/rotation`, `GET /api/v1/experiments/{id}/rotation/summary`, `POST /api/v1/experiments/{id}/rotation/log`.
 
 ### Feeding/Lots/Weekly Sessions (Future Step + Ritual Loop)
-- [ ] (in progress) Implement Feeding MVP queue + QR-first entry for running experiments (owner: Codex)
-  - Notes: Running-gated feeding events, experiment queue, and cockpit shortcut.
-  - Planned routes/API refs: `/experiments/{id}/feeding`, `GET /api/v1/experiments/{id}/feeding/queue`, `POST /api/v1/plants/{uuid}/feed`, `GET /api/v1/plants/{uuid}/feeding/recent`.
 - [ ] Build lot preparation and assignment workflow (owner: Codex)
   - API refs: `/api/v1/lots`, `/api/v1/recipes`.
 - [ ] Build weekly execution loop (session checklist + feeding + adverse events + metrics) (owner: Codex)
@@ -255,9 +257,9 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
 - [ ] Define app operational metrics and alert thresholds (owner: manual)
 
 ## Next 3 Prompts Plan
-1. Feeding MVP: running-only feed event queue and cockpit quick-entry.
-2. Lifecycle governance hardening: define backend-enforced immutability/deletion rules after start.
-3. Placement/rotation refinements: high-volume UX and conflict handling.
+1. Lifecycle governance hardening: define backend-enforced immutability/deletion rules after start.
+2. Lots MVP: connect feeding to optional lot/batch context without blocking fast entry.
+3. Weekly ritual loop MVP: lightweight session/metrics/feeding workflow on top of existing events.
 
 ## History / Legacy Appendix
 - Legacy setup naming migration (completed):
