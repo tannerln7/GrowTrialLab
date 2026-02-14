@@ -9,8 +9,14 @@ export type ExperimentStatusSummary = {
       recipes: boolean;
     };
   };
+  lifecycle: {
+    state: "draft" | "running" | "stopped";
+    started_at: string | null;
+    stopped_at: string | null;
+  };
   readiness: {
     is_ready: boolean;
+    ready_to_start: boolean;
     counts: {
       active_plants: number;
       needs_baseline: number;
