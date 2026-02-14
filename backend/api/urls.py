@@ -19,6 +19,7 @@ from .groups_views import (
     experiment_groups_recipes,
     experiment_groups_status,
 )
+from .status_views import experiment_status_summary
 from .overview_views import experiment_overview_plants
 from .baseline_views import (
     complete_baseline_packet,
@@ -159,6 +160,11 @@ urlpatterns = [
         "api/v1/experiments/<uuid:experiment_id>/overview/plants",
         experiment_overview_plants,
         name="experiment-overview-plants",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/status/summary",
+        experiment_status_summary,
+        name="experiment-status-summary",
     ),
     path(
         "api/v1/plants/<uuid:plant_id>/cockpit",

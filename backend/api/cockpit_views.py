@@ -7,6 +7,7 @@ from rest_framework.response import Response
 
 from .baseline import BASELINE_WEEK_NUMBER
 from .models import Photo, Plant, PlantWeeklyMetric
+from .status_summary import compute_setup_status
 
 
 def _require_app_user(request):
@@ -46,6 +47,12 @@ def plant_cockpit(request, plant_id: UUID):
         Photo.objects.filter(experiment=plant.experiment, plant=plant)
         .order_by("-created_at")[:6]
     )
+    setup_status = compute_setup_status(plant.experiment)
+    experiment_home = (
+        f"/experiments/{plant.experiment.id}/overview"
+        if setup_status.is_complete
+        else f"/experiments/{plant.experiment.id}/setup"
+    )
 
     return Response(
         {
@@ -70,8 +77,9 @@ def plant_cockpit(request, plant_id: UUID):
                 "assigned_recipe_code": plant.assigned_recipe.code if plant.assigned_recipe else None,
             },
             "links": {
+                "experiment_home": experiment_home,
                 "experiment_overview": f"/experiments/{plant.experiment.id}/overview",
-                "setup_assignment": f"/experiments/{plant.experiment.id}/setup?tab=assignment",
+                "setup_assignment": f"/experiments/{plant.experiment.id}/assignment",
                 "baseline_capture": f"/experiments/{plant.experiment.id}/baseline?plant={plant.id}",
             },
             "recent_photos": [
