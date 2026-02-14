@@ -656,9 +656,9 @@ class PlantReplacementTests(TestCase):
 
         self.assertEqual(original.status, Plant.Status.REMOVED)
         self.assertEqual(original.removed_reason, "Leaf collapse")
-        self.assertEqual(str(original.replaced_by_id), replacement_uuid)
+        self.assertEqual(str(original.replaced_by.id), replacement_uuid)
         self.assertEqual(replacement.status, Plant.Status.ACTIVE)
-        self.assertEqual(replacement.assigned_recipe_id, recipe.id)
+        self.assertEqual(replacement.assigned_recipe.id, recipe.id)
         self.assertIsNone(replacement.bin)
         self.assertNotEqual(replacement.plant_id, original.plant_id)
         self.assertFalse(
@@ -668,7 +668,10 @@ class PlantReplacementTests(TestCase):
                 week_number=BASELINE_WEEK_NUMBER,
             ).exists()
         )
-        self.assertEqual(replacement.replaces.id, original.id)
+        replacement_source = Plant.objects.filter(replaced_by=replacement).first()
+        self.assertIsNotNone(replacement_source)
+        assert replacement_source is not None
+        self.assertEqual(replacement_source.id, original.id)
 
     def test_replacement_updates_readiness_and_baseline_queue(self):
         experiment = Experiment.objects.create(name="Replace Readiness")

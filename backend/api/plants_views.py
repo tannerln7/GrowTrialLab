@@ -373,7 +373,7 @@ def plant_replace(request, plant_id: UUID):
     )
     if original is None:
         return Response({"detail": "Plant not found."}, status=404)
-    if original.replaced_by_id:
+    if original.replaced_by:
         return Response({"detail": "This plant already has a replacement."}, status=400)
 
     serializer = PlantReplaceSerializer(data=request.data)

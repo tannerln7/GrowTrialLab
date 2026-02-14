@@ -58,12 +58,13 @@ def plant_cockpit(request, plant_id: UUID):
         else f"/experiments/{plant.experiment.id}/setup"
     )
     replaces = _replaces_plant(plant)
-    replaced_by_uuid = str(plant.replaced_by_id) if plant.replaced_by_id else None
+    replaced_by = plant.replaced_by
+    replaced_by_uuid = str(replaced_by.id) if replaced_by else None
     replaces_uuid = str(replaces.id) if replaces else None
     chain_label = None
     if replaces:
         chain_label = f"Replacement of {replaces.plant_id or str(replaces.id)}"
-    elif plant.replaced_by_id:
+    elif replaced_by:
         chain_label = "Has replacement"
 
     return Response(
