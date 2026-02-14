@@ -360,7 +360,7 @@ class ExperimentOverviewTests(TestCase):
         self.assertEqual(payload["counts"]["removed"], 2)
         self.assertEqual(payload["counts"]["needs_baseline"], 1)
         self.assertEqual(payload["counts"]["needs_bin"], 1)
-        self.assertEqual(payload["counts"]["needs_assignment"], 1)
+        self.assertEqual(payload["counts"]["needs_assignment"], 2)
 
         uuids = {item["uuid"] for item in payload["plants"]}
         self.assertIn(str(plant_ready.id), uuids)
@@ -502,6 +502,13 @@ class ExperimentStatusSummaryTests(TestCase):
             week_number=BASELINE_WEEK_NUMBER,
             metrics={"health_score": 3},
         )
+        tray = Tray.objects.create(
+            experiment=experiment,
+            name="T1",
+            block=block,
+            recipe=assigned_recipe,
+        )
+        TrayPlant.objects.create(tray=tray, plant=ready_plant, order_index=0)
 
         response = self.client.get(f"/api/v1/experiments/{experiment.id}/status/summary")
         self.assertEqual(response.status_code, 200)
@@ -512,43 +519,59 @@ class ExperimentStatusSummaryTests(TestCase):
         self.assertEqual(payload["readiness"]["counts"]["active_plants"], 3)
         self.assertEqual(payload["readiness"]["counts"]["needs_baseline"], 2)
         self.assertEqual(payload["readiness"]["counts"]["needs_assignment"], 2)
+        self.assertEqual(payload["readiness"]["counts"]["needs_placement"], 2)
+        self.assertEqual(payload["readiness"]["counts"]["needs_tray_recipe"], 0)
 
-    def test_status_summary_needs_assignment_drops_after_apply(self):
-        experiment = Experiment.objects.create(name="Readiness Assignment Apply")
+    def test_status_summary_needs_assignment_maps_to_placement_and_tray_recipe(self):
+        experiment = Experiment.objects.create(name="Readiness Placement Mapping")
         species = Species.objects.create(name="Nepenthes veitchii", category="nepenthes")
-        Block.objects.create(experiment=experiment, name="B1", description="slot")
-        Recipe.objects.create(experiment=experiment, code="R0", name="Control")
-        Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
+        block = Block.objects.create(experiment=experiment, name="B1", description="slot")
+        recipe0 = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        recipe1 = Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
 
-        Plant.objects.create(
+        placed_with_recipe = Plant.objects.create(
             experiment=experiment,
             species=species,
             plant_id="NP-101",
             bin="A",
-            assigned_recipe=None,
+            assigned_recipe=recipe0,
         )
-        Plant.objects.create(
+        placed_without_recipe = Plant.objects.create(
             experiment=experiment,
             species=species,
             plant_id="NP-102",
             bin="B",
-            assigned_recipe=None,
+            assigned_recipe=recipe1,
         )
-
-        before_response = self.client.get(f"/api/v1/experiments/{experiment.id}/status/summary")
-        self.assertEqual(before_response.status_code, 200)
-        self.assertEqual(before_response.json()["readiness"]["counts"]["needs_assignment"], 2)
-
-        apply_response = self.client.post(
-            f"/api/v1/experiments/{experiment.id}/groups/apply",
-            data={"seed": 77},
-            content_type="application/json",
+        unplaced = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="NP-103",
+            bin="C",
+            assigned_recipe=recipe1,
         )
-        self.assertEqual(apply_response.status_code, 200)
+        tray_with_recipe = Tray.objects.create(
+            experiment=experiment,
+            name="T1",
+            block=block,
+            recipe=recipe0,
+        )
+        tray_without_recipe = Tray.objects.create(
+            experiment=experiment,
+            name="T2",
+            block=block,
+            recipe=None,
+        )
+        TrayPlant.objects.create(tray=tray_with_recipe, plant=placed_with_recipe, order_index=0)
+        TrayPlant.objects.create(tray=tray_without_recipe, plant=placed_without_recipe, order_index=0)
+        self.assertIsNotNone(unplaced.id)
 
-        after_response = self.client.get(f"/api/v1/experiments/{experiment.id}/status/summary")
-        self.assertEqual(after_response.status_code, 200)
-        self.assertEqual(after_response.json()["readiness"]["counts"]["needs_assignment"], 0)
+        response = self.client.get(f"/api/v1/experiments/{experiment.id}/status/summary")
+        self.assertEqual(response.status_code, 200)
+        counts = response.json()["readiness"]["counts"]
+        self.assertEqual(counts["needs_placement"], 1)
+        self.assertEqual(counts["needs_tray_recipe"], 1)
+        self.assertEqual(counts["needs_assignment"], 2)
 
 
 @override_settings(
@@ -591,7 +614,7 @@ class ExperimentLifecycleTests(TestCase):
         species = Species.objects.create(name="Drosera adelae green", category="drosera")
         recipe0 = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
         Recipe.objects.create(experiment=experiment, code="R1", name="Treatment")
-        Block.objects.create(experiment=experiment, name="B1", description="slot")
+        block = Block.objects.create(experiment=experiment, name="B1", description="slot")
         plant = Plant.objects.create(
             experiment=experiment,
             species=species,
@@ -606,6 +629,8 @@ class ExperimentLifecycleTests(TestCase):
             week_number=BASELINE_WEEK_NUMBER,
             metrics={"health_score": 4},
         )
+        tray = Tray.objects.create(experiment=experiment, name="T1", block=block, recipe=recipe0)
+        TrayPlant.objects.create(tray=tray, plant=plant, order_index=0)
 
         response = self.client.post(f"/api/v1/experiments/{experiment.id}/start")
         self.assertEqual(response.status_code, 200)
@@ -652,7 +677,7 @@ class PlacementApiTests(TestCase):
         experiment = Experiment.objects.create(name="Placement Summary")
         species = Species.objects.create(name="Sarracenia flava", category="sarracenia")
         recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
-        tray = Tray.objects.create(experiment=experiment, name="T1")
+        tray = Tray.objects.create(experiment=experiment, name="T1", recipe=recipe)
         placed = Plant.objects.create(
             experiment=experiment,
             species=species,
@@ -672,9 +697,10 @@ class PlacementApiTests(TestCase):
         response = self.client.get(f"/api/v1/experiments/{experiment.id}/placement/summary")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["unplaced_active_plants_count"], 1)
+        self.assertEqual(payload["unplaced_plants_count"], 1)
         self.assertEqual(len(payload["trays"]), 1)
-        self.assertEqual(payload["trays"][0]["plant_count"], 1)
+        self.assertEqual(payload["trays"][0]["placed_count"], 1)
+        self.assertEqual(payload["trays"][0]["recipe_code"], "R0")
 
     def test_add_plant_to_tray_reduces_unplaced(self):
         experiment = Experiment.objects.create(name="Placement Add")
@@ -702,7 +728,7 @@ class PlacementApiTests(TestCase):
 
         summary_response = self.client.get(f"/api/v1/experiments/{experiment.id}/placement/summary")
         self.assertEqual(summary_response.status_code, 200)
-        self.assertEqual(summary_response.json()["unplaced_active_plants_count"], 0)
+        self.assertEqual(summary_response.json()["unplaced_plants_count"], 0)
 
     def test_cannot_place_same_plant_in_two_trays(self):
         experiment = Experiment.objects.create(name="Placement Duplicate")
@@ -755,6 +781,100 @@ class PlacementApiTests(TestCase):
             response.json()["detail"],
             "Removed plants cannot be placed in trays.",
         )
+
+    def test_setting_tray_recipe_blocked_while_running(self):
+        experiment = Experiment.objects.create(
+            name="Placement Running Lock",
+            lifecycle_state=Experiment.LifecycleState.RUNNING,
+        )
+        recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        tray = Tray.objects.create(experiment=experiment, name="T1")
+
+        response = self.client.patch(
+            f"/api/v1/trays/{tray.id}/",
+            data={"recipe": str(recipe.id)},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"],
+            "Placement cannot be edited while the experiment is running. Stop the experiment to change placement.",
+        )
+
+    def test_auto_place_rejected_when_running(self):
+        experiment = Experiment.objects.create(
+            name="Placement Auto Running",
+            lifecycle_state=Experiment.LifecycleState.RUNNING,
+        )
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/placement/auto",
+            data={"mode": "bin_balance_v1"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+
+    def test_auto_place_requires_baseline_and_bin(self):
+        experiment = Experiment.objects.create(name="Placement Auto Baseline")
+        species = Species.objects.create(name="Nepenthes auto", category="nepenthes")
+        block = Block.objects.create(experiment=experiment, name="B1", description="slot")
+        recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        Tray.objects.create(experiment=experiment, name="T1", block=block, recipe=recipe)
+        Plant.objects.create(experiment=experiment, species=species, plant_id="NP-401", bin="A")
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/placement/auto",
+            data={"mode": "bin_balance_v1"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("requires baseline week 0", response.json()["detail"])
+
+    def test_auto_place_balances_bins_and_ignores_removed_plants(self):
+        experiment = Experiment.objects.create(name="Placement Auto Balance")
+        species = Species.objects.create(name="Drosera auto", category="drosera")
+        block = Block.objects.create(experiment=experiment, name="B1", description="slot")
+        recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
+        tray_a = Tray.objects.create(experiment=experiment, name="T1", block=block, recipe=recipe)
+        tray_b = Tray.objects.create(experiment=experiment, name="T2", block=block, recipe=recipe)
+
+        plants: list[Plant] = []
+        for idx in range(6):
+            plant = Plant.objects.create(
+                experiment=experiment,
+                species=species,
+                plant_id=f"DR-{idx+1:03d}",
+                bin="A" if idx < 4 else "B",
+                status=Plant.Status.ACTIVE,
+            )
+            plants.append(plant)
+            PlantWeeklyMetric.objects.create(
+                experiment=experiment,
+                plant=plant,
+                week_number=BASELINE_WEEK_NUMBER,
+                metrics={"health_score": 4},
+            )
+        removed = Plant.objects.create(
+            experiment=experiment,
+            species=species,
+            plant_id="DR-999",
+            bin="A",
+            status=Plant.Status.REMOVED,
+        )
+
+        response = self.client.post(
+            f"/api/v1/experiments/{experiment.id}/placement/auto",
+            data={"mode": "bin_balance_v1", "clear_existing": True},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["placed_count"], len(plants))
+        self.assertEqual(TrayPlant.objects.filter(plant__status=Plant.Status.ACTIVE).count(), len(plants))
+        self.assertFalse(TrayPlant.objects.filter(plant=removed).exists())
+
+        placed_on_a = TrayPlant.objects.filter(tray=tray_a, plant__status=Plant.Status.ACTIVE).count()
+        placed_on_b = TrayPlant.objects.filter(tray=tray_b, plant__status=Plant.Status.ACTIVE).count()
+        self.assertLessEqual(abs(placed_on_a - placed_on_b), 1)
 
 
 @override_settings(
@@ -876,6 +996,7 @@ class FeedingApiTests(TestCase):
             lifecycle_state=Experiment.LifecycleState.RUNNING,
         )
         species = Species.objects.create(name="Drosera alba", category="drosera")
+        block = Block.objects.create(experiment=experiment, name="B1", description="slot")
         recipe = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
         plant = Plant.objects.create(
             experiment=experiment,
@@ -883,6 +1004,8 @@ class FeedingApiTests(TestCase):
             plant_id="DR-711",
             assigned_recipe=recipe,
         )
+        tray = Tray.objects.create(experiment=experiment, name="T1", block=block, recipe=recipe)
+        TrayPlant.objects.create(tray=tray, plant=plant, order_index=0)
 
         feed_response = self.client.post(
             f"/api/v1/plants/{plant.id}/feed",
@@ -918,7 +1041,7 @@ class FeedingApiTests(TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertEqual(
             response.json()["detail"],
-            "This plant has no recipe assignment yet. Assign recipes before feeding.",
+            "Plant has no assigned recipe (tray recipe missing).",
         )
 
     def test_feed_rejected_when_recipe_mismatch(self):
@@ -927,6 +1050,7 @@ class FeedingApiTests(TestCase):
             lifecycle_state=Experiment.LifecycleState.RUNNING,
         )
         species = Species.objects.create(name="Drosera mismatch", category="drosera")
+        block = Block.objects.create(experiment=experiment, name="B1", description="slot")
         assigned = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
         other = Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
         plant = Plant.objects.create(
@@ -935,6 +1059,8 @@ class FeedingApiTests(TestCase):
             plant_id="DR-712",
             assigned_recipe=assigned,
         )
+        tray = Tray.objects.create(experiment=experiment, name="T1", block=block, recipe=assigned)
+        TrayPlant.objects.create(tray=tray, plant=plant, order_index=0)
 
         response = self.client.post(
             f"/api/v1/plants/{plant.id}/feed",
@@ -953,6 +1079,7 @@ class FeedingApiTests(TestCase):
             lifecycle_state=Experiment.LifecycleState.RUNNING,
         )
         species = Species.objects.create(name="Pinguicula x", category="pinguicula")
+        block = Block.objects.create(experiment=experiment, name="B1", description="slot")
         r0 = Recipe.objects.create(experiment=experiment, code="R0", name="Control")
         r1 = Recipe.objects.create(experiment=experiment, code="R1", name="Treatment 1")
         p1 = Plant.objects.create(
@@ -973,6 +1100,11 @@ class FeedingApiTests(TestCase):
             plant_id="PG-999",
             status=Plant.Status.DEAD,
         )
+        tray_one = Tray.objects.create(experiment=experiment, name="T1", block=block, recipe=r1)
+        tray_two = Tray.objects.create(experiment=experiment, name="T2", block=block, recipe=None)
+        TrayPlant.objects.create(tray=tray_one, plant=p1, order_index=0)
+        TrayPlant.objects.create(tray=tray_two, plant=p2, order_index=0)
+        TrayPlant.objects.create(tray=tray_one, plant=p3, order_index=1)
 
         old_20_days = timezone.now() - timedelta(days=20)
         old_10_days = timezone.now() - timedelta(days=10)
@@ -1003,16 +1135,20 @@ class FeedingApiTests(TestCase):
         response = self.client.get(f"/api/v1/experiments/{experiment.id}/feeding/queue")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["remaining_count"], 3)
+        self.assertEqual(payload["remaining_count"], 1)
         self.assertEqual(payload["window_days"], 7)
+        blocked = {item["plant_id"]: item["blocked_reason"] for item in payload["plants"]}
+        self.assertEqual(blocked["PG-001"], None)
+        self.assertEqual(blocked["PG-002"], "Needs tray recipe")
+        self.assertEqual(blocked["PG-004"], "Unplaced")
         self.assertEqual(payload["plants"][0]["assigned_recipe_code"], "R1")
         self.assertEqual(payload["plants"][0]["assigned_recipe_name"], "Treatment 1")
         self.assertEqual(payload["plants"][0]["assigned_recipe_id"], str(r1.id))
+        self.assertEqual(payload["plants"][0]["placed_tray_id"], str(tray_one.id))
+        self.assertEqual(payload["plants"][0]["placed_tray_name"], "T1")
 
         plant_ids = [item["plant_id"] for item in payload["plants"]]
-        self.assertEqual(plant_ids[:4], ["PG-002", "PG-004", "PG-001", "PG-003"])
-        needs_flags = [item["needs_feeding"] for item in payload["plants"][:4]]
-        self.assertEqual(needs_flags, [True, True, True, False])
+        self.assertEqual(plant_ids[:4], ["PG-001", "PG-002", "PG-004", "PG-003"])
 
 
 @override_settings(
@@ -1200,7 +1336,7 @@ class PlantReplacementTests(TestCase):
         summary_payload = summary_response.json()["readiness"]["counts"]
         self.assertEqual(summary_payload["active_plants"], 1)
         self.assertEqual(summary_payload["needs_baseline"], 1)
-        self.assertEqual(summary_payload["needs_assignment"], 0)
+        self.assertEqual(summary_payload["needs_assignment"], 1)
 
         queue_response = self.client.get(f"/api/v1/experiments/{experiment.id}/baseline/queue")
         self.assertEqual(queue_response.status_code, 200)

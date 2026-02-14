@@ -249,6 +249,16 @@ class MetricTemplateSerializer(serializers.ModelSerializer):
 
 
 class TraySerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        experiment = attrs.get("experiment") or (self.instance.experiment if self.instance else None)
+        block = attrs.get("block") or (self.instance.block if self.instance else None)
+        recipe = attrs.get("recipe") or (self.instance.recipe if self.instance else None)
+        if experiment and block and block.experiment_id != experiment.id:
+            raise serializers.ValidationError("Block must belong to the same experiment as tray.")
+        if experiment and recipe and recipe.experiment_id != experiment.id:
+            raise serializers.ValidationError("Recipe must belong to the same experiment as tray.")
+        return attrs
+
     class Meta:
         model = Tray
         fields = "__all__"

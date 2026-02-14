@@ -23,6 +23,7 @@ from .groups_views import (
 from .status_views import experiment_start, experiment_status_summary, experiment_stop
 from .overview_views import experiment_overview_plants
 from .placement_views import (
+    experiment_placement_auto,
     experiment_placement_summary,
     experiment_trays,
     tray_add_plant,
@@ -201,6 +202,11 @@ urlpatterns = [
         "api/v1/experiments/<uuid:experiment_id>/placement/summary",
         experiment_placement_summary,
         name="experiment-placement-summary",
+    ),
+    path(
+        "api/v1/experiments/<uuid:experiment_id>/placement/auto",
+        experiment_placement_auto,
+        name="experiment-placement-auto",
     ),
     path(
         "api/v1/experiments/<uuid:experiment_id>/rotation/summary",

@@ -1,4 +1,5 @@
-from rest_framework import viewsets
+from rest_framework import status, viewsets
+from rest_framework.response import Response
 
 from .models import (
     AdverseEvent,
@@ -109,6 +110,31 @@ class PlantViewSet(ExperimentFilteredViewSet):
 class TrayViewSet(ExperimentFilteredViewSet):
     queryset = Tray.objects.all().order_by("name")
     serializer_class = TraySerializer
+
+    def _placement_locked(self, tray: Tray) -> bool:
+        return tray.experiment.lifecycle_state == Experiment.LifecycleState.RUNNING
+
+    def update(self, request, *args, **kwargs):
+        tray = self.get_object()
+        if self._placement_locked(tray):
+            return Response(
+                {
+                    "detail": "Placement cannot be edited while the experiment is running. Stop the experiment to change placement."
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        tray = self.get_object()
+        if self._placement_locked(tray):
+            return Response(
+                {
+                    "detail": "Placement cannot be edited while the experiment is running. Stop the experiment to change placement."
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().partial_update(request, *args, **kwargs)
 
 
 class TrayPlantViewSet(ExperimentFilteredViewSet):

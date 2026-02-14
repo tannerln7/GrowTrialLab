@@ -198,6 +198,13 @@ class Plant(UUIDModel):
 class Tray(UUIDModel):
     experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="trays")
     block = models.ForeignKey("Block", on_delete=models.SET_NULL, null=True, blank=True, related_name="trays")
+    recipe = models.ForeignKey(
+        "Recipe",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="trays",
+    )
     name = models.CharField(max_length=64)
     notes = models.TextField(blank=True)
     plants = models.ManyToManyField(Plant, through="TrayPlant", related_name="trays")

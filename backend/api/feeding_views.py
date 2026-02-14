@@ -7,7 +7,13 @@ from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Experiment, FeedingEvent, Plant
+from .models import Experiment, FeedingEvent, Plant, TrayPlant
+from .tray_assignment import (
+    feeding_block_reason,
+    placement_info,
+    plant_tray_placement,
+    resolved_assigned_recipe,
+)
 
 FEEDING_QUEUE_WINDOW_DAYS = 7
 _MIN_DATETIME = datetime.min.replace(tzinfo=dt_timezone.utc)
@@ -41,16 +47,29 @@ def _needs_feeding(last_fed_at: datetime | None) -> bool:
     return last_fed_at < cutoff
 
 
-def _queue_payload_item(plant: Plant, last_fed_at: datetime | None) -> dict[str, object]:
+def _queue_payload_item(
+    plant: Plant,
+    last_fed_at: datetime | None,
+    *,
+    tray_placement: TrayPlant | None,
+    blocked_reason: str | None,
+) -> dict[str, object]:
+    assigned_recipe = resolved_assigned_recipe(plant, tray_placement, allow_fallback=False)
+    placement = placement_info(tray_placement)
     return {
         "uuid": str(plant.id),
         "plant_id": plant.plant_id,
         "species_name": plant.species.name,
         "species_category": plant.species.category,
         "cultivar": plant.cultivar,
-        "assigned_recipe_id": str(plant.assigned_recipe.id) if plant.assigned_recipe else None,
-        "assigned_recipe_code": plant.assigned_recipe.code if plant.assigned_recipe else None,
-        "assigned_recipe_name": plant.assigned_recipe.name if plant.assigned_recipe else None,
+        "assigned_recipe_id": str(assigned_recipe.id) if assigned_recipe else None,
+        "assigned_recipe_code": assigned_recipe.code if assigned_recipe else None,
+        "assigned_recipe_name": assigned_recipe.name if assigned_recipe else None,
+        "placed_tray_id": placement.tray_id if placement else None,
+        "placed_tray_name": placement.tray_name if placement else None,
+        "placed_block_id": placement.block_id if placement else None,
+        "placed_block_name": placement.block_name if placement else None,
+        "blocked_reason": blocked_reason,
         "last_fed_at": last_fed_at.isoformat() if last_fed_at else None,
         "needs_feeding": _needs_feeding(last_fed_at),
     }
@@ -72,15 +91,27 @@ def experiment_feeding_queue(request, experiment_id: UUID):
         .order_by("id")
     )
     last_fed_by_plant = _last_fed_map(experiment)
+    tray_placements = {
+        str(item.plant.id): item
+        for item in TrayPlant.objects.filter(tray__experiment=experiment).select_related(
+            "tray__recipe", "tray__block"
+        )
+    }
 
     def plant_last_fed(plant: Plant) -> datetime | None:
         return last_fed_by_plant.get(str(plant.id))
 
+    def plant_blocked_reason(plant: Plant) -> str | None:
+        tray_placement = tray_placements.get(str(plant.id))
+        return feeding_block_reason(plant, tray_placement)
+
     def sort_key(plant: Plant):
         last_fed_at = plant_last_fed(plant)
         has_plant_id = bool((plant.plant_id or "").strip())
+        blocked_reason = plant_blocked_reason(plant)
         return (
             0 if _needs_feeding(last_fed_at) else 1,
+            0 if blocked_reason is None else 1,
             last_fed_at if last_fed_at is not None else _MIN_DATETIME,
             0 if has_plant_id else 1,
             (plant.plant_id or "").lower(),
@@ -88,14 +119,23 @@ def experiment_feeding_queue(request, experiment_id: UUID):
         )
 
     ordered_plants = sorted(plants, key=sort_key)
-    remaining_count = sum(1 for plant in plants if _needs_feeding(plant_last_fed(plant)))
+    remaining_count = sum(
+        1
+        for plant in plants
+        if _needs_feeding(plant_last_fed(plant)) and plant_blocked_reason(plant) is None
+    )
 
     return Response(
         {
             "remaining_count": remaining_count,
             "window_days": FEEDING_QUEUE_WINDOW_DAYS,
             "plants": [
-                _queue_payload_item(plant, plant_last_fed(plant))
+                _queue_payload_item(
+                    plant,
+                    plant_last_fed(plant),
+                    tray_placement=tray_placements.get(str(plant.id)),
+                    blocked_reason=plant_blocked_reason(plant),
+                )
                 for plant in ordered_plants[:50]
             ],
         }
@@ -120,17 +160,17 @@ def plant_feed(request, plant_id: UUID):
             {"detail": "Feeding is available only while an experiment is running."},
             status=409,
         )
-    if plant.assigned_recipe is None:
+    tray_placement = plant_tray_placement(plant)
+    assigned_recipe = resolved_assigned_recipe(plant, tray_placement, allow_fallback=False)
+    if assigned_recipe is None:
         return Response(
-            {
-                "detail": "This plant has no recipe assignment yet. Assign recipes before feeding."
-            },
+            {"detail": "Plant has no assigned recipe (tray recipe missing)."},
             status=409,
         )
 
     recipe_id = request.data.get("recipe_id")
     if recipe_id:
-        if str(recipe_id) != str(plant.assigned_recipe.id):
+        if str(recipe_id) != str(assigned_recipe.id):
             return Response(
                 {"detail": "Feeding must use the plant's assigned recipe."},
                 status=409,
@@ -154,7 +194,7 @@ def plant_feed(request, plant_id: UUID):
     event = FeedingEvent.objects.create(
         experiment=plant.experiment,
         plant=plant,
-        recipe=plant.assigned_recipe,
+        recipe=assigned_recipe,
         amount_text=amount_text,
         note=note,
         notes=note,

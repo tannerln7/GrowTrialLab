@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from .baseline import BASELINE_WEEK_NUMBER
 from .models import Block, Experiment, Plant, PlantWeeklyMetric, Recipe
+from .tray_assignment import experiment_tray_placements
 
 
 @dataclass(frozen=True)
@@ -47,14 +48,25 @@ def experiment_status_summary_payload(experiment: Experiment) -> dict:
     }
 
     needs_baseline = 0
-    needs_assignment = 0
+    needs_placement = 0
+    needs_tray_recipe = 0
+    tray_placements = experiment_tray_placements(experiment.id)
     for plant in active_plants:
         if str(plant.id) not in baseline_plant_ids or not plant.bin:
             needs_baseline += 1
-        if plant.assigned_recipe is None:
-            needs_assignment += 1
+        tray_placement = tray_placements.get(str(plant.id))
+        if tray_placement is None:
+            needs_placement += 1
+        elif tray_placement.tray.recipe is None:
+            needs_tray_recipe += 1
 
-    readiness_ready = setup.is_complete and needs_baseline == 0 and needs_assignment == 0
+    needs_assignment = needs_placement + needs_tray_recipe
+    readiness_ready = (
+        setup.is_complete
+        and needs_baseline == 0
+        and needs_placement == 0
+        and needs_tray_recipe == 0
+    )
     return {
         "setup": {
             "is_complete": setup.is_complete,
@@ -76,6 +88,8 @@ def experiment_status_summary_payload(experiment: Experiment) -> dict:
                 "active_plants": len(active_plants),
                 "needs_baseline": needs_baseline,
                 "needs_assignment": needs_assignment,
+                "needs_placement": needs_placement,
+                "needs_tray_recipe": needs_tray_recipe,
             },
         },
     }
