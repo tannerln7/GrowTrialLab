@@ -153,6 +153,16 @@ This file records architecture/product decisions and why they were made.
 - Invariants: Backend feed writes enforce lifecycle `running` (`409` when draft/stopped); queue uses a fixed 7-day needs-feeding window for v1.
 - Deferred hooks: `recipe` remains optional and lot/batch integration is intentionally deferred.
 
+### 2026-02-14: Assignment is canonical for plant recipe, and feeding is recipe-locked
+- Decision: Treat `Plant.assigned_recipe` as the canonical persisted assignment from Groups Apply; feeding always uses this assigned recipe.
+- Rationale: Prevents recipe drift between assignment and operations, and removes operator ambiguity during feed entry.
+- Refs: `0f5683d0`, `9b0de186`, `1e804826`.
+- Invariants:
+  - `POST /api/v1/plants/{uuid}/feed` returns `409` when the plant has no assignment.
+  - If `recipe_id` is sent and differs from assignment, backend returns `409`.
+  - If `recipe_id` is omitted, backend auto-applies `plant.assigned_recipe`.
+- UX impact: Feeding UI is simplified to read-only assigned recipe display; unassigned plants are blocked with a direct assignment CTA.
+
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
 - Rationale: Clear persistence boundary and easy backup target.

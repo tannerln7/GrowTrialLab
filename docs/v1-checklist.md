@@ -158,6 +158,10 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Refs: `90aa50fb`, `af3c5c71`, `6146269d`
   - Routes: `GET /api/v1/experiments/{id}/feeding/queue`, `POST /api/v1/plants/{uuid}/feed`, `GET /api/v1/plants/{uuid}/feeding/recent`, `/experiments/{id}/feeding`.
   - Notes: Feeding writes are lifecycle-gated to `running` (backend `409` outside running); queue uses a 7-day needs-first window and Plant Cockpit now exposes last-fed hint + quick feed launch.
+- [x] Canonical assignment persistence and recipe-locked feeding (owner: Codex)
+  - Refs: `0f5683d0`, `9b0de186`, `1e804826`
+  - Routes: `POST /api/v1/experiments/{id}/groups/apply`, `POST /api/v1/plants/{uuid}/feed`, `GET /api/v1/experiments/{id}/feeding/queue`, `GET /api/v1/plants/{uuid}/cockpit`, `GET /api/v1/experiments/{id}/overview/plants`.
+  - Notes: `Plant.assigned_recipe` is the canonical source of plant→recipe assignment; feeding auto-uses assigned recipe, rejects mismatched `recipe_id`, and blocks unassigned plants (UI + backend `409`).
 
 ## Remaining Milestones
 
