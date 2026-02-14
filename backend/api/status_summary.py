@@ -34,7 +34,8 @@ def experiment_status_summary_payload(experiment: Experiment) -> dict:
     setup = compute_setup_status(experiment)
     active_plants = list(
         Plant.objects.filter(experiment=experiment, status=Plant.Status.ACTIVE)
-        .only("id", "bin", "assigned_recipe_id")
+        .select_related("assigned_recipe")
+        .only("id", "bin", "assigned_recipe")
         .order_by("id")
     )
     baseline_plant_ids = {
@@ -50,7 +51,7 @@ def experiment_status_summary_payload(experiment: Experiment) -> dict:
     for plant in active_plants:
         if str(plant.id) not in baseline_plant_ids or not plant.bin:
             needs_baseline += 1
-        if plant.assigned_recipe_id is None:
+        if plant.assigned_recipe is None:
             needs_assignment += 1
 
     readiness_ready = setup.is_complete and needs_baseline == 0 and needs_assignment == 0
