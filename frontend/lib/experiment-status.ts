@@ -21,6 +21,8 @@ export type ExperimentStatusSummary = {
       active_plants: number;
       needs_baseline: number;
       needs_assignment: number;
+      needs_placement: number;
+      needs_tray_recipe: number;
     };
   };
 };

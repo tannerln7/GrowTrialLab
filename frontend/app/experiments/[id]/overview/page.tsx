@@ -20,7 +20,8 @@ type FilterId =
   | "all"
   | "needs_baseline"
   | "needs_bin"
-  | "needs_assignment"
+  | "needs_placement"
+  | "needs_tray_recipe"
   | "active"
   | "removed";
 
@@ -35,6 +36,10 @@ type OverviewPlant = {
   assigned_recipe_id: string | null;
   assigned_recipe_code: string | null;
   assigned_recipe_name: string | null;
+  placed_tray_id: string | null;
+  placed_tray_name: string | null;
+  placed_block_id: string | null;
+  placed_block_name: string | null;
   has_baseline: boolean;
   replaced_by_uuid: string | null;
 };
@@ -45,6 +50,8 @@ type OverviewCounts = {
   removed: number;
   needs_baseline: number;
   needs_bin: number;
+  needs_placement: number;
+  needs_tray_recipe: number;
   needs_assignment: number;
 };
 
@@ -57,7 +64,8 @@ const FILTERS: Array<{ id: FilterId; label: string }> = [
   { id: "all", label: "All" },
   { id: "needs_baseline", label: "Needs Baseline" },
   { id: "needs_bin", label: "Needs Bin" },
-  { id: "needs_assignment", label: "Needs Assignment" },
+  { id: "needs_placement", label: "Needs Placement" },
+  { id: "needs_tray_recipe", label: "Needs Tray Recipe" },
   { id: "active", label: "Active" },
   { id: "removed", label: "Removed" },
 ];
@@ -81,7 +89,8 @@ export default function ExperimentOverviewPage() {
     if (
       value === "needs_baseline" ||
       value === "needs_bin" ||
-      value === "needs_assignment" ||
+      value === "needs_placement" ||
+      value === "needs_tray_recipe" ||
       value === "active" ||
       value === "removed"
     ) {
@@ -109,6 +118,8 @@ export default function ExperimentOverviewPage() {
       removed: 0,
       needs_baseline: 0,
       needs_bin: 0,
+      needs_placement: 0,
+      needs_tray_recipe: 0,
       needs_assignment: 0,
     },
     plants: [],
@@ -260,15 +271,19 @@ export default function ExperimentOverviewPage() {
     return data.plants.filter((plant) => {
       const needsBaseline = plant.status === "active" && (!plant.has_baseline || !plant.bin);
       const needsBin = plant.status === "active" && !plant.bin;
-      const needsAssignment = plant.status === "active" && !plant.assigned_recipe_code;
+      const needsPlacement = plant.status === "active" && !plant.placed_tray_id;
+      const needsTrayRecipe =
+        plant.status === "active" && !!plant.placed_tray_id && !plant.assigned_recipe_id;
 
       let matchesFilter = true;
       if (activeFilter === "needs_baseline") {
         matchesFilter = needsBaseline;
       } else if (activeFilter === "needs_bin") {
         matchesFilter = needsBin;
-      } else if (activeFilter === "needs_assignment") {
-        matchesFilter = needsAssignment;
+      } else if (activeFilter === "needs_placement") {
+        matchesFilter = needsPlacement;
+      } else if (activeFilter === "needs_tray_recipe") {
+        matchesFilter = needsTrayRecipe;
       } else if (activeFilter === "active") {
         matchesFilter = plant.status === "active";
       } else if (activeFilter === "removed") {
@@ -304,8 +319,11 @@ export default function ExperimentOverviewPage() {
     if (plant.status === "active" && !plant.bin) {
       needs.push("Needs Bin");
     }
-    if (plant.status === "active" && !plant.assigned_recipe_code) {
-      needs.push("Needs Assignment");
+    if (plant.status === "active" && !plant.placed_tray_id) {
+      needs.push("Needs Placement");
+    }
+    if (plant.status === "active" && plant.placed_tray_id && !plant.assigned_recipe_id) {
+      needs.push("Needs Tray Recipe");
     }
     return needs;
   }
@@ -320,8 +338,8 @@ export default function ExperimentOverviewPage() {
     if (!plant.has_baseline || !plant.bin) {
       return `/experiments/${experimentId}/baseline?plant=${plant.uuid}`;
     }
-    if (!plant.assigned_recipe_code) {
-      return `/experiments/${experimentId}/assignment`;
+    if (!plant.placed_tray_id || !plant.assigned_recipe_id) {
+      return `/experiments/${experimentId}/placement`;
     }
     return null;
   }
@@ -333,7 +351,7 @@ export default function ExperimentOverviewPage() {
     if (!plant.has_baseline || !plant.bin) {
       return "Baseline";
     }
-    return "Assign";
+    return "Placement";
   }
 
   if (notInvited) {
@@ -415,7 +433,7 @@ export default function ExperimentOverviewPage() {
           {!summary.readiness.ready_to_start ? (
             <div className={styles.stack}>
               <p className={styles.inlineNote}>
-                Start is disabled until setup, baseline, and assignment readiness are complete.
+                Start is disabled until setup, baseline, placement, and tray recipe readiness are complete.
               </p>
               <div className={styles.actions}>
                 {!summary.setup.is_complete ? (
@@ -429,8 +447,8 @@ export default function ExperimentOverviewPage() {
                   </Link>
                 ) : null}
                 {summary.readiness.counts.needs_assignment > 0 ? (
-                  <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/assignment`}>
-                    Run assignment
+                  <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/placement`}>
+                    Manage trays & placement
                   </Link>
                 ) : null}
               </div>
@@ -444,15 +462,13 @@ export default function ExperimentOverviewPage() {
           {summary.readiness.is_ready ? (
             <div className={styles.stack}>
               <p className={styles.successText}>Ready to start</p>
-              <button className={styles.buttonSecondary} type="button" disabled>
-                Start (coming soon)
-              </button>
             </div>
           ) : (
             <div className={styles.stack}>
               <p className={styles.mutedText}>
-                Not ready: {summary.readiness.counts.needs_baseline} plant(s) need baseline, {" "}
-                {summary.readiness.counts.needs_assignment} need assignment.
+                Not ready: {summary.readiness.counts.needs_baseline} plant(s) need baseline,{" "}
+                {summary.readiness.counts.needs_placement} need placement,{" "}
+                {summary.readiness.counts.needs_tray_recipe} need tray recipes.
               </p>
               <div className={styles.actions}>
                 <Link className={styles.buttonPrimary} href={baselineActionHref}>
@@ -460,15 +476,15 @@ export default function ExperimentOverviewPage() {
                 </Link>
                 <Link
                   className={styles.buttonSecondary}
-                  href={`/experiments/${experimentId}/assignment`}
+                  href={`/experiments/${experimentId}/placement`}
                 >
-                  Run assignment
+                  Manage trays & placement
                 </Link>
                 <Link
                   className={styles.buttonSecondary}
                   href={`/experiments/${experimentId}/placement`}
                 >
-                  Placement
+                  Manage tray recipes
                 </Link>
                 <Link
                   className={styles.buttonSecondary}
@@ -482,7 +498,7 @@ export default function ExperimentOverviewPage() {
               </div>
               {summary.readiness.counts.needs_assignment > 0 ? (
                 <p className={styles.inlineNote}>
-                  Assign recipes to enable feeding for all plants.
+                  Assign tray recipes and place all plants to enable feeding for all plants.
                 </p>
               ) : null}
             </div>
@@ -504,7 +520,7 @@ export default function ExperimentOverviewPage() {
           </div>
           {summary.readiness.counts.needs_assignment > 0 ? (
             <p className={styles.inlineNote}>
-              Assign recipes to enable feeding for all plants.
+              Assign tray recipes and place all plants to enable feeding for all plants.
             </p>
           ) : null}
           {summary.lifecycle.state !== "running" ? (
@@ -525,9 +541,11 @@ export default function ExperimentOverviewPage() {
                     ? data.counts.removed
                     : filter.id === "needs_baseline"
                       ? data.counts.needs_baseline
-                      : filter.id === "needs_bin"
-                        ? data.counts.needs_bin
-                        : data.counts.needs_assignment;
+                    : filter.id === "needs_bin"
+                      ? data.counts.needs_bin
+                      : filter.id === "needs_placement"
+                        ? data.counts.needs_placement
+                        : data.counts.needs_tray_recipe;
             return (
               <button
                 key={filter.id}
@@ -591,8 +609,13 @@ export default function ExperimentOverviewPage() {
               },
               {
                 key: "group",
-                label: "Group",
+                label: "Recipe",
                 render: (plant) => plant.assigned_recipe_code || "Missing",
+              },
+              {
+                key: "tray",
+                label: "Tray",
+                render: (plant) => plant.placed_tray_name || "Unplaced",
               },
               {
                 key: "action",
@@ -638,8 +661,10 @@ export default function ExperimentOverviewPage() {
                   ) : null}
                   <span>Bin</span>
                   <strong>{plant.bin || "Missing"}</strong>
-                  <span>Group</span>
+                  <span>Recipe</span>
                   <strong>{plant.assigned_recipe_code || "Missing"}</strong>
+                  <span>Tray</span>
+                  <strong>{plant.placed_tray_name || "Unplaced"}</strong>
                   <div className={styles.badgeRow}>
                     {needs.map((label) => (
                       <span className={styles.badgeWarn} key={label}>

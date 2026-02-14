@@ -5,7 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
-import { fetchExperimentStatusSummary } from "@/lib/experiment-status";
+import {
+  fetchExperimentStatusSummary,
+  type ExperimentStatusSummary,
+} from "@/lib/experiment-status";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
@@ -18,7 +21,7 @@ type PlacementPlant = {
   plant_id: string;
   species_name: string;
   bin: string | null;
-  assigned_recipe_code: string | null;
+  status: string;
 };
 
 type TrayPlant = {
@@ -27,28 +30,42 @@ type TrayPlant = {
   plant_id: string;
   species_name: string;
   bin: string | null;
+  status: string;
   assigned_recipe_code: string | null;
+  assigned_recipe_name: string | null;
 };
 
 type PlacementTray = {
   tray_id: string;
-  name: string;
+  tray_name: string;
   block_id: string | null;
   block_name: string | null;
-  plant_count: number;
+  recipe_id: string | null;
+  recipe_code: string | null;
+  recipe_name: string | null;
+  placed_count: number;
   plants: TrayPlant[];
 };
 
 type PlacementSummary = {
   trays: PlacementTray[];
-  unplaced_active_plants_count: number;
-  unplaced_active_plants: PlacementPlant[];
+  unplaced_plants_count: number;
+  unplaced_plants: PlacementPlant[];
 };
 
 type BlockOption = {
   id: string;
   name: string;
 };
+
+type RecipeOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+const RUNNING_LOCK_MESSAGE =
+  "Placement cannot be edited while the experiment is running. Stop the experiment to change placement.";
 
 export default function PlacementPage() {
   const params = useParams();
@@ -69,17 +86,23 @@ export default function PlacementPage() {
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [statusSummary, setStatusSummary] = useState<ExperimentStatusSummary | null>(null);
   const [summary, setSummary] = useState<PlacementSummary | null>(null);
   const [blocks, setBlocks] = useState<BlockOption[]>([]);
+  const [recipes, setRecipes] = useState<RecipeOption[]>([]);
   const [expandedTrays, setExpandedTrays] = useState<Record<string, boolean>>({});
   const [traySelectionByPlant, setTraySelectionByPlant] = useState<Record<string, string>>({});
   const [newTrayName, setNewTrayName] = useState("");
   const [newTrayBlockId, setNewTrayBlockId] = useState("");
+  const [newTrayRecipeId, setNewTrayRecipeId] = useState("");
+
+  const placementLocked = statusSummary?.lifecycle.state === "running";
 
   const loadPlacement = useCallback(async () => {
-    const [summaryResponse, blocksResponse] = await Promise.all([
+    const [summaryResponse, blocksResponse, recipesResponse] = await Promise.all([
       backendFetch(`/api/v1/experiments/${experimentId}/placement/summary`),
       backendFetch(`/api/v1/experiments/${experimentId}/blocks/`),
+      backendFetch(`/api/v1/recipes/?experiment=${experimentId}`),
     ]);
     if (!summaryResponse.ok) {
       throw new Error("Unable to load placement summary.");
@@ -87,10 +110,15 @@ export default function PlacementPage() {
     if (!blocksResponse.ok) {
       throw new Error("Unable to load blocks.");
     }
+    if (!recipesResponse.ok) {
+      throw new Error("Unable to load recipes.");
+    }
     const summaryPayload = (await summaryResponse.json()) as PlacementSummary;
     const blocksPayload = (await blocksResponse.json()) as unknown;
+    const recipesPayload = (await recipesResponse.json()) as unknown;
     setSummary(summaryPayload);
     setBlocks(unwrapList<BlockOption>(blocksPayload));
+    setRecipes(unwrapList<RecipeOption>(recipesPayload));
     return summaryPayload;
   }, [experimentId]);
 
@@ -108,12 +136,13 @@ export default function PlacementPage() {
           setNotInvited(true);
           return;
         }
-        const statusSummary = await fetchExperimentStatusSummary(experimentId);
-        if (!statusSummary) {
+        const summaryResponse = await fetchExperimentStatusSummary(experimentId);
+        if (!summaryResponse) {
           setError("Unable to load placement status.");
           return;
         }
-        if (!statusSummary.setup.is_complete) {
+        setStatusSummary(summaryResponse);
+        if (!summaryResponse.setup.is_complete) {
           router.replace(`/experiments/${experimentId}/setup`);
           return;
         }
@@ -133,6 +162,10 @@ export default function PlacementPage() {
   }, [experimentId, loadPlacement, router]);
 
   async function createTray() {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
     if (!newTrayName.trim()) {
       setError("Tray name is required.");
       return;
@@ -147,6 +180,7 @@ export default function PlacementPage() {
         body: JSON.stringify({
           name: newTrayName.trim(),
           block_id: newTrayBlockId || null,
+          recipe_id: newTrayRecipeId || null,
         }),
       });
       if (!response.ok) {
@@ -156,6 +190,7 @@ export default function PlacementPage() {
       }
       setNewTrayName("");
       setNewTrayBlockId("");
+      setNewTrayRecipeId("");
       setNotice("Tray created.");
       await loadPlacement();
     } catch (requestError) {
@@ -170,6 +205,10 @@ export default function PlacementPage() {
   }
 
   async function saveTray(tray: PlacementTray) {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
     setSaving(true);
     setError("");
     setNotice("");
@@ -178,8 +217,9 @@ export default function PlacementPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: tray.name,
+          name: tray.tray_name,
           block: tray.block_id || null,
+          recipe: tray.recipe_id || null,
         }),
       });
       if (!response.ok) {
@@ -187,7 +227,7 @@ export default function PlacementPage() {
         setError(payload.detail || "Unable to save tray.");
         return;
       }
-      setNotice(`${tray.name} saved.`);
+      setNotice(`${tray.tray_name} saved.`);
       await loadPlacement();
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
@@ -201,6 +241,10 @@ export default function PlacementPage() {
   }
 
   async function addPlantToTray(plantUuid: string) {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
     const trayId = traySelectionByPlant[plantUuid];
     if (!trayId) {
       setError("Select a tray first.");
@@ -239,6 +283,10 @@ export default function PlacementPage() {
   }
 
   async function removePlantFromTray(trayId: string, trayPlantId: string) {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
     setSaving(true);
     setError("");
     setNotice("");
@@ -264,6 +312,41 @@ export default function PlacementPage() {
     }
   }
 
+  async function autoPlacePlants() {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await backendFetch(`/api/v1/experiments/${experimentId}/placement/auto`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "bin_balance_v1",
+          clear_existing: true,
+        }),
+      });
+      const payload = (await response.json()) as { detail?: string; placed_count?: number };
+      if (!response.ok) {
+        setError(payload.detail || "Unable to auto-place plants.");
+        return;
+      }
+      setNotice(`Auto-placement complete (${payload.placed_count ?? 0} placed).`);
+      await loadPlacement();
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to auto-place plants.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (notInvited) {
     return (
       <PageShell title="Placement">
@@ -277,7 +360,7 @@ export default function PlacementPage() {
   return (
     <PageShell
       title="Placement"
-      subtitle="Assign plants to trays (physical containers)."
+      subtitle="Assign plants to trays and set tray recipes."
       actions={
         <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
           ← Overview
@@ -289,14 +372,31 @@ export default function PlacementPage() {
       {notice ? <p className={styles.successText}>{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
+      {placementLocked ? (
+        <SectionCard title="Placement Locked While Running">
+          <p className={styles.mutedText}>{RUNNING_LOCK_MESSAGE}</p>
+          <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+            Back to Overview
+          </Link>
+        </SectionCard>
+      ) : null}
+
       {summary ? (
         <>
           <SectionCard title="Unplaced Plants">
-            <p className={styles.mutedText}>
-              Unplaced active plants: {summary.unplaced_active_plants_count}
-            </p>
+            <div className={styles.actions}>
+              <p className={styles.mutedText}>Unplaced active plants: {summary.unplaced_plants_count}</p>
+              <button
+                className={styles.buttonPrimary}
+                type="button"
+                disabled={saving || placementLocked}
+                onClick={() => void autoPlacePlants()}
+              >
+                Auto-place (balance by bin)
+              </button>
+            </div>
             <ResponsiveList
-              items={summary.unplaced_active_plants}
+              items={summary.unplaced_plants}
               getKey={(plant) => plant.uuid}
               columns={[
                 {
@@ -308,11 +408,6 @@ export default function PlacementPage() {
                 },
                 { key: "species", label: "Species", render: (plant) => plant.species_name },
                 { key: "bin", label: "Bin", render: (plant) => plant.bin || "Missing" },
-                {
-                  key: "group",
-                  label: "Group",
-                  render: (plant) => plant.assigned_recipe_code || "Missing",
-                },
                 {
                   key: "action",
                   label: "Action",
@@ -327,18 +422,19 @@ export default function PlacementPage() {
                             [plant.uuid]: event.target.value,
                           }))
                         }
+                        disabled={saving || placementLocked}
                       >
                         <option value="">Select tray</option>
                         {summary.trays.map((tray) => (
                           <option key={tray.tray_id} value={tray.tray_id}>
-                            {tray.name}
+                            {tray.tray_name}
                           </option>
                         ))}
                       </select>
                       <button
                         className={styles.buttonSecondary}
                         type="button"
-                        disabled={saving || summary.trays.length === 0}
+                        disabled={saving || placementLocked || summary.trays.length === 0}
                         onClick={() => void addPlantToTray(plant.uuid)}
                       >
                         Add to tray
@@ -357,8 +453,6 @@ export default function PlacementPage() {
                   <strong>{plant.species_name}</strong>
                   <span>Bin</span>
                   <strong>{plant.bin || "Missing"}</strong>
-                  <span>Group</span>
-                  <strong>{plant.assigned_recipe_code || "Missing"}</strong>
                   <select
                     className={styles.select}
                     value={traySelectionByPlant[plant.uuid] || ""}
@@ -368,18 +462,19 @@ export default function PlacementPage() {
                         [plant.uuid]: event.target.value,
                       }))
                     }
+                    disabled={saving || placementLocked}
                   >
                     <option value="">Select tray</option>
                     {summary.trays.map((tray) => (
                       <option key={tray.tray_id} value={tray.tray_id}>
-                        {tray.name}
+                        {tray.tray_name}
                       </option>
                     ))}
                   </select>
                   <button
                     className={styles.buttonSecondary}
                     type="button"
-                    disabled={saving || summary.trays.length === 0}
+                    disabled={saving || placementLocked || summary.trays.length === 0}
                     onClick={() => void addPlantToTray(plant.uuid)}
                   >
                     Add to tray
@@ -388,7 +483,7 @@ export default function PlacementPage() {
               )}
               emptyState={
                 <p className={styles.mutedText}>
-                  {summary.unplaced_active_plants_count === 0
+                  {summary.unplaced_plants_count === 0
                     ? "All active plants are placed."
                     : "No unplaced plants in this page window."}
                 </p>
@@ -405,6 +500,7 @@ export default function PlacementPage() {
                   value={newTrayName}
                   placeholder="T1"
                   onChange={(event) => setNewTrayName(event.target.value)}
+                  disabled={saving || placementLocked}
                 />
               </label>
               <label className={styles.field}>
@@ -413,6 +509,7 @@ export default function PlacementPage() {
                   className={styles.select}
                   value={newTrayBlockId}
                   onChange={(event) => setNewTrayBlockId(event.target.value)}
+                  disabled={saving || placementLocked}
                 >
                   <option value="">No block</option>
                   {blocks.map((block) => (
@@ -422,10 +519,26 @@ export default function PlacementPage() {
                   ))}
                 </select>
               </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Tray recipe (optional)</span>
+                <select
+                  className={styles.select}
+                  value={newTrayRecipeId}
+                  onChange={(event) => setNewTrayRecipeId(event.target.value)}
+                  disabled={saving || placementLocked}
+                >
+                  <option value="">No recipe</option>
+                  {recipes.map((recipe) => (
+                    <option key={recipe.id} value={recipe.id}>
+                      {recipe.code} - {recipe.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 className={styles.buttonPrimary}
                 type="button"
-                disabled={saving}
+                disabled={saving || placementLocked}
                 onClick={() => void createTray()}
               >
                 Create tray
@@ -438,14 +551,15 @@ export default function PlacementPage() {
                 return (
                   <article className={styles.blockRow} key={tray.tray_id}>
                     <div className={styles.actions}>
-                      <strong>{tray.name}</strong>
-                      <span className={styles.mutedText}>{tray.plant_count} plant(s)</span>
+                      <strong>{tray.tray_name}</strong>
+                      <span className={styles.mutedText}>{tray.placed_count} placed</span>
                     </div>
                     <label className={styles.field}>
                       <span className={styles.fieldLabel}>Name</span>
                       <input
                         className={styles.input}
-                        value={tray.name}
+                        value={tray.tray_name}
+                        disabled={saving || placementLocked}
                         onChange={(event) =>
                           setSummary((current) => {
                             if (!current) {
@@ -455,7 +569,7 @@ export default function PlacementPage() {
                               ...current,
                               trays: current.trays.map((item) =>
                                 item.tray_id === tray.tray_id
-                                  ? { ...item, name: event.target.value }
+                                  ? { ...item, tray_name: event.target.value }
                                   : item,
                               ),
                             };
@@ -468,6 +582,7 @@ export default function PlacementPage() {
                       <select
                         className={styles.select}
                         value={tray.block_id || ""}
+                        disabled={saving || placementLocked}
                         onChange={(event) =>
                           setSummary((current) => {
                             if (!current) {
@@ -492,11 +607,47 @@ export default function PlacementPage() {
                         ))}
                       </select>
                     </label>
+                    <label className={styles.field}>
+                      <span className={styles.fieldLabel}>Tray recipe</span>
+                      <select
+                        className={styles.select}
+                        value={tray.recipe_id || ""}
+                        disabled={saving || placementLocked}
+                        onChange={(event) =>
+                          setSummary((current) => {
+                            if (!current) {
+                              return current;
+                            }
+                            const nextRecipe = recipes.find((recipe) => recipe.id === event.target.value);
+                            return {
+                              ...current,
+                              trays: current.trays.map((item) =>
+                                item.tray_id === tray.tray_id
+                                  ? {
+                                      ...item,
+                                      recipe_id: event.target.value || null,
+                                      recipe_code: nextRecipe?.code ?? null,
+                                      recipe_name: nextRecipe?.name ?? null,
+                                    }
+                                  : item,
+                              ),
+                            };
+                          })
+                        }
+                      >
+                        <option value="">No recipe</option>
+                        {recipes.map((recipe) => (
+                          <option key={recipe.id} value={recipe.id}>
+                            {recipe.code} - {recipe.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <div className={styles.actions}>
                       <button
                         className={styles.buttonSecondary}
                         type="button"
-                        disabled={saving}
+                        disabled={saving || placementLocked}
                         onClick={() => void saveTray(tray)}
                       >
                         Save tray
@@ -537,9 +688,12 @@ export default function PlacementPage() {
                             render: (plant) => plant.bin || "Missing",
                           },
                           {
-                            key: "group",
-                            label: "Group",
-                            render: (plant) => plant.assigned_recipe_code || "Missing",
+                            key: "recipe",
+                            label: "Tray Recipe",
+                            render: (plant) =>
+                              plant.assigned_recipe_code
+                                ? `${plant.assigned_recipe_code}${plant.assigned_recipe_name ? ` - ${plant.assigned_recipe_name}` : ""}`
+                                : "Missing",
                           },
                           {
                             key: "actions",
@@ -548,7 +702,7 @@ export default function PlacementPage() {
                               <button
                                 className={styles.buttonSecondary}
                                 type="button"
-                                disabled={saving}
+                                disabled={saving || placementLocked}
                                 onClick={() =>
                                   void removePlantFromTray(tray.tray_id, plant.tray_plant_id)
                                 }
@@ -568,12 +722,16 @@ export default function PlacementPage() {
                             <strong>{plant.species_name}</strong>
                             <span>Bin</span>
                             <strong>{plant.bin || "Missing"}</strong>
-                            <span>Group</span>
-                            <strong>{plant.assigned_recipe_code || "Missing"}</strong>
+                            <span>Tray recipe</span>
+                            <strong>
+                              {plant.assigned_recipe_code
+                                ? `${plant.assigned_recipe_code}${plant.assigned_recipe_name ? ` - ${plant.assigned_recipe_name}` : ""}`
+                                : "Missing"}
+                            </strong>
                             <button
                               className={styles.buttonSecondary}
                               type="button"
-                              disabled={saving}
+                              disabled={saving || placementLocked}
                               onClick={() =>
                                 void removePlantFromTray(tray.tray_id, plant.tray_plant_id)
                               }

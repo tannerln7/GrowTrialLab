@@ -26,6 +26,11 @@ type FeedingQueuePlant = {
   assigned_recipe_id: string | null;
   assigned_recipe_code: string | null;
   assigned_recipe_name: string | null;
+  placed_tray_id: string | null;
+  placed_tray_name: string | null;
+  placed_block_id: string | null;
+  placed_block_name: string | null;
+  blocked_reason: string | null;
   last_fed_at: string | null;
   needs_feeding: boolean;
 };
@@ -101,7 +106,8 @@ export default function FeedingPage() {
     }
     return "";
   }, [params]);
-  const preselectedPlantId = searchParams.get("plant");
+  const preselectedPlantId = useMemo(() => searchParams.get("plant"), [searchParams]);
+  const rawFromParam = useMemo(() => searchParams.get("from"), [searchParams]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -116,7 +122,7 @@ export default function FeedingPage() {
   const [showNote, setShowNote] = useState(false);
   const [note, setNote] = useState("");
 
-  const fromParam = useMemo(() => normalizeFromParam(searchParams.get("from")), [searchParams]);
+  const fromParam = useMemo(() => normalizeFromParam(rawFromParam), [rawFromParam]);
   const overviewHref = fromParam || `/experiments/${experimentId}/overview`;
 
   const selectedPlant = useMemo(
@@ -132,25 +138,25 @@ export default function FeedingPage() {
       .slice(0, 3);
   }, [queue, selectedPlantId]);
   const canSaveAndNext = (queue?.remaining_count ?? 0) > 0;
-  const selectedPlantAssigned = Boolean(selectedPlant?.assigned_recipe_id);
-  const saveBlockedByAssignment = Boolean(selectedPlant && !selectedPlantAssigned);
+  const saveBlockedReason = selectedPlant?.blocked_reason ?? null;
+  const saveBlocked = Boolean(saveBlockedReason);
 
   const updatePlantQuery = useCallback(
     (plantId: string | null) => {
-      const currentPlant = searchParams.get("plant");
-      if ((currentPlant ?? null) === plantId) {
+      if ((preselectedPlantId ?? null) === plantId) {
         return;
       }
-      const nextParams = new URLSearchParams(searchParams.toString());
+      const nextParams = new URLSearchParams();
+      if (rawFromParam) {
+        nextParams.set("from", rawFromParam);
+      }
       if (plantId) {
         nextParams.set("plant", plantId);
-      } else {
-        nextParams.delete("plant");
       }
       const query = nextParams.toString();
       router.replace(`/experiments/${experimentId}/feeding${query ? `?${query}` : ""}`);
     },
-    [experimentId, router, searchParams],
+    [experimentId, preselectedPlantId, rawFromParam, router],
   );
 
   const selectPlant = useCallback(
@@ -235,8 +241,8 @@ export default function FeedingPage() {
       setError("Choose a plant to feed.");
       return;
     }
-    if (!selectedPlantAssigned) {
-      setError("This plant needs assignment before feeding.");
+    if (saveBlockedReason) {
+      setError(`Cannot feed this plant yet: ${saveBlockedReason}.`);
       return;
     }
 
@@ -393,6 +399,12 @@ export default function FeedingPage() {
                       ? `${selectedPlant.assigned_recipe_code}${selectedPlant.assigned_recipe_name ? ` - ${selectedPlant.assigned_recipe_name}` : ""}`
                       : "Unassigned"}
                   </p>
+                  <p className={styles.mutedText}>
+                    Tray: {selectedPlant.placed_tray_name || "Unplaced"}
+                  </p>
+                  {selectedPlant.blocked_reason ? (
+                    <p className={styles.errorText}>Blocked: {selectedPlant.blocked_reason}</p>
+                  ) : null}
                 </div>
               ) : null}
               <label className={styles.field}>
@@ -424,14 +436,21 @@ export default function FeedingPage() {
             </div>
           </SectionCard>
 
-          {saveBlockedByAssignment ? (
-            <SectionCard title="Assignment Required Before Feeding">
+          {saveBlocked ? (
+            <SectionCard title="Feeding Blocked">
               <p className={styles.mutedText}>
-                This plant needs assignment before feeding.
+                {saveBlockedReason === "Unplaced"
+                  ? "This plant needs placement in a tray before feeding."
+                  : "This plant needs a tray recipe before feeding."}
               </p>
-              <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/assignment`}>
-                Go to Assignment
-              </Link>
+              <div className={styles.actions}>
+                <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/placement`}>
+                  Fix placement
+                </Link>
+                <Link className={styles.buttonSecondary} href={overviewHref}>
+                  Back to Overview
+                </Link>
+              </div>
             </SectionCard>
           ) : null}
 
@@ -482,7 +501,7 @@ export default function FeedingPage() {
             <button
               className={styles.buttonPrimary}
               type="button"
-              disabled={!selectedPlantId || saving || saveBlockedByAssignment}
+              disabled={!selectedPlantId || saving || saveBlocked}
               onClick={() => void saveFeeding(false)}
             >
               {saving ? "Saving..." : "Save"}
@@ -490,7 +509,7 @@ export default function FeedingPage() {
             <button
               className={styles.buttonSecondary}
               type="button"
-              disabled={!selectedPlantId || saving || !canSaveAndNext || saveBlockedByAssignment}
+              disabled={!selectedPlantId || saving || !canSaveAndNext || saveBlocked}
               onClick={() => void saveFeeding(true)}
             >
               Save & Next

@@ -55,6 +55,10 @@ type PlantCockpit = {
     assigned_recipe_id: string | null;
     assigned_recipe_code: string | null;
     assigned_recipe_name: string | null;
+    placed_tray_id: string | null;
+    placed_tray_name: string | null;
+    placed_block_id: string | null;
+    placed_block_name: string | null;
     last_fed_at: string | null;
     replaced_by_uuid: string | null;
     replaces_uuid: string | null;
@@ -65,6 +69,7 @@ type PlantCockpit = {
     experiment_overview: string;
     setup_assignment: string;
     baseline_capture: string;
+    placement: string;
   };
   recent_photos: PlantPhoto[];
 };
@@ -190,10 +195,10 @@ function buildNowAction(cockpit: PlantCockpit | null): NowAction {
 
   if (!cockpit.derived.assigned_recipe_code) {
     return {
-      title: "Assignment needed",
-      detail: "This plant is ready for group assignment.",
-      href: cockpit.links.setup_assignment,
-      buttonLabel: "Go to assignment",
+      title: "Placement or tray recipe needed",
+      detail: "This plant needs tray placement and tray recipe before feeding.",
+      href: cockpit.links.placement,
+      buttonLabel: "Open placement",
       icon: FlaskConical,
     };
   }
@@ -520,7 +525,10 @@ export default function PlantQrPage() {
                 <span className={styles.badge}>Status: {cockpit.plant.status}</span>
                 <span className={styles.badge}>Bin: {cockpit.plant.bin || "No bin"}</span>
                 <span className={styles.badge}>
-                  Group: {cockpit.derived.assigned_recipe_code || "Unassigned"}
+                  Tray: {cockpit.derived.placed_tray_name || "Unplaced"}
+                </span>
+                <span className={styles.badge}>
+                  Recipe: {cockpit.derived.assigned_recipe_code || "Missing"}
                 </span>
               </div>
             </div>
@@ -585,7 +593,7 @@ export default function PlantQrPage() {
               <p className={sharedStyles.mutedText}>{nowAction.detail}</p>
               {cockpit.plant.status === "active" && !cockpit.derived.assigned_recipe_code ? (
                 <span className={sharedStyles.badgeWarn}>
-                  Needs assignment before feeding
+                  Needs placement / tray recipe before feeding
                 </span>
               ) : null}
               {cockpit.plant.status !== "active" ? (
