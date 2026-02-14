@@ -1,0 +1,26 @@
+{
+  "include": [
+    "backend"
+  ],
+  "exclude": [
+    ".git",
+    "**/node_modules",
+    "**/__pycache__",
+    "frontend",
+    "data",
+    "backend/.venv",
+    "backend/**/migrations"
+  ],
+  "venvPath": "backend",
+  "venv": ".venv",
+  "pythonVersion": "3.10",
+  "typeCheckingMode": "basic",
+  "executionEnvironments": [
+    {
+      "root": "backend",
+      "extraPaths": [
+        "backend"
+      ]
+    }
+  ]
+}
