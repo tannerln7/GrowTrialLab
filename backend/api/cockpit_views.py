@@ -9,7 +9,8 @@ from .baseline import BASELINE_WEEK_NUMBER
 from .models import FeedingEvent, Photo, Plant, PlantWeeklyMetric
 from .schedules import plan_for_experiment
 from .status_summary import compute_setup_status
-from .tray_assignment import placement_info, plant_tray_placement, resolved_assigned_recipe
+from .tray_assignment import build_location, plant_tray_placement, resolved_assigned_recipe
+
 
 
 def _require_app_user(request):
@@ -19,11 +20,13 @@ def _require_app_user(request):
     return None
 
 
+
 def _photo_url(request, photo: Photo) -> str:
     url = photo.file.url
     if url.startswith(("http://", "https://")):
         return url
     return request.build_absolute_uri(url)
+
 
 
 def _replaces_plant(plant: Plant) -> Plant | None:
@@ -64,7 +67,7 @@ def plant_cockpit(request, plant_id: UUID):
     replaced_by_uuid = str(replaced_by.id) if replaced_by else None
     replaces_uuid = str(replaces.id) if replaces else None
     tray_placement = plant_tray_placement(plant)
-    placement = placement_info(tray_placement)
+    location = build_location(tray_placement)
     assigned_recipe = resolved_assigned_recipe(plant, tray_placement, allow_fallback=True)
     latest_feeding_event = (
         FeedingEvent.objects.filter(plant=plant)
@@ -80,7 +83,7 @@ def plant_cockpit(request, plant_id: UUID):
         chain_label = "Has replacement"
     schedule_plan = plan_for_experiment(plant.experiment, days=3, plant_id=str(plant.id))
     scheduled_upcoming = []
-    for slot in schedule_plan["slots"]:
+    for slot in schedule_plan["slots"]["results"]:
         for item in slot["actions"]:
             scheduled_upcoming.append(
                 {
@@ -104,7 +107,7 @@ def plant_cockpit(request, plant_id: UUID):
                 "plant_id": plant.plant_id,
                 "cultivar": plant.cultivar,
                 "status": plant.status,
-                "bin": plant.bin,
+                "grade": plant.grade,
                 "removed_at": plant.removed_at.isoformat() if plant.removed_at else None,
                 "removed_reason": plant.removed_reason,
                 "species": {
@@ -122,20 +125,7 @@ def plant_cockpit(request, plant_id: UUID):
                 "assigned_recipe_id": str(assigned_recipe.id) if assigned_recipe else None,
                 "assigned_recipe_code": assigned_recipe.code if assigned_recipe else None,
                 "assigned_recipe_name": assigned_recipe.name if assigned_recipe else None,
-                "placed_tray_id": placement.tray_id if placement else None,
-                "placed_tray_name": placement.tray_name if placement else None,
-                "tray_id": placement.tray_id if placement else None,
-                "tray_name": placement.tray_name if placement else None,
-                "tray_code": placement.tray_code if placement else None,
-                "tray_capacity": placement.tray_capacity if placement else None,
-                "tray_current_count": placement.tray_current_count if placement else None,
-                "placed_block_id": placement.block_id if placement else None,
-                "placed_block_name": placement.block_name if placement else None,
-                "block_id": placement.block_id if placement else None,
-                "block_name": placement.block_name if placement else None,
-                "tent_id": placement.tent_id if placement else None,
-                "tent_code": placement.tent_code if placement else None,
-                "tent_name": placement.tent_name if placement else None,
+                "location": location,
                 "last_fed_at": last_fed_at.isoformat() if last_fed_at else None,
                 "replaced_by_uuid": replaced_by_uuid,
                 "replaces_uuid": replaces_uuid,
@@ -145,19 +135,24 @@ def plant_cockpit(request, plant_id: UUID):
             "links": {
                 "experiment_home": experiment_home,
                 "experiment_overview": f"/experiments/{plant.experiment.id}/overview",
-                "setup_assignment": f"/experiments/{plant.experiment.id}/assignment",
                 "baseline_capture": f"/experiments/{plant.experiment.id}/baseline?plant={plant.id}",
                 "placement": f"/experiments/{plant.experiment.id}/placement",
+                "schedule": f"/experiments/{plant.experiment.id}/schedule?plant={plant.id}",
+                "feeding": f"/experiments/{plant.experiment.id}/feeding?plant={plant.id}",
             },
-            "recent_photos": [
-                {
-                    "id": str(photo.id),
-                    "url": _photo_url(request, photo),
-                    "created_at": photo.created_at.isoformat(),
-                    "tag": photo.tag,
-                    "week_number": photo.week_number,
-                }
-                for photo in recent_photos
-            ],
+            "recent_photos": {
+                "count": len(recent_photos),
+                "results": [
+                    {
+                        "id": str(photo.id),
+                        "url": _photo_url(request, photo),
+                        "created_at": photo.created_at.isoformat(),
+                        "tag": photo.tag,
+                        "week_number": photo.week_number,
+                    }
+                    for photo in recent_photos
+                ],
+                "meta": {},
+            },
         }
     )

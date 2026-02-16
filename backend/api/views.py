@@ -1,23 +1,13 @@
-import logging
-from uuid import UUID
+from __future__ import annotations
 
-from api.models import AppUser
-from api.models import Block, Experiment, ExperimentSetupState, Tent
-from api.serializers import (
-    BlockSerializer,
-    EnvironmentPacketSerializer,
-    ExperimentSetupStateSerializer,
-    SetupStateUpdateSerializer,
-)
-from api.setup_packets import (
-    PACKET_ENVIRONMENT,
-    PACKET_PLANTS,
-    normalize_packet_ids,
-    next_incomplete_packet,
-)
+import logging
+
 from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+
+from api.contracts import list_envelope
+from api.models import AppUser
 
 logger = logging.getLogger(__name__)
 
@@ -41,200 +31,6 @@ def me(request):
     )
 
 
-def _require_app_user(request):
-    app_user = getattr(request, "app_user", None)
-    if app_user is None:
-        return Response({"detail": "Not authenticated."}, status=403)
-    return None
-
-
-def _get_experiment(experiment_id: UUID):
-    return Experiment.objects.filter(id=experiment_id).first()
-
-
-def _get_or_create_setup_state(experiment: Experiment):
-    return ExperimentSetupState.objects.get_or_create(
-        experiment=experiment,
-        defaults={"current_packet": PACKET_PLANTS},
-    )[0]
-
-
-def _ensure_default_blocks(experiment: Experiment):
-    default_tent, _ = Tent.objects.get_or_create(
-        experiment=experiment,
-        code="T1",
-        defaults={"name": "Tent 1"},
-    )
-    defaults = [
-        ("B1", "Front-left position"),
-        ("B2", "Front-right position"),
-        ("B3", "Back-left position"),
-        ("B4", "Back-right position"),
-    ]
-    created_count = 0
-    for name, description in defaults:
-        _, created = Block.objects.get_or_create(
-            experiment=experiment,
-            tent=default_tent,
-            name=name,
-            defaults={"description": description},
-        )
-        if created:
-            created_count += 1
-    return created_count
-
-
-@api_view(["GET", "PATCH"])
-def experiment_setup_state(request, experiment_id: UUID):
-    rejection = _require_app_user(request)
-    if rejection:
-        return rejection
-
-    experiment = _get_experiment(experiment_id)
-    if experiment is None:
-        return Response({"detail": "Experiment not found."}, status=404)
-
-    setup_state = _get_or_create_setup_state(experiment)
-    if request.method == "GET":
-        serializer = ExperimentSetupStateSerializer(setup_state)
-        return Response(serializer.data)
-
-    serializer = SetupStateUpdateSerializer(data=request.data, partial=True)
-    serializer.is_valid(raise_exception=True)
-    if "current_packet" in serializer.validated_data:
-        setup_state.current_packet = serializer.validated_data["current_packet"]
-    if "completed_packets" in serializer.validated_data:
-        setup_state.completed_packets = normalize_packet_ids(
-            serializer.validated_data["completed_packets"]
-        )
-        if setup_state.current_packet in setup_state.completed_packets:
-            setup_state.current_packet = next_incomplete_packet(setup_state.completed_packets)
-    setup_state.save()
-    return Response(ExperimentSetupStateSerializer(setup_state).data)
-
-
-@api_view(["PUT"])
-def experiment_environment_packet(request, experiment_id: UUID):
-    rejection = _require_app_user(request)
-    if rejection:
-        return rejection
-
-    experiment = _get_experiment(experiment_id)
-    if experiment is None:
-        return Response({"detail": "Experiment not found."}, status=404)
-
-    setup_state = _get_or_create_setup_state(experiment)
-    serializer = EnvironmentPacketSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-
-    payload = {
-        "tent_name": serializer.validated_data.get("tent_name", ""),
-        "light_schedule": serializer.validated_data.get("light_schedule", ""),
-        "light_height_notes": serializer.validated_data.get("light_height_notes", ""),
-        "ventilation_notes": serializer.validated_data.get("ventilation_notes", ""),
-        "water_source": serializer.validated_data.get("water_source", ""),
-        "run_in_days": serializer.validated_data.get("run_in_days", 14),
-        "notes": serializer.validated_data.get("notes", ""),
-    }
-    setup_state.packet_data[PACKET_ENVIRONMENT] = payload
-    setup_state.save(update_fields=["packet_data", "updated_at"])
-    return Response({"packet": PACKET_ENVIRONMENT, "data": payload})
-
-
-@api_view(["POST"])
-def complete_environment_packet(request, experiment_id: UUID):
-    rejection = _require_app_user(request)
-    if rejection:
-        return rejection
-
-    experiment = _get_experiment(experiment_id)
-    if experiment is None:
-        return Response({"detail": "Experiment not found."}, status=404)
-
-    setup_state = _get_or_create_setup_state(experiment)
-    payload = setup_state.packet_data.get(PACKET_ENVIRONMENT)
-    errors: list[str] = []
-    if not isinstance(payload, dict):
-        errors.append("Environment payload has not been saved yet.")
-    else:
-        if not str(payload.get("tent_name", "")).strip():
-            errors.append("Environment field 'tent_name' is required.")
-        if not str(payload.get("light_schedule", "")).strip():
-            errors.append("Environment field 'light_schedule' is required.")
-
-    block_count = Block.objects.filter(tent__experiment=experiment).count()
-    if block_count < 2:
-        errors.append("At least 2 blocks are required before completing the Environments step.")
-
-    if errors:
-        return Response(
-            {"detail": "Environments step cannot be completed.", "errors": errors},
-            status=400,
-        )
-
-    completed = normalize_packet_ids([*setup_state.completed_packets, PACKET_ENVIRONMENT])
-    setup_state.completed_packets = completed
-    setup_state.current_packet = next_incomplete_packet(completed)
-    setup_state.save(update_fields=["completed_packets", "current_packet", "updated_at"])
-    return Response(ExperimentSetupStateSerializer(setup_state).data)
-
-
-@api_view(["GET", "POST"])
-def experiment_blocks(request, experiment_id: UUID):
-    rejection = _require_app_user(request)
-    if rejection:
-        return rejection
-
-    experiment = _get_experiment(experiment_id)
-    if experiment is None:
-        return Response({"detail": "Experiment not found."}, status=404)
-
-    if request.method == "GET":
-        serializer = BlockSerializer(
-            Block.objects.filter(tent__experiment=experiment).order_by("name"),
-            many=True,
-        )
-        return Response(serializer.data)
-
-    tent_id = request.data.get("tent")
-    if tent_id:
-        tent = Tent.objects.filter(id=tent_id, experiment=experiment).first()
-        if tent is None:
-            return Response({"detail": "Tent not found for this experiment."}, status=400)
-    else:
-        tent, _ = Tent.objects.get_or_create(
-            experiment=experiment,
-            code="T1",
-            defaults={"name": "Tent 1"},
-        )
-    serializer = BlockSerializer(
-        data={**request.data, "experiment": str(experiment.id), "tent": str(tent.id)}
-    )
-    serializer.is_valid(raise_exception=True)
-    serializer.save()
-    return Response(serializer.data, status=201)
-
-
-@api_view(["POST"])
-def experiment_blocks_defaults(request, experiment_id: UUID):
-    rejection = _require_app_user(request)
-    if rejection:
-        return rejection
-
-    experiment = _get_experiment(experiment_id)
-    if experiment is None:
-        return Response({"detail": "Experiment not found."}, status=404)
-
-    created_count = _ensure_default_blocks(experiment)
-    blocks = Block.objects.filter(tent__experiment=experiment).order_by("name")
-    serializer = BlockSerializer(blocks, many=True)
-    return Response(
-        {
-            "created_count": created_count,
-            "blocks": serializer.data,
-        }
-    )
-
 
 def _serialize_user(app_user: AppUser):
     return {
@@ -245,6 +41,7 @@ def _serialize_user(app_user: AppUser):
         "created_at": app_user.created_at.isoformat(),
         "last_seen_at": app_user.last_seen_at.isoformat() if app_user.last_seen_at else None,
     }
+
 
 
 def _require_admin(request):
@@ -264,7 +61,7 @@ def admin_users(request):
 
     if request.method == "GET":
         users = AppUser.objects.order_by("id")
-        return Response([_serialize_user(user) for user in users])
+        return Response(list_envelope([_serialize_user(user) for user in users]))
 
     email = (request.data.get("email") or "").strip().lower()
     if not email:

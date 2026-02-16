@@ -1,10 +1,12 @@
-from rest_framework import status, viewsets
+from __future__ import annotations
+
+from rest_framework import viewsets
 from rest_framework.response import Response
 
+from .contracts import error_with_diagnostics
 from .models import (
     AdverseEvent,
     BatchLot,
-    Block,
     Experiment,
     FeedingEvent,
     MetricTemplate,
@@ -13,6 +15,7 @@ from .models import (
     PlantWeeklyMetric,
     Recipe,
     RotationLog,
+    Slot,
     Species,
     Tray,
     TrayPlant,
@@ -22,7 +25,6 @@ from .permissions import HasAdminAppUserPermission, HasAppUserPermission
 from .serializers import (
     AdverseEventSerializer,
     BatchLotSerializer,
-    BlockSerializer,
     ExperimentSerializer,
     FeedingEventSerializer,
     MetricTemplateSerializer,
@@ -32,10 +34,15 @@ from .serializers import (
     PlantWeeklyMetricSerializer,
     RecipeSerializer,
     RotationLogSerializer,
+    SlotSerializer,
     SpeciesSerializer,
     TrayPlantSerializer,
     TraySerializer,
     WeeklySessionSerializer,
+)
+
+PLACEMENT_LOCK_MESSAGE = (
+    "Placement cannot be edited while the experiment is running. Stop the experiment to change placement."
 )
 
 
@@ -107,6 +114,7 @@ class PlantViewSet(ExperimentFilteredViewSet):
             return PlantDetailSerializer
         return super().get_serializer_class()
 
+
 class TrayViewSet(ExperimentFilteredViewSet):
     queryset = Tray.objects.all().order_by("name")
     serializer_class = TraySerializer
@@ -114,37 +122,35 @@ class TrayViewSet(ExperimentFilteredViewSet):
     def _placement_locked(self, tray: Tray) -> bool:
         return tray.experiment.lifecycle_state == Experiment.LifecycleState.RUNNING
 
-    def _block_conflict_response(self, tray: Tray):
-        requested_block = self.request.data.get("block")
-        if requested_block is None:
-            requested_block = self.request.data.get("block_id")
-        if requested_block in {None, ""}:
+    def _slot_conflict_response(self, tray: Tray):
+        requested_slot = self.request.data.get("slot")
+        if requested_slot is None:
+            requested_slot = self.request.data.get("slot_id")
+        if requested_slot in {None, ""}:
             return None
-        block = Block.objects.filter(id=requested_block, tent__experiment=tray.experiment).first()
-        if block is None:
+        slot = Slot.objects.filter(id=requested_slot, tent__experiment=tray.experiment).first()
+        if slot is None:
             return None
         conflict_exists = (
-            Tray.objects.filter(experiment=tray.experiment, block=block)
+            Tray.objects.filter(experiment=tray.experiment, slot=slot)
             .exclude(id=tray.id)
             .exists()
         )
         if conflict_exists:
-            return Response(
-                {"detail": "Block already has a tray. Each block can contain only one tray."},
-                status=status.HTTP_409_CONFLICT,
+            return error_with_diagnostics(
+                "Slot already has a tray. Each slot can contain only one tray.",
+                diagnostics={"reason_counts": {"slot_occupied": 1}, "slot_id": str(slot.id)},
             )
         return None
 
     def update(self, request, *args, **kwargs):
         tray = self.get_object()
         if self._placement_locked(tray):
-            return Response(
-                {
-                    "detail": "Placement cannot be edited while the experiment is running. Stop the experiment to change placement."
-                },
-                status=status.HTTP_409_CONFLICT,
+            return error_with_diagnostics(
+                PLACEMENT_LOCK_MESSAGE,
+                diagnostics={"reason_counts": {"running": 1}},
             )
-        conflict_response = self._block_conflict_response(tray)
+        conflict_response = self._slot_conflict_response(tray)
         if conflict_response is not None:
             return conflict_response
         return super().update(request, *args, **kwargs)
@@ -152,13 +158,11 @@ class TrayViewSet(ExperimentFilteredViewSet):
     def partial_update(self, request, *args, **kwargs):
         tray = self.get_object()
         if self._placement_locked(tray):
-            return Response(
-                {
-                    "detail": "Placement cannot be edited while the experiment is running. Stop the experiment to change placement."
-                },
-                status=status.HTTP_409_CONFLICT,
+            return error_with_diagnostics(
+                PLACEMENT_LOCK_MESSAGE,
+                diagnostics={"reason_counts": {"running": 1}},
             )
-        conflict_response = self._block_conflict_response(tray)
+        conflict_response = self._slot_conflict_response(tray)
         if conflict_response is not None:
             return conflict_response
         return super().partial_update(request, *args, **kwargs)
@@ -170,16 +174,17 @@ class TrayPlantViewSet(ExperimentFilteredViewSet):
     experiment_filter_field = "tray__experiment_id"
 
 
-class BlockViewSet(ExperimentFilteredViewSet):
-    queryset = Block.objects.all().order_by("name")
-    serializer_class = BlockSerializer
+class SlotViewSet(ExperimentFilteredViewSet):
+    queryset = Slot.objects.all().order_by("tent_id", "shelf_index", "slot_index")
+    serializer_class = SlotSerializer
+    experiment_filter_field = "tent__experiment_id"
 
     def destroy(self, request, *args, **kwargs):
-        block = self.get_object()
-        if Tray.objects.filter(block=block).exists():
-            return Response(
-                {"detail": "Block cannot be deleted while trays are placed in it."},
-                status=status.HTTP_409_CONFLICT,
+        slot = self.get_object()
+        if Tray.objects.filter(slot=slot).exists():
+            return error_with_diagnostics(
+                "Slot cannot be deleted while trays are placed in it.",
+                diagnostics={"reason_counts": {"slot_occupied": 1}, "slot_id": str(slot.id)},
             )
         return super().destroy(request, *args, **kwargs)
 

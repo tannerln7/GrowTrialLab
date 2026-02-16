@@ -121,7 +121,7 @@ DEV_EMAIL = os.environ.get("DEV_EMAIL", ADMIN_EMAIL).strip().lower()
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip()
 
 REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "api.pagination.EnvelopePageNumberPagination",
     "PAGE_SIZE": 25,
 }
 

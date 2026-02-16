@@ -1,11 +1,11 @@
+from __future__ import annotations
+
 import uuid
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
-
-from .setup_packets import PACKET_ENVIRONMENT
 
 
 class AppUser(models.Model):
@@ -89,6 +89,7 @@ class Experiment(UUIDModel):
         choices=LifecycleState.choices,
         default=LifecycleState.DRAFT,
     )
+    baseline_locked = models.BooleanField(default=False)
     started_at = models.DateTimeField(null=True, blank=True)
     stopped_at = models.DateTimeField(null=True, blank=True)
     start_date = models.DateField(null=True, blank=True)
@@ -102,15 +103,6 @@ class Experiment(UUIDModel):
 
     def __str__(self):
         return self.name
-
-
-class ExperimentSetupState(UUIDModel):
-    experiment = models.OneToOneField(Experiment, on_delete=models.CASCADE, related_name="setup_state")
-    current_packet = models.CharField(max_length=32, default=PACKET_ENVIRONMENT)
-    completed_packets = models.JSONField(default=list, blank=True)
-    locked_packets = models.JSONField(default=list, blank=True)
-    packet_data = models.JSONField(default=dict, blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
 
 class Recipe(UUIDModel):
@@ -149,7 +141,7 @@ class BatchLot(UUIDModel):
 
 
 class Plant(UUIDModel):
-    class Bin(models.TextChoices):
+    class Grade(models.TextChoices):
         A = "A", "A"
         B = "B", "B"
         C = "C", "C"
@@ -164,7 +156,7 @@ class Plant(UUIDModel):
     species = models.ForeignKey(Species, on_delete=models.PROTECT, related_name="plants")
     plant_id = models.CharField(max_length=64, blank=True, default="")
     cultivar = models.CharField(max_length=255, null=True, blank=True)
-    bin = models.CharField(max_length=1, choices=Bin.choices, null=True, blank=True)
+    grade = models.CharField(max_length=1, choices=Grade.choices, null=True, blank=True)
     assigned_recipe = models.ForeignKey(
         Recipe, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_plants"
     )
@@ -195,82 +187,11 @@ class Plant(UUIDModel):
         return f"{self.experiment.pk}:{self.plant_id or '(pending)'}"
 
 
-class Tray(UUIDModel):
-    experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="trays")
-    block = models.ForeignKey("Block", on_delete=models.SET_NULL, null=True, blank=True, related_name="trays")
-    assigned_recipe = models.ForeignKey(
-        "Recipe",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="trays",
-    )
-    name = models.CharField(max_length=64)
-    capacity = models.IntegerField(default=1, validators=[MinValueValidator(1)])
-    notes = models.TextField(blank=True)
-    plants = models.ManyToManyField(Plant, through="TrayPlant", related_name="trays")
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["experiment", "name"], name="unique_tray_name_in_experiment")
-        ]
-
-    def __init__(self, *args, **kwargs):
-        legacy_recipe = kwargs.pop("recipe", None)
-        if "assigned_recipe" not in kwargs and legacy_recipe is not None:
-            kwargs["assigned_recipe"] = legacy_recipe
-        super().__init__(*args, **kwargs)
-
-    @property
-    def recipe(self):
-        return self.assigned_recipe
-
-    @recipe.setter
-    def recipe(self, value):
-        self.assigned_recipe = value
-
-    def __str__(self):
-        return f"{self.experiment.pk}:{self.name}"
-
-
-class TrayPlant(UUIDModel):
-    tray = models.ForeignKey(Tray, on_delete=models.CASCADE, related_name="tray_plants")
-    plant = models.ForeignKey(Plant, on_delete=models.CASCADE, related_name="tray_plants")
-    order_index = models.IntegerField(default=0)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["tray", "plant"], name="unique_plant_in_tray"),
-            models.UniqueConstraint(fields=["plant"], name="unique_plant_single_tray"),
-            models.UniqueConstraint(fields=["tray", "order_index"], name="unique_tray_order_index"),
-        ]
-
-
-class Block(UUIDModel):
-    experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="blocks")
-    tent = models.ForeignKey("Tent", on_delete=models.CASCADE, related_name="blocks")
-    name = models.CharField(max_length=64)
-    description = models.TextField(blank=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["tent", "name"], name="unique_block_name_in_tent")
-        ]
-
-    def save(self, *args, **kwargs):
-        tent_id = self.__dict__.get("tent_id")
-        experiment_id = self.__dict__.get("experiment_id")
-        if tent_id is None and experiment_id is not None:
-            default_tent, _ = Tent.objects.get_or_create(
-                experiment_id=experiment_id,
-                code="T1",
-                defaults={"name": "Tent 1"},
-            )
-            self.tent = default_tent
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.experiment.pk}:{self.name}"
+def default_tent_layout() -> dict:
+    return {
+        "schema_version": 1,
+        "shelves": [],
+    }
 
 
 class Tent(UUIDModel):
@@ -278,6 +199,7 @@ class Tent(UUIDModel):
     name = models.CharField(max_length=128)
     code = models.CharField(max_length=16, blank=True, default="")
     notes = models.TextField(blank=True)
+    layout = models.JSONField(default=default_tent_layout, blank=True)
     allowed_species = models.ManyToManyField(Species, related_name="tents", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -295,6 +217,73 @@ class Tent(UUIDModel):
     def __str__(self):
         suffix = f" ({self.code})" if self.code else ""
         return f"{self.experiment.pk}:{self.name}{suffix}"
+
+
+class Slot(UUIDModel):
+    tent = models.ForeignKey(Tent, on_delete=models.CASCADE, related_name="slots")
+    shelf_index = models.IntegerField(validators=[MinValueValidator(1)])
+    slot_index = models.IntegerField(validators=[MinValueValidator(1)])
+    label = models.CharField(max_length=128, blank=True, default="")
+    code = models.CharField(max_length=32, editable=False)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["tent_id", "shelf_index", "slot_index", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tent", "shelf_index", "slot_index"],
+                name="unique_slot_coordinate_in_tent",
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        self.code = f"S{self.shelf_index}-{self.slot_index}"
+        if not self.label:
+            self.label = f"Shelf {self.shelf_index} · Slot {self.slot_index}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.tent.id}:{self.code}"
+
+
+class Tray(UUIDModel):
+    experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="trays")
+    slot = models.ForeignKey(Slot, on_delete=models.SET_NULL, null=True, blank=True, related_name="trays")
+    assigned_recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="trays",
+    )
+    name = models.CharField(max_length=64)
+    capacity = models.IntegerField(default=1, validators=[MinValueValidator(1)])
+    notes = models.TextField(blank=True)
+    plants = models.ManyToManyField(Plant, through="TrayPlant", related_name="trays")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["experiment", "name"], name="unique_tray_name_in_experiment"),
+            models.UniqueConstraint(fields=["slot"], name="unique_tray_per_slot"),
+        ]
+
+    def __str__(self):
+        return f"{self.experiment.pk}:{self.name}"
+
+
+class TrayPlant(UUIDModel):
+    tray = models.ForeignKey(Tray, on_delete=models.CASCADE, related_name="tray_plants")
+    plant = models.ForeignKey(Plant, on_delete=models.CASCADE, related_name="tray_plants")
+    order_index = models.IntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["tray", "plant"], name="unique_plant_in_tray"),
+            models.UniqueConstraint(fields=["plant"], name="unique_plant_single_tray"),
+            models.UniqueConstraint(fields=["tray", "order_index"], name="unique_tray_order_index"),
+        ]
 
 
 class ScheduleAction(UUIDModel):
@@ -375,15 +364,15 @@ class ScheduleScope(UUIDModel):
 class RotationLog(UUIDModel):
     experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="rotation_logs")
     tray = models.ForeignKey(Tray, on_delete=models.CASCADE, related_name="rotation_logs")
-    from_block = models.ForeignKey(
-        Block,
+    from_slot = models.ForeignKey(
+        Slot,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="rotation_logs_from",
     )
-    to_block = models.ForeignKey(
-        Block,
+    to_slot = models.ForeignKey(
+        Slot,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

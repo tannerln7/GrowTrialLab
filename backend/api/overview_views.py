@@ -8,11 +8,12 @@ from rest_framework.response import Response
 from .baseline import BASELINE_WEEK_NUMBER
 from .models import Experiment, Plant, PlantWeeklyMetric
 from .tray_assignment import (
+    build_location,
     experiment_tray_current_counts,
     experiment_tray_placements,
-    placement_info,
     resolved_assigned_recipe,
 )
+
 
 
 def _require_app_user(request):
@@ -20,6 +21,7 @@ def _require_app_user(request):
     if app_user is None:
         return Response({"detail": "Not authenticated."}, status=403)
     return None
+
 
 
 def _get_experiment(experiment_id: UUID):
@@ -55,18 +57,16 @@ def experiment_overview_plants(request, experiment_id: UUID):
     active_count = 0
     removed_count = 0
     needs_baseline_count = 0
-    needs_bin_count = 0
+    needs_grade_count = 0
     needs_placement_count = 0
     needs_tray_recipe_count = 0
     needs_assignment_count = 0
 
     for plant in plants:
         tray_placement = tray_placements.get(str(plant.id))
-        placement = placement_info(
+        location = build_location(
             tray_placement,
-            tray_current_count=tray_current_counts.get(str(tray_placement.tray.id))
-            if tray_placement
-            else None,
+            tray_current_count=tray_current_counts.get(str(tray_placement.tray.id)) if tray_placement else None,
         )
         assigned_recipe = resolved_assigned_recipe(plant, tray_placement, allow_fallback=True)
         has_baseline = str(plant.id) in baseline_plant_ids
@@ -75,8 +75,8 @@ def experiment_overview_plants(request, experiment_id: UUID):
             active_count += 1
             if not has_baseline:
                 needs_baseline_count += 1
-            if not plant.bin:
-                needs_bin_count += 1
+            if not plant.grade:
+                needs_grade_count += 1
             if tray_placement is None:
                 needs_placement_count += 1
                 needs_assignment_count += 1
@@ -94,24 +94,11 @@ def experiment_overview_plants(request, experiment_id: UUID):
                 "species_category": plant.species.category,
                 "cultivar": plant.cultivar,
                 "status": plant.status,
-                "bin": plant.bin,
+                "grade": plant.grade,
                 "assigned_recipe_id": str(assigned_recipe.id) if assigned_recipe else None,
                 "assigned_recipe_code": assigned_recipe.code if assigned_recipe else None,
                 "assigned_recipe_name": assigned_recipe.name if assigned_recipe else None,
-                "placed_tray_id": placement.tray_id if placement else None,
-                "placed_tray_name": placement.tray_name if placement else None,
-                "tray_id": placement.tray_id if placement else None,
-                "tray_name": placement.tray_name if placement else None,
-                "tray_code": placement.tray_code if placement else None,
-                "tray_capacity": placement.tray_capacity if placement else None,
-                "tray_current_count": placement.tray_current_count if placement else None,
-                "placed_block_id": placement.block_id if placement else None,
-                "placed_block_name": placement.block_name if placement else None,
-                "block_id": placement.block_id if placement else None,
-                "block_name": placement.block_name if placement else None,
-                "tent_id": placement.tent_id if placement else None,
-                "tent_code": placement.tent_code if placement else None,
-                "tent_name": placement.tent_name if placement else None,
+                "location": location,
                 "has_baseline": has_baseline,
                 "replaced_by_uuid": str(plant.replaced_by.id) if plant.replaced_by else None,
             }
@@ -124,11 +111,15 @@ def experiment_overview_plants(request, experiment_id: UUID):
                 "active": active_count,
                 "removed": removed_count,
                 "needs_baseline": needs_baseline_count,
-                "needs_bin": needs_bin_count,
+                "needs_grade": needs_grade_count,
                 "needs_assignment": needs_assignment_count,
                 "needs_placement": needs_placement_count,
                 "needs_tray_recipe": needs_tray_recipe_count,
             },
-            "plants": payload_plants,
+            "plants": {
+                "count": len(payload_plants),
+                "results": payload_plants,
+                "meta": {},
+            },
         }
     )

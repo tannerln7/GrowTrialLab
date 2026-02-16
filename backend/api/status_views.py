@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from .contracts import error_with_diagnostics
 from .models import Experiment
 from .status_summary import experiment_status_summary_payload
 
@@ -41,15 +42,16 @@ def experiment_start(request, experiment_id: UUID):
         return Response({"detail": "Experiment not found."}, status=404)
 
     summary = experiment_status_summary_payload(experiment)
-    if not summary["setup"]["is_complete"] or not summary["readiness"]["ready_to_start"]:
-        return Response(
-            {
-                "detail": "Experiment is not ready to start.",
-                "counts": summary["readiness"]["counts"],
+    readiness = summary["readiness"]
+    if not summary["setup"]["is_complete"] or not readiness["ready_to_start"]:
+        return error_with_diagnostics(
+            "Experiment is not ready to start.",
+            diagnostics={
+                **readiness.get("meta", {}),
+                "counts": readiness["counts"],
                 "setup": summary["setup"],
-                "ready_to_start": summary["readiness"]["ready_to_start"],
+                "ready_to_start": readiness["ready_to_start"],
             },
-            status=409,
         )
 
     now = timezone.now()

@@ -1,11 +1,11 @@
+from __future__ import annotations
+
 from rest_framework import serializers
 
 from .models import (
     AdverseEvent,
     BatchLot,
-    Block,
     Experiment,
-    ExperimentSetupState,
     FeedingEvent,
     MetricTemplate,
     Photo,
@@ -16,13 +16,13 @@ from .models import (
     ScheduleAction,
     ScheduleRule,
     ScheduleScope,
+    Slot,
     Species,
     Tent,
     Tray,
     TrayPlant,
     WeeklySession,
 )
-from .setup_packets import STEP_LABELS, STEP_ORDER, normalize_step_ids
 from .tent_restrictions import first_disallowed_plant, tent_allows_species
 
 
@@ -36,62 +36,6 @@ class ExperimentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Experiment
         fields = "__all__"
-
-
-class ExperimentSetupStateSerializer(serializers.ModelSerializer):
-    packet_progress = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ExperimentSetupState
-        fields = [
-            "experiment",
-            "current_packet",
-            "completed_packets",
-            "locked_packets",
-            "packet_data",
-            "updated_at",
-            "packet_progress",
-        ]
-
-    def get_packet_progress(self, obj: ExperimentSetupState):
-        completed = set(normalize_step_ids(obj.completed_packets or []))
-        locked = set(normalize_step_ids(obj.locked_packets or []))
-        current_packet = obj.current_packet if obj.current_packet in STEP_ORDER else STEP_ORDER[0]
-        progress = []
-        for packet_id in STEP_ORDER:
-            if packet_id in completed:
-                status = "done"
-            elif packet_id == current_packet:
-                status = "current"
-            else:
-                status = "todo"
-            progress.append(
-                {
-                    "id": packet_id,
-                    "name": STEP_LABELS[packet_id],
-                    "status": status,
-                    "locked": packet_id in locked,
-                }
-            )
-        return progress
-
-
-class SetupStateUpdateSerializer(serializers.Serializer):
-    current_packet = serializers.ChoiceField(choices=STEP_ORDER, required=False)
-    completed_packets = serializers.ListField(
-        child=serializers.ChoiceField(choices=STEP_ORDER),
-        required=False,
-    )
-
-
-class EnvironmentPacketSerializer(serializers.Serializer):
-    tent_name = serializers.CharField(required=False, allow_blank=True)
-    light_schedule = serializers.CharField(required=False, allow_blank=True)
-    light_height_notes = serializers.CharField(required=False, allow_blank=True)
-    ventilation_notes = serializers.CharField(required=False, allow_blank=True)
-    water_source = serializers.CharField(required=False, allow_blank=True)
-    run_in_days = serializers.IntegerField(required=False, min_value=1, default=14)
-    notes = serializers.CharField(required=False, allow_blank=True)
 
 
 class RecipeSerializer(serializers.ModelSerializer):
@@ -148,6 +92,7 @@ class PlantDetailSerializer(serializers.ModelSerializer):
             "removed_reason",
             "replaced_by",
             "baseline_notes",
+            "grade",
             "experiment",
             "assigned_recipe",
             "created_at",
@@ -168,7 +113,7 @@ class ExperimentPlantSerializer(serializers.ModelSerializer):
             "species_name",
             "species_category",
             "plant_id",
-            "bin",
+            "grade",
             "cultivar",
             "status",
             "baseline_notes",
@@ -193,55 +138,17 @@ class ExperimentPlantCreateSerializer(serializers.Serializer):
         return attrs
 
 
-class PlantsPacketSerializer(serializers.Serializer):
-    id_format_notes = serializers.CharField(required=False, allow_blank=True)
-
-
-class BaselinePacketSerializer(serializers.Serializer):
-    template_id = serializers.UUIDField(required=False)
-    template_version = serializers.IntegerField(required=False, min_value=1)
-    notes = serializers.CharField(required=False, allow_blank=True)
-
-
-class GroupRecipeCreateSerializer(serializers.Serializer):
-    code = serializers.RegexField(regex=r"^R\d+$")
-    name = serializers.CharField(required=True, allow_blank=False)
-    notes = serializers.CharField(required=False, allow_blank=True)
-
-
-class GroupRecipeUpdateSerializer(serializers.Serializer):
-    name = serializers.CharField(required=False, allow_blank=False)
-    notes = serializers.CharField(required=False, allow_blank=True)
-
-    def validate(self, attrs):
-        if not attrs:
-            raise serializers.ValidationError("At least one field is required.")
-        return attrs
-
-
-class GroupsPreviewSerializer(serializers.Serializer):
-    seed = serializers.IntegerField(required=False, min_value=1, max_value=2_147_483_647)
-
-
-class GroupsApplySerializer(serializers.Serializer):
-    seed = serializers.IntegerField(required=True, min_value=1, max_value=2_147_483_647)
-
-
-class GroupsPacketSerializer(serializers.Serializer):
-    notes = serializers.CharField(required=False, allow_blank=True)
-
-
 class PlantBaselineSaveSerializer(serializers.Serializer):
     metrics = serializers.JSONField(required=True)
     notes = serializers.CharField(required=False, allow_blank=True)
-    bin = serializers.ChoiceField(choices=Plant.Bin.choices, required=False)
+    grade = serializers.ChoiceField(choices=Plant.Grade.choices, required=False)
 
 
 class PlantReplaceSerializer(serializers.Serializer):
     new_plant_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     copy_identity_fields = serializers.BooleanField(required=False, default=True)
     inherit_assignment = serializers.BooleanField(required=False, default=True)
-    inherit_bin = serializers.BooleanField(required=False, default=False)
+    inherit_grade = serializers.BooleanField(required=False, default=False)
     mark_original_removed = serializers.BooleanField(required=False, default=True)
     removed_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     removed_at = serializers.DateTimeField(required=False, allow_null=True)
@@ -331,20 +238,15 @@ class TraySerializer(serializers.ModelSerializer):
     def to_internal_value(self, data):
         if isinstance(data, dict):
             mutable = dict(data)
-            if "assigned_recipe" not in mutable:
-                if "recipe_id" in mutable:
-                    mutable["assigned_recipe"] = mutable.get("recipe_id")
-                elif "recipe" in mutable:
-                    mutable["assigned_recipe"] = mutable.get("recipe")
-            if "block" not in mutable and "block_id" in mutable:
-                mutable["block"] = mutable.get("block_id")
+            if "slot" not in mutable and "slot_id" in mutable:
+                mutable["slot"] = mutable.get("slot_id")
             data = mutable
         return super().to_internal_value(data)
 
     def validate(self, attrs):
         experiment = attrs.get("experiment") or (self.instance.experiment if self.instance else None)
-        block = attrs.get("block") or (self.instance.block if self.instance else None)
-        assigned_recipe = attrs.get("assigned_recipe") or (
+        slot = attrs.get("slot") if "slot" in attrs else (self.instance.slot if self.instance else None)
+        assigned_recipe = attrs.get("assigned_recipe") if "assigned_recipe" in attrs else (
             self.instance.assigned_recipe if self.instance else None
         )
         capacity = attrs.get("capacity")
@@ -352,18 +254,8 @@ class TraySerializer(serializers.ModelSerializer):
             capacity = self.instance.capacity
         if capacity is not None and capacity < 1:
             raise serializers.ValidationError("capacity must be at least 1.")
-        if experiment and block and block.tent.experiment_id != experiment.id:
-            raise serializers.ValidationError("Block must belong to the same experiment as tray.")
-        if block and not block.tent_id:
-            raise serializers.ValidationError("Block must be assigned to a tent before placing trays.")
-        if block:
-            conflicting_trays = Tray.objects.filter(block=block)
-            if self.instance is not None:
-                conflicting_trays = conflicting_trays.exclude(id=self.instance.id)
-            if conflicting_trays.exists():
-                raise serializers.ValidationError(
-                    "Block already has a tray. Each block can contain only one tray."
-                )
+        if experiment and slot and slot.tent.experiment_id != experiment.id:
+            raise serializers.ValidationError("Slot must belong to the same experiment as tray.")
         if experiment and assigned_recipe and assigned_recipe.experiment_id != experiment.id:
             raise serializers.ValidationError("Recipe must belong to the same experiment as tray.")
         if self.instance is not None:
@@ -372,13 +264,13 @@ class TraySerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     f"Tray currently has {current_count} plants; capacity cannot be set below that."
                 )
-            if block and block.tent:
+            if slot and slot.tent:
                 tray_plants = list(self.instance.tray_plants.select_related("plant__species").all())
-                violating = first_disallowed_plant(block.tent, [item.plant for item in tray_plants])
+                violating = first_disallowed_plant(slot.tent, [item.plant for item in tray_plants])
                 if violating:
                     raise serializers.ValidationError(
                         (
-                            f"Tray move blocked: tent '{block.tent.name}' does not allow "
+                            f"Tray move blocked: tent '{slot.tent.name}' does not allow "
                             f"plant '{violating.plant_id or violating.id}' ({violating.species.name})."
                         )
                     )
@@ -410,9 +302,9 @@ class TrayPlantSerializer(serializers.ModelSerializer):
                 occupancy_qs = occupancy_qs.exclude(id=self.instance.id)
             if occupancy_qs.count() >= tray.capacity:
                 raise serializers.ValidationError(f"Tray is full (capacity {tray.capacity}).")
-            if plant and tray.block and tray.block.tent and not tent_allows_species(tray.block.tent, plant.species_id):
+            if plant and tray.slot and tray.slot.tent and not tent_allows_species(tray.slot.tent, plant.species_id):
                 raise serializers.ValidationError(
-                    f"Plant species '{plant.species.name}' is not allowed in tent '{tray.block.tent.name}'."
+                    f"Plant species '{plant.species.name}' is not allowed in tent '{tray.slot.tent.name}'."
                 )
         return attrs
 
@@ -421,16 +313,9 @@ class TrayPlantSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class BlockSerializer(serializers.ModelSerializer):
-    def validate(self, attrs):
-        experiment = attrs.get("experiment") or (self.instance.experiment if self.instance else None)
-        tent = attrs.get("tent") or (self.instance.tent if self.instance else None)
-        if experiment and tent and tent.experiment_id != experiment.id:
-            raise serializers.ValidationError("Tent must belong to the same experiment as block.")
-        return attrs
-
+class SlotSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Block
+        model = Slot
         fields = "__all__"
 
 

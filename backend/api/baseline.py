@@ -5,8 +5,7 @@ from typing import Any
 
 from rest_framework.exceptions import ValidationError
 
-from .models import Experiment, ExperimentSetupState, MetricTemplate
-from .setup_packets import PACKET_BASELINE, PACKET_PLANTS, normalize_packet_ids
+from .models import Experiment, MetricTemplate
 
 BASELINE_WEEK_NUMBER = 0
 
@@ -18,14 +17,6 @@ class TemplateField:
     required: bool
     minimum: float | None = None
     maximum: float | None = None
-
-
-def get_or_create_setup_state(experiment: Experiment) -> ExperimentSetupState:
-    setup_state, _ = ExperimentSetupState.objects.get_or_create(
-        experiment=experiment,
-        defaults={"current_packet": PACKET_PLANTS},
-    )
-    return setup_state
 
 
 def get_metric_template_for_category(category: str | None) -> MetricTemplate | None:
@@ -122,20 +113,9 @@ def validate_metrics_against_template(metrics: Any, template: MetricTemplate | N
 
 
 def is_baseline_locked(experiment: Experiment) -> bool:
-    setup_state = get_or_create_setup_state(experiment)
-    baseline_packet = setup_state.packet_data.get(PACKET_BASELINE, {})
-    packet_locked = isinstance(baseline_packet, dict) and bool(baseline_packet.get("locked"))
-    return packet_locked or PACKET_BASELINE in normalize_packet_ids(setup_state.locked_packets or [])
+    return bool(experiment.baseline_locked)
 
 
-def lock_baseline(setup_state: ExperimentSetupState) -> None:
-    locked_packets = normalize_packet_ids([*(setup_state.locked_packets or []), PACKET_BASELINE])
-    setup_state.locked_packets = locked_packets
-
-    packet_data = dict(setup_state.packet_data or {})
-    baseline_payload = packet_data.get(PACKET_BASELINE)
-    if not isinstance(baseline_payload, dict):
-        baseline_payload = {}
-    baseline_payload["locked"] = True
-    packet_data[PACKET_BASELINE] = baseline_payload
-    setup_state.packet_data = packet_data
+def lock_baseline(experiment: Experiment) -> None:
+    experiment.baseline_locked = True
+    experiment.save(update_fields=["baseline_locked", "updated_at"])

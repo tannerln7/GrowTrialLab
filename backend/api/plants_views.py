@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 import csv
 import re
 from io import BytesIO, StringIO
 from uuid import UUID
 
+import reportlab.graphics.renderPDF as renderPDF
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.http import HttpResponse
 from django.utils import timezone
-import reportlab.graphics.renderPDF as renderPDF
 from reportlab.graphics.barcode.qr import QrCodeWidget
 from reportlab.graphics.shapes import Drawing
 from reportlab.lib.pagesizes import letter
@@ -16,16 +18,15 @@ from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from .models import Experiment, ExperimentSetupState, Plant, Species
+from .contracts import list_envelope
+from .models import Experiment, Plant, Species
 from .plant_ids import ExperimentPlantIdAllocator, prefix_for_species
 from .serializers import (
     ExperimentPlantCreateSerializer,
     ExperimentPlantSerializer,
     PlantReplaceSerializer,
-    PlantsPacketSerializer,
     SpeciesSerializer,
 )
-from .setup_packets import PACKET_PLANTS, normalize_packet_ids, next_incomplete_packet
 
 
 def _require_app_user(request):
@@ -37,13 +38,6 @@ def _require_app_user(request):
 
 def _get_experiment(experiment_id: UUID):
     return Experiment.objects.filter(id=experiment_id).first()
-
-
-def _get_or_create_setup_state(experiment: Experiment):
-    return ExperimentSetupState.objects.get_or_create(
-        experiment=experiment,
-        defaults={"current_packet": PACKET_PLANTS},
-    )[0]
 
 
 def _resolve_species(
@@ -145,7 +139,7 @@ def experiment_plants(request, experiment_id: UUID):
             "plant_id", "created_at"
         )
         serializer = ExperimentPlantSerializer(plants, many=True)
-        return Response(serializer.data)
+        return Response(list_envelope(list(serializer.data)))
 
     serializer = ExperimentPlantCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -407,7 +401,7 @@ def plant_replace(request, plant_id: UUID):
     mark_original_removed = payload.get("mark_original_removed", True)
     copy_identity_fields = payload.get("copy_identity_fields", True)
     inherit_assignment = payload.get("inherit_assignment", True)
-    inherit_bin = payload.get("inherit_bin", False)
+    inherit_grade = payload.get("inherit_grade", False)
     removed_reason = (payload.get("removed_reason") or "").strip()
     removed_at = payload.get("removed_at") or timezone.now()
 
@@ -418,46 +412,39 @@ def plant_replace(request, plant_id: UUID):
     else:
         new_plant_id = allocator.allocate(original.species)
 
-    requested_reuse_plant_id = bool(new_plant_id) and new_plant_id == original.plant_id
-    if requested_reuse_plant_id and not mark_original_removed:
+    if new_plant_id and Plant.objects.filter(
+        experiment=original.experiment,
+        plant_id=new_plant_id,
+    ).exists():
+        prefix_match = re.match(r"^([A-Za-z]+)-\\d+$", new_plant_id)
+        prefix = prefix_match.group(1).upper() if prefix_match else prefix_for_species(original.species)
         return Response(
-            {"detail": "Reusing plant_id requires mark_original_removed=true."},
-            status=400,
+            {
+                "detail": f"plant_id '{new_plant_id}' already exists in this experiment.",
+                "suggested_plant_id": _suggest_next_plant_id(original.experiment, prefix),
+            },
+            status=409,
         )
 
-    with transaction.atomic():
-        if requested_reuse_plant_id:
-            original.status = Plant.Status.REMOVED
-            original.removed_at = removed_at
-            original.removed_reason = removed_reason
-            original.save(update_fields=["status", "removed_at", "removed_reason", "updated_at"])
+    replacement = Plant.objects.create(
+        experiment=original.experiment,
+        species=original.species if copy_identity_fields else original.species,
+        plant_id=new_plant_id,
+        cultivar=original.cultivar if copy_identity_fields else None,
+        baseline_notes=original.baseline_notes if copy_identity_fields else "",
+        assigned_recipe=original.assigned_recipe if inherit_assignment else None,
+        grade=original.grade if inherit_grade else None,
+        status=Plant.Status.ACTIVE,
+    )
 
-        try:
-            replacement = Plant.objects.create(
-                experiment=original.experiment,
-                species=original.species,
-                plant_id=new_plant_id,
-                cultivar=original.cultivar if copy_identity_fields else None,
-                baseline_notes=original.baseline_notes if copy_identity_fields else "",
-                assigned_recipe=original.assigned_recipe if inherit_assignment else None,
-                bin=original.bin if inherit_bin else None,
-                status=Plant.Status.ACTIVE,
-            )
-        except IntegrityError as exc:
-            raise ValidationError(
-                f"plant_id '{new_plant_id}' already exists in this experiment."
-            ) from exc
-
-        if mark_original_removed and not requested_reuse_plant_id:
-            original.status = Plant.Status.REMOVED
-            original.removed_at = removed_at
-            original.removed_reason = removed_reason
-
-        original.replaced_by = replacement
-        update_fields = ["replaced_by", "updated_at"]
-        if mark_original_removed:
-            update_fields.extend(["status", "removed_at", "removed_reason"])
-        original.save(update_fields=update_fields)
+    original.replaced_by = replacement
+    if mark_original_removed:
+        original.status = Plant.Status.REMOVED
+        original.removed_at = removed_at
+        original.removed_reason = removed_reason
+        original.save(update_fields=["replaced_by", "status", "removed_at", "removed_reason", "updated_at"])
+    else:
+        original.save(update_fields=["replaced_by", "updated_at"])
 
     return Response(
         {
@@ -473,63 +460,9 @@ def plant_replace(request, plant_id: UUID):
                 "status": replacement.status,
                 "replaces_uuid": str(original.id),
                 "assigned_recipe_code": replacement.assigned_recipe.code if replacement.assigned_recipe else None,
-                "bin": replacement.bin,
+                "grade": replacement.grade,
                 "has_baseline": False,
             },
         },
         status=201,
-    )
-
-
-@api_view(["PUT"])
-def experiment_plants_packet(request, experiment_id: UUID):
-    rejection = _require_app_user(request)
-    if rejection:
-        return rejection
-
-    experiment = _get_experiment(experiment_id)
-    if experiment is None:
-        return Response({"detail": "Experiment not found."}, status=404)
-
-    serializer = PlantsPacketSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    setup_state = _get_or_create_setup_state(experiment)
-    payload = {
-        "id_format_notes": serializer.validated_data.get("id_format_notes", ""),
-    }
-    setup_state.packet_data[PACKET_PLANTS] = payload
-    setup_state.save(update_fields=["packet_data", "updated_at"])
-    return Response({"packet": PACKET_PLANTS, "data": payload})
-
-
-@api_view(["POST"])
-def complete_plants_packet(request, experiment_id: UUID):
-    rejection = _require_app_user(request)
-    if rejection:
-        return rejection
-
-    experiment = _get_experiment(experiment_id)
-    if experiment is None:
-        return Response({"detail": "Experiment not found."}, status=404)
-
-    if not Plant.objects.filter(experiment=experiment).exists():
-        return Response(
-            {
-                "detail": "Plants step cannot be completed.",
-                "errors": ["At least 1 plant is required before completing the Plants step."],
-            },
-            status=400,
-        )
-
-    setup_state = _get_or_create_setup_state(experiment)
-    completed = normalize_packet_ids([*setup_state.completed_packets, PACKET_PLANTS])
-    setup_state.completed_packets = completed
-    setup_state.current_packet = next_incomplete_packet(completed)
-    setup_state.save(update_fields=["completed_packets", "current_packet", "updated_at"])
-    return Response(
-        {
-            "current_packet": setup_state.current_packet,
-            "completed_packets": setup_state.completed_packets,
-            "packet_data": setup_state.packet_data,
-        }
     )

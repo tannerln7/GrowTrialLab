@@ -7,6 +7,7 @@ from uuid import UUID
 
 from django.utils import timezone
 
+from .contracts import list_envelope
 from .models import (
     Experiment,
     Plant,
@@ -95,7 +96,7 @@ def build_scope_context(experiment: Experiment) -> ScopeContext:
     trays = {
         str(item.id): item
         for item in Tray.objects.filter(experiment=experiment)
-        .select_related("block__tent", "assigned_recipe")
+        .select_related("slot__tent", "assigned_recipe")
         .order_by("name")
     }
     plants = {
@@ -117,8 +118,8 @@ def build_scope_context(experiment: Experiment) -> ScopeContext:
         active_placements[plant_id] = placement
         tray_id = str(placement.tray.id)
         active_plants_by_tray[tray_id].add(plant_id)
-        if placement.tray.block and placement.tray.block.tent:
-            active_plants_by_tent[str(placement.tray.block.tent.id)].add(plant_id)
+        if placement.tray.slot and placement.tray.slot.tent:
+            active_plants_by_tent[str(placement.tray.slot.tent.id)].add(plant_id)
 
     return ScopeContext(
         tents=tents,
@@ -319,7 +320,7 @@ def plan_for_experiment(
         "days": normalized_days,
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
-        "slots": sorted_slots,
+        "slots": list_envelope(sorted_slots),
         "next_slot": {
             "date": next_slot["date"],
             "timeframe": next_slot["timeframe"],

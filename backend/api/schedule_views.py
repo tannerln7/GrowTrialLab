@@ -6,6 +6,7 @@ from django.db import transaction
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from .contracts import error_with_diagnostics, list_envelope
 from .models import Experiment, ScheduleAction, ScheduleRule, ScheduleScope
 from .schedules import (
     action_blockers,
@@ -137,9 +138,9 @@ def experiment_schedules(request, experiment_id: UUID):
         context = build_scope_context(experiment)
         return Response(
             {
-                "schedules": [
-                    _serialize_action(action, context=context, experiment=experiment) for action in actions
-                ]
+                "schedules": list_envelope(
+                    [_serialize_action(action, context=context, experiment=experiment) for action in actions]
+                )
             }
         )
 
@@ -186,9 +187,9 @@ def schedule_detail(request, schedule_id: UUID):
 
     if request.method == "DELETE":
         if action.experiment.lifecycle_state == Experiment.LifecycleState.RUNNING:
-            return Response(
-                {"detail": "Schedules cannot be deleted while the experiment is running."},
-                status=409,
+            return error_with_diagnostics(
+                "Schedules cannot be deleted while the experiment is running.",
+                diagnostics={"reason_counts": {"running": 1}},
             )
         action.delete()
         return Response(status=204)
