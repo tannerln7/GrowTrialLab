@@ -7,15 +7,15 @@ This file records architecture/product decisions and why they were made.
 - Canonical entry route: `/experiments/{id}`.
   - Redirect to `/experiments/{id}/setup` until bootstrap setup is complete.
   - Redirect to `/experiments/{id}/overview` once bootstrap setup is complete.
-- Canonical bootstrap setup scope: Plants, Tents+Blocks/Slots, Recipes only.
+- Canonical bootstrap setup scope: Plants, Tents+Slots, Recipes only.
 - Canonical readiness flows: `/experiments/{id}/baseline`, `/experiments/{id}/placement`, `/experiments/{id}/rotation`, `/experiments/{id}/feeding`, and `/experiments/{id}/schedule`, launched from Overview.
-- Assignment page remains available for legacy recipe/group tooling, but tray-level placement is now the canonical recipe-assignment source for operations (`Tray.assigned_recipe`).
+- Recipe management is experiment-scoped (`/experiments/{id}/recipes`), and tray-level assignment is canonical for operations (`Tray.assigned_recipe`).
 - Lifecycle prerequisite policy: deletion gating and strict immutability are deferred until lifecycle primitives (`draft`/`running`/`stopped`) exist.
-- Terminology policy: API/DB key `bin` remains stable, but user-facing UI copy uses **Grade**.
+- Terminology policy: plant grading is canonical as `grade` across DB/API/UI.
 
 ## Lifecycle Implications (Planned)
 - Intended freeze scope once an experiment is `running`:
-  - slots/blocks structure, recipes, selected baseline template scope, experiment structural identity, placement structure
+  - slots structure, recipes, selected baseline template scope, experiment structural identity, placement structure
 - Intended mutable scope while `running`:
   - notes, photos, events, remove/replace plant actions, operational annotations
 - Deferred until lifecycle is implemented:
@@ -23,6 +23,22 @@ This file records architecture/product decisions and why they were made.
   - backend-enforced immutability rules tied to lifecycle transitions
 
 ## Decision Entries
+
+### 2026-02-16: Envelope-first API contracts + slot/grade canonical schema
+- Decision: Standardize API contracts around expandable envelopes and nested location objects:
+  - list shape: `{ count, results, meta }`
+  - blocked operations: `{ detail, diagnostics }`
+  - location shape: `{ location: { status, tent, slot, tray } }`
+  - tent layout shape: `{ schema_version: 1, shelves: [{ index, tray_count }] }`
+- Decision: Complete schema cleanup for current product vision:
+  - `Block -> Slot`
+  - `Plant.bin -> Plant.grade`
+  - remove packet/setup-state and groups/randomization compatibility endpoints
+- Rationale: Database is disposable in dev; canonical contracts reduce payload drift and keep future additions additive instead of breaking.
+- Invariants:
+  - Slot coordinates are canonical identity for ordering/display/code.
+  - Slot coordinates are immutable via PATCH; coordinate changes happen only through `POST /api/v1/tents/{id}/slots/generate`.
+  - Slot regeneration in `draft|stopped` supports safe reshape (occupied coordinates must remain valid) and returns orphan diagnostics when blocked.
 
 ### 2026-02-13: Backend stack is Django + DRF on Postgres
 - Decision: Use Django as core backend framework, DRF for APIs, and Postgres as the DB.
@@ -44,6 +60,11 @@ This file records architecture/product decisions and why they were made.
 - Rationale: Avoids browser-side hardcoded `localhost:8000` failures when operators open the app from other LAN devices via `http://<host-ip>:3000`.
 - Notes: Local compose defaults are intentionally dev-oriented (`NEXT_BACKEND_ORIGIN=http://backend:8000`, permissive `DJANGO_ALLOWED_HOSTS` override). Production must set strict host/origin values.
 - Follow-up: Rewrite config preserves trailing slashes for `/api/:path*/` so DRF list routes do not enter slash-normalization redirect loops.
+
+### 2026-02-14: Dev DB reset must not run concurrent migration processes
+- Decision: `infra/scripts/reset-dev.sh` now waits for backend health after `docker compose up` and does not run a second explicit `manage.py migrate`.
+- Rationale: Backend startup already runs migrations/bootstrapping; a concurrent second migrate process can race on migration schema creation and fail with Postgres unique violations.
+- Notes: Script now treats backend `/healthz` readiness as completion signal for reset flow.
 
 ### 2026-02-13: Auth model is Cloudflare Access JWT verification + invite-only users
 - Decision: Verify `Cf-Access-Jwt-Assertion` server-side; do not trust headers alone; unknown users denied unless bootstrap admin path applies.
@@ -77,7 +98,7 @@ This file records architecture/product decisions and why they were made.
 - Refs: `5571d379`, `2f919969`, `d0467ff4`.
 
 ### 2026-02-14: Baseline step lock is a UI-only guardrail in v1
-- Decision: Keep baseline lock state and lock endpoints for workflow signaling, but do not enforce lock-based write denial in backend baseline/bin APIs.
+- Decision: Keep baseline lock state and lock endpoints for workflow signaling, but do not enforce lock-based write denial in backend baseline/grade APIs.
 - Rationale: Reduces v1 complexity and avoids backend unlock override paths while preserving UX-level accidental-edit protection.
 - Refs: `de058638`, `1cf9c9e6`, `e68610fc`.
 - Caution: Audit-grade integrity will require backend-enforced lock rules in a later phase.
@@ -99,7 +120,7 @@ This file records architecture/product decisions and why they were made.
 - Caution: Strong integrity controls (auditable lock enforcement) remain a post-v1 hardening item.
 
 ### 2026-02-14: Experiment Overview is the primary roster/work queue surface
-- Decision: Add `/experiments/{id}/overview` backed by `GET /api/v1/experiments/{id}/overview/plants` to centralize plant queue triage (needs baseline/bin/assignment, active, removed) and search.
+- Decision: Add `/experiments/{id}/overview` backed by `GET /api/v1/experiments/{id}/overview/plants` to centralize plant queue triage (needs baseline/grade/placement/tray recipe, active, removed) and search.
 - Rationale: Operators need one mobile-first page to identify what requires action before entering specific step flows.
 - Refs: `51a32d99`, `65f84632`, `12517df6`.
 
@@ -109,7 +130,7 @@ This file records architecture/product decisions and why they were made.
 - Refs: `310f00b5`, `41599236`, `669ae104`.
 
 ### 2026-02-14: Setup is bootstrap-only and hidden after completion
-- Decision: Reduce setup to three bootstrap checks only (Plants, Blocks/Slots, Recipes). Once complete, `/experiments/{id}/setup` redirects to overview and no normal navigation links point back to setup.
+- Decision: Reduce setup to three bootstrap checks only (Plants, Tents+Slots, Recipes). Once complete, `/experiments/{id}/setup` redirects to overview and no normal navigation links point back to setup.
 - Rationale: Operators should complete setup quickly, then work from overview readiness actions instead of a long multi-step wizard.
 - Refs: `f2b49938`, `c61be2e7`.
 - API support: `GET /api/v1/experiments/{id}/status/summary` (`ee000fab`, `c8b7db72`, `d302abd6`).
@@ -152,7 +173,7 @@ This file records architecture/product decisions and why they were made.
 - Decision: Implement overview-launched rotation logging on `/experiments/{id}/rotation` with `GET /rotation/summary` and `POST /rotation/log`.
 - Rationale: Operators need a low-friction way to capture tray moves during active runs without introducing weekly scheduler/due logic.
 - Refs: `3b52663c`, `9798c9fe`, `ec06d079`, `b80218ae`.
-- Notes: Rotation logging rejects non-running lifecycle states (`409`) and updates `Tray.block` to the destination block as the canonical current location.
+- Notes: Rotation logging rejects non-running lifecycle states (`409`) and updates `Tray.slot` to the destination slot as the canonical current location.
 
 ### 2026-02-14: Feeding MVP is running-only queue logging launched from Overview/Cockpit
 - Decision: Implement feeding workflow on `/experiments/{id}/feeding` plus plant-level `POST /api/v1/plants/{uuid}/feed`, with queue source `GET /api/v1/experiments/{id}/feeding/queue` and history via `GET /api/v1/plants/{uuid}/feeding/recent`.
@@ -184,42 +205,41 @@ This file records architecture/product decisions and why they were made.
 - UX impact: Overview readiness/actions and feeding queue now surface placement/tray-recipe blockers directly.
 
 ### 2026-02-14: Multi-tent hierarchy is first-class and restrictions are backend-enforced
-- Decision: Physical hierarchy is now `Tent -> Block -> Tray -> Plant`; blocks belong to tents and experiments can manage multiple tents. Tent-level `allowed_species` restrictions are enforced server-side for both `POST /api/v1/trays/{tray_id}/plants` and `POST /api/v1/experiments/{id}/rotation/log` destination moves.
+- Decision: Physical hierarchy is now `Tent -> Slot -> Tray -> Plant`; slots belong to tents and experiments can manage multiple tents. Tent-level `allowed_species` restrictions are enforced server-side for both `POST /api/v1/trays/{tray_id}/plants` and `POST /api/v1/experiments/{id}/rotation/log` destination moves.
 - Rationale: Multi-tent operations require explicit structure and hard validation to prevent accidental placement/moves into incompatible environments.
 - Refs: `cd9e2cf6`, `4e74e10d`, `8157c551`.
 - Invariants:
   - Empty `tent.allowed_species` means unrestricted; non-empty means only listed species allowed.
-  - Restrictions apply when a tray is in a block/tent; unplaced trays are not restriction-checked until placement/move.
-  - `GET /api/v1/experiments/{id}/status/summary` now includes tent-aware readiness (`needs_tent_restriction`) and setup requires tents + blocks.
+  - Restrictions apply when a tray is in a slot/tent; unplaced trays are not restriction-checked until placement/move.
+  - `GET /api/v1/experiments/{id}/status/summary` now includes tent-aware readiness (`needs_tent_restriction`) and setup requires tents + slots.
 
 ### 2026-02-14: Placement choices are now restriction-aware and tray-capacity-aware by default
-- Decision: Placement and rotation UIs now show only valid destination options (tented blocks + restriction-compatible blocks), while backend enforces the same rules with explicit 409s. Tray capacity is first-class (`Tray.capacity`) and enforced on placement writes.
+- Decision: Placement and rotation UIs now show only valid destination options (tented slots + restriction-compatible slots), while backend enforces the same rules with explicit 409s. Tray capacity is first-class (`Tray.capacity`) and enforced on placement writes.
 - Rationale: Operators should not be asked to choose impossible options; invalid choices are filtered out up front, with inline “why blocked” hints when no valid destination exists.
 - Refs: `35513ef9`, `ee65db44`, `edcc4142`.
 - Invariants:
   - `POST /api/v1/trays/{tray_id}/plants` returns `409` when tray is full (`Tray is full (capacity N).`) and still enforces tent restrictions.
-  - `PATCH /api/v1/trays/{id}/` validates destination block compatibility against tray contents and enforces one tray per block.
+  - `PATCH /api/v1/trays/{id}/` validates destination slot compatibility against tray contents and enforces one tray per slot.
   - `POST /api/v1/experiments/{id}/placement/auto` is deterministic and now returns structured unplaceable diagnostics (`reason_counts`, `unplaceable_plants`) instead of opaque failures.
 - UX alignment:
-  - Placement/rotation pickers exclude non-compatible blocks.
+  - Placement/rotation pickers exclude non-compatible slots.
   - Add-plant tray pickers are filtered by tent restrictions and tray capacity.
-  - Create forms prefill suggested IDs (`TN*`, `B*`, `TR*`, and category-derived plant IDs).
+  - Create forms prefill suggested IDs (`TN*`, `S*`, `TR*`, and category-derived plant IDs).
 
 ### 2026-02-14: Plant location context is surfaced directly in overview and cockpit
-- Decision: Extend overview/cockpit payloads with derived location fields (`tent_*`, `block_*`, `tray_*`, tray occupancy) and render tent/tray-aware grouping in the overview queue.
+- Decision: Extend overview/cockpit payloads with nested `location` fields (`tent`, `slot`, `tray`, tray occupancy) and render tent/tray-aware grouping in the overview queue.
 - Rationale: Operators need immediate physical context (where a plant is) without opening placement pages or making additional API calls.
 - Routes/APIs: `GET /api/v1/experiments/{id}/overview/plants`, `GET /api/v1/plants/{uuid}/cockpit`, `/experiments/{id}/overview`, `/p/{uuid}`.
 - Notes: Overview sorting/grouping is deterministic (tent, tray, plant ID) with a dedicated unplaced section.
 
-### 2026-02-14: UI terminology uses Grade while backend contract keeps bin
-- Decision: Rename user-facing `Bin`/`Needs Bin` labels to `Grade`/`Needs Grade` in overview, baseline, cockpit, placement, and assignment screens while keeping backend keys unchanged.
-- Rationale: Avoids confusion between biological grading (`bin`) and physical container concepts (tray/bin language).
-- Scope: UI copy only; no DB/schema/API key rename.
+### 2026-02-16: Grade terminology is now canonical in schema and API
+- Decision: Complete rename to `grade` (DB fields, serializers, API payloads, and UI copy).
+- Rationale: Removes bin/container ambiguity and avoids long-term dual-term maintenance costs.
 
-### 2026-02-14: Legacy assignment compatibility remains temporarily
-- Decision: Keep Groups endpoints and `Plant.assigned_recipe` writes for backward compatibility while new readiness/feeding flows rely on tray-derived assignment.
-- Rationale: Avoids risky endpoint churn while migration to tray-canonical behavior is completed.
-- Refs: `fec05082`.
+### 2026-02-16: Plant setup favors preset species selection with manual fallback
+- Decision: `/experiments/{id}/plants` manual add flow now includes a dropdown of common carnivorous plant presets that autofill species/category/cultivar, plus a `Custom (not listed)` option for manual entry.
+- Rationale: Reduces repetitive typing and data-entry mistakes during bootstrap while preserving flexibility for uncommon plants.
+- Constraints: Quantity and baseline notes remain manual inputs; Plant ID keeps existing auto-suggestion/auto-iteration behavior with optional manual override.
 
 ### 2026-02-13: Uploads stored in `/data/uploads` with local bind mount
 - Decision: Keep media under container path `/data/uploads`, mapped to host `./data/uploads` in local compose.
@@ -253,9 +273,10 @@ This file records architecture/product decisions and why they were made.
 - Decision: Add `ExperimentSetupState` with stable step keys and per-step data storage.
 - Rationale: Enabled early incremental setup delivery while preserving compatibility.
 - Refs: `94f306a2`, `80789485`, `948a8a7a`.
-- Legacy compatibility details: model fields and payload keys still use `current_packet`, `completed_packets`, `locked_packets`, `packet_data`.
+- Legacy compatibility details: this packet-era state machine has now been removed in favor of bootstrap/readiness summaries.
 
 ### 2026-02-14: Setup naming migration kept backend keys stable (later superseded by bootstrap-only setup)
 - Decision: UI moved away from packet naming while backend keys and `/packets/*` endpoints stayed stable for compatibility; later UX simplified to bootstrap-only setup.
 - Rationale: Avoided data migration risk while reducing setup complexity.
 - Refs: `a6b19d01`, `ea4373b7`.
+- Status: superseded by the envelope-first cleanup that removed packet endpoints and packet-era setup state.

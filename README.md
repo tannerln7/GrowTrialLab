@@ -7,7 +7,7 @@ Monorepo scaffold for local development with:
 
 Experiment flow summary:
 - `/experiments/{id}` is the canonical experiment entry route.
-- It redirects to `/experiments/{id}/setup` until bootstrap setup is complete (plants + blocks + recipes).
+- It redirects to `/experiments/{id}/setup` until bootstrap setup is complete (plants + tents/slots + recipes).
 - After bootstrap setup, it redirects to `/experiments/{id}/overview` for readiness work (baseline + placement/tray recipes + feeding).
 
 ## Quick start
@@ -108,7 +108,7 @@ What it runs:
 - Detects the actual Postgres volume name from `docker compose config --format json`
 - `docker volume rm -f <detected_postgres_volume>`
 - `docker compose up --build -d`
-- `docker compose exec -T backend uv run python manage.py migrate`
+- waits for backend health at `http://localhost:8000/healthz` while backend startup runs migrations/bootstrap
 
 ## Auth behavior
 

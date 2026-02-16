@@ -18,30 +18,30 @@ Status convention:
 - Canonical navigation starts at `/experiments/{id}`:
   - Redirects to `/experiments/{id}/setup` while bootstrap setup is incomplete.
   - Redirects to `/experiments/{id}/overview` after bootstrap setup is complete.
-- Bootstrap setup is intentionally minimal: Plants, Blocks/Slots, and Recipes.
-  - Slots now means Tents + Blocks (physical hierarchy: Tent -> Block -> Tray -> Plant).
+- Bootstrap setup is intentionally minimal: Plants, Tents + Slots, and Recipes.
+  - Physical hierarchy is `Tent -> Slot -> Tray -> Plant`.
 - Readiness work happens from Overview and dedicated pages:
   - Baseline capture: `/experiments/{id}/baseline`
   - Placement: `/experiments/{id}/placement`
   - Rotation: `/experiments/{id}/rotation`
   - Feeding: `/experiments/{id}/feeding`
   - Schedule: `/experiments/{id}/schedule`
-- Terminology note: API/DB field `bin` remains unchanged for compatibility, but UI presents it as **Grade** to avoid confusion with physical tray/bin containers.
-- Assignment route (`/experiments/{id}/assignment`) remains for legacy recipe/group tooling, but tray placement (`Tray.assigned_recipe`) is the canonical recipe-assignment source for start/readiness/feeding.
+- Terminology note: Plant grading is now canonical as `grade` across DB, API, and UI.
+- Assignment randomization/groups compatibility layers were removed; experiment-scoped `Recipe` CRUD remains and tray recipe assignment (`Tray.assigned_recipe`) is canonical for readiness/feeding.
 - Experiment lifecycle is being introduced as a prerequisite for future delete-gating/immutability:
   - `draft` -> `running` -> `stopped` (archive deferred)
 
 ## Lifecycle Implications
 - Future freeze scope once running (deferred policy enforcement after lifecycle lands):
-  - slots/blocks structure, recipes, metric template selection, experiment identity/structure, placement structure
+  - slots structure, recipes, metric template selection, experiment identity/structure, placement structure
 - Still editable while running (intended):
   - notes, photos, events, removed/replacement status changes, operational annotations
 - Deletion gating and hard immutability rules are intentionally deferred until lifecycle primitives exist.
 
 ## Current Status Summary
-The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Setup is now bootstrap-only (Plants, Tents+Blocks/Slots, Recipes), and readiness workflows (baseline + placement/tray recipes + feeding) are centered in Overview and dedicated pages.
+The repo has a working monorepo foundation with Docker Compose, Django + DRF backend, Next.js App Router frontend, Cloudflare Access invite-only auth, and a mobile-first dark UI baseline. Setup is now bootstrap-only (Plants, Tents+Slots, Recipes), and readiness workflows (baseline + placement/tray recipes + feeding) are centered in Overview and dedicated pages.
 
-Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. Baseline and Groups/Assignment are implemented with UI-only lock semantics, `/p/{uuid}` now functions as a mobile-first plant cockpit/task launcher, and Scheduling MVP provides timeframe-based recurring action planning with grouped upcoming slots.
+Core domain models and CRUD endpoints exist, plus PWA baseline assets (manifest/icons/custom `sw.js` and `/offline`). QR labels resolve to an in-app plant page and labels encode absolute URLs. `/p/{uuid}` now functions as a mobile-first plant cockpit/task launcher, and Scheduling MVP provides timeframe-based recurring action planning with grouped upcoming slots.
 
 The largest remaining V1 work is lifecycle hardening (immutability/deletion policies), production-hardening/security/deployment details, and operational guardrails (backups, stricter step-lock governance, reporting/export paths).
 
@@ -57,7 +57,10 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Notes: Frontend now uses same-origin requests + Next rewrites to backend (`NEXT_BACKEND_ORIGIN`), replacing browser `localhost:8000` dependency. Rewrite rules preserve trailing slashes for DRF list routes to avoid proxy redirect loops.
 - [x] Local dev DB reset script for clean-state validation (owner: Codex)
   - Refs: `b8ac31e9`
-  - Notes: `infra/scripts/reset-dev.sh` safely resets local compose Postgres volume, rebuilds stack, and runs migrations.
+  - Notes: `infra/scripts/reset-dev.sh` safely resets local compose Postgres volume, rebuilds stack, and waits for backend health while backend startup runs migrations/bootstrap.
+- [x] Envelope-first API + Slot/Grade schema refactor (owner: Codex)
+  - Routes: `POST /api/v1/tents/{id}/slots/generate`, `GET /api/v1/experiments/{id}/recipes`, `PATCH /api/v1/recipes/{id}`, `GET /api/v1/experiments/{id}/overview/plants`, `GET /api/v1/plants/{id}/cockpit`, `GET /api/v1/experiments/{id}/feeding/queue`, `GET /api/v1/experiments/{id}/rotation/summary`.
+  - Notes: Legacy packet/groups contracts were removed; list responses now use `{count, results, meta}`, location payloads use nested `location`, blocked operations use structured `diagnostics`, slots use versioned tent `layout` with safe-reshape regeneration rules, and plant grading is canonical `grade`.
 - [x] Cloudflare Access auth middleware with invite-only provisioning and bootstrap admin (owner: Codex)
   - Refs: `262849c8`, `bba65cd9`, `f00306e5`
   - Routes: `GET /api/me`, middleware exemption `GET /healthz`.
@@ -85,6 +88,7 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
 - [x] Plants frontend + plants list UX (owner: Codex)
   - Refs: `53ace4f8`
   - Routes: `/experiments/{id}/setup`, `/experiments/{id}/plants`.
+  - Notes: Manual plant add now supports a carnivorous-plant preset dropdown that autofills species/category/cultivar with a custom manual fallback; quantity, baseline notes, and Plant ID remain operator-entered with existing ID suggestion behavior.
 - [x] UI placeholder foundation and illustration inventory tracking (owner: Codex)
   - Refs: `62e4a898`
   - Notes: `IllustrationPlaceholder`, `AppMarkPlaceholder`, `docs/ui-illustration-inventory.md`.
@@ -115,7 +119,7 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Notes: Baseline page now supports queue mode (`remaining_count`, next-missing navigation, and save-and-next flow) using `GET /api/v1/experiments/{id}/baseline/queue`.
 - [x] Baseline lock semantics switched to UI-only guardrail (owner: Codex)
   - Refs: `de058638`, `1cf9c9e6`, `e68610fc`
-  - Notes: Backend no longer returns lock-based 403 for baseline/bin edits; baseline page is read-only by default when locked and supports local unlock/re-lock.
+  - Notes: Backend no longer returns lock-based 403 for baseline/grade edits; baseline page is read-only by default when locked and supports local unlock/re-lock.
 - [x] Groups/Assignment APIs with deterministic stratified assignment (owner: Codex)
   - Refs: `a6b19d01`, `990b1c6b`
   - Routes: `GET /api/v1/experiments/{id}/groups/status`, `POST /api/v1/experiments/{id}/groups/recipes`, `PATCH /api/v1/experiments/{id}/groups/recipes/{recipe_id}`, `POST /api/v1/experiments/{id}/groups/preview`, `POST /api/v1/experiments/{id}/groups/apply`, `PUT /api/v1/experiments/{id}/packets/groups/`, `POST /api/v1/experiments/{id}/packets/groups/complete/`.
@@ -135,7 +139,7 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
 - [x] Experiment status summary endpoint for bootstrap/readiness gating (owner: Codex)
   - Refs: `ee000fab`, `c8b7db72`, `d302abd6`
   - Route: `GET /api/v1/experiments/{id}/status/summary`.
-  - Notes: Setup completeness checks plants/blocks/recipes only; readiness now tracks `needs_baseline`, `needs_placement`, and `needs_tray_recipe` on active plants.
+  - Notes: Setup completeness checks plants/tents+slots/recipes only; readiness now tracks `needs_baseline`, `needs_placement`, and `needs_tray_recipe` on active plants.
 - [x] Bootstrap-only setup checklist + dedicated slots and assignment pages (owner: Codex)
   - Refs: `f2b49938`, `a181325a`, `c61be2e7`
   - Routes: `/experiments/{id}/setup`, `/experiments/{id}/slots`, `/experiments/{id}/assignment`.
@@ -150,7 +154,7 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Notes: Cockpit adds sticky status strip, prioritized Now panel, inline photo upload, and recent activity preview while preserving safe back-to-overview behavior.
 - [x] Location-aware plant context and UI Grade terminology pass (owner: Codex)
   - Routes: `GET /api/v1/experiments/{id}/overview/plants`, `GET /api/v1/plants/{uuid}/cockpit`, `/experiments/{id}/overview`, `/p/{uuid}`, `/experiments/{id}/baseline`.
-  - Notes: Overview/cockpit payloads now include derived tent/block/tray location + tray occupancy fields; overview roster is grouped/sorted by tent and tray with an explicit Unplaced section; user-facing `Bin` labels are now `Grade` while API keys remain `bin`.
+  - Notes: Overview/cockpit payloads now include derived tent/slot/tray location + tray occupancy fields; overview roster is grouped/sorted by tent and tray with an explicit Unplaced section; grading terminology is now canonical as `grade`.
 - [x] Plant replacement workflow with remove/replace chain links (owner: Codex)
   - Refs: `20032471`, `eea577e4`, `153922e9`, `e0800082`, `74506afa`, `325a7667`, `9169ace1`
   - Routes: `POST /api/v1/plants/{uuid}/replace`, `GET /api/v1/plants/{uuid}/cockpit`, `GET /api/v1/experiments/{id}/overview/plants`.
@@ -162,19 +166,19 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
 - [x] Placement step MVP with tray composition workflow (owner: Codex)
   - Refs: `8f3f79c8`, `f9cb600a`, `dd7a6279`, `47eef321`, `b86db9f1`
   - Routes: `GET /api/v1/experiments/{id}/placement/summary`, `POST /api/v1/experiments/{id}/placement/auto`, `POST /api/v1/experiments/{id}/trays`, `PATCH /api/v1/trays/{id}/`, `POST /api/v1/trays/{id}/plants`, `DELETE /api/v1/trays/{id}/plants/{tray_plant_id}`, `/experiments/{id}/placement`.
-  - Notes: Enforces one-tray-per-plant, one-tray-per-block, tray-level recipe assignment, removed-plant placement rejection, and running-state placement mutation locks.
+  - Notes: Enforces one-tray-per-plant, one-tray-per-slot, tray-level recipe assignment, removed-plant placement rejection, and running-state placement mutation locks.
 - [x] Multi-tent hierarchy and species restriction enforcement (owner: Codex)
   - Refs: `cd9e2cf6`, `4e74e10d`, `8157c551`
-  - Routes: `GET/POST /api/v1/experiments/{id}/tents`, `PATCH/DELETE /api/v1/tents/{id}`, `GET/POST /api/v1/tents/{id}/blocks`, `POST /api/v1/tents/{id}/blocks/defaults`, `GET /api/v1/experiments/{id}/placement/summary`, `POST /api/v1/trays/{id}/plants`, `POST /api/v1/experiments/{id}/rotation/log`.
-  - Notes: Blocks now belong to tents; destination-tent species restrictions are enforced for tray placement and tray moves. Status summary/start readiness now include tent presence and tent-restriction compliance.
+  - Routes: `GET/POST /api/v1/experiments/{id}/tents`, `PATCH/DELETE /api/v1/tents/{id}`, `GET/POST /api/v1/tents/{id}/slots`, `POST /api/v1/tents/{id}/slots/generate`, `GET /api/v1/experiments/{id}/placement/summary`, `POST /api/v1/trays/{id}/plants`, `POST /api/v1/experiments/{id}/rotation/log`.
+  - Notes: Slots belong to tents; destination-tent species restrictions are enforced for tray placement and tray moves. Status summary/start readiness now include tent presence and tent-restriction compliance.
 - [x] Placement/rotation polish pass: valid-option filtering, tray capacity, and deterministic auto-place diagnostics (owner: Codex)
   - Refs: `35513ef9`, `ee65db44`, `edcc4142`
   - Routes: `POST /api/v1/experiments/{id}/placement/auto`, `GET /api/v1/experiments/{id}/placement/summary`, `POST /api/v1/experiments/{id}/trays`, `POST /api/v1/trays/{id}/plants`, `PATCH /api/v1/trays/{id}/`, `/experiments/{id}/placement`, `/experiments/{id}/rotation`, `/experiments/{id}/slots`, `/experiments/{id}/plants`.
-  - Notes: Tray capacity (`Tray.capacity`) is now enforced, placement/rotation destination selectors are restriction-filtered, auto-place returns structured unplaceable diagnostics, and create flows now prefill suggested IDs (`TN*`, `B*`, `TR*`, category-prefixed plant IDs).
+  - Notes: Tray capacity (`Tray.capacity`) is now enforced, placement/rotation destination selectors are restriction-filtered, auto-place returns structured unplaceable diagnostics, and create flows now prefill suggested IDs (`TN*`, `S*`, `TR*`, category-prefixed plant IDs).
 - [x] Rotation MVP with tray movement logs and recent history (owner: Codex)
   - Refs: `3b52663c`, `9798c9fe`, `ec06d079`, `b80218ae`
   - Routes: `GET /api/v1/experiments/{id}/rotation/summary`, `POST /api/v1/experiments/{id}/rotation/log`, `/experiments/{id}/rotation`.
-  - Notes: Rotation logging is allowed only for `running` lifecycle state and updates `Tray.block` as the canonical current location.
+  - Notes: Rotation logging is allowed only for `running` lifecycle state and updates `Tray.slot` as the canonical current location.
 - [x] Feeding MVP with running-only queue logging and cockpit entry (owner: Codex)
   - Refs: `90aa50fb`, `af3c5c71`, `6146269d`
   - Routes: `GET /api/v1/experiments/{id}/feeding/queue`, `POST /api/v1/plants/{uuid}/feed`, `GET /api/v1/plants/{uuid}/feeding/recent`, `/experiments/{id}/feeding`.
@@ -298,11 +302,9 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
 ## History / Legacy Appendix
 - Legacy setup naming migration (completed):
   - Refs: `a6b19d01`, `ea4373b7`
-  - Notes: User-facing packet wording was removed while backend compatibility keys/endpoints remained stable.
+  - Notes: User-facing packet wording was removed early; packet/state compatibility layers were removed in the envelope-first cleanup.
 - Legacy compatibility contracts still in use:
-  - `ExperimentSetupState` fields such as `current_packet`, `completed_packets`, `locked_packets`, `packet_data`.
-  - Compatibility endpoint family under `/api/v1/experiments/{id}/packets/...`.
-  - Route refs: `/packets/environment`, `/packets/plants`, `/packets/baseline`, `/packets/groups`.
+  - None. Packet/setup-state and groups/randomization compatibility endpoints were removed in favor of canonical setup/readiness + tray-based operations.
 
 ## Deferred Items (Explicitly Not in V1)
 - [ ] Native mobile apps (iOS/Android) separate from PWA.

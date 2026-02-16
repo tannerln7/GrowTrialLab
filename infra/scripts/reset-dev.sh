@@ -14,6 +14,11 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v curl >/dev/null 2>&1; then
+  echo "[reset-dev] curl is required to poll backend health."
+  exit 1
+fi
+
 COMPOSE_JSON="$(docker compose config --format json)"
 DB_VOLUME_KEY="$(
   echo "$COMPOSE_JSON" | jq -r '
@@ -58,7 +63,22 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 
-echo "[reset-dev] Running migrations explicitly..."
-docker compose exec -T backend uv run python manage.py migrate
+HEALTH_URL="${RESET_DEV_HEALTH_URL:-http://localhost:8000/healthz}"
+echo "[reset-dev] Waiting for backend health at $HEALTH_URL (migrations run on backend startup)..."
+healthy=0
+for _ in $(seq 1 180); do
+  if curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
+    healthy=1
+    break
+  fi
+  sleep 1
+done
+
+if [[ "$healthy" -ne 1 ]]; then
+  echo "[reset-dev] Backend did not become healthy in time."
+  echo "[reset-dev] Recent backend logs:"
+  docker compose logs --tail=120 backend || true
+  exit 1
+fi
 
 echo "[reset-dev] Done. Stack is running with a clean empty DB."
