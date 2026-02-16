@@ -6,7 +6,7 @@ export type ExperimentStatusSummary = {
     missing: {
       plants: boolean;
       tents: boolean;
-      blocks: boolean;
+      slots: boolean;
       recipes: boolean;
     };
   };
@@ -25,6 +25,10 @@ export type ExperimentStatusSummary = {
       needs_placement: number;
       needs_tray_recipe: number;
       needs_tent_restriction: number;
+    };
+    meta: {
+      reason_counts: Record<string, number>;
+      missing_setup: string[];
     };
   };
   schedule: {

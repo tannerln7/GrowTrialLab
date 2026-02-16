@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { backendFetch, normalizeBackendError } from "@/lib/backend";
+import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
@@ -16,59 +16,80 @@ import SectionCard from "@/src/components/ui/SectionCard";
 
 import styles from "../../experiments.module.css";
 
+type Location = {
+  status: "placed" | "unplaced";
+  tent: { id: string; code: string | null; name: string } | null;
+  slot: {
+    id: string;
+    code: string;
+    label: string;
+    shelf_index: number;
+    slot_index: number;
+  } | null;
+  tray: {
+    id: string;
+    code: string;
+    name: string;
+    capacity: number;
+    current_count: number;
+  } | null;
+};
+
 type RotationTray = {
   tray_id: string;
   tray_name: string;
-  current_block_id: string | null;
-  current_block_name: string | null;
-  current_tent_name: string | null;
+  location: Location;
   plant_count: number;
 };
 
 type RotationLog = {
   id: string;
   tray_name: string;
-  from_block_name: string | null;
-  to_block_name: string | null;
+  from_slot: { id: string; code: string; label: string; tent_name: string } | null;
+  to_slot: { id: string; code: string; label: string; tent_name: string } | null;
   occurred_at: string;
   note: string;
 };
 
 type RotationSummary = {
-  trays: RotationTray[];
-  recent_logs: RotationLog[];
+  trays: { count: number; results: RotationTray[]; meta: Record<string, unknown> };
+  recent_logs: { count: number; results: RotationLog[]; meta: Record<string, unknown> };
   unplaced_trays_count: number;
 };
 
-type BlockOption = {
-  id: string;
-  name: string;
-  label: string;
-  allowedSpeciesIds: Set<string> | null;
-};
-
-type TentResponse = {
-  id: string;
+type Species = { id: string; name: string; category: string };
+type Tent = {
+  tent_id: string;
   name: string;
   code: string;
-  allowed_species: Array<{
-    id: string;
+  allowed_species: Species[];
+  slots: Array<{
+    slot_id: string;
+    code: string;
+    label: string;
+    shelf_index: number;
+    slot_index: number;
   }>;
-  blocks: Array<{
-    id: string;
-    name: string;
+};
+
+type PlacementTray = {
+  tray_id: string;
+  plants: Array<{
+    species_id: string;
+    species_name: string;
+    species_category: string;
   }>;
 };
 
 type PlacementSummary = {
-  trays: Array<{
-    tray_id: string;
-    plants: Array<{
-      species_id: string;
-      species_name: string;
-      species_category: string;
-    }>;
-  }>;
+  tents: { count: number; results: Tent[]; meta: Record<string, unknown> };
+  trays: { count: number; results: PlacementTray[]; meta: Record<string, unknown> };
+};
+
+type SlotOption = {
+  id: string;
+  label: string;
+  allowedSpeciesIds: Set<string> | null;
 };
 
 function formatDateTime(value: string): string {
@@ -77,6 +98,13 @@ function formatDateTime(value: string): string {
     return value;
   }
   return date.toLocaleString();
+}
+
+function locationLabel(location: Location): string {
+  if (location.status !== "placed" || !location.slot || !location.tent) {
+    return "Unplaced";
+  }
+  return `${location.tent.code || location.tent.name} / ${location.slot.code}`;
 }
 
 export default function RotationPage() {
@@ -100,37 +128,36 @@ export default function RotationPage() {
   const [notice, setNotice] = useState("");
   const [statusSummary, setStatusSummary] = useState<ExperimentStatusSummary | null>(null);
   const [summary, setSummary] = useState<RotationSummary | null>(null);
-  const [blocks, setBlocks] = useState<BlockOption[]>([]);
+  const [slotOptions, setSlotOptions] = useState<SlotOption[]>([]);
   const [traySpeciesById, setTraySpeciesById] = useState<Record<string, string[]>>({});
   const [selectedTrayId, setSelectedTrayId] = useState("");
-  const [selectedToBlockId, setSelectedToBlockId] = useState("");
+  const [selectedToSlotId, setSelectedToSlotId] = useState("");
   const [note, setNote] = useState("");
 
   const running = statusSummary?.lifecycle.state === "running";
 
-  const compatibleBlocksForSelectedTray = useMemo(() => {
+  const compatibleSlotsForSelectedTray = useMemo(() => {
     if (!selectedTrayId) {
-      return blocks;
+      return slotOptions;
     }
     const speciesIds = traySpeciesById[selectedTrayId] || [];
     if (speciesIds.length === 0) {
-      return blocks;
+      return slotOptions;
     }
-    return blocks.filter((block) => {
-      if (block.allowedSpeciesIds === null) {
+    return slotOptions.filter((slot) => {
+      if (slot.allowedSpeciesIds === null) {
         return true;
       }
-      return speciesIds.every((speciesId) => block.allowedSpeciesIds?.has(speciesId));
+      return speciesIds.every((speciesId) => slot.allowedSpeciesIds?.has(speciesId));
     });
-  }, [blocks, selectedTrayId, traySpeciesById]);
+  }, [selectedTrayId, slotOptions, traySpeciesById]);
 
-  const selectedTrayBlocked = selectedTrayId !== "" && compatibleBlocksForSelectedTray.length === 0;
+  const selectedTrayBlocked = selectedTrayId !== "" && compatibleSlotsForSelectedTray.length === 0;
 
   const loadSummary = useCallback(async () => {
-    const [statusResponse, rotationResponse, tentsResponse, placementResponse] = await Promise.all([
+    const [statusResponse, rotationResponse, placementResponse] = await Promise.all([
       fetchExperimentStatusSummary(experimentId),
       backendFetch(`/api/v1/experiments/${experimentId}/rotation/summary`),
-      backendFetch(`/api/v1/experiments/${experimentId}/tents`),
       backendFetch(`/api/v1/experiments/${experimentId}/placement/summary`),
     ]);
     if (!statusResponse) {
@@ -139,34 +166,34 @@ export default function RotationPage() {
     if (!rotationResponse.ok) {
       throw new Error("Unable to load rotation summary.");
     }
-    if (!tentsResponse.ok) {
-      throw new Error("Unable to load tents.");
-    }
     if (!placementResponse.ok) {
       throw new Error("Unable to load placement summary.");
     }
-    setStatusSummary(statusResponse);
-    setSummary((await rotationResponse.json()) as RotationSummary);
-    const tents = (await tentsResponse.json()) as TentResponse[];
+
+    const rotationPayload = (await rotationResponse.json()) as RotationSummary;
     const placementPayload = (await placementResponse.json()) as PlacementSummary;
+
+    const tents = unwrapList<Tent>(placementPayload.tents);
+    const trays = unwrapList<PlacementTray>(placementPayload.trays);
+
+    setStatusSummary(statusResponse);
+    setSummary(rotationPayload);
+
     const nextTraySpeciesById: Record<string, string[]> = {};
-    for (const tray of placementPayload.trays) {
+    for (const tray of trays) {
       nextTraySpeciesById[tray.tray_id] = Array.from(new Set(tray.plants.map((plant) => plant.species_id)));
     }
     setTraySpeciesById(nextTraySpeciesById);
-    setBlocks(
-      tents.flatMap((tent) =>
-        tent.blocks.map((block) => ({
-          id: block.id,
-          name: block.name,
-          label: `${tent.name} / ${block.name}`,
-          allowedSpeciesIds:
-            tent.allowed_species.length === 0
-              ? null
-              : new Set(tent.allowed_species.map((species) => species.id)),
-        })),
-      ),
+
+    const nextSlots = tents.flatMap((tent) =>
+      tent.slots.map((slot) => ({
+        id: slot.slot_id,
+        label: `${tent.code || tent.name} / ${slot.code}`,
+        allowedSpeciesIds:
+          tent.allowed_species.length === 0 ? null : new Set(tent.allowed_species.map((species) => species.id)),
+      })),
     );
+    setSlotOptions(nextSlots);
   }, [experimentId]);
 
   useEffect(() => {
@@ -214,12 +241,12 @@ export default function RotationPage() {
       setError("Select a tray first.");
       return;
     }
-    if (selectedToBlockId && !compatibleBlocksForSelectedTray.some((block) => block.id === selectedToBlockId)) {
-      setError("Selected destination block is not compatible with this tray's plants.");
+    if (selectedToSlotId && !compatibleSlotsForSelectedTray.some((slot) => slot.id === selectedToSlotId)) {
+      setError("Selected destination slot is not compatible with this tray's plants.");
       return;
     }
     if (selectedTrayBlocked) {
-      setError("No compatible destination blocks for this tray.");
+      setError("No compatible destination slots for this tray.");
       return;
     }
 
@@ -232,7 +259,7 @@ export default function RotationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tray_id: selectedTrayId,
-          to_block_id: selectedToBlockId || null,
+          to_slot_id: selectedToSlotId || null,
           note: note.trim() || undefined,
         }),
       });
@@ -266,6 +293,9 @@ export default function RotationPage() {
     );
   }
 
+  const trays = summary ? unwrapList<RotationTray>(summary.trays) : [];
+  const recentLogs = summary ? unwrapList<RotationLog>(summary.recent_logs) : [];
+
   return (
     <PageShell
       title="Rotation"
@@ -283,9 +313,7 @@ export default function RotationPage() {
 
       {statusSummary ? (
         <SectionCard title="Experiment State">
-          <span className={styles.badgeWarn}>
-            {statusSummary.lifecycle.state.toUpperCase()}
-          </span>
+          <span className={styles.badgeWarn}>{statusSummary.lifecycle.state.toUpperCase()}</span>
         </SectionCard>
       ) : null}
 
@@ -306,13 +334,9 @@ export default function RotationPage() {
             <div className={styles.formGrid}>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Tray</span>
-                <select
-                  className={styles.select}
-                  value={selectedTrayId}
-                  onChange={(event) => setSelectedTrayId(event.target.value)}
-                >
+                <select className={styles.select} value={selectedTrayId} onChange={(event) => setSelectedTrayId(event.target.value)}>
                   <option value="">Select tray</option>
-                  {summary.trays.map((tray) => (
+                  {trays.map((tray) => (
                     <option key={tray.tray_id} value={tray.tray_id}>
                       {tray.tray_name}
                     </option>
@@ -320,33 +344,25 @@ export default function RotationPage() {
                 </select>
               </label>
               <label className={styles.field}>
-                <span className={styles.fieldLabel}>Destination block</span>
-                <select
-                  className={styles.select}
-                  value={selectedToBlockId}
-                  onChange={(event) => setSelectedToBlockId(event.target.value)}
-                >
+                <span className={styles.fieldLabel}>Destination slot</span>
+                <select className={styles.select} value={selectedToSlotId} onChange={(event) => setSelectedToSlotId(event.target.value)}>
                   <option value="">None / Unassigned</option>
-                  {compatibleBlocksForSelectedTray.map((block) => (
-                    <option key={block.id} value={block.id}>
-                      {block.label}
+                  {compatibleSlotsForSelectedTray.map((slot) => (
+                    <option key={slot.id} value={slot.id}>
+                      {slot.label}
                     </option>
                   ))}
                 </select>
                 {selectedTrayBlocked ? (
                   <p className={styles.inlineNote}>
-                    No compatible destination blocks for this tray. This tray contains plants not allowed in restricted tents.
+                    No compatible destination slots for this tray. This tray contains plants not allowed in restricted tents.
                     <Link href={`/experiments/${experimentId}/slots`}> Adjust tent restrictions</Link>.
                   </p>
                 ) : null}
               </label>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Note (optional)</span>
-                <textarea
-                  className={styles.textarea}
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                />
+                <textarea className={styles.textarea} value={note} onChange={(event) => setNote(event.target.value)} />
               </label>
               <button
                 className={styles.buttonPrimary}
@@ -360,21 +376,16 @@ export default function RotationPage() {
           </SectionCard>
 
           <SectionCard title="Current Tray Locations">
-            <p className={styles.mutedText}>
-              Unplaced trays: {summary.unplaced_trays_count}
-            </p>
+            <p className={styles.mutedText}>Unplaced trays: {summary.unplaced_trays_count}</p>
             <ResponsiveList
-              items={summary.trays}
+              items={trays}
               getKey={(tray) => tray.tray_id}
               columns={[
                 { key: "tray", label: "Tray", render: (tray) => tray.tray_name },
                 {
-                  key: "block",
-                  label: "Current Block",
-                  render: (tray) =>
-                    tray.current_block_name
-                      ? `${tray.current_tent_name || "Tent"} / ${tray.current_block_name}`
-                      : "Unassigned",
+                  key: "slot",
+                  label: "Current Slot",
+                  render: (tray) => locationLabel(tray.location),
                 },
                 { key: "count", label: "Plants", render: (tray) => tray.plant_count },
                 {
@@ -386,7 +397,7 @@ export default function RotationPage() {
                       type="button"
                       onClick={() => {
                         setSelectedTrayId(tray.tray_id);
-                        setSelectedToBlockId("");
+                        setSelectedToSlotId("");
                       }}
                     >
                       Move
@@ -398,8 +409,8 @@ export default function RotationPage() {
                 <div className={styles.cardKeyValue}>
                   <span>Tray</span>
                   <strong>{tray.tray_name}</strong>
-                  <span>Current block</span>
-                  <strong>{tray.current_block_name || "Unassigned"}</strong>
+                  <span>Current slot</span>
+                  <strong>{locationLabel(tray.location)}</strong>
                   <span>Plants</span>
                   <strong>{tray.plant_count}</strong>
                   <button
@@ -407,7 +418,7 @@ export default function RotationPage() {
                     type="button"
                     onClick={() => {
                       setSelectedTrayId(tray.tray_id);
-                      setSelectedToBlockId("");
+                      setSelectedToSlotId("");
                     }}
                   >
                     Move
@@ -419,15 +430,14 @@ export default function RotationPage() {
 
           <SectionCard title="Recent Moves">
             <ResponsiveList
-              items={summary.recent_logs}
+              items={recentLogs}
               getKey={(log) => log.id}
               columns={[
                 { key: "tray", label: "Tray", render: (log) => log.tray_name },
                 {
                   key: "from_to",
                   label: "Move",
-                  render: (log) =>
-                    `${log.from_block_name || "Unassigned"} -> ${log.to_block_name || "Unassigned"}`,
+                  render: (log) => `${log.from_slot?.label || "Unassigned"} -> ${log.to_slot?.label || "Unassigned"}`,
                 },
                 { key: "time", label: "Time", render: (log) => formatDateTime(log.occurred_at) },
                 { key: "note", label: "Note", render: (log) => log.note || "-" },
@@ -438,9 +448,9 @@ export default function RotationPage() {
                   <strong>{log.tray_name}</strong>
                   <span>Move</span>
                   <strong>
-                    {log.from_block_name || "Unassigned"}{" -> "}{
-                      log.to_block_name || "Unassigned"
-                    }
+                    {log.from_slot?.label || "Unassigned"}
+                    {" -> "}
+                    {log.to_slot?.label || "Unassigned"}
                   </strong>
                   <span>Time</span>
                   <strong>{formatDateTime(log.occurred_at)}</strong>

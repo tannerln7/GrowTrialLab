@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { backendFetch, normalizeBackendError } from "@/lib/backend";
+import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
@@ -64,34 +64,56 @@ type SchedulePlan = {
   start_date: string;
   end_date: string;
   due_counts_today: number;
-  slots: Array<{
-    date: string;
-    timeframe: Timeframe | null;
-    exact_time: string | null;
-    slot_label: string;
-    actions: ScheduleSlotAction[];
-  }>;
+  slots: {
+    count: number;
+    results: Array<{
+      date: string;
+      timeframe: Timeframe | null;
+      exact_time: string | null;
+      slot_label: string;
+      actions: ScheduleSlotAction[];
+    }>;
+    meta: Record<string, unknown>;
+  };
 };
 
 type PlacementSummary = {
-  tents: Array<{
-    tent_id: string;
-    name: string;
-    code: string;
-    allowed_species_count: number;
-    allowed_species: Array<{ id: string; name: string; category: string }>;
-  }>;
-  trays: Array<{
-    tray_id: string;
-    tray_name: string;
-    tent_id: string | null;
-    tent_name: string | null;
-    assigned_recipe_id: string | null;
-    assigned_recipe_code: string | null;
-    assigned_recipe_name: string | null;
-    current_count: number;
-    capacity: number;
-  }>;
+  tents: {
+    count: number;
+    results: Array<{
+      tent_id: string;
+      name: string;
+      code: string;
+      allowed_species_count: number;
+      allowed_species: Array<{ id: string; name: string; category: string }>;
+    }>;
+    meta: Record<string, unknown>;
+  };
+  trays: {
+    count: number;
+    results: Array<{
+      tray_id: string;
+      name: string;
+      assigned_recipe_id: string | null;
+      assigned_recipe_code: string | null;
+      assigned_recipe_name: string | null;
+      current_count: number;
+      capacity: number;
+      location: {
+        status: "placed" | "unplaced";
+        tent: { id: string; code: string | null; name: string } | null;
+        slot: { id: string; code: string; label: string } | null;
+        tray: { id: string; code: string; name: string; capacity: number; current_count: number } | null;
+      };
+      plants: Array<{
+        uuid: string;
+        species_id: string;
+        species_name: string;
+        species_category: string;
+      }>;
+    }>;
+    meta: Record<string, unknown>;
+  };
 };
 
 type OverviewPlant = {
@@ -102,13 +124,12 @@ type OverviewPlant = {
   status: string;
   assigned_recipe_id: string | null;
   assigned_recipe_code: string | null;
-  placed_tray_id: string | null;
-  tray_name: string | null;
-  tray_code: string | null;
-  block_name: string | null;
-  tent_id: string | null;
-  tent_code: string | null;
-  tent_name: string | null;
+  location: {
+    status: "placed" | "unplaced";
+    tent: { id: string; code: string | null; name: string } | null;
+    slot: { id: string; code: string; label: string } | null;
+    tray: { id: string; code: string; name: string } | null;
+  };
 };
 
 const ACTION_TYPE_OPTIONS: Array<{ value: ActionType; label: string }> = [
@@ -176,7 +197,7 @@ function actionTypeLabel(actionType: ActionType): string {
   return ACTION_TYPE_OPTIONS.find((item) => item.value === actionType)?.label ?? actionType;
 }
 
-function compactAllowedSpeciesLabel(tent: PlacementSummary["tents"][number]): string {
+function compactAllowedSpeciesLabel(tent: PlacementSummary["tents"]["results"][number]): string {
   if (tent.allowed_species_count === 0) {
     return "Any species";
   }
@@ -191,13 +212,13 @@ function compactAllowedSpeciesLabel(tent: PlacementSummary["tents"][number]): st
 }
 
 function trayRestrictionHint(
-  tray: PlacementSummary["trays"][number],
-  tentById: Map<string, PlacementSummary["tents"][number]>,
+  tray: PlacementSummary["trays"]["results"][number],
+  tentById: Map<string, PlacementSummary["tents"]["results"][number]>,
 ): string {
-  if (!tray.tent_id) {
+  if (!tray.location.tent?.id) {
     return "";
   }
-  const trayTent = tentById.get(tray.tent_id);
+  const trayTent = tentById.get(tray.location.tent.id);
   if (!trayTent || trayTent.allowed_species_count === 0) {
     return "";
   }
@@ -251,20 +272,20 @@ export default function ExperimentSchedulePage() {
   const [selectedScopeIds, setSelectedScopeIds] = useState<string[]>([]);
 
   const tentById = useMemo(() => {
-    const map = new Map<string, PlacementSummary["tents"][number]>();
-    for (const tent of placementSummary?.tents || []) {
+    const map = new Map<string, PlacementSummary["tents"]["results"][number]>();
+    for (const tent of placementSummary ? unwrapList<PlacementSummary["tents"]["results"][number]>(placementSummary.tents) : []) {
       map.set(tent.tent_id, tent);
     }
     return map;
-  }, [placementSummary?.tents]);
+  }, [placementSummary]);
 
   const trayById = useMemo(() => {
-    const map = new Map<string, PlacementSummary["trays"][number]>();
-    for (const tray of placementSummary?.trays || []) {
+    const map = new Map<string, PlacementSummary["trays"]["results"][number]>();
+    for (const tray of placementSummary ? unwrapList<PlacementSummary["trays"]["results"][number]>(placementSummary.trays) : []) {
       map.set(tray.tray_id, tray);
     }
     return map;
-  }, [placementSummary?.trays]);
+  }, [placementSummary]);
 
   const activePlants = useMemo(
     () => overviewPlants.filter((plant) => plant.status === "active"),
@@ -298,7 +319,7 @@ export default function ExperimentSchedulePage() {
     }
     if (scopeType === "TRAY") {
       const tray = trayById.get(firstScope);
-      return tray ? `Tray ${tray.tray_name}` : "Tray";
+      return tray ? `Tray ${tray.name}` : "Tray";
     }
     const plant = activePlants.find((item) => item.uuid === firstScope);
     return plant ? `Plant ${plant.plant_id || plant.uuid}` : "Plant";
@@ -332,7 +353,7 @@ export default function ExperimentSchedulePage() {
     } else if (scopeType === "TRAY") {
       for (const trayId of selectedScopeIds) {
         for (const plant of activePlants) {
-          if (plant.placed_tray_id === trayId) {
+          if (plant.location.tray?.id === trayId) {
             targetIds.add(plant.uuid);
           }
         }
@@ -340,7 +361,7 @@ export default function ExperimentSchedulePage() {
     } else {
       for (const tentId of selectedScopeIds) {
         for (const plant of activePlants) {
-          if (plant.tent_id === tentId) {
+          if (plant.location.tent?.id === tentId) {
             targetIds.add(plant.uuid);
           }
         }
@@ -353,7 +374,7 @@ export default function ExperimentSchedulePage() {
       if (!targetIds.has(plant.uuid)) {
         continue;
       }
-      if (!plant.placed_tray_id) {
+      if (plant.location.status !== "placed") {
         hasUnplaced = true;
       } else if (!plant.assigned_recipe_id) {
         hasMissingRecipe = true;
@@ -398,15 +419,19 @@ export default function ExperimentSchedulePage() {
       throw new Error("Unable to load schedules.");
     }
 
-    const schedulesPayload = (await schedulesResponse.json()) as { schedules: ScheduleAction[] };
+    const schedulesPayload = (await schedulesResponse.json()) as {
+      schedules: { count: number; results: ScheduleAction[]; meta: Record<string, unknown> };
+    };
     const planPayload = (await planResponse.json()) as SchedulePlan;
     const placementPayload = (await placementResponse.json()) as PlacementSummary;
-    const overviewPayload = (await overviewResponse.json()) as { plants: OverviewPlant[] };
+    const overviewPayload = (await overviewResponse.json()) as {
+      plants: { count: number; results: OverviewPlant[]; meta: Record<string, unknown> };
+    };
 
-    setActions(schedulesPayload.schedules);
+    setActions(unwrapList<ScheduleAction>(schedulesPayload.schedules));
     setPlan(planPayload);
     setPlacementSummary(placementPayload);
-    setOverviewPlants(overviewPayload.plants);
+    setOverviewPlants(unwrapList<OverviewPlant>(overviewPayload.plants));
   }, [daysWindow, experimentId, plantFilter, router]);
 
   useEffect(() => {
@@ -626,23 +651,23 @@ export default function ExperimentSchedulePage() {
   }
 
   const traysGroupedByTent = useMemo(() => {
-    const groups = new Map<string, Array<PlacementSummary["trays"][number]>>();
-    for (const tray of placementSummary?.trays || []) {
-      const tent = tray.tent_id ? tentById.get(tray.tent_id) : null;
+    const groups = new Map<string, Array<PlacementSummary["trays"]["results"][number]>>();
+    for (const tray of placementSummary ? unwrapList<PlacementSummary["trays"]["results"][number]>(placementSummary.trays) : []) {
+      const tent = tray.location.tent ? tentById.get(tray.location.tent.id) : null;
       const key = tent ? `Tent ${tent.code || tent.name}` : "Unplaced";
       const current = groups.get(key) || [];
       current.push(tray);
       groups.set(key, current);
     }
     return Array.from(groups.entries()).sort((left, right) => left[0].localeCompare(right[0]));
-  }, [placementSummary?.trays, tentById]);
+  }, [placementSummary, tentById]);
 
   const plantsGroupedByLocation = useMemo(() => {
     const groups = new Map<string, OverviewPlant[]>();
     for (const plant of activePlants) {
-      const tentLabel = plant.tent_code || plant.tent_name || "Unplaced";
-      const trayLabel = plant.tray_code || plant.tray_name || "Unplaced";
-      const key = plant.placed_tray_id
+      const tentLabel = plant.location.tent?.code || plant.location.tent?.name || "Unplaced";
+      const trayLabel = plant.location.tray?.code || plant.location.tray?.name || "Unplaced";
+      const key = plant.location.tray?.id
         ? `Tent ${tentLabel} > Tray ${trayLabel}`
         : "Unplaced";
       const current = groups.get(key) || [];
@@ -694,9 +719,9 @@ export default function ExperimentSchedulePage() {
             14 days
           </button>
         </div>
-        {plan?.slots.length ? (
+        {plan && unwrapList<SchedulePlan["slots"]["results"][number]>(plan.slots).length ? (
           <div className={styles.blocksList}>
-            {plan.slots.map((slot) => (
+            {unwrapList<SchedulePlan["slots"]["results"][number]>(plan.slots).map((slot) => (
               <article className={styles.blockRow} key={`${slot.date}-${slot.exact_time || slot.timeframe}`}>
                 <strong>{formatSlotTitle(slot.date, slot.timeframe, slot.exact_time)}</strong>
                 <div className={styles.stack}>
@@ -992,7 +1017,7 @@ export default function ExperimentSchedulePage() {
 
           {scopeType === "TENT" ? (
             <div className={styles.blocksList}>
-              {placementSummary?.tents.map((tent) => (
+              {(placementSummary ? unwrapList<PlacementSummary["tents"]["results"][number]>(placementSummary.tents) : []).map((tent) => (
                 <label className={styles.checkboxRow} key={tent.tent_id}>
                   <input
                     type="checkbox"
@@ -1004,7 +1029,7 @@ export default function ExperimentSchedulePage() {
                   </span>
                 </label>
               ))}
-              {placementSummary?.tents.length === 0 ? (
+              {(placementSummary ? unwrapList<PlacementSummary["tents"]["results"][number]>(placementSummary.tents).length : 0) === 0 ? (
                 <p className={styles.inlineNote}>No tents available yet. Add tents in Slots.</p>
               ) : null}
             </div>
@@ -1023,7 +1048,7 @@ export default function ExperimentSchedulePage() {
                         onChange={() => toggleScopeSelection(tray.tray_id)}
                       />
                       <span>
-                        Tray {tray.tray_name} ({tray.current_count}/{tray.capacity}){" "}
+                        Tray {tray.name} ({tray.current_count}/{tray.capacity}){" "}
                         {tray.assigned_recipe_code
                           ? `· ${tray.assigned_recipe_code}`
                           : "· Missing tray recipe"}
@@ -1035,7 +1060,7 @@ export default function ExperimentSchedulePage() {
                   ))}
                 </article>
               ))}
-              {(placementSummary?.trays.length || 0) === 0 ? (
+              {(placementSummary ? unwrapList<PlacementSummary["trays"]["results"][number]>(placementSummary.trays).length : 0) === 0 ? (
                 <p className={styles.inlineNote}>No trays available yet. Add trays in Placement.</p>
               ) : null}
             </div>
@@ -1055,7 +1080,7 @@ export default function ExperimentSchedulePage() {
                       />
                       <span>
                         {plant.plant_id || "(pending)"} · {plant.species_name} ·{" "}
-                        {plant.tray_code || plant.tray_name || "Unplaced"}
+                        {plant.location.tray?.code || plant.location.tray?.name || "Unplaced"}
                       </span>
                     </label>
                   ))}

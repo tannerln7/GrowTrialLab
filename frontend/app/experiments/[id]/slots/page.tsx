@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
-import { suggestBlockName, suggestTentCode, suggestTentName } from "@/lib/id-suggestions";
+import { suggestTentCode, suggestTentName } from "@/lib/id-suggestions";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
@@ -18,11 +18,12 @@ type Species = {
   category: string;
 };
 
-type TentBlock = {
+type Slot = {
   id: string;
-  name: string;
-  description: string;
-  tray_count: number;
+  shelf_index: number;
+  slot_index: number;
+  code: string;
+  label: string;
 };
 
 type Tent = {
@@ -31,8 +32,19 @@ type Tent = {
   code: string;
   notes: string;
   allowed_species: Species[];
-  blocks: TentBlock[];
+  layout: {
+    schema_version: number;
+    shelves: Array<{ index: number; tray_count: number }>;
+  };
+  slots: Slot[];
 };
+
+function buildDefaultShelves(tent: Tent): number[] {
+  if (tent.layout?.schema_version === 1 && Array.isArray(tent.layout.shelves)) {
+    return tent.layout.shelves.map((shelf) => shelf.tray_count);
+  }
+  return [4];
+}
 
 export default function ExperimentSlotsPage() {
   const params = useParams();
@@ -54,26 +66,16 @@ export default function ExperimentSlotsPage() {
   const [notice, setNotice] = useState("");
   const [tents, setTents] = useState<Tent[]>([]);
   const [species, setSpecies] = useState<Species[]>([]);
-  const [speciesSearch, setSpeciesSearch] = useState("");
   const [newTentName, setNewTentName] = useState("");
   const [newTentCode, setNewTentCode] = useState("");
-  const [newBlockNameByTent, setNewBlockNameByTent] = useState<Record<string, string>>({});
-  const [newBlockDescByTent, setNewBlockDescByTent] = useState<Record<string, string>>({});
-
-  const filteredSpecies = useMemo(() => {
-    const q = speciesSearch.trim().toLowerCase();
-    if (!q) {
-      return species;
-    }
-    return species.filter((item) => item.name.toLowerCase().includes(q));
-  }, [species, speciesSearch]);
+  const [shelfCountsByTent, setShelfCountsByTent] = useState<Record<string, number[]>>({});
 
   const tentNameSuggestion = useMemo(
-    () => suggestTentName(tents.map((item) => item.name)),
+    () => suggestTentName(tents.map((tent) => tent.name)),
     [tents],
   );
   const tentCodeSuggestion = useMemo(
-    () => suggestTentCode(tents.map((item) => item.code)),
+    () => suggestTentCode(tents.map((tent) => tent.code)),
     [tents],
   );
 
@@ -82,6 +84,7 @@ export default function ExperimentSlotsPage() {
       backendFetch(`/api/v1/experiments/${experimentId}/tents`),
       backendFetch("/api/v1/species/"),
     ]);
+
     if (!tentsResponse.ok) {
       throw new Error("Unable to load tents.");
     }
@@ -89,10 +92,21 @@ export default function ExperimentSlotsPage() {
       throw new Error("Unable to load species.");
     }
 
-    const tentsPayload = (await tentsResponse.json()) as Tent[];
+    const tentsPayload = (await tentsResponse.json()) as unknown;
     const speciesPayload = (await speciesResponse.json()) as unknown;
-    setTents(tentsPayload);
+    const tentRows = unwrapList<Tent>(tentsPayload);
+    setTents(tentRows);
     setSpecies(unwrapList<Species>(speciesPayload));
+
+    setShelfCountsByTent((current) => {
+      const next = { ...current };
+      for (const tent of tentRows) {
+        if (!next[tent.id] || next[tent.id].length === 0) {
+          next[tent.id] = buildDefaultShelves(tent);
+        }
+      }
+      return next;
+    });
   }, [experimentId]);
 
   useEffect(() => {
@@ -110,6 +124,7 @@ export default function ExperimentSlotsPage() {
           setNotInvited(true);
           return;
         }
+
         await loadData();
       } catch (requestError) {
         const normalized = normalizeBackendError(requestError);
@@ -138,12 +153,13 @@ export default function ExperimentSlotsPage() {
   }, [newTentCode, tentCodeSuggestion]);
 
   async function createTent() {
-    const tentName = newTentName.trim() || tentNameSuggestion;
-    const tentCode = newTentCode.trim() || tentCodeSuggestion;
-    if (!tentName) {
+    const name = newTentName.trim() || tentNameSuggestion;
+    const code = newTentCode.trim() || tentCodeSuggestion;
+    if (!name) {
       setError("Tent name is required.");
       return;
     }
+
     setSaving(true);
     setError("");
     setNotice("");
@@ -152,8 +168,8 @@ export default function ExperimentSlotsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: tentName,
-          code: tentCode,
+          name,
+          code,
           allowed_species: [],
         }),
       });
@@ -172,6 +188,7 @@ export default function ExperimentSlotsPage() {
         setError(payload.detail || "Unable to create tent.");
         return;
       }
+
       setNotice("Tent created.");
       setNewTentName("");
       setNewTentCode("");
@@ -187,7 +204,7 @@ export default function ExperimentSlotsPage() {
     }
   }
 
-  async function saveTent(tent: Tent) {
+  async function saveTentRestrictions(tent: Tent, allowedSpeciesIds: string[]) {
     setSaving(true);
     setError("");
     setNotice("");
@@ -196,178 +213,97 @@ export default function ExperimentSlotsPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: tent.name,
-          code: tent.code,
-          notes: tent.notes,
-          allowed_species: tent.allowed_species.map((item) => item.id),
+          allowed_species: allowedSpeciesIds,
         }),
       });
       const payload = (await response.json()) as { detail?: string };
       if (!response.ok) {
-        setError(payload.detail || "Unable to save tent.");
+        setError(payload.detail || "Unable to update tent restrictions.");
         return;
       }
-      setNotice(`${tent.name} saved.`);
+      setNotice(`Updated restrictions for ${tent.name}.`);
       await loadData();
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
       if (normalized.kind === "offline") {
         setOffline(true);
       }
-      setError("Unable to save tent.");
+      setError("Unable to update tent restrictions.");
     } finally {
       setSaving(false);
     }
   }
 
-  async function deleteTent(tentId: string) {
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/tents/${tentId}`, {
-        method: "DELETE",
-      });
-      if (response.status === 204) {
-        setNotice("Tent deleted.");
-        await loadData();
-        return;
-      }
-      const payload = (await response.json()) as { detail?: string };
-      setError(payload.detail || "Unable to delete tent.");
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to delete tent.");
-    } finally {
-      setSaving(false);
-    }
+  function updateShelfCount(tentId: string, shelfIndex: number, nextCount: number) {
+    setShelfCountsByTent((current) => {
+      const next = [...(current[tentId] || [4])];
+      next[shelfIndex] = Math.max(0, nextCount);
+      return { ...current, [tentId]: next };
+    });
   }
 
-  async function createTentDefaults(tentId: string) {
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/tents/${tentId}/blocks/defaults`, {
-        method: "POST",
-      });
-      const payload = (await response.json()) as { detail?: string; created_count?: number };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to create default blocks.");
-        return;
-      }
-      setNotice(`Default blocks ready (${payload.created_count ?? 0} created).`);
-      await loadData();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to create default blocks.");
-    } finally {
-      setSaving(false);
-    }
+  function addShelf(tentId: string) {
+    setShelfCountsByTent((current) => {
+      const next = [...(current[tentId] || [4]), 0];
+      return { ...current, [tentId]: next };
+    });
   }
 
-  async function createBlock(tentId: string) {
-    const tent = tents.find((item) => item.id === tentId);
-    const suggestedName = suggestBlockName(tent?.blocks.map((item) => item.name) || []);
-    const blockName = (newBlockNameByTent[tentId] || suggestedName).trim();
-    if (!blockName) {
-      setError("Block name is required.");
-      return;
-    }
+  function removeShelf(tentId: string) {
+    setShelfCountsByTent((current) => {
+      const values = [...(current[tentId] || [4])];
+      if (values.length <= 1) {
+        return current;
+      }
+      values.pop();
+      return { ...current, [tentId]: values };
+    });
+  }
+
+  async function generateSlots(tentId: string) {
+    const shelfCounts = shelfCountsByTent[tentId] || [4];
+    const layout = {
+      schema_version: 1,
+      shelves: shelfCounts.map((trayCount, index) => ({
+        index: index + 1,
+        tray_count: Math.max(0, trayCount),
+      })),
+    };
+
     setSaving(true);
     setError("");
     setNotice("");
+
     try {
-      const response = await backendFetch(`/api/v1/tents/${tentId}/blocks`, {
+      const response = await backendFetch(`/api/v1/tents/${tentId}/slots/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: blockName,
-          description: (newBlockDescByTent[tentId] || "").trim(),
-        }),
+        body: JSON.stringify({ layout }),
       });
-      const payload = (await response.json()) as { detail?: string; suggested_name?: string };
+      const payload = (await response.json()) as {
+        detail?: string;
+        diagnostics?: {
+          would_orphan_trays?: Array<{ tray_code: string; slot_shelf_index: number; slot_index: number }>;
+        };
+      };
       if (!response.ok) {
-        if (payload.suggested_name) {
-          setNewBlockNameByTent((current) => ({ ...current, [tentId]: payload.suggested_name || "" }));
-        }
-        setError(payload.detail || "Unable to create block.");
+        const orphanMessage = payload.diagnostics?.would_orphan_trays?.length
+          ? ` Would orphan: ${payload.diagnostics.would_orphan_trays
+              .map((item) => `${item.tray_code} @ S${item.slot_shelf_index}-${item.slot_index}`)
+              .join(", ")}.`
+          : "";
+        setError((payload.detail || "Unable to generate slots.") + orphanMessage);
         return;
       }
-      setNotice("Block created.");
-      setNewBlockNameByTent((current) => {
-        const next = { ...current };
-        delete next[tentId];
-        return next;
-      });
-      setNewBlockDescByTent((current) => ({ ...current, [tentId]: "" }));
+
+      setNotice("Slots generated.");
       await loadData();
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
       if (normalized.kind === "offline") {
         setOffline(true);
       }
-      setError("Unable to create block.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function saveBlock(block: TentBlock) {
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/blocks/${block.id}/`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: block.description }),
-      });
-      const payload = (await response.json()) as { detail?: string };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to save block.");
-        return;
-      }
-      setNotice(`${block.name} saved.`);
-      await loadData();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to save block.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function deleteBlock(blockId: string) {
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/blocks/${blockId}/`, {
-        method: "DELETE",
-      });
-      if (response.status === 204) {
-        setNotice("Block deleted.");
-        await loadData();
-        return;
-      }
-      const payload = (await response.json()) as { detail?: string };
-      setError(payload.detail || "Unable to delete block.");
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to delete block.");
+      setError("Unable to generate slots.");
     } finally {
       setSaving(false);
     }
@@ -385,15 +321,15 @@ export default function ExperimentSlotsPage() {
 
   return (
     <PageShell
-      title="Tents & Slots"
-      subtitle="Manage tents, species restrictions, and blocks."
+      title="Slots"
+      subtitle="Configure tent shelves and generate slot grids for tray placement."
       actions={
         <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
     >
-      {loading ? <p className={styles.mutedText}>Loading tents...</p> : null}
+      {loading ? <p className={styles.mutedText}>Loading slots...</p> : null}
       {error ? <p className={styles.errorText}>{error}</p> : null}
       {notice ? <p className={styles.successText}>{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
@@ -406,16 +342,14 @@ export default function ExperimentSlotsPage() {
               className={styles.input}
               value={newTentName}
               onChange={(event) => setNewTentName(event.target.value)}
-              placeholder={tentNameSuggestion}
             />
           </label>
           <label className={styles.field}>
-            <span className={styles.fieldLabel}>Code (optional)</span>
+            <span className={styles.fieldLabel}>Tent code</span>
             <input
               className={styles.input}
               value={newTentCode}
               onChange={(event) => setNewTentCode(event.target.value)}
-              placeholder={tentCodeSuggestion}
             />
           </label>
           <button className={styles.buttonPrimary} type="button" disabled={saving} onClick={() => void createTent()}>
@@ -424,181 +358,111 @@ export default function ExperimentSlotsPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Tents">
-        {tents.length === 0 ? (
-          <p className={styles.mutedText}>No tents yet.</p>
-        ) : (
-          <div className={styles.blocksList}>
-            {tents.map((tent) => (
-              <article className={styles.blockRow} key={tent.id}>
-                <div className={styles.actions}>
-                  <strong>
-                    {tent.name}
-                    {tent.code ? ` (${tent.code})` : ""}
-                  </strong>
-                  <span className={styles.mutedText}>
-                    Allowed species: {tent.allowed_species.length === 0 ? "Any" : tent.allowed_species.length}
-                  </span>
-                </div>
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Name</span>
-                  <input
-                    className={styles.input}
-                    value={tent.name}
-                    onChange={(event) =>
-                      setTents((current) =>
-                        current.map((item) => (item.id === tent.id ? { ...item, name: event.target.value } : item)),
-                      )
-                    }
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Code</span>
-                  <input
-                    className={styles.input}
-                    value={tent.code}
-                    onChange={(event) =>
-                      setTents((current) =>
-                        current.map((item) => (item.id === tent.id ? { ...item, code: event.target.value } : item)),
-                      )
-                    }
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Species restrictions</span>
-                  <input
-                    className={styles.input}
-                    value={speciesSearch}
-                    onChange={(event) => setSpeciesSearch(event.target.value)}
-                    placeholder="Search species"
-                  />
-                  <div className={styles.checkboxGroup}>
-                    {filteredSpecies.map((item) => {
-                      const checked = tent.allowed_species.some((selected) => selected.id === item.id);
-                      return (
-                        <label className={styles.checkboxRow} key={`${tent.id}:${item.id}`}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(event) =>
-                              setTents((current) =>
-                                current.map((entry) => {
-                                  if (entry.id !== tent.id) {
-                                    return entry;
-                                  }
-                                  const nextSpecies = event.target.checked
-                                    ? [...entry.allowed_species, item]
-                                    : entry.allowed_species.filter((selected) => selected.id !== item.id);
-                                  return { ...entry, allowed_species: nextSpecies };
-                                }),
-                              )
+      {tents.map((tent) => {
+        const shelfCounts = shelfCountsByTent[tent.id] || buildDefaultShelves(tent);
+        const totalSlots = shelfCounts.reduce((acc, value) => acc + Math.max(0, value), 0);
+        const selectedSpecies = new Set(tent.allowed_species.map((item) => item.id));
+
+        return (
+          <SectionCard key={tent.id} title={`${tent.name}${tent.code ? ` (${tent.code})` : ""}`}>
+            <div className={styles.formGrid}>
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>Allowed species</span>
+                <div className={styles.selectionGrid}>
+                  {species.map((item) => {
+                    const checked = selectedSpecies.has(item.id);
+                    return (
+                      <label key={item.id} className={styles.checkboxRow}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(event) => {
+                            const next = new Set(selectedSpecies);
+                            if (event.target.checked) {
+                              next.add(item.id);
+                            } else {
+                              next.delete(item.id);
                             }
-                          />
-                          <span>{item.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                  <p className={styles.mutedText}>
-                    Leave empty to allow any species.
-                  </p>
-                </label>
-
-                <div className={styles.actions}>
-                  <button className={styles.buttonSecondary} type="button" disabled={saving} onClick={() => void saveTent(tent)}>
-                    Save tent
-                  </button>
-                  <button
-                    className={styles.buttonSecondary}
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void createTentDefaults(tent.id)}
-                  >
-                    Create default blocks
-                  </button>
-                  <button className={styles.buttonDanger} type="button" disabled={saving} onClick={() => void deleteTent(tent.id)}>
-                    Delete tent
-                  </button>
-                </div>
-
-                <div className={styles.formGrid}>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>New block name</span>
-                    <input
-                      className={styles.input}
-                      value={
-                        newBlockNameByTent[tent.id] ??
-                        suggestBlockName(tent.blocks.map((item) => item.name))
-                      }
-                      placeholder={suggestBlockName(tent.blocks.map((item) => item.name))}
-                      onChange={(event) =>
-                        setNewBlockNameByTent((current) => ({ ...current, [tent.id]: event.target.value }))
-                      }
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>Description</span>
-                    <input
-                      className={styles.input}
-                      value={newBlockDescByTent[tent.id] || ""}
-                      placeholder="Front-left"
-                      onChange={(event) =>
-                        setNewBlockDescByTent((current) => ({ ...current, [tent.id]: event.target.value }))
-                      }
-                    />
-                  </label>
-                  <button className={styles.buttonPrimary} type="button" disabled={saving} onClick={() => void createBlock(tent.id)}>
-                    Add block
-                  </button>
-                </div>
-
-                {tent.blocks.length === 0 ? (
-                  <p className={styles.mutedText}>No blocks in this tent yet.</p>
-                ) : (
-                  <div className={styles.blocksList}>
-                    {tent.blocks.map((block) => (
-                      <article className={styles.blockRow} key={block.id}>
-                        <div className={styles.actions}>
-                          <strong>{block.name}</strong>
-                          <span className={styles.mutedText}>Trays: {block.tray_count}</span>
-                        </div>
-                        <textarea
-                          className={styles.textarea}
-                          value={block.description}
-                          onChange={(event) =>
-                            setTents((current) =>
-                              current.map((tentItem) =>
-                                tentItem.id === tent.id
-                                  ? {
-                                      ...tentItem,
-                                      blocks: tentItem.blocks.map((entry) =>
-                                        entry.id === block.id
-                                          ? { ...entry, description: event.target.value }
-                                          : entry,
-                                      ),
-                                    }
-                                  : tentItem,
-                              ),
-                            )
-                          }
+                            void saveTentRestrictions(tent, Array.from(next));
+                          }}
                         />
-                        <div className={styles.actions}>
-                          <button className={styles.buttonSecondary} type="button" disabled={saving} onClick={() => void saveBlock(block)}>
-                            Save block
-                          </button>
-                          <button className={styles.buttonDanger} type="button" disabled={saving} onClick={() => void deleteBlock(block.id)}>
-                            Delete block
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </article>
-            ))}
-          </div>
-        )}
-      </SectionCard>
+                        <span>{item.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>Shelves</span>
+                <div className={styles.actions}>
+                  <button className={styles.buttonSecondary} type="button" onClick={() => addShelf(tent.id)}>
+                    Add shelf
+                  </button>
+                  <button className={styles.buttonSecondary} type="button" onClick={() => removeShelf(tent.id)}>
+                    Remove shelf
+                  </button>
+                </div>
+                {shelfCounts.map((count, index) => (
+                  <label className={styles.field} key={`${tent.id}-shelf-${index + 1}`}>
+                    <span className={styles.fieldLabel}>Shelf {index + 1} tray count</span>
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={0}
+                      value={count}
+                      onChange={(event) =>
+                        updateShelfCount(tent.id, index, Number.parseInt(event.target.value || "0", 10))
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>Live preview</span>
+                <div className={styles.previewGrid}>
+                  {shelfCounts.map((count, index) => (
+                    <div className={styles.previewRow} key={`${tent.id}-preview-${index + 1}`}>
+                      <strong className={styles.mutedText}>Shelf {index + 1}</strong>
+                      <div className={styles.previewCells}>
+                        {Array.from({ length: Math.max(0, count) }).map((_, slotIndex) => (
+                          <span className={styles.previewCell} key={`${tent.id}-${index + 1}-${slotIndex + 1}`}>
+                            {`S${index + 1}-${slotIndex + 1}`}
+                          </span>
+                        ))}
+                        {count === 0 ? <span className={styles.mutedText}>No slots</span> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                className={styles.buttonPrimary}
+                type="button"
+                disabled={saving}
+                onClick={() => void generateSlots(tent.id)}
+              >
+                {saving ? "Generating..." : `Generate slots (${totalSlots})`}
+              </button>
+            </div>
+
+            <div className={styles.blocksList}>
+              {tent.slots.length === 0 ? (
+                <p className={styles.mutedText}>No slots generated for this tent yet.</p>
+              ) : (
+                tent.slots.map((slot) => (
+                  <article className={styles.blockRow} key={slot.id}>
+                    <strong>{slot.label}</strong>
+                    <p className={styles.mutedText}>{slot.code}</p>
+                  </article>
+                ))
+              )}
+            </div>
+          </SectionCard>
+        );
+      })}
     </PageShell>
   );
 }

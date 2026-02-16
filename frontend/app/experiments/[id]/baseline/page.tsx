@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { backendFetch, normalizeBackendError } from "@/lib/backend";
+import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
@@ -13,17 +13,7 @@ import StickyActionBar from "@/src/components/ui/StickyActionBar";
 
 import styles from "../../experiments.module.css";
 
-type PlantRow = {
-  id: string;
-  species_name: string;
-  species_category: string;
-  plant_id: string;
-  bin: string | null;
-  cultivar: string | null;
-  status: string;
-};
-
-type BaselineQueuePlant = {
+type QueuePlant = {
   uuid: string;
   plant_id: string;
   species_name: string;
@@ -31,106 +21,40 @@ type BaselineQueuePlant = {
   cultivar: string | null;
   status: string;
   has_baseline: boolean;
-  has_bin: boolean;
+  has_grade: boolean;
 };
 
-type BaselineQueueResponse = {
+type BaselineQueue = {
   remaining_count: number;
-  plants: BaselineQueuePlant[];
-};
-
-type TemplateField = {
-  key: string;
-  label: string;
-  type: "int" | "float" | "text" | "bool";
-  min?: number;
-  max?: number;
-  required?: boolean;
-};
-
-type PlantBaselinePayload = {
-  plant_id: string;
-  experiment_id: string;
-  bin: string | null;
   baseline_locked: boolean;
-  template: {
-    id: string;
-    category: string;
-    version: number;
-    fields: TemplateField[];
-  } | null;
-  baseline: {
-    metrics: Record<string, unknown>;
-    notes: string;
-  } | null;
+  plants: {
+    count: number;
+    results: QueuePlant[];
+    meta: Record<string, unknown>;
+  };
 };
 
-const FALLBACK_TEMPLATE_FIELDS: TemplateField[] = [
-  {
-    key: "health_score",
-    label: "Health Score",
-    type: "int",
-    min: 1,
-    max: 5,
-    required: true,
-  },
-  {
-    key: "growth_notes",
-    label: "Growth Notes",
-    type: "text",
-    required: false,
-  },
-];
+type PlantRow = {
+  id: string;
+  plant_id: string;
+  species_name: string;
+  species_category: string;
+};
 
-function normalizeTemplateFields(value: unknown): TemplateField[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
+type PlantBaseline = {
+  plant_id: string;
+  grade: "A" | "B" | "C" | null;
+  has_baseline: boolean;
+  metrics: Record<string, unknown>;
+  notes: string;
+  baseline_locked: boolean;
+};
 
-  const fields: TemplateField[] = [];
-  for (const item of value) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-    const raw = item as Record<string, unknown>;
-    const key = String(raw.key ?? "").trim();
-    const label = String(raw.label ?? key).trim();
-    const type = String(raw.type ?? "").toLowerCase();
-    if (!key || !label || !["int", "float", "text", "bool"].includes(type)) {
-      continue;
-    }
-    fields.push({
-      key,
-      label,
-      type: type as TemplateField["type"],
-      min: typeof raw.min === "number" ? raw.min : undefined,
-      max: typeof raw.max === "number" ? raw.max : undefined,
-      required: Boolean(raw.required),
-    });
-  }
-  return fields;
+function queueNeedsBaseline(plant: QueuePlant): boolean {
+  return !plant.has_baseline || !plant.has_grade;
 }
 
-function needsBaseline(plant: BaselineQueuePlant): boolean {
-  return !plant.has_baseline || !plant.has_bin;
-}
-
-function pickNextMissingPlant(
-  queue: BaselineQueueResponse,
-  currentPlantId: string | null,
-): string | null {
-  const missing = queue.plants.filter((plant) => needsBaseline(plant));
-  if (missing.length === 0) {
-    return null;
-  }
-  if (!currentPlantId) {
-    return missing[0].uuid;
-  }
-  const next = missing.find((plant) => plant.uuid !== currentPlantId);
-  return next ? next.uuid : missing[0].uuid;
-}
-
-export default function BaselineCapturePage() {
+export default function BaselinePage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -145,7 +69,7 @@ export default function BaselineCapturePage() {
     return "";
   }, [params]);
 
-  const preselectedPlantId = searchParams.get("plant");
+  const selectedPlantFromQuery = searchParams.get("plant") || "";
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -153,140 +77,47 @@ export default function BaselineCapturePage() {
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-
   const [plants, setPlants] = useState<PlantRow[]>([]);
-  const [baselineQueue, setBaselineQueue] = useState<BaselineQueueResponse | null>(null);
-  const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null);
-  const [baselineLocked, setBaselineLocked] = useState(false);
-  const [editingUnlocked, setEditingUnlocked] = useState(false);
-  const [showUnlockModal, setShowUnlockModal] = useState(false);
-  const [unlockConfirmed, setUnlockConfirmed] = useState(false);
-
-  const [templateFields, setTemplateFields] = useState<TemplateField[]>([]);
-  const [usingFallbackTemplate, setUsingFallbackTemplate] = useState(false);
-  const [metrics, setMetrics] = useState<Record<string, unknown>>({});
+  const [queue, setQueue] = useState<BaselineQueue | null>(null);
+  const [selectedPlantId, setSelectedPlantId] = useState("");
+  const [grade, setGrade] = useState<"A" | "B" | "C" | "">("");
   const [notes, setNotes] = useState("");
-  const [selectedBin, setSelectedBin] = useState<"A" | "B" | "C" | "">("");
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-
-  const selectedPlant = useMemo(() => {
-    const plantFromList = plants.find((plant) => plant.id === selectedPlantId);
-    if (plantFromList) {
-      return plantFromList;
-    }
-    const plantFromQueue = baselineQueue?.plants.find((plant) => plant.uuid === selectedPlantId);
-    if (!plantFromQueue) {
-      return null;
-    }
-    return {
-      id: plantFromQueue.uuid,
-      species_name: plantFromQueue.species_name,
-      species_category: plantFromQueue.species_category,
-      plant_id: plantFromQueue.plant_id,
-      bin: plantFromQueue.has_bin ? "Assigned" : null,
-      cultivar: plantFromQueue.cultivar,
-      status: plantFromQueue.status,
-    };
-  }, [baselineQueue?.plants, plants, selectedPlantId]);
-  const selectedQueuePlant = useMemo(
-    () => baselineQueue?.plants.find((plant) => plant.uuid === selectedPlantId) ?? null,
-    [baselineQueue?.plants, selectedPlantId],
+  const [metricsJson, setMetricsJson] = useState("{}\n");
+  const [editingUnlocked, setEditingUnlocked] = useState(false);
+  const queuePlants = useMemo(
+    () => (queue ? unwrapList<QueuePlant>(queue.plants) : []),
+    [queue],
   );
-  const remainingCount = baselineQueue?.remaining_count ?? 0;
-  const upNextPlants = useMemo(() => {
-    if (!baselineQueue) {
-      return [];
-    }
-    return baselineQueue.plants
-      .filter((plant) => needsBaseline(plant) && plant.uuid !== selectedPlantId)
-      .slice(0, 3);
-  }, [baselineQueue, selectedPlantId]);
-  const readOnly = baselineLocked && !editingUnlocked;
 
-  function handleRequestError(requestError: unknown, fallbackMessage: string): string {
-    const normalizedError = normalizeBackendError(requestError);
-    if (normalizedError.kind === "offline") {
-      setOffline(true);
-      return "Backend is unreachable.";
-    }
-    return fallbackMessage;
-  }
-
-  const fetchPlants = useCallback(async () => {
-    const response = await backendFetch(`/api/v1/experiments/${experimentId}/plants/`);
-    if (!response.ok) {
-      throw new Error("Unable to load plants.");
-    }
-    const data = (await response.json()) as PlantRow[];
-    setPlants(data);
-    return data;
-  }, [experimentId]);
-
-  const fetchBaselineQueue = useCallback(async () => {
+  const loadQueue = useCallback(async () => {
     const response = await backendFetch(`/api/v1/experiments/${experimentId}/baseline/queue`);
-    if (response.status === 403) {
-      setNotInvited(true);
-      return null;
-    }
     if (!response.ok) {
       throw new Error("Unable to load baseline queue.");
     }
-    const data = (await response.json()) as BaselineQueueResponse;
-    setBaselineQueue(data);
-    return data;
+    const payload = (await response.json()) as BaselineQueue;
+    setQueue(payload);
+    return payload;
   }, [experimentId]);
 
-  const selectPlant = useCallback(
-    (plantId: string | null) => {
-      setSelectedPlantId(plantId);
-      const nextParams = new URLSearchParams(searchParams.toString());
-      if (plantId) {
-        nextParams.set("plant", plantId);
-      } else {
-        nextParams.delete("plant");
-      }
-      const query = nextParams.toString();
-      router.replace(`/experiments/${experimentId}/baseline${query ? `?${query}` : ""}`);
-    },
-    [experimentId, router, searchParams],
-  );
-
-  const fetchPlantBaseline = useCallback(async (plantId: string) => {
+  const loadPlantBaseline = useCallback(async (plantId: string) => {
     const response = await backendFetch(`/api/v1/plants/${plantId}/baseline`);
     if (!response.ok) {
-      throw new Error("Unable to load baseline record.");
+      throw new Error("Unable to load baseline.");
     }
-
-    const data = (await response.json()) as PlantBaselinePayload;
-    setBaselineLocked(data.baseline_locked);
-    if (!data.baseline_locked) {
-      setEditingUnlocked(false);
-      setShowUnlockModal(false);
-      setUnlockConfirmed(false);
-    }
-    setMetrics(data.baseline?.metrics ?? {});
-    setNotes(data.baseline?.notes ?? "");
-    setSelectedBin((data.bin as "A" | "B" | "C" | null) ?? "");
-
-    const fields = normalizeTemplateFields(data.template?.fields);
-    if (fields.length > 0) {
-      setTemplateFields(fields);
-      setUsingFallbackTemplate(false);
-    } else {
-      setTemplateFields(FALLBACK_TEMPLATE_FIELDS);
-      setUsingFallbackTemplate(true);
-    }
+    const payload = (await response.json()) as PlantBaseline;
+    setGrade(payload.grade || "");
+    setNotes(payload.notes || "");
+    setMetricsJson(`${JSON.stringify(payload.metrics || {}, null, 2)}\n`);
   }, []);
 
   useEffect(() => {
-    async function loadInitial() {
+    async function load() {
       if (!experimentId) {
-        setLoading(false);
         return;
       }
       setLoading(true);
       setError("");
-
+      setOffline(false);
       try {
         const meResponse = await backendFetch("/api/me");
         if (meResponse.status === 403) {
@@ -294,78 +125,83 @@ export default function BaselineCapturePage() {
           return;
         }
 
-        const [queueData, plantsData] = await Promise.all([
-          fetchBaselineQueue(),
-          fetchPlants(),
+        const [plantsResponse, queuePayload] = await Promise.all([
+          backendFetch(`/api/v1/experiments/${experimentId}/plants/`),
+          loadQueue(),
         ]);
-        if (!queueData) {
+
+        if (!plantsResponse.ok) {
+          setError("Unable to load plants.");
           return;
         }
 
-        if (preselectedPlantId) {
-          setSelectedPlantId(preselectedPlantId);
-        } else if (queueData.remaining_count > 0) {
-          const firstMissing = pickNextMissingPlant(queueData, null);
-          if (firstMissing) {
-            selectPlant(firstMissing);
-          }
-        } else if (!preselectedPlantId && plantsData.length > 0) {
-          setSelectedPlantId(null);
-        }
+        const plantsPayload = (await plantsResponse.json()) as unknown;
+        const rows = unwrapList<PlantRow>(plantsPayload);
+        setPlants(rows);
 
-        setOffline(false);
+        const fromQuery = selectedPlantFromQuery;
+        const queueRows = unwrapList<QueuePlant>(queuePayload.plants);
+        const firstMissing = queueRows.find((plant) => queueNeedsBaseline(plant));
+        const target = fromQuery || firstMissing?.uuid || queueRows[0]?.uuid || "";
+
+        if (target) {
+          setSelectedPlantId(target);
+          await loadPlantBaseline(target);
+        } else {
+          setSelectedPlantId("");
+        }
       } catch (requestError) {
-        setError(handleRequestError(requestError, "Unable to load baseline capture."));
+        const normalized = normalizeBackendError(requestError);
+        if (normalized.kind === "offline") {
+          setOffline(true);
+        }
+        setError("Unable to load baseline page.");
       } finally {
         setLoading(false);
       }
     }
 
-    void loadInitial();
-  }, [experimentId, fetchBaselineQueue, fetchPlants, preselectedPlantId, selectPlant]);
+    void load();
+  }, [experimentId, loadPlantBaseline, loadQueue, selectedPlantFromQuery]);
 
-  useEffect(() => {
-    async function loadSelectedPlantBaseline() {
-      if (!selectedPlantId) {
-        return;
-      }
-      setError("");
-      try {
-        await fetchPlantBaseline(selectedPlantId);
-      } catch (requestError) {
-        setError(handleRequestError(requestError, "Unable to load selected plant baseline."));
-      }
+  const baselineLocked = queue?.baseline_locked ?? false;
+  const readOnly = baselineLocked && !editingUnlocked;
+
+  const nextMissingPlant = useMemo(() => {
+    if (!queue || queue.remaining_count <= 0) {
+      return null;
     }
+    if (!selectedPlantId) {
+      return queuePlants.find((plant) => queueNeedsBaseline(plant)) || null;
+    }
+    const index = queuePlants.findIndex((item) => item.uuid === selectedPlantId);
+    const after = queuePlants.slice(index + 1).find((plant) => queueNeedsBaseline(plant));
+    if (after) {
+      return after;
+    }
+    return queuePlants.find((plant) => queueNeedsBaseline(plant)) || null;
+  }, [queue, queuePlants, selectedPlantId]);
 
-    void loadSelectedPlantBaseline();
-  }, [fetchPlantBaseline, selectedPlantId]);
+  function jumpToPlant(plantId: string) {
+    const nextQuery = new URLSearchParams(searchParams.toString());
+    nextQuery.set("plant", plantId);
+    router.replace(`/experiments/${experimentId}/baseline?${nextQuery.toString()}`);
+  }
 
-  async function uploadBaselinePhoto(plantId: string) {
-    if (!photoFile) {
+  async function saveBaseline(saveAndNext: boolean) {
+    if (!selectedPlantId || readOnly) {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("experiment", experimentId);
-    formData.append("plant", plantId);
-    formData.append("week_number", "0");
-    formData.append("tag", "baseline");
-    formData.append("file", photoFile);
-
-    const response = await backendFetch("/api/v1/photos/", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error("Baseline saved, but photo upload failed.");
-    }
-
-    setPhotoFile(null);
-  }
-
-  async function saveBaseline(advance: boolean) {
-    if (!selectedPlantId) {
+    let metrics: Record<string, unknown>;
+    try {
+      metrics = JSON.parse(metricsJson) as Record<string, unknown>;
+      if (!metrics || typeof metrics !== "object" || Array.isArray(metrics)) {
+        setError("Metrics JSON must be an object.");
+        return;
+      }
+    } catch {
+      setError("Metrics JSON is invalid.");
       return;
     }
 
@@ -374,104 +210,82 @@ export default function BaselineCapturePage() {
     setNotice("");
 
     try {
-      const payload: Record<string, unknown> = {
-        metrics,
-        notes,
-      };
-      if (selectedBin) {
-        payload.bin = selectedBin;
-      }
-
       const response = await backendFetch(`/api/v1/plants/${selectedPlantId}/baseline`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          metrics,
+          notes,
+          grade: grade || null,
+        }),
       });
-
+      const payload = (await response.json()) as { detail?: string };
       if (!response.ok) {
-        const data = (await response.json()) as {
-          detail?: string;
-          metrics?: string[];
-        };
-        setError(data.metrics?.join(" ") || data.detail || "Unable to save baseline.");
+        setError(payload.detail || "Unable to save baseline.");
         return;
       }
 
-      await uploadBaselinePhoto(selectedPlantId);
-      const queueData = await fetchBaselineQueue();
-      await fetchPlants();
-      await fetchPlantBaseline(selectedPlantId);
+      await loadPlantBaseline(selectedPlantId);
+      const refreshedQueue = await loadQueue();
+      setNotice("Baseline saved.");
 
-      if (advance && queueData) {
-        const nextPlantId = pickNextMissingPlant(queueData, selectedPlantId);
-        if (nextPlantId) {
-          selectPlant(nextPlantId);
-          setNotice("Baseline saved. Moved to next missing plant.");
-        } else {
-          setNotice("All baselines complete.");
-          selectPlant(null);
-          router.replace(`/experiments/${experimentId}/overview`);
-        }
-      } else {
-        setNotice("Baseline saved.");
+      if (!saveAndNext) {
+        return;
       }
-      setOffline(false);
+
+      if (refreshedQueue.remaining_count === 0) {
+        setNotice("All baselines complete.");
+        router.push(`/experiments/${experimentId}/overview?refresh=${Date.now()}`);
+        return;
+      }
+
+      const refreshedRows = unwrapList<QueuePlant>(refreshedQueue.plants);
+      const nextPlant = refreshedRows.find((plant) => queueNeedsBaseline(plant) && plant.uuid !== selectedPlantId)
+        || refreshedRows.find((plant) => queueNeedsBaseline(plant));
+      if (nextPlant) {
+        jumpToPlant(nextPlant.uuid);
+      }
     } catch (requestError) {
-      setError(handleRequestError(requestError, "Unable to save baseline."));
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to save baseline.");
     } finally {
       setSaving(false);
     }
   }
 
-  function jumpToNextMissingBaseline() {
-    if (!baselineQueue) {
-      return;
+  async function lockBaseline() {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await backendFetch(`/api/v1/experiments/${experimentId}/baseline/lock`, {
+        method: "POST",
+      });
+      const payload = (await response.json()) as { detail?: string };
+      if (!response.ok) {
+        setError(payload.detail || "Unable to lock baseline.");
+        return;
+      }
+      setEditingUnlocked(false);
+      setNotice("Baseline locked (UI guardrail). Inputs are read-only by default.");
+      await loadQueue();
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to lock baseline.");
+    } finally {
+      setSaving(false);
     }
-    const nextPlantId = pickNextMissingPlant(baselineQueue, selectedPlantId);
-    if (nextPlantId) {
-      selectPlant(nextPlantId);
-    }
-  }
-
-  function updateMetricValue(field: TemplateField, rawValue: string | boolean) {
-    setMetrics((prev) => {
-      const next = { ...prev };
-
-      if (field.type === "bool") {
-        next[field.key] = rawValue;
-        return next;
-      }
-
-      if (typeof rawValue !== "string") {
-        return next;
-      }
-
-      if (rawValue === "") {
-        delete next[field.key];
-        return next;
-      }
-
-      if (field.type === "int") {
-        next[field.key] = Number.parseInt(rawValue, 10);
-      } else if (field.type === "float") {
-        next[field.key] = Number.parseFloat(rawValue);
-      } else {
-        next[field.key] = rawValue;
-      }
-      return next;
-    });
-  }
-
-  function confirmUnlockEditing() {
-    setEditingUnlocked(true);
-    setShowUnlockModal(false);
-    setUnlockConfirmed(false);
-    setNotice("Editing unlocked for this page session.");
   }
 
   if (notInvited) {
     return (
-      <PageShell title="Baseline Capture">
+      <PageShell title="Baseline">
         <SectionCard>
           <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
         </SectionCard>
@@ -481,338 +295,181 @@ export default function BaselineCapturePage() {
 
   return (
     <PageShell
-      title="Baseline Capture"
-      subtitle={`Experiment: ${experimentId}`}
-      stickyOffset
+      title="Baseline"
+      subtitle="Record week 0 metrics and assign grades."
       actions={
-        <div className={styles.actions}>
-          <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
-            ← Overview
-          </Link>
-        </div>
+        <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+          ← Overview
+        </Link>
       }
     >
-      {loading ? <p className={styles.mutedText}>Loading baseline workflow...</p> : null}
+      {loading ? <p className={styles.mutedText}>Loading baseline queue...</p> : null}
       {error ? <p className={styles.errorText}>{error}</p> : null}
       {notice ? <p className={styles.successText}>{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
-      {baselineQueue ? (
-        <SectionCard title="Queue Status">
-          <p className={styles.mutedText}>Remaining baselines: {remainingCount}</p>
-          {selectedQueuePlant?.has_baseline && selectedQueuePlant.has_bin ? (
-            <div className={styles.stack}>
-              <p className={styles.inlineNote}>This plant is complete.</p>
-              {remainingCount > 0 ? (
-                <button
-                  className={styles.buttonSecondary}
-                  type="button"
-                  onClick={jumpToNextMissingBaseline}
-                >
-                  Next missing baseline
-                </button>
-              ) : null}
-            </div>
+      <SectionCard title="Queue Status">
+        <p className={styles.mutedText}>Remaining baselines: {queue?.remaining_count ?? 0}</p>
+        {baselineLocked ? (
+          <p className={styles.inlineNote}>Baseline is locked in UI. Unlock editing for this session to continue.</p>
+        ) : null}
+        <div className={styles.actions}>
+          {baselineLocked && !editingUnlocked ? (
+            <button className={styles.buttonDanger} type="button" onClick={() => setEditingUnlocked(true)}>
+              Unlock editing
+            </button>
           ) : null}
-          {upNextPlants.length > 0 ? (
-            <details>
-              <summary className={styles.fieldLabel}>Up next</summary>
+          {baselineLocked && editingUnlocked ? (
+            <button className={styles.buttonSecondary} type="button" onClick={() => setEditingUnlocked(false)}>
+              Re-lock UI
+            </button>
+          ) : null}
+          {!baselineLocked ? (
+            <button className={styles.buttonSecondary} type="button" disabled={saving} onClick={() => void lockBaseline()}>
+              Lock baseline
+            </button>
+          ) : null}
+          {nextMissingPlant ? (
+            <button className={styles.buttonSecondary} type="button" onClick={() => jumpToPlant(nextMissingPlant.uuid)}>
+              Next missing baseline
+            </button>
+          ) : null}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Plant Queue">
+        {queue ? (
+          <ResponsiveList
+            items={queuePlants}
+            getKey={(plant) => plant.uuid}
+            columns={[
+              { key: "plant", label: "Plant", render: (plant) => plant.plant_id || "(pending)" },
+              { key: "species", label: "Species", render: (plant) => plant.species_name },
+              {
+                key: "baseline",
+                label: "Baseline",
+                render: (plant) => (plant.has_baseline ? "Complete" : "Missing"),
+              },
+              {
+                key: "grade",
+                label: "Grade",
+                render: (plant) => (plant.has_grade ? "Assigned" : "Missing"),
+              },
+              {
+                key: "action",
+                label: "Action",
+                render: (plant) => (
+                  <button className={styles.buttonSecondary} type="button" onClick={() => jumpToPlant(plant.uuid)}>
+                    Open
+                  </button>
+                ),
+              },
+            ]}
+            renderMobileCard={(plant) => (
+              <div className={styles.cardKeyValue}>
+                <span>Plant</span>
+                <strong>{plant.plant_id || "(pending)"}</strong>
+                <span>Species</span>
+                <strong>{plant.species_name}</strong>
+                <span>Baseline</span>
+                <strong>{plant.has_baseline ? "Complete" : "Missing"}</strong>
+                <span>Grade</span>
+                <strong>{plant.has_grade ? "Assigned" : "Missing"}</strong>
+                <button className={styles.buttonSecondary} type="button" onClick={() => jumpToPlant(plant.uuid)}>
+                  Open
+                </button>
+              </div>
+            )}
+          />
+        ) : null}
+      </SectionCard>
+
+      {selectedPlantId ? (
+        <SectionCard title="Capture Baseline">
+          <div className={styles.formGrid}>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Plant</span>
+              <select
+                className={styles.select}
+                value={selectedPlantId}
+                onChange={(event) => jumpToPlant(event.target.value)}
+                disabled={saving}
+              >
+                {plants.map((plant) => (
+                  <option key={plant.id} value={plant.id}>
+                    {plant.plant_id || "(pending)"} · {plant.species_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Grade</span>
               <div className={styles.actions}>
-                {upNextPlants.map((plant) => (
+                {(["A", "B", "C"] as const).map((value) => (
                   <button
-                    className={styles.buttonSecondary}
-                    key={plant.uuid}
+                    key={value}
+                    className={grade === value ? styles.buttonPrimary : styles.buttonSecondary}
                     type="button"
-                    onClick={() => selectPlant(plant.uuid)}
+                    disabled={saving || readOnly}
+                    onClick={() => setGrade(value)}
                   >
-                    {plant.plant_id || "(pending)"}
+                    Grade {value}
                   </button>
                 ))}
               </div>
-            </details>
-          ) : null}
-          {baselineLocked ? (
-            <>
-              <p className={styles.successText}>
-                Baseline is locked for this experiment. Inputs are read-only by default in the UI.
-              </p>
-              <div className={styles.actions}>
-                {readOnly ? (
-                  <button
-                    className={styles.buttonSecondary}
-                    type="button"
-                    onClick={() => setShowUnlockModal(true)}
-                  >
-                    Unlock editing
-                  </button>
-                ) : (
-                  <button
-                    className={styles.buttonSecondary}
-                    type="button"
-                    onClick={() => {
-                      setEditingUnlocked(false);
-                      setUnlockConfirmed(false);
-                    }}
-                  >
-                    Re-lock
-                  </button>
-                )}
-              </div>
-            </>
-          ) : null}
-        </SectionCard>
-      ) : null}
+            </label>
 
-      {baselineQueue && baselineQueue.plants.length === 0 ? (
-        <SectionCard title="Plants">
-          <IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />
-        </SectionCard>
-      ) : null}
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Metrics (JSON)</span>
+              <textarea
+                className={styles.textarea}
+                value={metricsJson}
+                onChange={(event) => setMetricsJson(event.target.value)}
+                rows={8}
+                disabled={saving || readOnly}
+              />
+            </label>
 
-      {baselineQueue && !preselectedPlantId && remainingCount === 0 ? (
-        <SectionCard title="All baselines complete">
-          <p className={styles.successText}>All active plants have baseline metrics and grade assignments.</p>
-          <div className={styles.actions}>
-            <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
-              Back to Overview
-            </Link>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Notes</span>
+              <textarea
+                className={styles.textarea}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                disabled={saving || readOnly}
+              />
+            </label>
           </div>
         </SectionCard>
       ) : null}
 
-      {baselineQueue && baselineQueue.plants.length > 0 ? (
-        <>
-          <SectionCard title="Plant Queue">
-            <ResponsiveList
-              items={baselineQueue.plants}
-              getKey={(plant) => plant.uuid}
-              columns={[
-                {
-                  key: "plant_id",
-                  label: "Plant ID",
-                  render: (plant) => plant.plant_id || "(pending)",
-                },
-                {
-                  key: "species",
-                  label: "Species",
-                  render: (plant) => plant.species_name,
-                },
-                {
-                  key: "baseline",
-                  label: "Baseline",
-                  render: (plant) => (plant.has_baseline ? "Done" : "Missing"),
-                },
-                {
-                  key: "bin",
-                  label: "Grade",
-                  render: (plant) => (plant.has_bin ? "Assigned" : "Missing"),
-                },
-              ]}
-              renderMobileCard={(plant) => (
-                <div className={styles.cardKeyValue}>
-                  <span>Plant ID</span>
-                  <strong>{plant.plant_id || "(pending)"}</strong>
-                  <span>Species</span>
-                  <strong>{plant.species_name}</strong>
-                  <span>Baseline</span>
-                  <strong>{plant.has_baseline ? "Done" : "Missing"}</strong>
-                  <span>Grade</span>
-                  <strong>{plant.has_bin ? "Assigned" : "Missing"}</strong>
-                  <button
-                    className={styles.buttonSecondary}
-                    type="button"
-                    onClick={() => selectPlant(plant.uuid)}
-                  >
-                    Capture this plant
-                  </button>
-                </div>
-              )}
-            />
-          </SectionCard>
+      <StickyActionBar>
+        <button
+          className={styles.buttonPrimary}
+          type="button"
+          disabled={saving || readOnly || !selectedPlantId}
+          onClick={() => void saveBaseline(false)}
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+        <button
+          className={styles.buttonSecondary}
+          type="button"
+          disabled={saving || readOnly || !selectedPlantId || (queue?.remaining_count ?? 0) === 0}
+          onClick={() => void saveBaseline(true)}
+        >
+          Save & Next
+        </button>
+      </StickyActionBar>
 
-          {selectedPlant ? (
-            <SectionCard title="Capture Baseline">
-              <div className={styles.cardKeyValue}>
-                <span>Plant ID</span>
-                <strong>{selectedPlant.plant_id || "(pending)"}</strong>
-                <span>Species</span>
-                  <strong>{selectedPlant.species_name}</strong>
-                  <span>Category</span>
-                  <strong>{selectedPlant.species_category || "-"}</strong>
-                  <span>Current Grade (UI)</span>
-                  <strong>{selectedBin || selectedPlant.bin || "Unassigned"}</strong>
-                </div>
-
-              {usingFallbackTemplate ? (
-                <p className={styles.mutedText}>
-                  No metric template found for this species category. Using fallback MVP fields.
-                </p>
-              ) : null}
-              {readOnly ? (
-                <p className={styles.mutedText}>
-                  Baseline is currently read-only in this UI. Use Unlock editing to make changes.
-                </p>
-              ) : null}
-
-              <div className={styles.formGrid}>
-                {templateFields.map((field) => {
-                  if (field.type === "bool") {
-                    return (
-                      <label className={styles.field} key={field.key}>
-                        <span className={styles.fieldLabel}>{field.label}</span>
-                        <input
-                          className={styles.input}
-                          type="checkbox"
-                          checked={Boolean(metrics[field.key])}
-                          disabled={saving || readOnly}
-                          onChange={(event) =>
-                            updateMetricValue(field, event.target.checked)
-                          }
-                        />
-                      </label>
-                    );
-                  }
-
-                  if (field.type === "text") {
-                    return (
-                      <label className={styles.field} key={field.key}>
-                        <span className={styles.fieldLabel}>{field.label}</span>
-                        <textarea
-                          className={styles.textarea}
-                          value={String(metrics[field.key] ?? "")}
-                          disabled={saving || readOnly}
-                          onChange={(event) =>
-                            updateMetricValue(field, event.target.value)
-                          }
-                        />
-                      </label>
-                    );
-                  }
-
-                  return (
-                    <label className={styles.field} key={field.key}>
-                      <span className={styles.fieldLabel}>{field.label}</span>
-                      <input
-                        className={styles.input}
-                        type="number"
-                        min={field.min}
-                        max={field.max}
-                        step={field.type === "int" ? "1" : "0.1"}
-                        value={
-                          typeof metrics[field.key] === "number"
-                            ? String(metrics[field.key])
-                            : ""
-                        }
-                        disabled={saving || readOnly}
-                        onChange={(event) =>
-                          updateMetricValue(field, event.target.value)
-                        }
-                      />
-                    </label>
-                  );
-                })}
-
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Grade Assignment</span>
-                  <div className={styles.actions}>
-                    {(["A", "B", "C"] as const).map((binValue) => (
-                      <button
-                        key={binValue}
-                        type="button"
-                        disabled={saving || readOnly}
-                        className={
-                          selectedBin === binValue
-                            ? styles.buttonPrimary
-                            : styles.buttonSecondary
-                        }
-                        onClick={() => setSelectedBin(binValue)}
-                      >
-                        Grade {binValue}
-                      </button>
-                    ))}
-                  </div>
-                </label>
-
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Baseline Photo (optional)</span>
-                  <input
-                    className={styles.input}
-                    type="file"
-                    accept="image/*"
-                    disabled={saving || readOnly}
-                    onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
-                  />
-                </label>
-
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Notes</span>
-                  <textarea
-                    className={styles.textarea}
-                    value={notes}
-                    disabled={saving || readOnly}
-                    onChange={(event) => setNotes(event.target.value)}
-                  />
-                </label>
-              </div>
-            </SectionCard>
-          ) : null}
-
-          <StickyActionBar>
-            <button
-              className={styles.buttonPrimary}
-              type="button"
-              disabled={saving || readOnly || !selectedPlantId}
-              onClick={() => void saveBaseline(false)}
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
-            <button
-              className={styles.buttonSecondary}
-              type="button"
-              disabled={saving || readOnly || !selectedPlantId || remainingCount === 0}
-              onClick={() => void saveBaseline(true)}
-            >
-              {saving ? "Saving..." : "Save & Next"}
-            </button>
-          </StickyActionBar>
-        </>
-      ) : null}
-      {showUnlockModal ? (
-        <div className={styles.modalBackdrop} role="presentation">
-          <SectionCard title="Unlock baseline editing">
-            <p className={styles.mutedText}>
-              This lock is a UI guardrail only. API edits are still allowed.
-            </p>
-            <label className={styles.checkboxRow}>
-              <input
-                type="checkbox"
-                checked={unlockConfirmed}
-                onChange={(event) => setUnlockConfirmed(event.target.checked)}
-              />
-              <span>I understand and want to enable editing on this page.</span>
-            </label>
-            <div className={styles.actions}>
-              <button
-                className={styles.buttonSecondary}
-                type="button"
-                onClick={() => {
-                  setShowUnlockModal(false);
-                  setUnlockConfirmed(false);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className={styles.buttonDanger}
-                type="button"
-                disabled={!unlockConfirmed}
-                onClick={confirmUnlockEditing}
-              >
-                Unlock editing
-              </button>
-            </div>
-          </SectionCard>
-        </div>
+      {!loading && queue && queue.remaining_count === 0 ? (
+        <SectionCard>
+          <p className={styles.successText}>All active plants have baseline metrics and grade assignments.</p>
+          <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+            Back to Overview
+          </Link>
+        </SectionCard>
       ) : null}
     </PageShell>
   );

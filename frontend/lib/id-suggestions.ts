@@ -37,9 +37,9 @@ export function suggestTentName(existingNames: string[]): string {
   return `Tent ${next}`;
 }
 
-export function suggestBlockName(existingNames: string[]): string {
-  const next = nextNumber(existingNames, /^B(\d+)$/i);
-  return `B${next}`;
+export function suggestSlotName(existingNames: string[]): string {
+  const next = nextNumber(existingNames, /^S(\d+)-(\d+)$/i);
+  return `S1-${next}`;
 }
 
 export function suggestTrayName(existingNames: string[]): string {

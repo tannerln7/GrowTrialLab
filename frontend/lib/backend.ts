@@ -84,14 +84,11 @@ export function normalizeBackendError(error: unknown): BackendErrorShape {
 }
 
 export function unwrapList<T>(payload: unknown): T[] {
-  if (Array.isArray(payload)) {
-    return payload as T[];
-  }
-
   if (
     payload &&
     typeof payload === "object" &&
     "results" in payload &&
+    "meta" in payload &&
     Array.isArray((payload as { results?: unknown }).results)
   ) {
     return (payload as { results: T[] }).results;

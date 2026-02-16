@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { backendFetch, backendUrl, normalizeBackendError } from "@/lib/backend";
+import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
 import { suggestPlantId } from "@/lib/id-suggestions";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
@@ -18,10 +18,36 @@ type PlantRow = {
   species_name: string;
   species_category: string;
   plant_id: string;
-  bin: string | null;
+  grade: string | null;
   cultivar: string | null;
   status: string;
 };
+
+type PlantPreset = {
+  id: string;
+  speciesName: string;
+  category: string;
+  cultivar?: string;
+};
+
+const CARNIVOROUS_PLANT_PRESETS: PlantPreset[] = [
+  { id: "nep-ventricosa", speciesName: "Nepenthes ventricosa", category: "nepenthes" },
+  { id: "nep-alata", speciesName: "Nepenthes alata", category: "nepenthes" },
+  { id: "nep-ampullaria", speciesName: "Nepenthes ampullaria", category: "nepenthes" },
+  { id: "nep-maxima", speciesName: "Nepenthes maxima", category: "nepenthes" },
+  { id: "nep-rajah", speciesName: "Nepenthes rajah", category: "nepenthes" },
+  { id: "flytrap-typical", speciesName: "Dionaea muscipula", category: "flytrap", cultivar: "Typical" },
+  { id: "flytrap-b52", speciesName: "Dionaea muscipula", category: "flytrap", cultivar: "B52" },
+  { id: "drosera-capensis", speciesName: "Drosera capensis", category: "drosera" },
+  { id: "drosera-aliciae", speciesName: "Drosera aliciae", category: "drosera" },
+  { id: "drosera-spatulata", speciesName: "Drosera spatulata", category: "drosera" },
+  { id: "sarracenia-purpurea", speciesName: "Sarracenia purpurea", category: "sarracenia" },
+  { id: "sarracenia-flava", speciesName: "Sarracenia flava", category: "sarracenia" },
+  { id: "pinguicula-moranensis", speciesName: "Pinguicula moranensis", category: "pinguicula" },
+  { id: "pinguicula-gigantea", speciesName: "Pinguicula gigantea", category: "pinguicula" },
+  { id: "cephalotus-follicularis", speciesName: "Cephalotus follicularis", category: "cephalotus" },
+  { id: "utricularia-sandersonii", speciesName: "Utricularia sandersonii", category: "utricularia" },
+];
 
 export default function ExperimentPlantsPage() {
   const params = useParams();
@@ -49,6 +75,7 @@ export default function ExperimentPlantsPage() {
   const [manualBaselineNotes, setManualBaselineNotes] = useState("");
   const [manualPlantId, setManualPlantId] = useState("");
   const [manualQuantity, setManualQuantity] = useState(1);
+  const [selectedPresetId, setSelectedPresetId] = useState("custom");
 
   const [csvText, setCsvText] = useState("");
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -69,8 +96,8 @@ export default function ExperimentPlantsPage() {
     if (!response.ok) {
       throw new Error("Unable to load plants.");
     }
-    const data = (await response.json()) as PlantRow[];
-    setPlants(data);
+    const data = (await response.json()) as unknown;
+    setPlants(unwrapList<PlantRow>(data));
   }, [experimentId]);
 
   useEffect(() => {
@@ -172,6 +199,7 @@ export default function ExperimentPlantsPage() {
       setManualBaselineNotes("");
       setManualPlantId("");
       setManualQuantity(1);
+      setSelectedPresetId("custom");
       await loadPlants();
     } catch (requestError) {
       const normalizedError = normalizeBackendError(requestError);
@@ -296,6 +324,35 @@ export default function ExperimentPlantsPage() {
 
       <SectionCard title="Add Plants (Manual)">
         <div className={styles.formGrid}>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Plant preset</span>
+            <select
+              className={styles.input}
+              value={selectedPresetId}
+              onChange={(event) => {
+                const nextPresetId = event.target.value;
+                setSelectedPresetId(nextPresetId);
+                if (nextPresetId === "custom") {
+                  return;
+                }
+                const preset = CARNIVOROUS_PLANT_PRESETS.find((item) => item.id === nextPresetId);
+                if (!preset) {
+                  return;
+                }
+                setManualSpeciesName(preset.speciesName);
+                setManualCategory(preset.category);
+                setManualCultivar(preset.cultivar ?? "");
+              }}
+            >
+              <option value="custom">Custom (not listed)</option>
+              {CARNIVOROUS_PLANT_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.speciesName}
+                  {preset.cultivar ? ` — ${preset.cultivar}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>Species name</span>
             <input

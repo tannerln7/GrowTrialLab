@@ -37,7 +37,7 @@ type PlantCockpit = {
     plant_id: string;
     cultivar: string | null;
     status: string;
-    bin: string | null;
+    grade: string | null;
     removed_at: string | null;
     removed_reason: string;
     species: {
@@ -55,20 +55,24 @@ type PlantCockpit = {
     assigned_recipe_id: string | null;
     assigned_recipe_code: string | null;
     assigned_recipe_name: string | null;
-    placed_tray_id: string | null;
-    placed_tray_name: string | null;
-    tray_id: string | null;
-    tray_name: string | null;
-    tray_code: string | null;
-    tray_capacity: number | null;
-    tray_current_count: number | null;
-    placed_block_id: string | null;
-    placed_block_name: string | null;
-    block_id: string | null;
-    block_name: string | null;
-    tent_id: string | null;
-    tent_code: string | null;
-    tent_name: string | null;
+    location: {
+      status: "placed" | "unplaced";
+      tent: { id: string; code: string | null; name: string } | null;
+      slot: {
+        id: string;
+        code: string;
+        label: string;
+        shelf_index: number;
+        slot_index: number;
+      } | null;
+      tray: {
+        id: string;
+        code: string;
+        name: string;
+        capacity: number;
+        current_count: number;
+      } | null;
+    };
     last_fed_at: string | null;
     replaced_by_uuid: string | null;
     replaces_uuid: string | null;
@@ -85,11 +89,16 @@ type PlantCockpit = {
   links: {
     experiment_home: string;
     experiment_overview: string;
-    setup_assignment: string;
     baseline_capture: string;
     placement: string;
+    schedule: string;
+    feeding: string;
   };
-  recent_photos: PlantPhoto[];
+  recent_photos: {
+    count: number;
+    results: PlantPhoto[];
+    meta: Record<string, unknown>;
+  };
 };
 
 type UploadedPhoto = {
@@ -199,15 +208,17 @@ function formatScheduleSlot(dateValue: string, timeframe: string | null, exactTi
 }
 
 function trayOccupancyLabel(cockpit: PlantCockpit): string {
+  const tray = cockpit.derived.location.tray;
   if (
-    cockpit.derived.tray_current_count === null ||
-    cockpit.derived.tray_capacity === null ||
-    !Number.isFinite(cockpit.derived.tray_current_count) ||
-    !Number.isFinite(cockpit.derived.tray_capacity)
+    !tray ||
+    tray.current_count === null ||
+    tray.capacity === null ||
+    !Number.isFinite(tray.current_count) ||
+    !Number.isFinite(tray.capacity)
   ) {
     return "";
   }
-  return ` (${cockpit.derived.tray_current_count}/${cockpit.derived.tray_capacity})`;
+  return ` (${tray.current_count}/${tray.capacity})`;
 }
 
 function buildNowAction(cockpit: PlantCockpit | null): NowAction {
@@ -227,7 +238,7 @@ function buildNowAction(cockpit: PlantCockpit | null): NowAction {
     };
   }
 
-  if (!cockpit.derived.has_baseline || !cockpit.plant.bin) {
+  if (!cockpit.derived.has_baseline || !cockpit.plant.grade) {
     return {
       title: "Baseline needed",
       detail: "Record baseline metrics and assign a grade before assignment.",
@@ -237,7 +248,7 @@ function buildNowAction(cockpit: PlantCockpit | null): NowAction {
     };
   }
 
-  if (!cockpit.derived.assigned_recipe_code) {
+  if (!cockpit.derived.assigned_recipe_code || cockpit.derived.location.status !== "placed") {
     return {
       title: "Placement or tray recipe needed",
       detail: "This plant needs tray placement and tray recipe before feeding.",
@@ -286,7 +297,7 @@ export default function PlantQrPage() {
   const [removedReason, setRemovedReason] = useState("");
   const [inheritAssignment, setInheritAssignment] = useState(true);
   const [copyIdentity, setCopyIdentity] = useState(true);
-  const [inheritBin, setInheritBin] = useState(false);
+  const [inheritGrade, setInheritGrade] = useState(false);
 
   const overviewFromParam = useMemo(
     () => normalizeFromParam(searchParams.get("from")),
@@ -411,7 +422,11 @@ export default function PlantQrPage() {
         }
         return {
           ...current,
-          recent_photos: [recentPhoto, ...current.recent_photos].slice(0, 6),
+          recent_photos: {
+            ...current.recent_photos,
+            count: Math.min(current.recent_photos.count + 1, 6),
+            results: [recentPhoto, ...current.recent_photos.results].slice(0, 6),
+          },
         };
       });
       setPhotoFile(null);
@@ -449,7 +464,7 @@ export default function PlantQrPage() {
           new_plant_id: newPlantId.trim() || null,
           copy_identity_fields: copyIdentity,
           inherit_assignment: inheritAssignment,
-          inherit_bin: inheritBin,
+          inherit_grade: inheritGrade,
           mark_original_removed: true,
           removed_reason: removedReason.trim() || null,
         }),
@@ -570,23 +585,22 @@ export default function PlantQrPage() {
               </div>
               <div className={styles.badges}>
                 <span className={styles.badge}>Status: {cockpit.plant.status}</span>
-                <span className={styles.badge}>Grade: {cockpit.plant.bin || "Missing"}</span>
+                <span className={styles.badge}>Grade: {cockpit.plant.grade || "Missing"}</span>
                 <span className={styles.badge}>
-                  Tent: {cockpit.derived.tent_code || cockpit.derived.tent_name || "Unplaced"}
+                  Tent: {cockpit.derived.location.tent?.code || cockpit.derived.location.tent?.name || "Unplaced"}
                 </span>
-                <span className={styles.badge}>Block: {cockpit.derived.block_name || "Unplaced"}</span>
+                <span className={styles.badge}>Slot: {cockpit.derived.location.slot?.code || "Unplaced"}</span>
                 <span className={styles.badge}>
                   Tray:{" "}
-                  {cockpit.derived.tray_code ||
-                    cockpit.derived.tray_name ||
-                    cockpit.derived.placed_tray_name ||
+                  {cockpit.derived.location.tray?.code ||
+                    cockpit.derived.location.tray?.name ||
                     "Unplaced"}
                   {trayOccupancyLabel(cockpit)}
                 </span>
                 <span className={styles.badge}>
                   Recipe: {cockpit.derived.assigned_recipe_code || "Missing"}
                 </span>
-                {!cockpit.derived.tray_id ? <span className={styles.badge}>Unplaced</span> : null}
+                {cockpit.derived.location.status !== "placed" ? <span className={styles.badge}>Unplaced</span> : null}
               </div>
             </div>
           </SectionCard>
@@ -783,7 +797,7 @@ export default function PlantQrPage() {
               <span>Last fed: {formatLastFedAge(cockpit.derived.last_fed_at)}</span>
             </div>
             <ResponsiveList
-              items={cockpit.recent_photos}
+              items={cockpit.recent_photos.results}
               getKey={(photo) => photo.id}
               columns={[
                 {
@@ -933,8 +947,8 @@ export default function PlantQrPage() {
               <label className={sharedStyles.checkboxRow}>
                 <input
                   type="checkbox"
-                  checked={inheritBin}
-                  onChange={(event) => setInheritBin(event.target.checked)}
+                  checked={inheritGrade}
+                  onChange={(event) => setInheritGrade(event.target.checked)}
                 />
                 <span>Inherit grade assignment</span>
               </label>

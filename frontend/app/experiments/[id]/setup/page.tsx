@@ -108,8 +108,8 @@ export default function ExperimentSetupPage() {
     },
     {
       id: "tents_blocks",
-      title: "Tents + Blocks (Slots)",
-      complete: !statusSummary?.setup.missing.tents && !statusSummary?.setup.missing.blocks,
+      title: "Tents + Slots",
+      complete: !statusSummary?.setup.missing.tents && !statusSummary?.setup.missing.slots,
       href: `/experiments/${experimentId}/slots`,
       actionLabel: "Go to slots",
     },

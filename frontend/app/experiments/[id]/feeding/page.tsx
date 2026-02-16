@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { backendFetch, normalizeBackendError } from "@/lib/backend";
+import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
@@ -17,6 +17,25 @@ import StickyActionBar from "@/src/components/ui/StickyActionBar";
 
 import styles from "../../experiments.module.css";
 
+type Location = {
+  status: "placed" | "unplaced";
+  tent: { id: string; code: string | null; name: string } | null;
+  slot: {
+    id: string;
+    code: string;
+    label: string;
+    shelf_index: number;
+    slot_index: number;
+  } | null;
+  tray: {
+    id: string;
+    code: string;
+    name: string;
+    capacity: number;
+    current_count: number;
+  } | null;
+};
+
 type FeedingQueuePlant = {
   uuid: string;
   plant_id: string;
@@ -26,10 +45,7 @@ type FeedingQueuePlant = {
   assigned_recipe_id: string | null;
   assigned_recipe_code: string | null;
   assigned_recipe_name: string | null;
-  placed_tray_id: string | null;
-  placed_tray_name: string | null;
-  placed_block_id: string | null;
-  placed_block_name: string | null;
+  location: Location;
   blocked_reason: string | null;
   last_fed_at: string | null;
   needs_feeding: boolean;
@@ -38,7 +54,11 @@ type FeedingQueuePlant = {
 type FeedingQueueResponse = {
   remaining_count: number;
   window_days: number;
-  plants: FeedingQueuePlant[];
+  plants: {
+    count: number;
+    results: FeedingQueuePlant[];
+    meta: Record<string, unknown>;
+  };
 };
 
 function normalizeFromParam(rawFrom: string | null): string | null {
@@ -78,10 +98,10 @@ function formatLastFed(lastFedAt: string | null): string {
 }
 
 function pickNextNeedingFeed(
-  queue: FeedingQueueResponse,
+  plants: FeedingQueuePlant[],
   currentPlantId: string | null,
 ): string | null {
-  const missing = queue.plants.filter((plant) => plant.needs_feeding);
+  const missing = plants.filter((plant) => plant.needs_feeding);
   if (missing.length === 0) {
     return null;
   }
@@ -90,6 +110,13 @@ function pickNextNeedingFeed(
   }
   const next = missing.find((plant) => plant.uuid !== currentPlantId);
   return next ? next.uuid : missing[0].uuid;
+}
+
+function locationLabel(plant: FeedingQueuePlant): string {
+  if (plant.location.status !== "placed" || !plant.location.slot || !plant.location.tray) {
+    return "Unplaced";
+  }
+  return `${plant.location.slot.code} / ${plant.location.tray.code || plant.location.tray.name}`;
 }
 
 export default function FeedingPage() {
@@ -125,25 +152,26 @@ export default function FeedingPage() {
   const fromParam = useMemo(() => normalizeFromParam(rawFromParam), [rawFromParam]);
   const overviewHref = fromParam || `/experiments/${experimentId}/overview`;
 
+  const queuePlants = useMemo(() => (queue ? unwrapList<FeedingQueuePlant>(queue.plants) : []), [queue]);
+
   const selectedPlant = useMemo(
-    () => queue?.plants.find((plant) => plant.uuid === selectedPlantId) ?? null,
-    [queue?.plants, selectedPlantId],
+    () => queuePlants.find((plant) => plant.uuid === selectedPlantId) ?? null,
+    [queuePlants, selectedPlantId],
   );
-  const upNext = useMemo(() => {
-    if (!queue) {
-      return [];
-    }
-    return queue.plants
-      .filter((plant) => plant.needs_feeding && plant.uuid !== selectedPlantId)
-      .slice(0, 3);
-  }, [queue, selectedPlantId]);
+
+  const upNext = useMemo(
+    () => queuePlants.filter((plant) => plant.needs_feeding && plant.uuid !== selectedPlantId).slice(0, 3),
+    [queuePlants, selectedPlantId],
+  );
+
   const canSaveAndNext = (queue?.remaining_count ?? 0) > 0;
   const saveBlockedReason = selectedPlant?.blocked_reason ?? null;
   const saveBlocked = Boolean(saveBlockedReason);
 
-  const updatePlantQuery = useCallback(
+  const syncPlantInUrl = useCallback(
     (plantId: string | null) => {
-      if ((preselectedPlantId ?? null) === plantId) {
+      const current = preselectedPlantId ?? null;
+      if (current === plantId) {
         return;
       }
       const nextParams = new URLSearchParams();
@@ -157,16 +185,6 @@ export default function FeedingPage() {
       router.replace(`/experiments/${experimentId}/feeding${query ? `?${query}` : ""}`);
     },
     [experimentId, preselectedPlantId, rawFromParam, router],
-  );
-
-  const selectPlant = useCallback(
-    (plantId: string | null, options?: { syncUrl?: boolean }) => {
-      setSelectedPlantId(plantId);
-      if (options?.syncUrl !== false) {
-        updatePlantQuery(plantId);
-      }
-    },
-    [updatePlantQuery],
   );
 
   const loadQueue = useCallback(async () => {
@@ -212,15 +230,18 @@ export default function FeedingPage() {
         }
 
         const queuePayload = await loadQueue();
+        const plants = unwrapList<FeedingQueuePlant>(queuePayload.plants);
         if (preselectedPlantId) {
           setSelectedPlantId(preselectedPlantId);
-        } else if (queuePayload.remaining_count > 0) {
-          const nextPlant = pickNextNeedingFeed(queuePayload, null);
+        } else {
+          const nextPlant =
+            pickNextNeedingFeed(plants, null) ||
+            plants[0]?.uuid ||
+            null;
+          setSelectedPlantId(nextPlant);
           if (nextPlant) {
-            selectPlant(nextPlant);
+            syncPlantInUrl(nextPlant);
           }
-        } else if (queuePayload.plants.length > 0) {
-          selectPlant(queuePayload.plants[0].uuid);
         }
       } catch (requestError) {
         const normalized = normalizeBackendError(requestError);
@@ -234,7 +255,14 @@ export default function FeedingPage() {
     }
 
     void load();
-  }, [experimentId, loadQueue, preselectedPlantId, router, selectPlant]);
+  }, [experimentId, loadQueue, preselectedPlantId, router, syncPlantInUrl]);
+
+  function selectPlant(plantId: string | null, syncUrl = true) {
+    setSelectedPlantId(plantId);
+    if (syncUrl) {
+      syncPlantInUrl(plantId);
+    }
+  }
 
   async function saveFeeding(moveNext: boolean) {
     if (!selectedPlantId) {
@@ -271,13 +299,14 @@ export default function FeedingPage() {
       setShowNote(false);
 
       const refreshedQueue = await loadQueue();
+      const refreshedPlants = unwrapList<FeedingQueuePlant>(refreshedQueue.plants);
       if (moveNext) {
-        const nextPlantId = pickNextNeedingFeed(refreshedQueue, selectedPlantId);
+        const nextPlantId = pickNextNeedingFeed(refreshedPlants, selectedPlantId);
         if (!nextPlantId) {
           router.push(`/experiments/${experimentId}/overview?refresh=${Date.now()}`);
           return;
         }
-        selectPlant(nextPlantId);
+        selectPlant(nextPlantId, true);
       }
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
@@ -317,9 +346,7 @@ export default function FeedingPage() {
 
       {statusSummary && statusSummary.lifecycle.state !== "running" ? (
         <SectionCard title="Feeding Requires Running State">
-          <p className={styles.mutedText}>
-            Feeding is available only while an experiment is running.
-          </p>
+          <p className={styles.mutedText}>Feeding is available only while an experiment is running.</p>
           <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
             Start experiment from Overview
           </Link>
@@ -330,25 +357,19 @@ export default function FeedingPage() {
         <>
           <SectionCard title="Queue Status">
             <div className={styles.stack}>
-              <span className={styles.badgeWarn}>
-                Remaining feedings: {queue.remaining_count}
-              </span>
-              <p className={styles.mutedText}>
-                Window: feed plants at least once every {queue.window_days} days.
-              </p>
+              <span className={styles.badgeWarn}>Remaining feedings: {queue.remaining_count}</span>
+              <p className={styles.mutedText}>Window: feed plants at least once every {queue.window_days} days.</p>
               {selectedPlant && !selectedPlant.needs_feeding ? (
-                <p className={styles.inlineNote}>
-                  This plant is already within the feeding window.
-                </p>
+                <p className={styles.inlineNote}>This plant is already within the feeding window.</p>
               ) : null}
               {queue.remaining_count > 0 ? (
                 <button
                   className={styles.buttonSecondary}
                   type="button"
                   onClick={() => {
-                    const next = pickNextNeedingFeed(queue, selectedPlantId);
+                    const next = pickNextNeedingFeed(queuePlants, selectedPlantId);
                     if (next) {
-                      selectPlant(next);
+                      selectPlant(next, true);
                     }
                   }}
                 >
@@ -362,9 +383,7 @@ export default function FeedingPage() {
 
           {queue.remaining_count === 0 && !selectedPlant ? (
             <SectionCard title="All Feedings Complete">
-              <p className={styles.mutedText}>
-                No active plants currently need feeding.
-              </p>
+              <p className={styles.mutedText}>No active plants currently need feeding.</p>
               <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
                 Back to Overview
               </Link>
@@ -378,10 +397,10 @@ export default function FeedingPage() {
                 <select
                   className={styles.select}
                   value={selectedPlantId ?? ""}
-                  onChange={(event) => selectPlant(event.target.value || null)}
+                  onChange={(event) => selectPlant(event.target.value || null, true)}
                 >
                   <option value="">Select plant</option>
-                  {queue.plants.map((plant) => (
+                  {queuePlants.map((plant) => (
                     <option key={plant.uuid} value={plant.uuid}>
                       {plant.plant_id || "(pending)"} - {plant.species_name}
                     </option>
@@ -390,18 +409,14 @@ export default function FeedingPage() {
               </label>
               {selectedPlant ? (
                 <div className={styles.stack}>
-                  <p className={styles.mutedText}>
-                    Last fed: {formatLastFed(selectedPlant.last_fed_at)}
-                  </p>
+                  <p className={styles.mutedText}>Last fed: {formatLastFed(selectedPlant.last_fed_at)}</p>
                   <p className={styles.mutedText}>
                     Assigned recipe:{" "}
                     {selectedPlant.assigned_recipe_code
                       ? `${selectedPlant.assigned_recipe_code}${selectedPlant.assigned_recipe_name ? ` - ${selectedPlant.assigned_recipe_name}` : ""}`
                       : "Unassigned"}
                   </p>
-                  <p className={styles.mutedText}>
-                    Tray: {selectedPlant.placed_tray_name || "Unplaced"}
-                  </p>
+                  <p className={styles.mutedText}>Location: {locationLabel(selectedPlant)}</p>
                   {selectedPlant.blocked_reason ? (
                     <p className={styles.errorText}>Blocked: {selectedPlant.blocked_reason}</p>
                   ) : null}
@@ -416,21 +431,13 @@ export default function FeedingPage() {
                   placeholder="3 drops"
                 />
               </label>
-              <button
-                className={styles.buttonSecondary}
-                type="button"
-                onClick={() => setShowNote((current) => !current)}
-              >
+              <button className={styles.buttonSecondary} type="button" onClick={() => setShowNote((current) => !current)}>
                 {showNote ? "Hide note" : "Add note"}
               </button>
               {showNote ? (
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Note (optional)</span>
-                  <textarea
-                    className={styles.textarea}
-                    value={note}
-                    onChange={(event) => setNote(event.target.value)}
-                  />
+                  <textarea className={styles.textarea} value={note} onChange={(event) => setNote(event.target.value)} />
                 </label>
               ) : null}
             </div>
@@ -484,11 +491,7 @@ export default function FeedingPage() {
                     <strong>{plant.species_name}</strong>
                     <span>Last fed</span>
                     <strong>{formatLastFed(plant.last_fed_at)}</strong>
-                    <button
-                      className={styles.buttonSecondary}
-                      type="button"
-                      onClick={() => selectPlant(plant.uuid)}
-                    >
+                    <button className={styles.buttonSecondary} type="button" onClick={() => selectPlant(plant.uuid, true)}>
                       Select
                     </button>
                   </div>
