@@ -99,8 +99,6 @@ Historical context only:
   - `cd backend && uv run pyright`
 - Backend tests use pytest:
   - `cd backend && uv run pytest`
-  - `cd backend && uv run pytest -q`
-  - `cd backend && uv run pytest --maxfail=1`
 - Frontend lint/type checks:
   - `cd frontend && pnpm run lint`
   - `cd frontend && pnpm run typecheck`
