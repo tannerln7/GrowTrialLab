@@ -388,7 +388,7 @@ export default function ExperimentOverviewPage() {
     (summary?.schedule.due_counts_today ?? 0) > 0 || summary?.schedule.next_scheduled_slot == null;
 
   function actionButtonClass(needsAttention: boolean): string {
-    return [needsAttention ? styles.buttonPrimary : styles.buttonSecondary, styles.overviewActionButton].join(" ");
+    return [needsAttention ? "gt-button gt-button--primary" : "gt-button gt-button--secondary", styles.overviewActionButton].join(" ");
   }
 
   const readinessItems = [
@@ -690,14 +690,14 @@ export default function ExperimentOverviewPage() {
 
   return (
     <PageShell title="Overview" subtitle={experimentName || experimentId}>
-      {loading ? <p className={styles.mutedText}>Loading overview...</p> : null}
-      {error ? <p className={styles.errorText}>{error}</p> : null}
-      {notice ? <p className={styles.successText}>{notice}</p> : null}
+      {loading ? <p className="gt-text-muted">Loading overview...</p> : null}
+      {error ? <p className="gt-text-danger">{error}</p> : null}
+      {notice ? <p className="gt-text-success">{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Experiment State">
         <div className={styles.overviewStateCard}>
-          <p className={styles.mutedText}>State: {summary?.lifecycle.state.toUpperCase() || "UNKNOWN"}</p>
+          <p className="gt-text-muted">State: {summary?.lifecycle.state.toUpperCase() || "UNKNOWN"}</p>
           <div className={styles.overviewReadinessRow}>
             {readinessItems.map((item) => (
               <span
@@ -713,7 +713,7 @@ export default function ExperimentOverviewPage() {
           </div>
           <div className={styles.overviewStateActionRow}>
             <button
-              className={[styles.buttonPrimary, styles.overviewActionButton].join(" ")}
+              className={["gt-button gt-button--primary", styles.overviewActionButton].join(" ")}
               type="button"
               disabled={busy || !startReady}
               onClick={startExperiment}
@@ -722,7 +722,7 @@ export default function ExperimentOverviewPage() {
             </button>
             {summary?.lifecycle.state === "running" ? (
               <button
-                className={[styles.buttonDanger, styles.overviewActionButton].join(" ")}
+                className={["gt-button gt-button--danger", styles.overviewActionButton].join(" ")}
                 type="button"
                 disabled={busy}
                 onClick={stopExperiment}
@@ -754,7 +754,7 @@ export default function ExperimentOverviewPage() {
 
       <SectionCard title="Schedule">
         <div className={styles.overviewScheduleCard}>
-          <p className={styles.mutedText}>
+          <p className="gt-text-muted">
             Next schedule slot: {formatScheduleSlot(summary?.schedule.next_scheduled_slot || null)}
           </p>
           <div className={styles.actions}>
@@ -857,7 +857,7 @@ export default function ExperimentOverviewPage() {
                       );
                     })}
                     {tentGroup.shelves.length === 0 ? (
-                      <p className={styles.mutedText}>No mapped slots.</p>
+                      <p className="gt-text-muted">No mapped slots.</p>
                     ) : null}
                   </div>
                 </article>
@@ -878,7 +878,7 @@ export default function ExperimentOverviewPage() {
       {!loading && sortedPlants.length === 0 ? (
         <SectionCard>
           <IllustrationPlaceholder inventoryId="ILL-201" kind="generic" />
-          <p className={styles.mutedText}>No plants available for this experiment.</p>
+          <p className="gt-text-muted">No plants available for this experiment.</p>
         </SectionCard>
       ) : null}
     </PageShell>

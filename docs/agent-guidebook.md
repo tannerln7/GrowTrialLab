@@ -91,7 +91,7 @@ Historical context only:
 
 ## Frontend Styling Guidance (Current Conventions)
 - Token source of truth is `frontend/src/styles/tokens.css` (`--gt-*` variables); keep token names stable and minimal so they can map directly into future Tailwind theme config.
-- Shared global primitives live in `frontend/src/styles/primitives.css`; prefer these over re-defining base card/grid/cell/chip styles in route CSS modules.
+- Shared global primitives live in `frontend/src/styles/primitives.css`; prefer these over re-defining base card/grid/cell/chip/button/form/tooltip styles in route CSS modules.
 - For dense placement/recipe/baseline/overview cell layouts, use `gt-grid` with `data-cell-size="sm|md|lg"` plus `gt-cell` state modifiers instead of per-page min-width/padding forks.
 - Keep route CSS modules focused on page-specific layout/behavior overrides, not shared visual primitives.
 

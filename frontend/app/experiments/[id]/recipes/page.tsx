@@ -129,7 +129,7 @@ function ToolIconButton({
     <Tooltip.Root>
       <Tooltip.Trigger asChild>
         <button
-          className={danger ? styles.toolbarIconDanger : styles.toolbarIconButton}
+          className={danger ? "gt-icon-button gt-icon-button--danger" : "gt-icon-button"}
           type="button"
           onClick={onClick}
           disabled={disabled}
@@ -140,9 +140,9 @@ function ToolIconButton({
         </button>
       </Tooltip.Trigger>
       <Tooltip.Portal>
-        <Tooltip.Content className={styles.toolbarTooltip} sideOffset={6}>
+        <Tooltip.Content className="gt-tooltip" sideOffset={6}>
           {label}
-          <Tooltip.Arrow className={styles.toolbarTooltipArrow} />
+          <Tooltip.Arrow className="gt-tooltip-arrow" />
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>
@@ -696,48 +696,48 @@ export default function RecipesPage() {
       title="Recipes"
       subtitle="Assign recipes to individual plants using tray-grouped selection and draft saves."
       actions={
-        <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+        <Link className="gt-button gt-button--primary" href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
     >
-      {loading ? <p className={styles.mutedText}>Loading recipes...</p> : null}
-      {error ? <p className={styles.errorText}>{error}</p> : null}
-      {notice ? <p className={styles.successText}>{notice}</p> : null}
+      {loading ? <p className="gt-text-muted">Loading recipes...</p> : null}
+      {error ? <p className="gt-text-danger">{error}</p> : null}
+      {notice ? <p className="gt-text-success">{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Recipe Tools">
         <form className={styles.recipeCreateCompact} onSubmit={(event) => void createRecipe(event)}>
           <input
-            className={styles.input}
+            className="gt-input"
             value={code}
             onChange={(event) => setCode(event.target.value)}
             placeholder="Code (R0)"
             aria-label="Recipe code"
           />
           <input
-            className={styles.input}
+            className="gt-input"
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Name"
             aria-label="Recipe name"
           />
           <input
-            className={styles.input}
+            className="gt-input"
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             placeholder="Notes (optional)"
             aria-label="Recipe notes"
           />
-          <button className={styles.buttonPrimary} type="submit" disabled={saving}>
+          <button className="gt-button gt-button--primary" type="submit" disabled={saving}>
             {saving ? "Saving..." : "Create recipe"}
           </button>
         </form>
 
         <Tooltip.Provider delayDuration={150}>
           <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
-            <span className={styles.mutedText}>Recipes: {recipes.length}</span>
-            <span className={styles.mutedText}>Selected: {selectedRecipeIds.size}</span>
+            <span className="gt-text-muted">Recipes: {recipes.length}</span>
+            <span className="gt-text-muted">Selected: {selectedRecipeIds.size}</span>
             <div className={[styles.toolbarActionsCompact, "gt-btnbar"].join(" ")}>
               <ToolIconButton
                 label="Clear recipe selection"
@@ -794,7 +794,7 @@ export default function RecipesPage() {
               </article>
             );
           })}
-          {recipes.length === 0 ? <p className={styles.mutedText}>No recipes yet.</p> : null}
+          {recipes.length === 0 ? <p className="gt-text-muted">No recipes yet.</p> : null}
         </div>
       </SectionCard>
 
@@ -802,7 +802,7 @@ export default function RecipesPage() {
         <Tooltip.Provider delayDuration={150}>
           <div className={[styles.placementToolbar, "gt-stack"].join(" ")}>
             <select
-              className={styles.select}
+              className="gt-select"
               value={selectedBulkRecipeId}
               onChange={(event) => setSelectedBulkRecipeId(event.target.value)}
               aria-label="Recipe for selected plants"
@@ -834,7 +834,7 @@ export default function RecipesPage() {
                 disabled={selectedPlantIds.size === 0}
               />
               <button
-                className={styles.buttonPrimary}
+                className="gt-button gt-button--primary"
                 type="button"
                 disabled={selectedPlantIds.size === 0 || !selectedBulkRecipeId}
                 onClick={stageApplyRecipeToSelection}
@@ -843,7 +843,7 @@ export default function RecipesPage() {
                 Apply to selected
               </button>
               <button
-                className={styles.buttonSecondary}
+                className="gt-button gt-button--secondary"
                 type="button"
                 disabled={selectedPlantIds.size === 0}
                 onClick={stageRemoveRecipeFromSelection}
@@ -856,9 +856,9 @@ export default function RecipesPage() {
         </Tooltip.Provider>
 
         <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
-          <span className={styles.mutedText}>Plants in view: {allPlantIds.length}</span>
-          <span className={styles.mutedText}>Selected plants: {selectedPlantIds.size}</span>
-          <span className={styles.mutedText}>Draft changes: {draftChangeCount}</span>
+          <span className="gt-text-muted">Plants in view: {allPlantIds.length}</span>
+          <span className="gt-text-muted">Selected plants: {selectedPlantIds.size}</span>
+          <span className="gt-text-muted">Draft changes: {draftChangeCount}</span>
         </div>
 
         {diagnostics?.reason_counts ? (
@@ -882,10 +882,10 @@ export default function RecipesPage() {
                 <div className={styles.trayHeaderRow}>
                   <div className={styles.trayHeaderMeta}>
                     <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
-                    <span className={styles.mutedText}>Occupancy: {trayPlantIds.length}/{tray.capacity}</span>
+                    <span className="gt-text-muted">Occupancy: {trayPlantIds.length}/{tray.capacity}</span>
                   </div>
                   <div className={styles.trayHeaderActions}>
-                    <span className={styles.mutedText}>Selected: {selectedCount}</span>
+                    <span className="gt-text-muted">Selected: {selectedCount}</span>
                     <TrayHeaderToggle
                       onClick={() => togglePlantsSelectionByContainer(trayPlantIds)}
                       allSelected={allSelected}
@@ -906,10 +906,10 @@ export default function RecipesPage() {
               <div className={styles.trayHeaderRow}>
                 <div className={styles.trayHeaderMeta}>
                   <strong>Unplaced</strong>
-                  <span className={styles.mutedText}>Plants: {unplacedPlantIds.length}</span>
+                  <span className="gt-text-muted">Plants: {unplacedPlantIds.length}</span>
                 </div>
                 <div className={styles.trayHeaderActions}>
-                  <span className={styles.mutedText}>
+                  <span className="gt-text-muted">
                     Selected: {unplacedPlantIds.filter((plantId) => selectedPlantIds.has(plantId)).length}
                   </span>
                   <TrayHeaderToggle
@@ -930,11 +930,11 @@ export default function RecipesPage() {
 
       <StickyActionBar>
         <span className={styles.recipeLegendItem}>{draftChangeCount} recipe mapping change(s)</span>
-        <button className={styles.buttonPrimary} type="button" disabled={saving || draftChangeCount === 0} onClick={() => void saveDrafts()}>
+        <button className="gt-button gt-button--primary" type="button" disabled={saving || draftChangeCount === 0} onClick={() => void saveDrafts()}>
           <Save size={16} />
           {saving ? "Saving..." : "Save Recipe Mapping"}
         </button>
-        <button className={styles.buttonSecondary} type="button" disabled={saving || draftChangeCount === 0} onClick={resetDrafts}>
+        <button className="gt-button gt-button--secondary" type="button" disabled={saving || draftChangeCount === 0} onClick={resetDrafts}>
           Discard drafts
         </button>
       </StickyActionBar>

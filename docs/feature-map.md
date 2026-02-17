@@ -206,7 +206,7 @@ This file is the execution-focused feature map for product and engineering statu
   - Refs: local workspace (uncommitted changes)
 - `Completed` CSS Phase 1 token/primitives cleanup (Tailwind prep, no Tailwind yet):
   - Added shared design tokens and a small global primitive layer to reduce module drift while preserving the existing dark/material look.
-  - Placement and Recipes were rewired first (with Overview/Baseline cell quick-pass) to use shared `gt-*` surface/grid/cell primitives and attribute-driven cell sizing (`data-cell-size="sm|md|lg"`).
+  - Placement and Recipes were rewired first (with Overview/Baseline plus shared button/form/tooltip primitive adoption) to use shared `gt-*` surface/grid/cell primitives and attribute-driven cell sizing (`data-cell-size="sm|md|lg"`).
   - Relevant files:
     - `frontend/src/styles/tokens.css`
     - `frontend/src/styles/primitives.css`
@@ -216,7 +216,7 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/app/experiments/[id]/overview/page.tsx`
     - `frontend/app/experiments/[id]/baseline/page.tsx`
     - `frontend/app/experiments/experiments.module.css`
-    - `docs/ui-css-phase1-notes.md`
+    - `docs/ui-css-phase1-report.md`
   - Refs: local workspace (uncommitted changes)
 - `Completed` Baseline capture UX compact-grid update:
   - Capture controls now render above queue; queue now uses compact plant cells where selecting any cell activates that plant in the capture panel.

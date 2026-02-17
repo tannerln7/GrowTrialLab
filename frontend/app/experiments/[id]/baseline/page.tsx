@@ -726,39 +726,39 @@ export default function BaselinePage() {
       title="Baseline"
       subtitle="Record week 0 baseline metrics and grade."
       actions={
-        <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+        <Link className="gt-button gt-button--primary" href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
     >
-      {loading ? <p className={styles.mutedText}>Loading baseline queue...</p> : null}
-      {error ? <p className={styles.errorText}>{error}</p> : null}
-      {notice ? <p className={styles.successText}>{notice}</p> : null}
+      {loading ? <p className="gt-text-muted">Loading baseline queue...</p> : null}
+      {error ? <p className="gt-text-danger">{error}</p> : null}
+      {notice ? <p className="gt-text-success">{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Queue Status">
-        <p className={styles.mutedText}>Remaining baselines: {queue?.remaining_count ?? 0}</p>
+        <p className="gt-text-muted">Remaining baselines: {queue?.remaining_count ?? 0}</p>
         {baselineLocked ? (
           <p className={styles.inlineNote}>Baseline is locked in UI. Unlock editing for this session to continue.</p>
         ) : null}
         <div className={styles.actions}>
           {baselineLocked && !editingUnlocked ? (
-            <button className={styles.buttonDanger} type="button" onClick={() => setEditingUnlocked(true)}>
+            <button className="gt-button gt-button--danger" type="button" onClick={() => setEditingUnlocked(true)}>
               Unlock editing
             </button>
           ) : null}
           {baselineLocked && editingUnlocked ? (
-            <button className={styles.buttonSecondary} type="button" onClick={() => setEditingUnlocked(false)}>
+            <button className="gt-button gt-button--secondary" type="button" onClick={() => setEditingUnlocked(false)}>
               Re-lock UI
             </button>
           ) : null}
           {!baselineLocked && allBaselinesCaptured ? (
-            <button className={styles.buttonSecondary} type="button" disabled={saving} onClick={() => void lockBaseline()}>
+            <button className="gt-button gt-button--secondary" type="button" disabled={saving} onClick={() => void lockBaseline()}>
               Finish and Lock
             </button>
           ) : null}
           <button
-            className={styles.buttonPrimary}
+            className="gt-button gt-button--primary"
             type="button"
             disabled={primarySaveDisabled}
             onClick={() => void saveBaseline(primarySaveLabel === "Save & Next")}
@@ -774,7 +774,7 @@ export default function BaselinePage() {
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Plant</span>
               <select
-                className={styles.select}
+                className="gt-select"
                 value={selectedPlantId}
                 onChange={(event) => jumpToPlant(event.target.value)}
                 disabled={saving}
@@ -855,7 +855,7 @@ export default function BaselinePage() {
                   return (
                     <button
                       key={grade}
-                      className={selected ? styles.buttonPrimary : styles.buttonSecondary}
+                      className={selected ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
                       type="button"
                       disabled={saving || readOnly}
                       onClick={() => {
@@ -897,7 +897,7 @@ export default function BaselinePage() {
                 </div>
                 <div className={styles.baselinePhotoControls}>
                   <input
-                    className={`${styles.input} ${styles.baselineFileInput}`}
+                    className={`gt-input ${styles.baselineFileInput}`}
                     type="file"
                     accept="image/*"
                     capture="environment"
@@ -905,7 +905,7 @@ export default function BaselinePage() {
                     onChange={(event) => setPhotoFile(event.target.files?.[0] || null)}
                   />
                   <button
-                    className={styles.buttonSecondary}
+                    className="gt-button gt-button--secondary"
                     type="button"
                     disabled={readOnly || uploadingPhoto || saving || !photoFile}
                     onClick={() => void uploadBaselinePhoto()}
@@ -924,7 +924,7 @@ export default function BaselinePage() {
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Notes</span>
               <textarea
-                className={styles.textarea}
+                className="gt-textarea"
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 disabled={saving || readOnly}
