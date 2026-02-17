@@ -351,13 +351,35 @@
 .recipeLegendItem {
   display: inline-flex;
   align-items: center;
-  gap: 0.28rem;
-  border: 1px solid color-mix(in srgb, var(--border) 76%, var(--text-muted) 24%);
+  gap: 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, var(--text-muted) 26%);
   border-radius: 999px;
-  padding: 0.12rem 0.42rem;
+  padding: 0.12rem 0.44rem;
   font-size: 0.72rem;
   color: var(--text-muted);
   background: color-mix(in srgb, var(--surface-elevated) 88%, var(--text-muted) 12%);
+}
+
+.recipeBadge,
+.recipeBadgeEmpty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, var(--text-muted) 26%);
+  border-radius: 999px;
+  padding: 0.12rem 0.44rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.recipeBadge {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface-elevated) 84%, var(--text-muted) 16%);
+}
+
+.recipeBadgeEmpty {
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-elevated) 90%, var(--text-muted) 10%);
 }
 
 .recipeDot {
@@ -443,15 +465,11 @@
 }
 
 .placementToolbar {
-  display: grid;
-  gap: 0.55rem;
+  --gt-grid-gap: 0.55rem;
 }
 
 .toolbarActionsCompact {
-  display: flex;
-  flex-wrap: wrap;
   gap: 0.45rem;
-  align-items: center;
 }
 
 .toolbarIconButton,
@@ -503,17 +521,13 @@
 }
 
 .toolbarSummaryRow {
-  display: flex;
-  flex-wrap: wrap;
   gap: 0.45rem;
-  align-items: center;
 }
 
 .plantCellGrid,
 .plantCellGridTray {
-  display: grid;
-  gap: 0.45rem;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  --gt-grid-gap: 0.45rem;
+  --gt-cell-min: 110px;
 }
 
 .plantCellGridTray {
@@ -523,15 +537,7 @@
 }
 
 .plantCell {
-  position: relative;
-  border: 1px solid color-mix(in srgb, var(--border) 78%, var(--text-muted) 22%);
-  background: var(--surface-elevated);
-  border-radius: 10px;
-  padding: 0.45rem;
-  display: grid;
-  gap: 0.3rem;
   min-height: 104px;
-  align-content: start;
   cursor: pointer;
 }
 
@@ -549,8 +555,7 @@
 }
 
 .plantCellSelected {
-  border-color: color-mix(in srgb, var(--text-muted) 78%, var(--border));
-  background: color-mix(in srgb, var(--text-muted) 14%, var(--surface-elevated));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-muted) 32%, var(--border));
 }
 
 .plantCellDirty {
@@ -942,21 +947,13 @@
 }
 
 .trayMainGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 0.5rem;
+  --gt-grid-gap: 0.5rem;
+  --gt-cell-min: 140px;
 }
 
 .trayGridCell {
-  position: relative;
-  border: 1px solid color-mix(in srgb, var(--border) 78%, var(--text-muted) 22%);
-  background: var(--surface-elevated);
-  border-radius: 10px;
-  padding: 0.45rem;
-  display: grid;
-  gap: 0.3rem;
-  cursor: pointer;
   min-height: 84px;
+  cursor: pointer;
 }
 
 .trayGridCell:hover {
@@ -995,16 +992,12 @@
 }
 
 .trayManagerGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.55rem;
+  --gt-grid-gap: 0.55rem;
+  --gt-cell-min: 220px;
 }
 
 .trayEditorCell {
   position: relative;
-  border: 1px solid color-mix(in srgb, var(--border) 78%, var(--text-muted) 22%);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--surface) 82%, var(--text-muted) 18%);
   padding: 0.55rem;
   display: grid;
   gap: 0.45rem;
@@ -1028,9 +1021,6 @@
 }
 
 .tentBoardCard {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--surface) 90%, var(--text-muted) 10%);
   padding: 0.6rem;
   display: grid;
   gap: 0.45rem;
@@ -1043,13 +1033,11 @@
 }
 
 .slotCell {
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--surface) 84%, var(--text-muted) 16%);
+  border-style: dashed;
   padding: 0.32rem;
-  display: grid;
   gap: 0.35rem;
   align-content: start;
+  min-height: 0;
 }
 
 .slotCellLabel {
@@ -1081,9 +1069,6 @@
 
 .overviewTrayCell {
   position: relative;
-  border: 1px solid color-mix(in srgb, var(--border) 70%, var(--text-muted) 30%);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--surface) 84%, var(--text-muted) 16%);
   padding: 0.45rem;
   display: grid;
   gap: 0.3rem;

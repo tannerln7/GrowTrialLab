@@ -6,6 +6,8 @@
   - `docs/feature-map.md`
 - Agent onboarding and operating guide:
   - `docs/agent-guidebook.md`
+- UI styling refactor notes:
+  - `docs/ui-css-phase1-notes.md`
 - Legacy source documents (preserved, pre-consolidation):
   - `docs/legacy/README.md`
   - `docs/legacy/decisions.md`

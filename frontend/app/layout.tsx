@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 
 import Providers from "@/src/app/providers";
 import ServiceWorkerRegistration from "@/src/components/pwa/ServiceWorkerRegistration";
+import "@/src/styles/tokens.css";
+import "@/src/styles/primitives.css";
 
 import "./globals.css";
 

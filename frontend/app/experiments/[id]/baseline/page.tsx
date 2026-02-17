@@ -936,13 +936,21 @@ export default function BaselinePage() {
 
       <SectionCard title="Plant Queue">
         {queuePlants.length > 0 ? (
-          <div className={styles.plantCellGrid}>
+          <div className={[styles.plantCellGrid, "gt-grid"].join(" ")} data-cell-size="sm">
             {queuePlants.map((plant) => {
               const selected = plant.uuid === selectedPlantId;
               return (
                 <article
                   key={plant.uuid}
-                  className={`${styles.plantCell} ${styles.baselineQueuePlantCell} ${selected ? styles.plantCellSelected : ""}`}
+                  className={[
+                    styles.plantCell,
+                    styles.baselineQueuePlantCell,
+                    "gt-cell gt-cell--interactive",
+                    selected ? "gt-cell--selected" : "",
+                    selected ? styles.plantCellSelected : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   role="button"
                   tabIndex={0}
                   onClick={() => jumpToPlant(plant.uuid)}

@@ -642,7 +642,12 @@ export default function ExperimentOverviewPage() {
       <Link
         key={plant.uuid}
         href={plantLink(plant)}
-        className={[styles.plantCell, styles.overviewPlantCellLink, styles.overviewPlantCell].join(" ")}
+        className={[
+          styles.plantCell,
+          styles.overviewPlantCellLink,
+          styles.overviewPlantCell,
+          "gt-cell gt-cell--interactive",
+        ].join(" ")}
       >
         <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
         <span className={[styles.plantCellSpecies, styles.overviewPlantSpecies].join(" ")}>{speciesLine}</span>
@@ -765,7 +770,10 @@ export default function ExperimentOverviewPage() {
           <div className={styles.overviewTentBoardGrid}>
             {placementGroups.tents.map((tentGroup) => {
               return (
-                <article key={tentGroup.tent.id} className={[styles.tentBoardCard, styles.overviewTentBoardCard].join(" ")}>
+                <article
+                  key={tentGroup.tent.id}
+                  className={[styles.tentBoardCard, styles.overviewTentBoardCard, "gt-surface"].join(" ")}
+                >
                   <div className={styles.trayHeaderRow}>
                     <div className={styles.trayHeaderMeta}>
                       <strong>{tentGroup.tent.name || tentGroup.tent.code || "Tent"}</strong>
@@ -796,7 +804,12 @@ export default function ExperimentOverviewPage() {
                               return (
                                 <div
                                   key={`${tentGroup.tent.id}-shelf-${shelfGroup.shelfIndex}-slot-${slotIndex}`}
-                                  className={[styles.slotCell, styles.overviewSlotCell, styles.overviewSlotCellEmpty].join(" ")}
+                                  className={[
+                                    styles.slotCell,
+                                    styles.overviewSlotCell,
+                                    styles.overviewSlotCellEmpty,
+                                    "gt-cell gt-cell--muted",
+                                  ].join(" ")}
                                 >
                                   <span className={styles.slotCellLabel}>Slot {slotIndex}</span>
                                   <div className={styles.overviewSlotEmptyState}>Empty</div>
@@ -807,7 +820,7 @@ export default function ExperimentOverviewPage() {
                             return (
                               <div
                                 key={slotGroup.slot.id}
-                                className={[styles.slotCell, styles.overviewSlotCell].join(" ")}
+                                className={[styles.slotCell, styles.overviewSlotCell, "gt-cell gt-cell--muted"].join(" ")}
                                 style={{ gridColumnStart: slotIndex }}
                               >
                                 <span className={styles.slotCellLabel}>Slot {slotIndex}</span>
@@ -815,7 +828,7 @@ export default function ExperimentOverviewPage() {
                                   {slotGroup.trays.map((trayGroup) => (
                                     <article
                                       key={trayGroup.tray.id}
-                                      className={styles.overviewTrayCell}
+                                      className={[styles.overviewTrayCell, "gt-surface"].join(" ")}
                                     >
                                     <div className={styles.overviewTrayMeta}>
                                       <strong className={styles.trayGridCellId}>
@@ -827,7 +840,7 @@ export default function ExperimentOverviewPage() {
                                           </span>
                                         ) : null}
                                       </div>
-                                      <div className={styles.plantCellGridTray}>
+                                      <div className={[styles.plantCellGridTray, "gt-grid"].join(" ")} data-cell-size="sm">
                                         {trayGroup.plants.map((plant) => renderPlantCell(plant))}
                                       </div>
                                     </article>
@@ -856,7 +869,7 @@ export default function ExperimentOverviewPage() {
 
       {placementGroups.unplaced.length > 0 ? (
         <SectionCard title="Unplaced Plants">
-          <div className={styles.plantCellGrid}>
+          <div className={[styles.plantCellGrid, "gt-grid"].join(" ")} data-cell-size="sm">
             {placementGroups.unplaced.map((plant) => renderPlantCell(plant))}
           </div>
         </SectionCard>

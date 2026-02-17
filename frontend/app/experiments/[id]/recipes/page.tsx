@@ -645,6 +645,8 @@ export default function RecipesPage() {
         key={plant.uuid}
         className={[
           styles.plantCell,
+          "gt-cell gt-cell--interactive",
+          selected ? "gt-cell--selected" : "",
           selected ? styles.plantCellSelected : "",
           dirty ? styles.plantCellDirty : "",
         ]
@@ -733,10 +735,10 @@ export default function RecipesPage() {
         </form>
 
         <Tooltip.Provider delayDuration={150}>
-          <div className={styles.toolbarSummaryRow}>
+          <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
             <span className={styles.mutedText}>Recipes: {recipes.length}</span>
             <span className={styles.mutedText}>Selected: {selectedRecipeIds.size}</span>
-            <div className={styles.toolbarActionsCompact}>
+            <div className={[styles.toolbarActionsCompact, "gt-btnbar"].join(" ")}>
               <ToolIconButton
                 label="Clear recipe selection"
                 icon={<X size={16} />}
@@ -756,13 +758,21 @@ export default function RecipesPage() {
           </div>
         </Tooltip.Provider>
 
-        <div className={styles.trayMainGrid}>
+        <div className={[styles.trayMainGrid, "gt-grid"].join(" ")} data-cell-size="md">
           {recipes.map((recipe) => {
             const selected = selectedRecipeIds.has(recipe.id);
             return (
               <article
                 key={recipe.id}
-                className={[styles.trayGridCell, styles.recipeCell, selected ? styles.plantCellSelected : ""].filter(Boolean).join(" ")}
+                className={[
+                  styles.trayGridCell,
+                  styles.recipeCell,
+                  "gt-cell gt-cell--interactive",
+                  selected ? "gt-cell--selected" : "",
+                  selected ? styles.plantCellSelected : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 onClick={() => toggleRecipeSelection(recipe.id)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -790,7 +800,7 @@ export default function RecipesPage() {
 
       <SectionCard title="Plants by Tray (Draft)">
         <Tooltip.Provider delayDuration={150}>
-          <div className={styles.placementToolbar}>
+          <div className={[styles.placementToolbar, "gt-stack"].join(" ")}>
             <select
               className={styles.select}
               value={selectedBulkRecipeId}
@@ -804,7 +814,7 @@ export default function RecipesPage() {
                 </option>
               ))}
             </select>
-            <div className={styles.toolbarActionsCompact}>
+            <div className={[styles.toolbarActionsCompact, "gt-btnbar"].join(" ")}>
               <ToolIconButton
                 label="Select all plants"
                 icon={<CheckSquare size={16} />}
@@ -845,7 +855,7 @@ export default function RecipesPage() {
           </div>
         </Tooltip.Provider>
 
-        <div className={styles.toolbarSummaryRow}>
+        <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
           <span className={styles.mutedText}>Plants in view: {allPlantIds.length}</span>
           <span className={styles.mutedText}>Selected plants: {selectedPlantIds.size}</span>
           <span className={styles.mutedText}>Draft changes: {draftChangeCount}</span>
@@ -861,14 +871,14 @@ export default function RecipesPage() {
           </div>
         ) : null}
 
-        <div className={styles.trayManagerGrid}>
+        <div className={[styles.trayManagerGrid, "gt-grid"].join(" ")} data-cell-size="lg">
           {sortedTrays.map((tray) => {
             const trayPlantIds = trayPlantIdsByTray[tray.tray_id] || [];
             const selectedCount = trayPlantIds.filter((plantId) => selectedPlantIds.has(plantId)).length;
             const allSelected = trayPlantIds.length > 0 && selectedCount === trayPlantIds.length;
 
             return (
-              <article key={tray.tray_id} className={styles.trayEditorCell}>
+              <article key={tray.tray_id} className={[styles.trayEditorCell, "gt-surface-2"].join(" ")}>
                 <div className={styles.trayHeaderRow}>
                   <div className={styles.trayHeaderMeta}>
                     <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
@@ -884,13 +894,15 @@ export default function RecipesPage() {
                     />
                   </div>
                 </div>
-                <div className={styles.plantCellGridTray}>{trayPlantIds.map((plantId) => renderPlantCell(plantId))}</div>
+                <div className={[styles.plantCellGridTray, "gt-grid"].join(" ")} data-cell-size="sm">
+                  {trayPlantIds.map((plantId) => renderPlantCell(plantId))}
+                </div>
               </article>
             );
           })}
 
           {unplacedPlantIds.length > 0 ? (
-            <article className={styles.trayEditorCell}>
+            <article className={[styles.trayEditorCell, "gt-surface-2"].join(" ")}>
               <div className={styles.trayHeaderRow}>
                 <div className={styles.trayHeaderMeta}>
                   <strong>Unplaced</strong>
@@ -908,7 +920,9 @@ export default function RecipesPage() {
                   />
                 </div>
               </div>
-              <div className={styles.plantCellGridTray}>{unplacedPlantIds.map((plantId) => renderPlantCell(plantId))}</div>
+              <div className={[styles.plantCellGridTray, "gt-grid"].join(" ")} data-cell-size="sm">
+                {unplacedPlantIds.map((plantId) => renderPlantCell(plantId))}
+              </div>
             </article>
           ) : null}
         </div>

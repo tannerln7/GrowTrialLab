@@ -1550,7 +1550,14 @@ export default function PlacementPage() {
     return (
       <article
         key={plant.uuid}
-        className={[styles.plantCell, selected ? styles.plantCellSelected : ""].filter(Boolean).join(" ")}
+        className={[
+          styles.plantCell,
+          "gt-cell gt-cell--interactive",
+          selected ? "gt-cell--selected" : "",
+          selected ? styles.plantCellSelected : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         onClick={() => togglePlantSelection(plant.uuid)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -1587,7 +1594,14 @@ export default function PlacementPage() {
     return (
       <article
         key={trayId}
-        className={[styles.trayGridCell, selected ? styles.plantCellSelected : ""].filter(Boolean).join(" ")}
+        className={[
+          styles.trayGridCell,
+          "gt-cell gt-cell--interactive",
+          selected ? "gt-cell--selected" : "",
+          selected ? styles.plantCellSelected : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         onClick={() => toggleTraySelection(trayId)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -1879,7 +1893,7 @@ export default function PlacementPage() {
         </div>
 
         {!isStepComplete(currentStep) ? (
-          <div className={styles.stepBlocker}>
+          <div className={[styles.stepBlocker, "gt-surface"].join(" ")}>
             <strong>Step blocker</strong>
             <p className={styles.mutedText}>{stepBlockedMessage(currentStep)}</p>
           </div>
@@ -2073,10 +2087,10 @@ export default function PlacementPage() {
               </SectionCard>
 
               <SectionCard title={`Tray Manager (${trays.length})`}>
-                <div className={styles.toolbarSummaryRow}>
+                <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
                   <span className={styles.mutedText}>Total trays: {sortedTrayIds.length}</span>
                   <span className={styles.mutedText}>Selected: {selectedTrayManagerIds.size}</span>
-                  <div className={styles.toolbarActionsCompact}>
+                  <div className={[styles.toolbarActionsCompact, "gt-btnbar"].join(" ")}>
                     <ToolIconButton
                       label="Select all trays"
                       icon={<CheckSquare size={16} />}
@@ -2100,7 +2114,7 @@ export default function PlacementPage() {
                   </div>
                 </div>
 
-                <div className={styles.trayManagerGrid}>
+                <div className={[styles.trayManagerGrid, "gt-grid"].join(" ")} data-cell-size="lg">
                   {sortedTrayIds.map((trayId) => {
                     const tray = trayById.get(trayId);
                     if (!tray) {
@@ -2111,7 +2125,14 @@ export default function PlacementPage() {
                     return (
                       <article
                         key={trayId}
-                        className={[styles.trayEditorCell, selected ? styles.plantCellSelected : ""].filter(Boolean).join(" ")}
+                        className={[
+                          styles.trayEditorCell,
+                          "gt-surface-2",
+                          selected ? "gt-cell--selected" : "",
+                          selected ? styles.plantCellSelected : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                         onClick={() => toggleTrayManagerSelection(trayId)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
@@ -2190,7 +2211,7 @@ export default function PlacementPage() {
             <div className={styles.stack}>
               <SectionCard title="Plants -> Trays (Draft)">
                 <Tooltip.Provider delayDuration={150}>
-                  <div className={styles.placementToolbar}>
+                  <div className={[styles.placementToolbar, "gt-stack"].join(" ")}>
                     <select
                       className={styles.select}
                       value={destinationTrayId}
@@ -2210,7 +2231,7 @@ export default function PlacementPage() {
                         );
                       })}
                     </select>
-                    <div className={styles.toolbarActionsCompact}>
+                    <div className={[styles.toolbarActionsCompact, "gt-btnbar"].join(" ")}>
                       <ToolIconButton
                         label="Select all unplaced plants"
                         icon={<CheckSquare size={16} />}
@@ -2242,7 +2263,7 @@ export default function PlacementPage() {
                   </div>
                 </Tooltip.Provider>
 
-                <div className={styles.toolbarSummaryRow}>
+                <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
                   <span className={styles.mutedText}>Unplaced active plants: {mainGridPlantIds.length}</span>
                   <span className={styles.mutedText}>Selected in main grid: {selectedInMainGrid.length}</span>
                   {trays.length === 0 ? <span className={styles.badgeWarn}>Create at least one tray.</span> : null}
@@ -2258,11 +2279,13 @@ export default function PlacementPage() {
                   </div>
                 ) : null}
 
-                <div className={styles.plantCellGrid}>{mainGridPlantIds.map((plantId) => renderPlantCell(plantId))}</div>
+                <div className={[styles.plantCellGrid, "gt-grid"].join(" ")} data-cell-size="sm">
+                  {mainGridPlantIds.map((plantId) => renderPlantCell(plantId))}
+                </div>
               </SectionCard>
 
               <SectionCard title="Tray Containers">
-                <div className={styles.trayManagerGrid}>
+                <div className={[styles.trayManagerGrid, "gt-grid"].join(" ")} data-cell-size="lg">
                   {sortedTrayIds.map((trayId) => {
                     const tray = trayById.get(trayId);
                     if (!tray) {
@@ -2272,7 +2295,7 @@ export default function PlacementPage() {
                     const selectedInTray = selectedInTrayByTrayId[trayId] || [];
 
                     return (
-                      <article key={trayId} className={styles.trayEditorCell}>
+                      <article key={trayId} className={[styles.trayEditorCell, "gt-surface-2"].join(" ")}>
                         <div className={styles.trayHeaderRow}>
                           <div className={styles.trayHeaderMeta}>
                             <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
@@ -2290,7 +2313,9 @@ export default function PlacementPage() {
                           </div>
                         </div>
 
-                        <div className={styles.plantCellGridTray}>{trayPlantIds.map((plantId) => renderPlantCell(plantId))}</div>
+                        <div className={[styles.plantCellGridTray, "gt-grid"].join(" ")} data-cell-size="sm">
+                          {trayPlantIds.map((plantId) => renderPlantCell(plantId))}
+                        </div>
                       </article>
                     );
                   })}
@@ -2323,7 +2348,7 @@ export default function PlacementPage() {
             <div className={styles.stack}>
               <SectionCard title="Trays -> Slots (Draft)">
                 <Tooltip.Provider delayDuration={150}>
-                  <div className={styles.placementToolbar}>
+                  <div className={[styles.placementToolbar, "gt-stack"].join(" ")}>
                     <select
                       className={styles.select}
                       value={destinationSlotId}
@@ -2343,7 +2368,7 @@ export default function PlacementPage() {
                         );
                       })}
                     </select>
-                    <div className={styles.toolbarActionsCompact}>
+                    <div className={[styles.toolbarActionsCompact, "gt-btnbar"].join(" ")}>
                       <ToolIconButton
                         label="Select all unplaced trays"
                         icon={<CheckSquare size={16} />}
@@ -2369,12 +2394,14 @@ export default function PlacementPage() {
                   </div>
                 </Tooltip.Provider>
 
-                <div className={styles.toolbarSummaryRow}>
+                <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
                   <span className={styles.mutedText}>Unplaced trays: {mainGridTrayIds.length}</span>
                   <span className={styles.mutedText}>Selected trays: {selectedTrayIds.size}</span>
                 </div>
 
-                <div className={styles.trayMainGrid}>{mainGridTrayIds.map((trayId) => renderTrayCell(trayId))}</div>
+                <div className={[styles.trayMainGrid, "gt-grid"].join(" ")} data-cell-size="md">
+                  {mainGridTrayIds.map((trayId) => renderTrayCell(trayId))}
+                </div>
               </SectionCard>
 
               <SectionCard title="Tent Slot Containers">
@@ -2383,7 +2410,7 @@ export default function PlacementPage() {
                     const selectedInTent = selectedTraysByTentId[tent.tent_id] || [];
 
                     return (
-                      <article key={tent.tent_id} className={styles.tentBoardCard}>
+                      <article key={tent.tent_id} className={[styles.tentBoardCard, "gt-surface"].join(" ")}>
                         <div className={styles.trayHeaderRow}>
                           <div className={styles.trayHeaderMeta}>
                             <strong>{tent.name}</strong>
@@ -2416,7 +2443,7 @@ export default function PlacementPage() {
                             .map((slot) => {
                               const trayId = draftSlotToTray.get(slot.slot_id) || null;
                               return (
-                                <div key={slot.slot_id} className={styles.slotCell}>
+                                <div key={slot.slot_id} className={[styles.slotCell, "gt-cell gt-cell--muted"].join(" ")}>
                                   <span className={styles.slotCellLabel}>{slot.code}</span>
                                   {trayId ? (
                                     renderTrayCell(trayId, true)

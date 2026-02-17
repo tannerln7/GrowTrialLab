@@ -1,0 +1,58 @@
+:root {
+  /* Spacing scale (4/8/12/16/24 baseline) */
+  --gt-space-xs: 0.25rem;
+  --gt-space-sm: 0.5rem;
+  --gt-space-md: 0.75rem;
+  --gt-space-lg: 1rem;
+  --gt-space-xl: 1.5rem;
+
+  /* Radius scale */
+  --gt-radius-sm: 0.5rem;
+  --gt-radius-md: 0.625rem;
+  --gt-radius-lg: 1rem;
+
+  /* Type scale */
+  --gt-text-label: 0.76rem;
+  --gt-text-body: 0.94rem;
+  --gt-text-title: 1.1rem;
+
+  /* Elevation */
+  --gt-elevation-1: 0 10px 22px rgba(0, 0, 0, 0.22);
+  --gt-elevation-2: 0 16px 30px rgba(0, 0, 0, 0.26);
+
+  /* Core dark palette */
+  --gt-bg: #101418;
+  --gt-surface: #171c22;
+  --gt-surface-2: #202833;
+  --gt-border: #2f3a47;
+  --gt-border-subtle: #2a3440;
+  --gt-text: #f3f6fa;
+  --gt-text-muted: #b8c3d1;
+  --gt-accent: #6bb0ff;
+  --gt-accent-2: #66d0a1;
+  --gt-danger: #ff8f8f;
+  --gt-warning: #f4cf6b;
+  --gt-selected-bg: color-mix(in srgb, var(--gt-accent) 14%, var(--gt-surface-2));
+  --gt-selected-outline: color-mix(in srgb, var(--gt-accent) 62%, var(--gt-border));
+
+  /* Domain UI semantics */
+  --gt-cell: var(--gt-surface-2);
+  --gt-cell-selected: var(--gt-selected-bg);
+  --gt-cell-muted: color-mix(in srgb, var(--gt-surface) 84%, var(--gt-text-muted) 16%);
+  --gt-outline-focus: #86c6ff;
+
+  /* Compatibility aliases for existing modules */
+  --bg: var(--gt-bg);
+  --surface: var(--gt-surface);
+  --surface-elevated: var(--gt-surface-2);
+  --border: var(--gt-border);
+  --divider: var(--gt-border-subtle);
+  --text: var(--gt-text);
+  --text-muted: var(--gt-text-muted);
+  --primary: var(--gt-accent);
+  --primary-contrast: #061424;
+  --danger: var(--gt-danger);
+  --success: var(--gt-accent-2);
+  --warning: var(--gt-warning);
+  --focus: var(--gt-outline-focus);
+}
