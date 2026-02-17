@@ -57,12 +57,14 @@ def make_plant(experiment: Experiment, species: Species):
         *,
         grade: str | None = None,
         selected_species: Species | None = None,
+        assigned_recipe: Recipe | None = None,
     ) -> Plant:
         return Plant.objects.create(
             experiment=experiment,
             species=selected_species or species,
             plant_id=plant_id,
             grade=grade,
+            assigned_recipe=assigned_recipe,
             status=Plant.Status.ACTIVE,
         )
 
@@ -88,13 +90,12 @@ def ready_to_start(experiment: Experiment, make_slot, make_plant, mark_baseline)
         slot = make_slot(1, 1)
         Recipe.objects.create(experiment=experiment, code="R0", name="Control")
         recipe = Recipe.objects.create(experiment=experiment, code="R1", name="Treatment")
-        plant = make_plant("NP-READY-001", grade="A")
+        plant = make_plant("NP-READY-001", grade="A", assigned_recipe=recipe)
         mark_baseline(plant)
         tray = Tray.objects.create(
             experiment=experiment,
             name="TR-READY-1",
             slot=slot,
-            assigned_recipe=recipe,
             capacity=4,
         )
         tray.plants.add(plant)

@@ -114,6 +114,53 @@ class PlantViewSet(ExperimentFilteredViewSet):
             return PlantDetailSerializer
         return super().get_serializer_class()
 
+    def _resolve_requested_recipe(self, plant: Plant):
+        has_assigned_recipe = "assigned_recipe" in self.request.data
+        has_assigned_recipe_id = "assigned_recipe_id" in self.request.data
+        if not has_assigned_recipe and not has_assigned_recipe_id:
+            return None, None
+
+        raw_recipe_id = self.request.data.get("assigned_recipe")
+        if not has_assigned_recipe:
+            raw_recipe_id = self.request.data.get("assigned_recipe_id")
+
+        if raw_recipe_id in {None, ""}:
+            return None, None
+
+        recipe = Recipe.objects.filter(id=raw_recipe_id).select_related("experiment").first()
+        if recipe is None:
+            return None, error_with_diagnostics(
+                "Recipe not found.",
+                status_code=400,
+                diagnostics={"reason_counts": {"recipe_not_found": 1}},
+            )
+        if recipe.experiment.id != plant.experiment.id:
+            return None, error_with_diagnostics(
+                "Recipe must belong to the same experiment as plant.",
+                status_code=400,
+                diagnostics={"reason_counts": {"recipe_experiment_mismatch": 1}},
+            )
+        return recipe, None
+
+    def update(self, request, *args, **kwargs):
+        plant = self.get_object()
+        _, validation_response = self._resolve_requested_recipe(plant)
+        if validation_response is not None:
+            return validation_response
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        plant = self.get_object()
+        recipe, validation_response = self._resolve_requested_recipe(plant)
+        if validation_response is not None:
+            return validation_response
+        if "assigned_recipe" in request.data or "assigned_recipe_id" in request.data:
+            plant.assigned_recipe = recipe
+            plant.save(update_fields=["assigned_recipe", "updated_at"])
+            serializer = self.get_serializer(plant)
+            return Response(serializer.data)
+        return super().partial_update(request, *args, **kwargs)
+
 
 class TrayViewSet(ExperimentFilteredViewSet):
     queryset = Tray.objects.all().order_by("name")

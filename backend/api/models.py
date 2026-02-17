@@ -251,13 +251,6 @@ class Slot(UUIDModel):
 class Tray(UUIDModel):
     experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name="trays")
     slot = models.ForeignKey(Slot, on_delete=models.SET_NULL, null=True, blank=True, related_name="trays")
-    assigned_recipe = models.ForeignKey(
-        Recipe,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="trays",
-    )
     name = models.CharField(max_length=64)
     capacity = models.IntegerField(default=1, validators=[MinValueValidator(1)])
     notes = models.TextField(blank=True)

@@ -13,7 +13,7 @@ from .baseline import BASELINE_WEEK_NUMBER
 from .contracts import error_with_diagnostics, list_envelope
 from .models import Experiment, Plant, PlantWeeklyMetric, Recipe, Slot, Tent, Tray, TrayPlant
 from .tent_restrictions import tent_allows_species
-from .tray_assignment import build_location, experiment_tray_placements, resolved_assigned_recipe
+from .tray_placement import build_location, experiment_tray_placements
 
 AUTOPLACE_REASON_NO_COMPATIBLE_TRAYS = "no_compatible_trays"
 AUTOPLACE_REASON_COMPATIBLE_TRAYS_FULL = "compatible_trays_full"
@@ -66,6 +66,16 @@ def _plant_sort_key(plant: Plant) -> tuple[str, str, str, str]:
     )
 
 
+def _recipe_summary(recipe: Recipe | None) -> dict | None:
+    if recipe is None:
+        return None
+    return {
+        "id": str(recipe.id),
+        "code": recipe.code,
+        "name": recipe.name,
+    }
+
+
 def _tray_remaining_capacity(state: TrayAutoState) -> int:
     return state.tray.capacity - (state.current_count + len(state.new_plants))
 
@@ -108,11 +118,14 @@ def experiment_placement_summary(request, experiment_id: UUID):
     )
     trays = list(
         Tray.objects.filter(experiment=experiment)
-        .select_related("slot__tent", "assigned_recipe")
+        .select_related("slot__tent")
         .order_by("name")
     )
     tray_items_by_tray_id: dict[str, list[TrayPlant]] = {}
-    for item in TrayPlant.objects.filter(tray__in=trays).select_related("plant__species").order_by(
+    for item in TrayPlant.objects.filter(tray__in=trays).select_related(
+        "plant__species",
+        "plant__assigned_recipe",
+    ).order_by(
         "order_index",
         "id",
     ):
@@ -124,7 +137,7 @@ def experiment_placement_summary(request, experiment_id: UUID):
     unplaced_active_qs = (
         Plant.objects.filter(experiment=experiment, status=Plant.Status.ACTIVE)
         .exclude(id__in=placed_plant_ids)
-        .select_related("species")
+        .select_related("species", "assigned_recipe")
         .order_by("plant_id", "created_at", "id")
     )
     unplaced_active = list(unplaced_active_qs[:50])
@@ -172,9 +185,6 @@ def experiment_placement_summary(request, experiment_id: UUID):
             {
                 "tray_id": str(tray.id),
                 "name": tray.name,
-                "assigned_recipe_id": str(tray.assigned_recipe.id) if tray.assigned_recipe else None,
-                "assigned_recipe_code": tray.assigned_recipe.code if tray.assigned_recipe else None,
-                "assigned_recipe_name": tray.assigned_recipe.name if tray.assigned_recipe else None,
                 "capacity": tray.capacity,
                 "current_count": len(tray_items),
                 "location": location,
@@ -188,6 +198,7 @@ def experiment_placement_summary(request, experiment_id: UUID):
                         "species_category": tray_plant.plant.species.category,
                         "grade": tray_plant.plant.grade,
                         "status": tray_plant.plant.status,
+                        "assigned_recipe": _recipe_summary(tray_plant.plant.assigned_recipe),
                     }
                     for tray_plant in tray_items
                 ],
@@ -208,6 +219,7 @@ def experiment_placement_summary(request, experiment_id: UUID):
                         "species_category": plant.species.category,
                         "grade": plant.grade,
                         "status": plant.status,
+                        "assigned_recipe": _recipe_summary(plant.assigned_recipe),
                     }
                     for plant in unplaced_active
                 ],
@@ -222,8 +234,6 @@ def experiment_placement_summary(request, experiment_id: UUID):
                         "tray_name": tray.name,
                         "capacity": tray.capacity,
                         "current_count": len(tray_items_by_tray_id.get(str(tray.id), [])),
-                        "assigned_recipe_id": str(tray.assigned_recipe.id) if tray.assigned_recipe else None,
-                        "assigned_recipe_code": tray.assigned_recipe.code if tray.assigned_recipe else None,
                     }
                     for tray in trays
                     if tray.slot is None
@@ -265,13 +275,6 @@ def experiment_trays(request, experiment_id: UUID):
                 diagnostics={"reason_counts": {"slot_occupied": 1}, "slot_id": str(slot.id)},
             )
 
-    assigned_recipe = None
-    assigned_recipe_id = request.data.get("assigned_recipe_id")
-    if assigned_recipe_id:
-        assigned_recipe = Recipe.objects.filter(id=assigned_recipe_id, experiment=experiment).first()
-        if assigned_recipe is None:
-            return Response({"detail": "Recipe not found for this experiment."}, status=400)
-
     try:
         capacity = int(request.data.get("capacity") or 1)
     except (TypeError, ValueError):
@@ -300,7 +303,6 @@ def experiment_trays(request, experiment_id: UUID):
         experiment=experiment,
         name=name,
         slot=slot,
-        assigned_recipe=assigned_recipe,
         capacity=capacity,
         notes=(request.data.get("notes") or "").strip(),
     )
@@ -310,8 +312,6 @@ def experiment_trays(request, experiment_id: UUID):
             "tray_id": str(tray.id),
             "name": tray.name,
             "capacity": tray.capacity,
-            "assigned_recipe_id": str(assigned_recipe.id) if assigned_recipe else None,
-            "assigned_recipe_code": assigned_recipe.code if assigned_recipe else None,
             "location": {
                 "status": "placed" if slot else "unplaced",
                 "tent": {
@@ -349,7 +349,7 @@ def tray_add_plant(request, tray_id: UUID):
     if rejection:
         return rejection
 
-    tray = Tray.objects.filter(id=tray_id).select_related("experiment", "slot__tent", "assigned_recipe").first()
+    tray = Tray.objects.filter(id=tray_id).select_related("experiment", "slot__tent").first()
     if tray is None:
         return Response({"detail": "Tray not found."}, status=404)
     if _is_running(tray.experiment):
@@ -434,6 +434,82 @@ def tray_remove_plant(request, tray_id: UUID, tray_plant_id: UUID):
 
 
 @api_view(["POST"])
+def tray_apply_recipe(request, tray_id: UUID):
+    rejection = _require_app_user(request)
+    if rejection:
+        return rejection
+
+    tray = Tray.objects.filter(id=tray_id).select_related("experiment").first()
+    if tray is None:
+        return error_with_diagnostics(
+            "Tray not found.",
+            status_code=404,
+            diagnostics={"reason_counts": {"tray_not_found": 1}},
+        )
+
+    recipe_id = request.data.get("recipe_id")
+    if not recipe_id:
+        return error_with_diagnostics(
+            "recipe_id is required.",
+            status_code=400,
+            diagnostics={"reason_counts": {"missing_recipe_id": 1}},
+        )
+
+    recipe = Recipe.objects.filter(id=recipe_id, experiment=tray.experiment).first()
+    if recipe is None:
+        return error_with_diagnostics(
+            "Recipe not found for this experiment.",
+            status_code=400,
+            diagnostics={"reason_counts": {"recipe_not_found": 1}},
+        )
+
+    active_plant_ids = list(
+        TrayPlant.objects.filter(tray=tray, plant__status=Plant.Status.ACTIVE).values_list("plant_id", flat=True)
+    )
+    if not active_plant_ids:
+        return Response(
+            {
+                "tray_id": str(tray.id),
+                "recipe": _recipe_summary(recipe),
+                "updated_count": 0,
+                "plants": list_envelope([]),
+            }
+        )
+
+    with transaction.atomic():
+        plants_to_update = Plant.objects.filter(id__in=active_plant_ids).exclude(assigned_recipe=recipe)
+        changed_plant_ids = list(plants_to_update.values_list("id", flat=True))
+        updated_count = plants_to_update.update(assigned_recipe=recipe)
+
+    updated_plants = list(
+        Plant.objects.filter(id__in=changed_plant_ids)
+        .select_related("species", "assigned_recipe")
+        .order_by("plant_id", "created_at", "id")
+    )
+
+    return Response(
+        {
+            "tray_id": str(tray.id),
+            "recipe": _recipe_summary(recipe),
+            "updated_count": int(updated_count),
+            "plants": list_envelope(
+                [
+                    {
+                        "uuid": str(plant.id),
+                        "plant_id": plant.plant_id,
+                        "species_name": plant.species.name,
+                        "species_category": plant.species.category,
+                        "status": plant.status,
+                        "assigned_recipe": _recipe_summary(plant.assigned_recipe),
+                    }
+                    for plant in updated_plants
+                ]
+            ),
+        }
+    )
+
+
+@api_view(["POST"])
 def experiment_placement_auto(request, experiment_id: UUID):
     rejection = _require_app_user(request)
     if rejection:
@@ -485,7 +561,7 @@ def experiment_placement_auto(request, experiment_id: UUID):
         )
 
     raw_tray_ids = request.data.get("tray_ids")
-    tray_queryset = Tray.objects.filter(experiment=experiment).select_related("assigned_recipe", "slot__tent")
+    tray_queryset = Tray.objects.filter(experiment=experiment).select_related("slot__tent")
     if isinstance(raw_tray_ids, list) and raw_tray_ids:
         tray_queryset = tray_queryset.filter(id__in=raw_tray_ids)
     trays = list(tray_queryset.order_by("name", "id"))

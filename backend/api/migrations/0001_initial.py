@@ -256,7 +256,6 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(max_length=64)),
                 ('capacity', models.IntegerField(default=1, validators=[django.core.validators.MinValueValidator(1)])),
                 ('notes', models.TextField(blank=True)),
-                ('assigned_recipe', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='trays', to='api.recipe')),
                 ('experiment', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='trays', to='api.experiment')),
                 ('slot', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='trays', to='api.slot')),
             ],

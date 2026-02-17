@@ -9,7 +9,7 @@ from .baseline import BASELINE_WEEK_NUMBER
 from .models import FeedingEvent, Photo, Plant, PlantWeeklyMetric
 from .schedules import plan_for_experiment
 from .status_summary import compute_setup_status
-from .tray_assignment import build_location, plant_tray_placement, resolved_assigned_recipe
+from .tray_placement import build_location, plant_tray_placement
 
 
 
@@ -68,7 +68,7 @@ def plant_cockpit(request, plant_id: UUID):
     replaces_uuid = str(replaces.id) if replaces else None
     tray_placement = plant_tray_placement(plant)
     location = build_location(tray_placement)
-    assigned_recipe = resolved_assigned_recipe(plant, tray_placement, allow_fallback=True)
+    assigned_recipe = plant.assigned_recipe
     latest_feeding_event = (
         FeedingEvent.objects.filter(plant=plant)
         .only("occurred_at")
@@ -122,9 +122,13 @@ def plant_cockpit(request, plant_id: UUID):
             },
             "derived": {
                 "has_baseline": has_baseline,
-                "assigned_recipe_id": str(assigned_recipe.id) if assigned_recipe else None,
-                "assigned_recipe_code": assigned_recipe.code if assigned_recipe else None,
-                "assigned_recipe_name": assigned_recipe.name if assigned_recipe else None,
+                "assigned_recipe": {
+                    "id": str(assigned_recipe.id),
+                    "code": assigned_recipe.code,
+                    "name": assigned_recipe.name,
+                }
+                if assigned_recipe
+                else None,
                 "location": location,
                 "last_fed_at": last_fed_at.isoformat() if last_fed_at else None,
                 "replaced_by_uuid": replaced_by_uuid,

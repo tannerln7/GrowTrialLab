@@ -51,6 +51,27 @@ class BatchLotSerializer(serializers.ModelSerializer):
 
 
 class PlantSerializer(serializers.ModelSerializer):
+    assigned_recipe_id = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            mutable = dict(data)
+            if "assigned_recipe" not in mutable and "assigned_recipe_id" in mutable:
+                mutable["assigned_recipe"] = mutable.get("assigned_recipe_id")
+            data = mutable
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        experiment = attrs.get("experiment") or (self.instance.experiment if self.instance else None)
+        assigned_recipe = (
+            attrs.get("assigned_recipe")
+            if "assigned_recipe" in attrs
+            else (self.instance.assigned_recipe if self.instance else None)
+        )
+        if experiment and assigned_recipe and assigned_recipe.experiment_id != experiment.id:
+            raise serializers.ValidationError("Recipe must belong to the same experiment as plant.")
+        return attrs
+
     class Meta:
         model = Plant
         fields = "__all__"
@@ -246,9 +267,6 @@ class TraySerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         experiment = attrs.get("experiment") or (self.instance.experiment if self.instance else None)
         slot = attrs.get("slot") if "slot" in attrs else (self.instance.slot if self.instance else None)
-        assigned_recipe = attrs.get("assigned_recipe") if "assigned_recipe" in attrs else (
-            self.instance.assigned_recipe if self.instance else None
-        )
         capacity = attrs.get("capacity")
         if capacity is None and self.instance is not None:
             capacity = self.instance.capacity
@@ -256,8 +274,6 @@ class TraySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("capacity must be at least 1.")
         if experiment and slot and slot.tent.experiment_id != experiment.id:
             raise serializers.ValidationError("Slot must belong to the same experiment as tray.")
-        if experiment and assigned_recipe and assigned_recipe.experiment_id != experiment.id:
-            raise serializers.ValidationError("Recipe must belong to the same experiment as tray.")
         if self.instance is not None:
             current_count = self.instance.tray_plants.count()
             if capacity is not None and current_count > capacity:
