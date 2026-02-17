@@ -8,7 +8,6 @@ import { backendFetch, normalizeBackendError } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
-import styles from "../experiments.module.css";
 
 export default function NewExperimentPage() {
   const router = useRouter();
@@ -86,46 +85,46 @@ export default function NewExperimentPage() {
       title="New Experiment"
       subtitle="Create an experiment and finish bootstrap setup."
       actions={
-        <Link className={styles.buttonSecondary} href="/experiments">
+        <Link className={"gt-button gt-button--secondary"} href="/experiments">
           Cancel
         </Link>
       }
     >
       <SectionCard title="Experiment Details">
-        <form className={styles.formGrid} onSubmit={onSubmit}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Name</span>
+        <form className={"gt-stack"} onSubmit={onSubmit}>
+          <label className={"gt-col"}>
+            <span className={"gt-text-muted"}>Name</span>
             <input
-              className={styles.input}
+              className={"gt-input"}
               value={name}
               onChange={(event) => setName(event.target.value)}
               required
             />
           </label>
 
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Description</span>
+          <label className={"gt-col"}>
+            <span className={"gt-text-muted"}>Description</span>
             <textarea
-              className={styles.textarea}
+              className={"gt-textarea"}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
             />
           </label>
 
-          <div className={styles.actions}>
+          <div className={"gt-btnbar"}>
             <button
-              className={styles.buttonPrimary}
+              className={"gt-button gt-button--primary"}
               disabled={saving}
               type="submit"
             >
               {saving ? "Creating..." : "Create experiment"}
             </button>
-            <Link className={styles.buttonSecondary} href="/experiments">
+            <Link className={"gt-button gt-button--secondary"} href="/experiments">
               Cancel
             </Link>
           </div>
 
-          {error ? <p className={styles.errorText}>{error}</p> : null}
+          {error ? <p className={"gt-text-danger"}>{error}</p> : null}
           {offline ? (
             <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" />
           ) : null}

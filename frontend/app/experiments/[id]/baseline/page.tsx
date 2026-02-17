@@ -739,9 +739,9 @@ export default function BaselinePage() {
       <SectionCard title="Queue Status">
         <p className="gt-text-muted">Remaining baselines: {queue?.remaining_count ?? 0}</p>
         {baselineLocked ? (
-          <p className={styles.inlineNote}>Baseline is locked in UI. Unlock editing for this session to continue.</p>
+          <p className={"gt-text-muted"}>Baseline is locked in UI. Unlock editing for this session to continue.</p>
         ) : null}
-        <div className={styles.actions}>
+        <div className={"gt-btnbar"}>
           {baselineLocked && !editingUnlocked ? (
             <button className="gt-button gt-button--danger" type="button" onClick={() => setEditingUnlocked(true)}>
               Unlock editing
@@ -770,9 +770,9 @@ export default function BaselinePage() {
 
       {selectedPlantId ? (
         <SectionCard title="Capture Baseline">
-          <div className={styles.formGrid}>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Plant</span>
+          <div className={"gt-stack"}>
+            <label className={"gt-col"}>
+              <span className={"gt-text-muted"}>Plant</span>
               <select
                 className="gt-select"
                 value={selectedPlantId}
@@ -787,8 +787,8 @@ export default function BaselinePage() {
               </select>
             </label>
 
-            <div className={styles.field}>
-              <span className={styles.fieldLabel}>Baseline metrics (1-5)</span>
+            <div className={"gt-col"}>
+              <span className={"gt-text-muted"}>Baseline metrics (1-5)</span>
               <div className={styles.metricSliderGrid}>
                 {sliderDefinitions.map((slider) => {
                   const value = sliderValues[slider.key];
@@ -829,8 +829,8 @@ export default function BaselinePage() {
               </div>
             </div>
 
-            <div className={styles.field}>
-              <span className={styles.fieldLabel}>Grade</span>
+            <div className={"gt-col"}>
+              <span className={"gt-text-muted"}>Grade</span>
               <div className={styles.baselineGradeRow}>
                 <span className={styles.baselineGradePill}>{gradeStatusChipText}</span>
                 {manualOverrideActive ? (
@@ -874,14 +874,14 @@ export default function BaselinePage() {
                 })}
               </div>
               {selectedBaselineCapturedAt ? (
-                <p className={styles.inlineNote}>
+                <p className={"gt-text-muted"}>
                   Last baseline capture: {new Date(selectedBaselineCapturedAt).toLocaleString()}
                 </p>
               ) : null}
             </div>
 
-            <div className={styles.field}>
-              <span className={styles.fieldLabel}>Baseline photo</span>
+            <div className={"gt-col"}>
+              <span className={"gt-text-muted"}>Baseline photo</span>
               <div className={styles.baselinePhotoRow}>
                 <div className={styles.baselinePhotoThumbCell}>
                   {photoThumbnailSrc ? (
@@ -915,14 +915,14 @@ export default function BaselinePage() {
                 </div>
               </div>
               {selectedBaselinePhoto ? (
-                <p className={styles.inlineNote}>
+                <p className={"gt-text-muted"}>
                   Latest upload: {new Date(selectedBaselinePhoto.created_at).toLocaleString()}
                 </p>
               ) : null}
             </div>
 
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Notes</span>
+            <label className={"gt-col"}>
+              <span className={"gt-text-muted"}>Notes</span>
               <textarea
                 className="gt-textarea"
                 value={notes}
@@ -973,7 +973,7 @@ export default function BaselinePage() {
             })}
           </div>
         ) : (
-          <p className={styles.inlineNote}>No active plants found in this queue.</p>
+          <p className={"gt-text-muted"}>No active plants found in this queue.</p>
         )}
       </SectionCard>
 

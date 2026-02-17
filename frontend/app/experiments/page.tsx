@@ -8,7 +8,6 @@ import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
-import styles from "./experiments.module.css";
 
 type Experiment = {
   id: string;
@@ -72,19 +71,19 @@ export default function ExperimentsPage() {
       title="Experiments"
       subtitle="Create experiments and complete bootstrap setup."
       actions={
-        <div className={styles.actions}>
-          <Link className={styles.buttonPrimary} href="/experiments/new">
+        <div className={"gt-btnbar"}>
+          <Link className={"gt-button gt-button--primary"} href="/experiments/new">
             New experiment
           </Link>
-          <Link className={styles.buttonSecondary} href="/">
+          <Link className={"gt-button gt-button--secondary"} href="/">
             Back home
           </Link>
         </div>
       }
     >
       <SectionCard title="All Experiments">
-        {loading ? <p className={styles.mutedText}>Loading...</p> : null}
-        {error ? <p className={styles.errorText}>{error}</p> : null}
+        {loading ? <p className={"gt-text-muted"}>Loading...</p> : null}
+        {error ? <p className={"gt-text-danger"}>{error}</p> : null}
 
         {!loading && !error ? (
           <ResponsiveList
@@ -110,7 +109,7 @@ export default function ExperimentsPage() {
               },
             ]}
             renderMobileCard={(item) => (
-              <div className={styles.cardKeyValue}>
+              <div className={"gt-col"}>
                 <span>Name</span>
                 <strong>{item.name}</strong>
                 <span>Status</span>
@@ -131,11 +130,11 @@ export default function ExperimentsPage() {
         ) : null}
       </SectionCard>
       <SectionCard>
-        <div className={styles.actions}>
-          <Link className={styles.buttonPrimary} href="/experiments/new">
+        <div className={"gt-btnbar"}>
+          <Link className={"gt-button gt-button--primary"} href="/experiments/new">
             New experiment
           </Link>
-          <Link className={styles.buttonSecondary} href="/">
+          <Link className={"gt-button gt-button--secondary"} href="/">
             Back home
           </Link>
         </div>

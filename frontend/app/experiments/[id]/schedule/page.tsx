@@ -13,7 +13,6 @@ import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 
-import styles from "../../experiments.module.css";
 
 type Timeframe = "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT";
 type RuleType = "DAILY" | "WEEKLY" | "CUSTOM_DAYS_INTERVAL";
@@ -688,27 +687,27 @@ export default function ExperimentSchedulePage() {
       title="Schedule"
       subtitle={plantFilter ? "Filtered for selected plant" : "Recurring actions plan"}
       actions={
-        <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/overview`}>
+        <Link className={"gt-button gt-button--secondary"} href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
     >
-      {loading ? <p className={styles.mutedText}>Loading schedules...</p> : null}
-      {error ? <p className={styles.errorText}>{error}</p> : null}
-      {notice ? <p className={styles.successText}>{notice}</p> : null}
+      {loading ? <p className={"gt-text-muted"}>Loading schedules...</p> : null}
+      {error ? <p className={"gt-text-danger"}>{error}</p> : null}
+      {notice ? <p className={"gt-text-success"}>{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Upcoming plan">
-        <div className={styles.actions}>
+        <div className={"gt-btnbar"}>
           <button
-            className={daysWindow === 7 ? styles.buttonPrimary : styles.buttonSecondary}
+            className={daysWindow === 7 ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
             type="button"
             onClick={() => setDaysWindow(7)}
           >
             7 days
           </button>
           <button
-            className={daysWindow === 14 ? styles.buttonPrimary : styles.buttonSecondary}
+            className={daysWindow === 14 ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
             type="button"
             onClick={() => setDaysWindow(14)}
           >
@@ -716,19 +715,19 @@ export default function ExperimentSchedulePage() {
           </button>
         </div>
         {plan && unwrapList<SchedulePlan["slots"]["results"][number]>(plan.slots).length ? (
-          <div className={styles.blocksList}>
+          <div className={"gt-stack"}>
             {unwrapList<SchedulePlan["slots"]["results"][number]>(plan.slots).map((slot) => (
-              <article className={styles.blockRow} key={`${slot.date}-${slot.exact_time || slot.timeframe}`}>
+              <article className={"gt-cell gt-cell--muted"} key={`${slot.date}-${slot.exact_time || slot.timeframe}`}>
                 <strong>{formatSlotTitle(slot.date, slot.timeframe, slot.exact_time)}</strong>
-                <div className={styles.stack}>
+                <div className={"gt-stack"}>
                   {slot.actions.map((item) => (
-                    <div className={styles.cardKeyValue} key={`${slot.date}-${item.schedule_id}-${item.title}`}>
+                    <div className={"gt-col"} key={`${slot.date}-${item.schedule_id}-${item.title}`}>
                       <span>{item.title}</span>
                       <strong>{item.scope_summary || "No scope"}</strong>
                       {item.blocked_reasons.length > 0 ? (
-                        <div className={styles.badgeRow}>
+                        <div className={"gt-row"}>
                           {item.blocked_reasons.map((reason) => (
-                            <span className={styles.badgeWarn} key={reason}>
+                            <span className={"gt-badge"} key={reason}>
                               {reason}
                             </span>
                           ))}
@@ -741,16 +740,16 @@ export default function ExperimentSchedulePage() {
             ))}
           </div>
         ) : (
-          <p className={styles.mutedText}>No upcoming scheduled actions in this window.</p>
+          <p className={"gt-text-muted"}>No upcoming scheduled actions in this window.</p>
         )}
       </SectionCard>
 
       <SectionCard title={editingId ? "Edit action" : "Create action"}>
-        <div className={styles.formGrid}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Action type</span>
+        <div className={"gt-stack"}>
+          <label className={"gt-col"}>
+            <span className={"gt-text-muted"}>Action type</span>
             <select
-              className={styles.select}
+              className={"gt-select"}
               value={actionType}
               onChange={(event) => setActionType(event.target.value as ActionType)}
               disabled={saving}
@@ -763,10 +762,10 @@ export default function ExperimentSchedulePage() {
             </select>
           </label>
 
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Title</span>
+          <label className={"gt-col"}>
+            <span className={"gt-text-muted"}>Title</span>
             <input
-              className={styles.input}
+              className={"gt-input"}
               value={title}
               onChange={(event) => {
                 setTitle(event.target.value);
@@ -774,20 +773,20 @@ export default function ExperimentSchedulePage() {
               }}
               disabled={saving}
             />
-            <span className={styles.inlineNote}>Suggestion: {suggestedTitle}</span>
+            <span className={"gt-text-muted"}>Suggestion: {suggestedTitle}</span>
           </label>
 
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Description (optional)</span>
+          <label className={"gt-col"}>
+            <span className={"gt-text-muted"}>Description (optional)</span>
             <textarea
-              className={styles.textarea}
+              className={"gt-textarea"}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               disabled={saving}
             />
           </label>
 
-          <label className={styles.checkboxRow}>
+          <label className={"gt-row"}>
             <input
               type="checkbox"
               checked={enabled}
@@ -797,23 +796,23 @@ export default function ExperimentSchedulePage() {
             <span>Enabled</span>
           </label>
 
-          <div className={styles.actions}>
+          <div className={"gt-btnbar"}>
             <button
-              className={recurrenceMode === "weekly" ? styles.buttonPrimary : styles.buttonSecondary}
+              className={recurrenceMode === "weekly" ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
               type="button"
               onClick={() => setRecurrenceMode("weekly")}
             >
               Weekly pattern
             </button>
             <button
-              className={recurrenceMode === "interval" ? styles.buttonPrimary : styles.buttonSecondary}
+              className={recurrenceMode === "interval" ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
               type="button"
               onClick={() => setRecurrenceMode("interval")}
             >
               Every X days
             </button>
             <button
-              className={recurrenceMode === "daily" ? styles.buttonPrimary : styles.buttonSecondary}
+              className={recurrenceMode === "daily" ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
               type="button"
               onClick={() => setRecurrenceMode("daily")}
             >
@@ -822,13 +821,13 @@ export default function ExperimentSchedulePage() {
           </div>
 
           {recurrenceMode === "weekly" ? (
-            <div className={styles.blocksList}>
+            <div className={"gt-stack"}>
               {weeklyRules.map((rule, index) => (
-                <article className={styles.blockRow} key={`${rule.weekday}-${index}`}>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>Weekday</span>
+                <article className={"gt-cell gt-cell--muted"} key={`${rule.weekday}-${index}`}>
+                  <label className={"gt-col"}>
+                    <span className={"gt-text-muted"}>Weekday</span>
                     <select
-                      className={styles.select}
+                      className={"gt-select"}
                       value={rule.weekday}
                       onChange={(event) =>
                         setWeeklyRules((current) =>
@@ -845,10 +844,10 @@ export default function ExperimentSchedulePage() {
                       ))}
                     </select>
                   </label>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>Timeframe</span>
+                  <label className={"gt-col"}>
+                    <span className={"gt-text-muted"}>Timeframe</span>
                     <select
-                      className={styles.select}
+                      className={"gt-select"}
                       value={rule.timeframe}
                       onChange={(event) =>
                         setWeeklyRules((current) =>
@@ -867,10 +866,10 @@ export default function ExperimentSchedulePage() {
                       ))}
                     </select>
                   </label>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>Exact time (optional)</span>
+                  <label className={"gt-col"}>
+                    <span className={"gt-text-muted"}>Exact time (optional)</span>
                     <input
-                      className={styles.input}
+                      className={"gt-input"}
                       type="time"
                       value={rule.exact_time}
                       onChange={(event) =>
@@ -882,10 +881,10 @@ export default function ExperimentSchedulePage() {
                       }
                     />
                   </label>
-                  <div className={styles.actions}>
+                  <div className={"gt-btnbar"}>
                     {weeklyRules.length > 1 ? (
                       <button
-                        className={styles.buttonSecondary}
+                        className={"gt-button gt-button--secondary"}
                         type="button"
                         onClick={() =>
                           setWeeklyRules((current) => current.filter((_, itemIndex) => itemIndex !== index))
@@ -898,7 +897,7 @@ export default function ExperimentSchedulePage() {
                 </article>
               ))}
               <button
-                className={styles.buttonSecondary}
+                className={"gt-button gt-button--secondary"}
                 type="button"
                 onClick={() =>
                   setWeeklyRules((current) => [
@@ -913,21 +912,21 @@ export default function ExperimentSchedulePage() {
           ) : null}
 
           {recurrenceMode === "interval" ? (
-            <div className={styles.formGrid}>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Interval days</span>
+            <div className={"gt-stack"}>
+              <label className={"gt-col"}>
+                <span className={"gt-text-muted"}>Interval days</span>
                 <input
-                  className={styles.input}
+                  className={"gt-input"}
                   type="number"
                   min={1}
                   value={intervalDays}
                   onChange={(event) => setIntervalDays(Math.max(1, Number(event.target.value) || 1))}
                 />
               </label>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Timeframe</span>
+              <label className={"gt-col"}>
+                <span className={"gt-text-muted"}>Timeframe</span>
                 <select
-                  className={styles.select}
+                  className={"gt-select"}
                   value={intervalTimeframe}
                   onChange={(event) => setIntervalTimeframe(event.target.value as Timeframe)}
                 >
@@ -938,10 +937,10 @@ export default function ExperimentSchedulePage() {
                   ))}
                 </select>
               </label>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Exact time (optional)</span>
+              <label className={"gt-col"}>
+                <span className={"gt-text-muted"}>Exact time (optional)</span>
                 <input
-                  className={styles.input}
+                  className={"gt-input"}
                   type="time"
                   value={intervalExactTime}
                   onChange={(event) => setIntervalExactTime(event.target.value)}
@@ -951,11 +950,11 @@ export default function ExperimentSchedulePage() {
           ) : null}
 
           {recurrenceMode === "daily" ? (
-            <div className={styles.formGrid}>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Timeframe</span>
+            <div className={"gt-stack"}>
+              <label className={"gt-col"}>
+                <span className={"gt-text-muted"}>Timeframe</span>
                 <select
-                  className={styles.select}
+                  className={"gt-select"}
                   value={dailyTimeframe}
                   onChange={(event) => setDailyTimeframe(event.target.value as Timeframe)}
                 >
@@ -966,10 +965,10 @@ export default function ExperimentSchedulePage() {
                   ))}
                 </select>
               </label>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Exact time (optional)</span>
+              <label className={"gt-col"}>
+                <span className={"gt-text-muted"}>Exact time (optional)</span>
                 <input
-                  className={styles.input}
+                  className={"gt-input"}
                   type="time"
                   value={dailyExactTime}
                   onChange={(event) => setDailyExactTime(event.target.value)}
@@ -978,9 +977,9 @@ export default function ExperimentSchedulePage() {
             </div>
           ) : null}
 
-          <div className={styles.actions}>
+          <div className={"gt-btnbar"}>
             <button
-              className={scopeType === "TENT" ? styles.buttonPrimary : styles.buttonSecondary}
+              className={scopeType === "TENT" ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
               type="button"
               onClick={() => {
                 setScopeType("TENT");
@@ -990,7 +989,7 @@ export default function ExperimentSchedulePage() {
               Tents
             </button>
             <button
-              className={scopeType === "TRAY" ? styles.buttonPrimary : styles.buttonSecondary}
+              className={scopeType === "TRAY" ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
               type="button"
               onClick={() => {
                 setScopeType("TRAY");
@@ -1000,7 +999,7 @@ export default function ExperimentSchedulePage() {
               Trays
             </button>
             <button
-              className={scopeType === "PLANT" ? styles.buttonPrimary : styles.buttonSecondary}
+              className={scopeType === "PLANT" ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
               type="button"
               onClick={() => {
                 setScopeType("PLANT");
@@ -1012,9 +1011,9 @@ export default function ExperimentSchedulePage() {
           </div>
 
           {scopeType === "TENT" ? (
-            <div className={styles.blocksList}>
+            <div className={"gt-stack"}>
               {(placementSummary ? unwrapList<PlacementSummary["tents"]["results"][number]>(placementSummary.tents) : []).map((tent) => (
-                <label className={styles.checkboxRow} key={tent.tent_id}>
+                <label className={"gt-row"} key={tent.tent_id}>
                   <input
                     type="checkbox"
                     checked={selectedScopeIds.includes(tent.tent_id)}
@@ -1026,18 +1025,18 @@ export default function ExperimentSchedulePage() {
                 </label>
               ))}
               {(placementSummary ? unwrapList<PlacementSummary["tents"]["results"][number]>(placementSummary.tents).length : 0) === 0 ? (
-                <p className={styles.inlineNote}>No tents available yet. Add tents in Placement step 1.</p>
+                <p className={"gt-text-muted"}>No tents available yet. Add tents in Placement step 1.</p>
               ) : null}
             </div>
           ) : null}
 
           {scopeType === "TRAY" ? (
-            <div className={styles.blocksList}>
+            <div className={"gt-stack"}>
               {traysGroupedByTent.map(([group, trays]) => (
-                <article className={styles.blockRow} key={group}>
+                <article className={"gt-cell gt-cell--muted"} key={group}>
                   <strong>{group}</strong>
                   {trays.map((tray) => (
-                    <label className={styles.checkboxRow} key={tray.tray_id}>
+                    <label className={"gt-row"} key={tray.tray_id}>
                       <input
                         type="checkbox"
                         checked={selectedScopeIds.includes(tray.tray_id)}
@@ -1054,18 +1053,18 @@ export default function ExperimentSchedulePage() {
                 </article>
               ))}
               {(placementSummary ? unwrapList<PlacementSummary["trays"]["results"][number]>(placementSummary.trays).length : 0) === 0 ? (
-                <p className={styles.inlineNote}>No trays available yet. Add trays in Placement.</p>
+                <p className={"gt-text-muted"}>No trays available yet. Add trays in Placement.</p>
               ) : null}
             </div>
           ) : null}
 
           {scopeType === "PLANT" ? (
-            <div className={styles.blocksList}>
+            <div className={"gt-stack"}>
               {plantsGroupedByLocation.map(([group, plants]) => (
-                <article className={styles.blockRow} key={group}>
+                <article className={"gt-cell gt-cell--muted"} key={group}>
                   <strong>{group}</strong>
                   {plants.map((plant) => (
-                    <label className={styles.checkboxRow} key={plant.uuid}>
+                    <label className={"gt-row"} key={plant.uuid}>
                       <input
                         type="checkbox"
                         checked={selectedScopeIds.includes(plant.uuid)}
@@ -1080,24 +1079,24 @@ export default function ExperimentSchedulePage() {
                 </article>
               ))}
               {activePlants.length === 0 ? (
-                <p className={styles.inlineNote}>No active plants available for scheduling.</p>
+                <p className={"gt-text-muted"}>No active plants available for scheduling.</p>
               ) : null}
             </div>
           ) : null}
 
           {feedWarnings.length > 0 ? (
-            <div className={styles.badgeRow}>
+            <div className={"gt-row"}>
               {feedWarnings.map((warning) => (
-                <span className={styles.badgeWarn} key={warning}>
+                <span className={"gt-badge"} key={warning}>
                   {warning}
                 </span>
               ))}
             </div>
           ) : null}
 
-          <div className={styles.actions}>
+          <div className={"gt-btnbar"}>
             <button
-              className={styles.buttonPrimary}
+              className={"gt-button gt-button--primary"}
               type="button"
               disabled={saving}
               onClick={() => void saveScheduleAction()}
@@ -1106,7 +1105,7 @@ export default function ExperimentSchedulePage() {
             </button>
             {editingId ? (
               <button
-                className={styles.buttonSecondary}
+                className={"gt-button gt-button--secondary"}
                 type="button"
                 disabled={saving}
                 onClick={resetForm}
@@ -1120,32 +1119,32 @@ export default function ExperimentSchedulePage() {
 
       <SectionCard title="Existing actions">
         {actions.length === 0 ? (
-          <p className={styles.mutedText}>No schedule actions yet.</p>
+          <p className={"gt-text-muted"}>No schedule actions yet.</p>
         ) : (
-          <div className={styles.blocksList}>
+          <div className={"gt-stack"}>
             {actions.map((action) => (
-              <article className={styles.blockRow} key={action.id}>
-                <div className={styles.actions}>
+              <article className={"gt-cell gt-cell--muted"} key={action.id}>
+                <div className={"gt-btnbar"}>
                   <strong>{action.title}</strong>
-                  <span className={styles.mutedText}>{actionTypeLabel(action.action_type)}</span>
+                  <span className={"gt-text-muted"}>{actionTypeLabel(action.action_type)}</span>
                 </div>
-                <p className={styles.mutedText}>
+                <p className={"gt-text-muted"}>
                   {action.rules.map((rule) => summarizeRule(rule)).join(" · ")}
                 </p>
-                <p className={styles.mutedText}>
+                <p className={"gt-text-muted"}>
                   {action.scopes.map((scope) => scope.label).join(", ")}
                 </p>
                 {action.current_blockers.length > 0 ? (
-                  <div className={styles.badgeRow}>
+                  <div className={"gt-row"}>
                     {action.current_blockers.map((reason) => (
-                      <span className={styles.badgeWarn} key={reason}>
+                      <span className={"gt-badge"} key={reason}>
                         {reason}
                       </span>
                     ))}
                   </div>
                 ) : null}
-                <div className={styles.actions}>
-                  <label className={styles.checkboxRow}>
+                <div className={"gt-btnbar"}>
+                  <label className={"gt-row"}>
                     <input
                       type="checkbox"
                       checked={action.enabled}
@@ -1155,7 +1154,7 @@ export default function ExperimentSchedulePage() {
                     <span>Enabled</span>
                   </label>
                   <button
-                    className={styles.buttonSecondary}
+                    className={"gt-button gt-button--secondary"}
                     type="button"
                     disabled={saving}
                     onClick={() => startEdit(action)}
@@ -1163,7 +1162,7 @@ export default function ExperimentSchedulePage() {
                     Edit
                   </button>
                   <button
-                    className={styles.buttonDanger}
+                    className={"gt-button gt-button--danger"}
                     type="button"
                     disabled={saving}
                     onClick={() => void deleteScheduleAction(action.id)}

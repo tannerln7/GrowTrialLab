@@ -11,7 +11,6 @@ import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 
-import styles from "../../experiments.module.css";
 
 type PlantRow = {
   id: string;
@@ -310,24 +309,24 @@ export default function ExperimentPlantsPage() {
       title="Plants"
       subtitle={`Experiment: ${experimentId}`}
       actions={
-        <div className={styles.actions}>
-          <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+        <div className={"gt-btnbar"}>
+          <Link className={"gt-button gt-button--primary"} href={`/experiments/${experimentId}/overview`}>
             ← Overview
           </Link>
         </div>
       }
     >
-      {loading ? <p className={styles.mutedText}>Loading plants...</p> : null}
-      {error ? <p className={styles.errorText}>{error}</p> : null}
-      {notice ? <p className={styles.successText}>{notice}</p> : null}
+      {loading ? <p className={"gt-text-muted"}>Loading plants...</p> : null}
+      {error ? <p className={"gt-text-danger"}>{error}</p> : null}
+      {notice ? <p className={"gt-text-success"}>{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Add Plants (Manual)">
-        <div className={styles.formGrid}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Plant preset</span>
+        <div className={"gt-stack"}>
+          <label className={"gt-col"}>
+            <span className={"gt-text-muted"}>Plant preset</span>
             <select
-              className={styles.input}
+              className={"gt-input"}
               value={selectedPresetId}
               onChange={(event) => {
                 const nextPresetId = event.target.value;
@@ -353,61 +352,61 @@ export default function ExperimentPlantsPage() {
               ))}
             </select>
           </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Species name</span>
+          <label className={"gt-col"}>
+            <span className={"gt-text-muted"}>Species name</span>
             <input
-              className={styles.input}
+              className={"gt-input"}
               value={manualSpeciesName}
               onChange={(event) => setManualSpeciesName(event.target.value)}
               placeholder="Nepenthes ventricosa"
             />
           </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Category</span>
+          <label className={"gt-col"}>
+            <span className={"gt-text-muted"}>Category</span>
             <input
-              className={styles.input}
+              className={"gt-input"}
               value={manualCategory}
               onChange={(event) => setManualCategory(event.target.value)}
               placeholder="nepenthes"
             />
           </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Cultivar</span>
+          <label className={"gt-col"}>
+            <span className={"gt-text-muted"}>Cultivar</span>
             <input
-              className={styles.input}
+              className={"gt-input"}
               value={manualCultivar}
               onChange={(event) => setManualCultivar(event.target.value)}
             />
           </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Quantity</span>
+          <label className={"gt-col"}>
+            <span className={"gt-text-muted"}>Quantity</span>
             <input
-              className={styles.input}
+              className={"gt-input"}
               type="number"
               min={1}
               value={manualQuantity}
               onChange={(event) => setManualQuantity(Number(event.target.value) || 1)}
             />
           </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Plant ID (optional)</span>
+          <label className={"gt-col"}>
+            <span className={"gt-text-muted"}>Plant ID (optional)</span>
             <input
-              className={styles.input}
+              className={"gt-input"}
               value={manualPlantId}
               onChange={(event) => setManualPlantId(event.target.value)}
               placeholder={suggestedPlantId}
             />
           </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Baseline notes</span>
+          <label className={"gt-col"}>
+            <span className={"gt-text-muted"}>Baseline notes</span>
             <textarea
-              className={styles.textarea}
+              className={"gt-textarea"}
               value={manualBaselineNotes}
               onChange={(event) => setManualBaselineNotes(event.target.value)}
             />
           </label>
           <button
-            className={styles.buttonSecondary}
+            className={"gt-button gt-button--secondary"}
             type="button"
             disabled={saving || !manualSpeciesName.trim()}
             onClick={() => void addPlantsQuick()}
@@ -418,12 +417,12 @@ export default function ExperimentPlantsPage() {
       </SectionCard>
 
       <SectionCard title="Bulk Import CSV">
-        <p className={styles.inlineNote}>
+        <p className={"gt-text-muted"}>
           Columns: species_name, category, cultivar, quantity, plant_id, baseline_notes
         </p>
-        <div className={styles.formGrid}>
+        <div className={"gt-stack"}>
           <textarea
-            className={styles.textarea}
+            className={"gt-textarea"}
             value={csvText}
             onChange={(event) => setCsvText(event.target.value)}
             placeholder={
@@ -431,13 +430,13 @@ export default function ExperimentPlantsPage() {
             }
           />
           <input
-            className={styles.input}
+            className={"gt-input"}
             type="file"
             accept=".csv,text/csv"
             onChange={(event) => setCsvFile(event.target.files?.[0] ?? null)}
           />
           <button
-            className={styles.buttonSecondary}
+            className={"gt-button gt-button--secondary"}
             type="button"
             disabled={saving || (!csvFile && !csvText.trim())}
             onClick={() => void importPlantsCsv()}
@@ -448,16 +447,16 @@ export default function ExperimentPlantsPage() {
       </SectionCard>
 
       <SectionCard title="Tools">
-        <div className={styles.actions}>
+        <div className={"gt-btnbar"}>
           <button
-            className={styles.buttonSecondary}
+            className={"gt-button gt-button--secondary"}
             type="button"
             disabled={saving}
             onClick={() => void generateMissingIds()}
           >
             Generate IDs for pending plants
           </button>
-          <button className={styles.buttonSecondary} type="button" onClick={downloadLabels}>
+          <button className={"gt-button gt-button--secondary"} type="button" onClick={downloadLabels}>
             Download labels PDF
           </button>
         </div>
@@ -494,7 +493,7 @@ export default function ExperimentPlantsPage() {
               },
             ]}
             renderMobileCard={(plant) => (
-              <div className={styles.cardKeyValue}>
+              <div className={"gt-col"}>
                 <span>Plant ID</span>
                 <strong>
                   <Link href={`/p/${plant.id}`}>{plant.plant_id || "(pending)"}</Link>
