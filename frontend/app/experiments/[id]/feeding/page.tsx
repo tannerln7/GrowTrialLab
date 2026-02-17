@@ -42,9 +42,7 @@ type FeedingQueuePlant = {
   species_name: string;
   species_category: string;
   cultivar: string | null;
-  assigned_recipe_id: string | null;
-  assigned_recipe_code: string | null;
-  assigned_recipe_name: string | null;
+  assigned_recipe: { id: string; code: string; name: string } | null;
   location: Location;
   blocked_reason: string | null;
   last_fed_at: string | null;
@@ -412,8 +410,8 @@ export default function FeedingPage() {
                   <p className={styles.mutedText}>Last fed: {formatLastFed(selectedPlant.last_fed_at)}</p>
                   <p className={styles.mutedText}>
                     Assigned recipe:{" "}
-                    {selectedPlant.assigned_recipe_code
-                      ? `${selectedPlant.assigned_recipe_code}${selectedPlant.assigned_recipe_name ? ` - ${selectedPlant.assigned_recipe_name}` : ""}`
+                    {selectedPlant.assigned_recipe
+                      ? `${selectedPlant.assigned_recipe.code}${selectedPlant.assigned_recipe.name ? ` - ${selectedPlant.assigned_recipe.name}` : ""}`
                       : "Unassigned"}
                   </p>
                   <p className={styles.mutedText}>Location: {locationLabel(selectedPlant)}</p>
@@ -448,7 +446,7 @@ export default function FeedingPage() {
               <p className={styles.mutedText}>
                 {saveBlockedReason === "Unplaced"
                   ? "This plant needs placement in a tray before feeding."
-                  : "This plant needs a tray recipe before feeding."}
+                  : "This plant needs a plant recipe before feeding."}
               </p>
               <div className={styles.actions}>
                 <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/placement`}>

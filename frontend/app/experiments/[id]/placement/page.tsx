@@ -1,5 +1,8 @@
 "use client";
 
+import * as Popover from "@radix-ui/react-popover";
+import * as Select from "@radix-ui/react-select";
+import { Check, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -14,6 +17,7 @@ import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
+import StickyActionBar from "@/src/components/ui/StickyActionBar";
 
 import styles from "../../experiments.module.css";
 
@@ -44,6 +48,16 @@ type Location = {
   tray: { id: string; code: string; name: string; capacity: number; current_count: number } | null;
 };
 
+type RecipeSummary = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+type Recipe = RecipeSummary & {
+  notes: string;
+};
+
 type TrayPlant = {
   tray_plant_id: string;
   uuid: string;
@@ -53,14 +67,12 @@ type TrayPlant = {
   species_category: string;
   grade: string | null;
   status: string;
+  assigned_recipe: RecipeSummary | null;
 };
 
 type Tray = {
   tray_id: string;
   name: string;
-  assigned_recipe_id: string | null;
-  assigned_recipe_code: string | null;
-  assigned_recipe_name: string | null;
   capacity: number;
   current_count: number;
   location: Location;
@@ -75,6 +87,7 @@ type UnplacedPlant = {
   species_category: string;
   grade: string | null;
   status: string;
+  assigned_recipe: RecipeSummary | null;
 };
 
 type PlacementSummary = {
@@ -92,18 +105,9 @@ type PlacementSummary = {
       tray_name: string;
       capacity: number;
       current_count: number;
-      assigned_recipe_id: string | null;
-      assigned_recipe_code: string | null;
     }>;
     meta: Record<string, unknown>;
   };
-};
-
-type Recipe = {
-  id: string;
-  code: string;
-  name: string;
-  notes: string;
 };
 
 type Diagnostics = {
@@ -117,12 +121,80 @@ type Diagnostics = {
 
 const RUNNING_LOCK_MESSAGE =
   "Placement cannot be edited while the experiment is running. Stop the experiment to change placement.";
+const RECIPE_COLORS = ["#3f84e5", "#f27a54", "#17a37b", "#cc8d2b", "#8a6ae8", "#c1579a"];
 
 function locationLabel(location: Location): string {
   if (location.status !== "placed" || !location.slot || !location.tent) {
     return "Unplaced";
   }
   return `${location.tent.code || location.tent.name} / ${location.slot.code}`;
+}
+
+function recipeLabel(recipe: RecipeSummary): string {
+  return recipe.name ? `${recipe.code} - ${recipe.name}` : recipe.code;
+}
+
+function recipeChipLabel(recipe: RecipeSummary | null): string {
+  if (!recipe) {
+    return "Recipe: Unassigned";
+  }
+  return `Recipe: ${recipeLabel(recipe)}`;
+}
+
+function recipeColor(seed: string): string {
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+  return RECIPE_COLORS[hash % RECIPE_COLORS.length];
+}
+
+function summarizeTrayRecipes(tray: Tray): {
+  label: string;
+  tone: "mixed" | "assigned" | "unassigned";
+  assignedRecipes: RecipeSummary[];
+  hasUnassigned: boolean;
+} {
+  const assignedMap = new Map<string, RecipeSummary>();
+  let hasUnassigned = false;
+
+  for (const plant of tray.plants) {
+    if (plant.assigned_recipe) {
+      assignedMap.set(plant.assigned_recipe.id, plant.assigned_recipe);
+    } else {
+      hasUnassigned = true;
+    }
+  }
+
+  const assignedRecipes = Array.from(assignedMap.values()).sort((left, right) =>
+    left.code.localeCompare(right.code),
+  );
+  const variantCount = assignedRecipes.length + (hasUnassigned ? 1 : 0);
+
+  if (variantCount > 1) {
+    return {
+      label: "Recipe mix: Mixed",
+      tone: "mixed",
+      assignedRecipes,
+      hasUnassigned,
+    };
+  }
+
+  if (assignedRecipes.length === 1) {
+    return {
+      label: `Recipe mix: ${recipeLabel(assignedRecipes[0])}`,
+      tone: "assigned",
+      assignedRecipes,
+      hasUnassigned,
+    };
+  }
+
+  return {
+    label: "Recipe mix: Unassigned",
+    tone: "unassigned",
+    assignedRecipes,
+    hasUnassigned,
+  };
 }
 
 export default function PlacementPage() {
@@ -149,10 +221,13 @@ export default function PlacementPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [newTrayName, setNewTrayName] = useState("");
   const [newTraySlotId, setNewTraySlotId] = useState("");
-  const [newTrayRecipeId, setNewTrayRecipeId] = useState("");
   const [newTrayCapacity, setNewTrayCapacity] = useState(1);
   const [traySelectionByPlant, setTraySelectionByPlant] = useState<Record<string, string>>({});
   const [slotSelectionByTray, setSlotSelectionByTray] = useState<Record<string, string>>({});
+  const [draftRecipeByPlantId, setDraftRecipeByPlantId] = useState<Record<string, string | null>>({});
+  const [overriddenPlantIds, setOverriddenPlantIds] = useState<Set<string>>(new Set());
+  const [recipeSelectionByTray, setRecipeSelectionByTray] = useState<Record<string, string>>({});
+  const [recipeSelectionByPlant, setRecipeSelectionByPlant] = useState<Record<string, string>>({});
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
 
   const placementLocked = statusSummary?.lifecycle.state === "running";
@@ -194,6 +269,45 @@ export default function PlacementPage() {
     () => allSlots.filter((slot) => !occupiedSlotByTray.has(slot.id)),
     [allSlots, occupiedSlotByTray],
   );
+
+  const recipeById = useMemo(() => {
+    const map = new Map<string, RecipeSummary>();
+    for (const recipe of recipes) {
+      map.set(recipe.id, recipe);
+    }
+    return map;
+  }, [recipes]);
+
+  const persistedRecipeByPlantId = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    for (const plant of summary?.unplaced_plants.results || []) {
+      map[plant.uuid] = plant.assigned_recipe?.id || null;
+    }
+    for (const tray of summary?.trays.results || []) {
+      for (const plant of tray.plants) {
+        map[plant.uuid] = plant.assigned_recipe?.id || null;
+      }
+    }
+    return map;
+  }, [summary?.trays.results, summary?.unplaced_plants.results]);
+
+  useEffect(() => {
+    setDraftRecipeByPlantId(persistedRecipeByPlantId);
+    setOverriddenPlantIds(new Set());
+    setRecipeSelectionByTray({});
+    setRecipeSelectionByPlant({});
+  }, [persistedRecipeByPlantId]);
+
+  const stagedChangeCount = useMemo(() => {
+    let count = 0;
+    for (const [plantId, persistedRecipeId] of Object.entries(persistedRecipeByPlantId)) {
+      const draftRecipeId = draftRecipeByPlantId[plantId] ?? persistedRecipeId ?? null;
+      if ((draftRecipeId || null) !== (persistedRecipeId || null)) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [draftRecipeByPlantId, persistedRecipeByPlantId]);
 
   const loadPage = useCallback(async () => {
     const [summaryResponse, statusResponse, recipesResponse] = await Promise.all([
@@ -274,7 +388,6 @@ export default function PlacementPage() {
         body: JSON.stringify({
           name: newTrayName.trim() || trayNameSuggestion,
           slot_id: newTraySlotId || null,
-          assigned_recipe_id: newTrayRecipeId || null,
           capacity: newTrayCapacity,
         }),
       });
@@ -289,7 +402,6 @@ export default function PlacementPage() {
       setNotice("Tray created.");
       setNewTrayName("");
       setNewTraySlotId("");
-      setNewTrayRecipeId("");
       setNewTrayCapacity(1);
       await loadPage();
     } catch (requestError) {
@@ -396,6 +508,93 @@ export default function PlacementPage() {
     }
   }
 
+  function applyStagedRecipeToTray(tray: Tray, recipeId: string) {
+    if (!recipeId) {
+      setError("Select a recipe before applying.");
+      return;
+    }
+    setError("");
+    setNotice("");
+    setDraftRecipeByPlantId((current) => {
+      const next = { ...current };
+      for (const plant of tray.plants) {
+        if (overriddenPlantIds.has(plant.uuid)) {
+          continue;
+        }
+        next[plant.uuid] = recipeId;
+      }
+      return next;
+    });
+  }
+
+  function stagePlantRecipe(plantId: string, recipeId: string | null) {
+    setError("");
+    setNotice("");
+    setDraftRecipeByPlantId((current) => ({
+      ...current,
+      [plantId]: recipeId,
+    }));
+    setOverriddenPlantIds((current) => {
+      const next = new Set(current);
+      next.add(plantId);
+      return next;
+    });
+  }
+
+  function revertStagedRecipeChanges() {
+    setDraftRecipeByPlantId(persistedRecipeByPlantId);
+    setOverriddenPlantIds(new Set());
+    setRecipeSelectionByTray({});
+    setRecipeSelectionByPlant({});
+    setNotice("Staged recipe changes reverted.");
+  }
+
+  async function saveStagedRecipeChanges() {
+    const updates = Object.entries(persistedRecipeByPlantId)
+      .map(([plantId, persistedRecipeId]) => {
+        const draftRecipeId = draftRecipeByPlantId[plantId] ?? persistedRecipeId ?? null;
+        if ((draftRecipeId || null) === (persistedRecipeId || null)) {
+          return null;
+        }
+        return {
+          plant_id: plantId,
+          assigned_recipe_id: draftRecipeId,
+        };
+      })
+      .filter((item): item is { plant_id: string; assigned_recipe_id: string | null } => item !== null);
+
+    if (updates.length === 0) {
+      setNotice("No staged recipe changes to save.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await backendFetch(`/api/v1/experiments/${experimentId}/plants/recipes`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+      });
+      const payload = (await response.json()) as { detail?: string; count?: number };
+      if (!response.ok) {
+        setError(payload.detail || "Unable to save recipe assignments.");
+        return;
+      }
+      setNotice(`Saved recipe changes for ${payload.count || updates.length} plant(s).`);
+      await loadPage();
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to save recipe assignments.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function runAutoPlace() {
     if (placementLocked) {
       setError(RUNNING_LOCK_MESSAGE);
@@ -453,6 +652,52 @@ export default function PlacementPage() {
     return map;
   }, [summary?.tents.results, summary?.trays.results, summary?.unplaced_plants.results]);
 
+  function draftRecipeForPlant(plant: { uuid: string; assigned_recipe: RecipeSummary | null }): RecipeSummary | null {
+    const persistedRecipeId = plant.assigned_recipe?.id || null;
+    const draftRecipeId = draftRecipeByPlantId[plant.uuid] ?? persistedRecipeId;
+    if (!draftRecipeId) {
+      return null;
+    }
+    return recipeById.get(draftRecipeId) || null;
+  }
+
+  function isPlantRecipeStaged(plant: { uuid: string; assigned_recipe: RecipeSummary | null }): boolean {
+    const persistedRecipeId = plant.assigned_recipe?.id || null;
+    const draftRecipeId = draftRecipeByPlantId[plant.uuid] ?? persistedRecipeId;
+    return (draftRecipeId || null) !== (persistedRecipeId || null);
+  }
+
+  function renderRecipeSelect(
+    value: string | undefined,
+    onValueChange: (next: string) => void,
+    placeholder: string,
+  ) {
+    return (
+      <Select.Root value={value} onValueChange={onValueChange}>
+        <Select.Trigger className={styles.recipeSelectTrigger} aria-label={placeholder}>
+          <Select.Value placeholder={placeholder} />
+          <Select.Icon>
+            <ChevronDown size={14} />
+          </Select.Icon>
+        </Select.Trigger>
+        <Select.Portal>
+          <Select.Content className={styles.recipeSelectContent} position="popper" sideOffset={6}>
+            <Select.Viewport className={styles.recipeSelectViewport}>
+              {recipes.map((recipe) => (
+                <Select.Item key={recipe.id} value={recipe.id} className={styles.recipeSelectItem}>
+                  <Select.ItemText>{recipeLabel(recipe)}</Select.ItemText>
+                  <Select.ItemIndicator className={styles.recipeSelectIndicator}>
+                    <Check size={14} />
+                  </Select.ItemIndicator>
+                </Select.Item>
+              ))}
+            </Select.Viewport>
+          </Select.Content>
+        </Select.Portal>
+      </Select.Root>
+    );
+  }
+
   if (notInvited) {
     return (
       <PageShell title="Placement">
@@ -466,7 +711,7 @@ export default function PlacementPage() {
   return (
     <PageShell
       title="Placement"
-      subtitle="Assign trays to slots and place plants into trays."
+      subtitle="Assign trays to slots, place plants into trays, and set recipes per plant."
       actions={
         <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
           ← Overview
@@ -502,17 +747,6 @@ export default function PlacementPage() {
             </select>
           </label>
           <label className={styles.field}>
-            <span className={styles.fieldLabel}>Recipe (optional)</span>
-            <select className={styles.select} value={newTrayRecipeId} onChange={(event) => setNewTrayRecipeId(event.target.value)}>
-              <option value="">None</option>
-              {recipes.map((recipe) => (
-                <option key={recipe.id} value={recipe.id}>
-                  {recipe.code} · {recipe.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.field}>
             <span className={styles.fieldLabel}>Capacity</span>
             <input
               className={styles.input}
@@ -537,6 +771,22 @@ export default function PlacementPage() {
             { key: "plant", label: "Plant", render: (plant) => plant.plant_id || "(pending)" },
             { key: "species", label: "Species", render: (plant) => plant.species_name },
             { key: "grade", label: "Grade", render: (plant) => plant.grade || "Missing" },
+            {
+              key: "recipe",
+              label: "Recipe",
+              render: (plant) => {
+                const draftRecipe = draftRecipeForPlant(plant);
+                const staged = isPlantRecipeStaged(plant);
+                return (
+                  <div className={styles.actions}>
+                    <span className={draftRecipe ? styles.recipeChipAssigned : styles.recipeChipUnassigned}>
+                      {recipeChipLabel(draftRecipe)}
+                    </span>
+                    {staged ? <span className={styles.recipeLegendItem}>Staged</span> : null}
+                  </div>
+                );
+              },
+            },
             {
               key: "tray",
               label: "Add to tray",
@@ -579,6 +829,15 @@ export default function PlacementPage() {
               <strong>{plant.species_name}</strong>
               <span>Grade</span>
               <strong>{plant.grade || "Missing"}</strong>
+              <span>Recipe</span>
+              <strong>
+                <span
+                  className={draftRecipeForPlant(plant) ? styles.recipeChipAssigned : styles.recipeChipUnassigned}
+                >
+                  {recipeChipLabel(draftRecipeForPlant(plant))}
+                </span>
+              </strong>
+              {isPlantRecipeStaged(plant) ? <span className={styles.recipeLegendItem}>Staged</span> : null}
             </div>
           )}
         />
@@ -592,12 +851,48 @@ export default function PlacementPage() {
               const occupiedBy = occupiedSlotByTray.get(slot.id);
               return !occupiedBy || occupiedBy === tray.tray_id;
             });
+            const draftTray = {
+              ...tray,
+              plants: tray.plants.map((plant) => ({
+                ...plant,
+                assigned_recipe: draftRecipeForPlant(plant),
+              })),
+            };
+            const trayRecipeState = summarizeTrayRecipes(draftTray);
+            const trayRecipeSelection =
+              recipeSelectionByTray[tray.tray_id] || trayRecipeState.assignedRecipes[0]?.id || "";
 
             return (
               <article key={tray.tray_id} className={styles.blockRow}>
-                <strong>{tray.name}</strong>
+                <div className={styles.actions}>
+                  <strong>{tray.name}</strong>
+                  <span
+                    className={
+                      trayRecipeState.tone === "assigned"
+                        ? styles.recipeChipAssigned
+                        : trayRecipeState.tone === "mixed"
+                          ? styles.recipeChipMixed
+                          : styles.recipeChipUnassigned
+                    }
+                  >
+                    {trayRecipeState.label}
+                  </span>
+                </div>
                 <p className={styles.mutedText}>Location: {location}</p>
                 <p className={styles.mutedText}>Occupancy: {tray.current_count}/{tray.capacity}</p>
+                {trayRecipeState.assignedRecipes.length > 0 || trayRecipeState.hasUnassigned ? (
+                  <div className={styles.recipeLegendRow}>
+                    {trayRecipeState.assignedRecipes.map((recipe) => (
+                      <span key={recipe.id} className={styles.recipeLegendItem}>
+                        <span className={styles.recipeDot} style={{ backgroundColor: recipeColor(recipe.id) }} />
+                        {recipe.code}
+                      </span>
+                    ))}
+                    {trayRecipeState.hasUnassigned ? (
+                      <span className={styles.recipeLegendItem}>Unassigned</span>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className={styles.actions}>
                   <select
                     className={styles.select}
@@ -626,39 +921,118 @@ export default function PlacementPage() {
                   >
                     Move tray
                   </button>
-                  <select
-                    className={styles.select}
-                    value={tray.assigned_recipe_id || ""}
-                    onChange={(event) =>
-                      void updateTray(tray, {
-                        assigned_recipe: event.target.value || null,
-                      })
-                    }
-                    disabled={placementLocked}
-                  >
-                    <option value="">No tray recipe</option>
-                    {recipes.map((recipe) => (
-                      <option key={recipe.id} value={recipe.id}>
-                        {recipe.code} · {recipe.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Popover.Root>
+                    <Popover.Trigger asChild>
+                      <button className={styles.buttonSecondary} type="button" disabled={saving || recipes.length === 0}>
+                        Set recipe for all plants in this tray (staged)
+                      </button>
+                    </Popover.Trigger>
+                    <Popover.Portal>
+                      <Popover.Content className={styles.recipePopover} sideOffset={8} align="start">
+                        <p className={styles.fieldLabel}>Apply staged recipe to plants in this tray</p>
+                        {recipes.length > 0 ? (
+                          renderRecipeSelect(
+                            trayRecipeSelection || undefined,
+                            (next) =>
+                              setRecipeSelectionByTray((current) => ({
+                                ...current,
+                                [tray.tray_id]: next,
+                              })),
+                            "Select recipe",
+                          )
+                        ) : (
+                          <p className={styles.mutedText}>No recipes available yet.</p>
+                        )}
+                        <button
+                          className={styles.buttonPrimary}
+                          type="button"
+                          disabled={!trayRecipeSelection || saving || recipes.length === 0}
+                          onClick={() => applyStagedRecipeToTray(tray, trayRecipeSelection)}
+                        >
+                          Stage
+                        </button>
+                      </Popover.Content>
+                    </Popover.Portal>
+                  </Popover.Root>
                 </div>
-                {tray.plants.map((plant) => (
-                  <div key={plant.uuid} className={styles.actions}>
-                    <span className={styles.mutedText}>
-                      {plant.plant_id || "(pending)"} · {plant.species_name}
-                    </span>
-                    <button
-                      className={styles.buttonSecondary}
-                      type="button"
-                      disabled={placementLocked}
-                      onClick={() => void removePlantFromTray(tray.tray_id, plant.tray_plant_id)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+                {tray.plants.map((plant) => {
+                  const draftRecipe = draftRecipeForPlant(plant);
+                  const persistedRecipeId = plant.assigned_recipe?.id || "";
+                  const draftRecipeId = draftRecipe?.id || "";
+                  const selectedPlantRecipeId =
+                    recipeSelectionByPlant[plant.uuid] ?? draftRecipeId;
+                  const isStaged = draftRecipeId !== persistedRecipeId;
+                  const isOverridden = overriddenPlantIds.has(plant.uuid);
+                  return (
+                    <div key={plant.uuid} className={styles.trayPlantRow}>
+                      <Popover.Root>
+                        <Popover.Trigger asChild>
+                          <button className={styles.buttonSecondary} type="button">
+                            {plant.plant_id || "(pending)"} · {plant.species_name}
+                          </button>
+                        </Popover.Trigger>
+                        <Popover.Portal>
+                          <Popover.Content className={styles.recipePopover} sideOffset={8} align="start">
+                            <p className={styles.fieldLabel}>Set recipe for this plant</p>
+                            {recipes.length > 0 ? (
+                              renderRecipeSelect(
+                                selectedPlantRecipeId || undefined,
+                                (next) =>
+                                  setRecipeSelectionByPlant((current) => ({
+                                    ...current,
+                                    [plant.uuid]: next,
+                                  })),
+                                "Select recipe",
+                              )
+                            ) : (
+                              <p className={styles.mutedText}>No recipes available yet.</p>
+                            )}
+                            <div className={styles.actions}>
+                              <button
+                                className={styles.buttonPrimary}
+                                type="button"
+                                disabled={
+                                  recipes.length === 0 ||
+                                  !selectedPlantRecipeId ||
+                                  selectedPlantRecipeId === draftRecipeId
+                                }
+                                onClick={() =>
+                                  stagePlantRecipe(
+                                    plant.uuid,
+                                    selectedPlantRecipeId || null,
+                                  )
+                                }
+                              >
+                                Stage
+                              </button>
+                              <button
+                                className={styles.buttonSecondary}
+                                type="button"
+                                disabled={!draftRecipeId}
+                                onClick={() => stagePlantRecipe(plant.uuid, null)}
+                              >
+                                Stage clear
+                              </button>
+                            </div>
+                          </Popover.Content>
+                        </Popover.Portal>
+                      </Popover.Root>
+                      <span className={draftRecipe ? styles.recipeChipAssigned : styles.recipeChipUnassigned}>
+                        {recipeChipLabel(draftRecipe)}
+                      </span>
+                      {isStaged ? <span className={styles.recipeLegendItem}>Staged</span> : null}
+                      {isOverridden ? <span className={styles.recipeLegendItem}>Override</span> : null}
+                      <button
+                        className={styles.buttonSecondary}
+                        type="button"
+                        disabled={placementLocked}
+                        onClick={() => void removePlantFromTray(tray.tray_id, plant.tray_plant_id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
               </article>
             );
           })}
@@ -679,6 +1053,26 @@ export default function PlacementPage() {
           </div>
         ) : null}
       </SectionCard>
+
+      <StickyActionBar>
+        <span className={styles.recipeLegendItem}>{stagedChangeCount} plants changed</span>
+        <button
+          className={styles.buttonPrimary}
+          type="button"
+          disabled={saving || stagedChangeCount === 0}
+          onClick={() => void saveStagedRecipeChanges()}
+        >
+          {saving ? "Saving..." : "Save recipe changes"}
+        </button>
+        <button
+          className={styles.buttonSecondary}
+          type="button"
+          disabled={saving || stagedChangeCount === 0}
+          onClick={revertStagedRecipeChanges}
+        >
+          Revert staged changes
+        </button>
+      </StickyActionBar>
     </PageShell>
   );
 }

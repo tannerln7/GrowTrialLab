@@ -18,7 +18,7 @@ type Recipe = {
   notes: string;
 };
 
-export default function AssignmentPage() {
+export default function RecipesPage() {
   const params = useParams();
   const experimentId = useMemo(() => {
     if (typeof params.id === "string") {
@@ -184,7 +184,7 @@ export default function AssignmentPage() {
   return (
     <PageShell
       title="Recipes"
-      subtitle="Manage experiment recipes used by trays and feeding."
+      subtitle="Manage experiment recipes used for per-plant assignment and feeding."
       actions={
         <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
           ← Overview

@@ -3,17 +3,19 @@
 import {
   AlertCircle,
   Camera,
+  ChevronDown,
   ClipboardPlus,
   FlaskConical,
   RefreshCcw,
   ShieldAlert,
   Tag,
 } from "lucide-react";
+import * as Popover from "@radix-ui/react-popover";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { backendFetch, backendUrl, normalizeBackendError } from "@/lib/backend";
+import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
@@ -52,9 +54,7 @@ type PlantCockpit = {
   };
   derived: {
     has_baseline: boolean;
-    assigned_recipe_id: string | null;
-    assigned_recipe_code: string | null;
-    assigned_recipe_name: string | null;
+    assigned_recipe: { id: string; code: string; name: string } | null;
     location: {
       status: "placed" | "unplaced";
       tent: { id: string; code: string | null; name: string } | null;
@@ -123,6 +123,13 @@ type ReplacementResponse = {
   replacement: {
     uuid: string;
   };
+};
+
+type Recipe = {
+  id: string;
+  code: string;
+  name: string;
+  notes: string;
 };
 
 const TAG_OPTIONS: Array<{ value: UploadTag; label: string }> = [
@@ -207,6 +214,10 @@ function formatScheduleSlot(dateValue: string, timeframe: string | null, exactTi
   return day;
 }
 
+function recipeLabel(recipe: { code: string; name: string }): string {
+  return recipe.name ? `${recipe.code} - ${recipe.name}` : recipe.code;
+}
+
 function trayOccupancyLabel(cockpit: PlantCockpit): string {
   const tray = cockpit.derived.location.tray;
   if (
@@ -241,17 +252,17 @@ function buildNowAction(cockpit: PlantCockpit | null): NowAction {
   if (!cockpit.derived.has_baseline || !cockpit.plant.grade) {
     return {
       title: "Baseline needed",
-      detail: "Record baseline metrics and assign a grade before assignment.",
+      detail: "Record baseline metrics and assign a grade before recipe assignment.",
       href: cockpit.links.baseline_capture,
       buttonLabel: "Record baseline",
       icon: ClipboardPlus,
     };
   }
 
-  if (!cockpit.derived.assigned_recipe_code || cockpit.derived.location.status !== "placed") {
+  if (!cockpit.derived.assigned_recipe || cockpit.derived.location.status !== "placed") {
     return {
-      title: "Placement or tray recipe needed",
-      detail: "This plant needs tray placement and tray recipe before feeding.",
+      title: "Placement or recipe assignment needed",
+      detail: "This plant needs tray placement and a plant recipe assignment before feeding.",
       href: cockpit.links.placement,
       buttonLabel: "Open placement",
       icon: FlaskConical,
@@ -260,7 +271,7 @@ function buildNowAction(cockpit: PlantCockpit | null): NowAction {
 
   return {
     title: "Setup complete",
-    detail: "Baseline, grade, and assignment are all set for this plant.",
+    detail: "Baseline, grade, and recipe assignment are all set for this plant.",
     icon: Tag,
   };
 }
@@ -298,6 +309,9 @@ export default function PlantQrPage() {
   const [inheritAssignment, setInheritAssignment] = useState(true);
   const [copyIdentity, setCopyIdentity] = useState(true);
   const [inheritGrade, setInheritGrade] = useState(false);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [recipeSelection, setRecipeSelection] = useState("");
+  const [recipeSaving, setRecipeSaving] = useState(false);
 
   const overviewFromParam = useMemo(
     () => normalizeFromParam(searchParams.get("from")),
@@ -348,6 +362,20 @@ export default function PlantQrPage() {
         const data = (await response.json()) as PlantCockpit;
         setCockpit(data);
         setUploadTag(data.derived.has_baseline ? "identity" : "baseline");
+        setRecipeSelection(data.derived.assigned_recipe?.id || "");
+        try {
+          const recipesResponse = await backendFetch(
+            `/api/v1/experiments/${data.plant.experiment.id}/recipes`,
+          );
+          if (recipesResponse.ok) {
+            const recipesPayload = (await recipesResponse.json()) as unknown;
+            setRecipes(unwrapList<Recipe>(recipesPayload));
+          } else {
+            setRecipes([]);
+          }
+        } catch {
+          setRecipes([]);
+        }
         setOffline(false);
       } catch (requestError) {
         const normalizedError = normalizeBackendError(requestError);
@@ -498,6 +526,58 @@ export default function PlantQrPage() {
     }
   }
 
+  async function handleRecipeChange(nextRecipeId: string | null) {
+    if (!cockpit) {
+      return;
+    }
+
+    setRecipeSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await backendFetch(`/api/v1/plants/${cockpit.plant.uuid}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assigned_recipe_id: nextRecipeId }),
+      });
+      const payload = (await response.json()) as { detail?: string };
+      if (!response.ok) {
+        setError(payload.detail || "Unable to update recipe.");
+        return;
+      }
+
+      const selectedRecipe = nextRecipeId
+        ? recipes.find((recipe) => recipe.id === nextRecipeId) || null
+        : null;
+      setCockpit((current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          derived: {
+            ...current.derived,
+            assigned_recipe: selectedRecipe
+              ? { id: selectedRecipe.id, code: selectedRecipe.code, name: selectedRecipe.name }
+              : null,
+          },
+        };
+      });
+      setRecipeSelection(nextRecipeId || "");
+      setNotice(nextRecipeId ? "Recipe updated." : "Recipe cleared.");
+    } catch (requestError) {
+      const normalizedError = normalizeBackendError(requestError);
+      if (normalizedError.kind === "offline") {
+        setOffline(true);
+        setError("You are offline. Recipe updates are unavailable.");
+      } else {
+        setError("Unable to update recipe.");
+      }
+    } finally {
+      setRecipeSaving(false);
+    }
+  }
+
   if (notInvited) {
     return (
       <PageShell
@@ -597,9 +677,13 @@ export default function PlantQrPage() {
                     "Unplaced"}
                   {trayOccupancyLabel(cockpit)}
                 </span>
-                <span className={styles.badge}>
-                  Recipe: {cockpit.derived.assigned_recipe_code || "Missing"}
-                </span>
+                {cockpit.derived.assigned_recipe ? (
+                  <span className={styles.badge}>
+                    Recipe: {recipeLabel(cockpit.derived.assigned_recipe)}
+                  </span>
+                ) : (
+                  <span className={sharedStyles.badgeWarn}>Recipe: Unassigned</span>
+                )}
                 {cockpit.derived.location.status !== "placed" ? <span className={styles.badge}>Unplaced</span> : null}
               </div>
             </div>
@@ -662,9 +746,9 @@ export default function PlantQrPage() {
                 <strong>{nowAction.title}</strong>
               </div>
               <p className={sharedStyles.mutedText}>{nowAction.detail}</p>
-              {cockpit.plant.status === "active" && !cockpit.derived.assigned_recipe_code ? (
+              {cockpit.plant.status === "active" && !cockpit.derived.assigned_recipe ? (
                 <span className={sharedStyles.badgeWarn}>
-                  Needs placement / tray recipe before feeding
+                  Needs placement / recipe assignment before feeding
                 </span>
               ) : null}
               {cockpit.plant.status !== "active" ? (
@@ -707,6 +791,64 @@ export default function PlantQrPage() {
           {cockpit.plant.status === "active" ? (
             <SectionCard title="Manage">
               <div className={sharedStyles.stack}>
+                <div className={sharedStyles.actions}>
+                  <Popover.Root>
+                    <Popover.Trigger asChild>
+                      <button className={sharedStyles.buttonSecondary} type="button" disabled={recipeSaving}>
+                        <ChevronDown size={14} />
+                        Change recipe
+                      </button>
+                    </Popover.Trigger>
+                    <Popover.Portal>
+                      <Popover.Content className={styles.recipePopover} sideOffset={8} align="start">
+                        <p className={sharedStyles.fieldLabel}>Set recipe assignment</p>
+                        {recipes.length > 0 ? (
+                          <label className={sharedStyles.field}>
+                            <span className={sharedStyles.fieldLabel}>Recipe</span>
+                            <select
+                              className={sharedStyles.select}
+                              value={recipeSelection}
+                              onChange={(event) => setRecipeSelection(event.target.value)}
+                              disabled={recipeSaving}
+                            >
+                              <option value="">Select recipe</option>
+                              {recipes.map((recipe) => (
+                                <option key={recipe.id} value={recipe.id}>
+                                  {recipeLabel(recipe)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ) : (
+                          <p className={sharedStyles.mutedText}>No recipes available yet.</p>
+                        )}
+                        <div className={sharedStyles.actions}>
+                          <button
+                            className={sharedStyles.buttonPrimary}
+                            type="button"
+                            disabled={
+                              recipeSaving ||
+                              recipes.length === 0 ||
+                              !recipeSelection ||
+                              recipeSelection === cockpit.derived.assigned_recipe?.id
+                            }
+                            onClick={() => void handleRecipeChange(recipeSelection)}
+                          >
+                            {recipeSaving ? "Saving..." : "Save recipe"}
+                          </button>
+                          <button
+                            className={sharedStyles.buttonSecondary}
+                            type="button"
+                            disabled={recipeSaving || !cockpit.derived.assigned_recipe}
+                            onClick={() => void handleRecipeChange(null)}
+                          >
+                            Clear recipe
+                          </button>
+                        </div>
+                      </Popover.Content>
+                    </Popover.Portal>
+                  </Popover.Root>
+                </div>
                 <p className={sharedStyles.mutedText}>
                   Replace this plant if it was removed from trial or needs substitution.
                 </p>
@@ -934,7 +1076,7 @@ export default function PlantQrPage() {
                   checked={inheritAssignment}
                   onChange={(event) => setInheritAssignment(event.target.checked)}
                 />
-                <span>Inherit assignment (recommended)</span>
+                <span>Inherit recipe assignment (recommended)</span>
               </label>
               <label className={sharedStyles.checkboxRow}>
                 <input
@@ -950,7 +1092,7 @@ export default function PlantQrPage() {
                   checked={inheritGrade}
                   onChange={(event) => setInheritGrade(event.target.checked)}
                 />
-                <span>Inherit grade assignment</span>
+                <span>Inherit grade</span>
               </label>
               <label className={sharedStyles.checkboxRow}>
                 <input type="checkbox" checked readOnly />

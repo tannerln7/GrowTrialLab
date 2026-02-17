@@ -94,9 +94,6 @@ type PlacementSummary = {
     results: Array<{
       tray_id: string;
       name: string;
-      assigned_recipe_id: string | null;
-      assigned_recipe_code: string | null;
-      assigned_recipe_name: string | null;
       current_count: number;
       capacity: number;
       location: {
@@ -122,8 +119,7 @@ type OverviewPlant = {
   species_name: string;
   species_category: string;
   status: string;
-  assigned_recipe_id: string | null;
-  assigned_recipe_code: string | null;
+  assigned_recipe: { id: string; code: string; name: string } | null;
   location: {
     status: "placed" | "unplaced";
     tent: { id: string; code: string | null; name: string } | null;
@@ -376,7 +372,7 @@ export default function ExperimentSchedulePage() {
       }
       if (plant.location.status !== "placed") {
         hasUnplaced = true;
-      } else if (!plant.assigned_recipe_id) {
+      } else if (!plant.assigned_recipe) {
         hasMissingRecipe = true;
       }
     }
@@ -384,7 +380,7 @@ export default function ExperimentSchedulePage() {
       warnings.push("Blocked: Unplaced");
     }
     if (hasMissingRecipe) {
-      warnings.push("Blocked: Needs tray recipe");
+      warnings.push("Blocked: Needs plant recipe");
     }
     return warnings;
   }, [actionType, activePlants, scopeType, selectedScopeIds, summary?.lifecycle.state]);
@@ -1049,9 +1045,6 @@ export default function ExperimentSchedulePage() {
                       />
                       <span>
                         Tray {tray.name} ({tray.current_count}/{tray.capacity}){" "}
-                        {tray.assigned_recipe_code
-                          ? `· ${tray.assigned_recipe_code}`
-                          : "· Missing tray recipe"}
                         {trayRestrictionHint(tray, tentById)
                           ? ` · ${trayRestrictionHint(tray, tentById)}`
                           : ""}

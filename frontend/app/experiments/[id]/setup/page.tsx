@@ -117,7 +117,7 @@ export default function ExperimentSetupPage() {
       id: "recipes",
       title: "Recipes",
       complete: !statusSummary?.setup.missing.recipes,
-      href: `/experiments/${experimentId}/assignment`,
+      href: `/experiments/${experimentId}/recipes`,
       actionLabel: "Go to recipes",
     },
   ];

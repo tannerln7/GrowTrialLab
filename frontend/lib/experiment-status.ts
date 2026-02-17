@@ -23,7 +23,7 @@ export type ExperimentStatusSummary = {
       needs_baseline: number;
       needs_assignment: number;
       needs_placement: number;
-      needs_tray_recipe: number;
+      needs_plant_recipe: number;
       needs_tent_restriction: number;
     };
     meta: {

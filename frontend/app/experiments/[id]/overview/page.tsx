@@ -21,7 +21,7 @@ type FilterId =
   | "needs_baseline"
   | "needs_grade"
   | "needs_placement"
-  | "needs_tray_recipe"
+  | "needs_plant_recipe"
   | "active"
   | "removed";
 
@@ -40,7 +40,7 @@ type OverviewPlant = {
   cultivar: string | null;
   status: string;
   grade: string | null;
-  assigned_recipe_code: string | null;
+  assigned_recipe: { id: string; code: string; name: string } | null;
   has_baseline: boolean;
   replaced_by_uuid: string | null;
   location: {
@@ -60,7 +60,7 @@ type OverviewResponse = {
     needs_grade: number;
     needs_assignment: number;
     needs_placement: number;
-    needs_tray_recipe: number;
+    needs_plant_recipe: number;
   };
   plants: {
     count: number;
@@ -74,7 +74,7 @@ const FILTERS: Array<{ id: FilterId; label: string }> = [
   { id: "needs_baseline", label: "Needs Baseline" },
   { id: "needs_grade", label: "Needs Grade" },
   { id: "needs_placement", label: "Needs Placement" },
-  { id: "needs_tray_recipe", label: "Needs Tray Recipe" },
+  { id: "needs_plant_recipe", label: "Needs Plant Recipe" },
   { id: "active", label: "Active" },
   { id: "removed", label: "Removed" },
 ];
@@ -82,7 +82,7 @@ const FILTERS: Array<{ id: FilterId; label: string }> = [
 const DIAGNOSTIC_LABELS: Record<string, string> = {
   needs_baseline: "needs baseline",
   needs_placement: "needs placement",
-  needs_tray_recipe: "needs tray recipe",
+  needs_plant_recipe: "needs plant recipe",
   needs_tent_restriction: "violates tent restrictions",
 };
 
@@ -117,6 +117,13 @@ function locationSummary(plant: OverviewPlant): string {
       ? ` (${plant.location.tray.current_count}/${plant.location.tray.capacity})`
       : "";
   return `Slot ${slotLabel} > Tray ${trayLabel}${occupancy}`;
+}
+
+function recipeChipLabel(recipe: OverviewPlant["assigned_recipe"]): string {
+  if (!recipe) {
+    return "Recipe: Unassigned";
+  }
+  return recipe.name ? `Recipe: ${recipe.code} - ${recipe.name}` : `Recipe: ${recipe.code}`;
 }
 
 function formatActionError(error: unknown, fallback: string): string {
@@ -207,7 +214,7 @@ export default function ExperimentOverviewPage() {
       value === "needs_baseline" ||
       value === "needs_grade" ||
       value === "needs_placement" ||
-      value === "needs_tray_recipe" ||
+      value === "needs_plant_recipe" ||
       value === "active" ||
       value === "removed"
     ) {
@@ -373,10 +380,7 @@ export default function ExperimentOverviewPage() {
       const needsBaseline = plant.status === "active" && (!plant.has_baseline || !plant.grade);
       const needsGrade = plant.status === "active" && !plant.grade;
       const needsPlacement = plant.status === "active" && plant.location.status !== "placed";
-      const needsTrayRecipe =
-        plant.status === "active" &&
-        plant.location.status === "placed" &&
-        !plant.assigned_recipe_code;
+      const needsPlantRecipe = plant.status === "active" && !plant.assigned_recipe;
 
       let matchesFilter = true;
       if (activeFilter === "needs_baseline") {
@@ -385,8 +389,8 @@ export default function ExperimentOverviewPage() {
         matchesFilter = needsGrade;
       } else if (activeFilter === "needs_placement") {
         matchesFilter = needsPlacement;
-      } else if (activeFilter === "needs_tray_recipe") {
-        matchesFilter = needsTrayRecipe;
+      } else if (activeFilter === "needs_plant_recipe") {
+        matchesFilter = needsPlantRecipe;
       } else if (activeFilter === "active") {
         matchesFilter = plant.status === "active";
       } else if (activeFilter === "removed") {
@@ -523,7 +527,7 @@ export default function ExperimentOverviewPage() {
 
       <SectionCard title="Readiness">
         <p className={styles.mutedText}>
-          Needs baseline: {data?.counts.needs_baseline ?? 0} · Needs grade: {data?.counts.needs_grade ?? 0} · Needs placement: {data?.counts.needs_placement ?? 0} · Needs tray recipe: {data?.counts.needs_tray_recipe ?? 0}
+          Needs baseline: {data?.counts.needs_baseline ?? 0} · Needs grade: {data?.counts.needs_grade ?? 0} · Needs placement: {data?.counts.needs_placement ?? 0} · Needs plant recipe: {data?.counts.needs_plant_recipe ?? 0}
         </p>
         <div className={styles.actions}>
           <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/baseline`}>
@@ -532,7 +536,7 @@ export default function ExperimentOverviewPage() {
           <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/placement`}>
             Manage placement
           </Link>
-          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/assignment`}>
+          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/recipes`}>
             Manage recipes
           </Link>
           <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/rotation`}>
@@ -606,8 +610,16 @@ export default function ExperimentOverviewPage() {
               },
               {
                 key: "recipe",
-                label: "Tray Recipe",
-                render: (plant) => plant.assigned_recipe_code || "Missing",
+                label: "Recipe",
+                render: (plant) => (
+                  <span
+                    className={
+                      plant.assigned_recipe ? styles.recipeChipAssigned : styles.recipeChipUnassigned
+                    }
+                  >
+                    {recipeChipLabel(plant.assigned_recipe)}
+                  </span>
+                ),
               },
             ]}
             renderMobileCard={(plant) => (
@@ -624,8 +636,16 @@ export default function ExperimentOverviewPage() {
                 <strong>{plant.grade || "Missing"}</strong>
                 <span>Location</span>
                 <strong>{locationSummary(plant)}</strong>
-                <span>Tray recipe</span>
-                <strong>{plant.assigned_recipe_code || "Missing"}</strong>
+                <span>Recipe</span>
+                <strong>
+                  <span
+                    className={
+                      plant.assigned_recipe ? styles.recipeChipAssigned : styles.recipeChipUnassigned
+                    }
+                  >
+                    {recipeChipLabel(plant.assigned_recipe)}
+                  </span>
+                </strong>
               </div>
             )}
           />
