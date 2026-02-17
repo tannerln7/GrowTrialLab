@@ -1,28 +1,28 @@
 .checkboxGroup {
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--gt-radius-md);
   max-height: 180px;
   overflow: auto;
-  padding: 0.5rem;
+  padding: var(--gt-space-2);
   display: grid;
-  gap: 0.35rem;
+  gap: var(--gt-space-1);
 }
 
 .tileGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.6rem;
+  gap: var(--gt-space-2);
 }
 
 .tileButton {
   border: 1px solid var(--border);
   background: var(--surface-elevated);
   color: var(--text);
-  border-radius: 10px;
-  padding: 0.7rem;
+  border-radius: var(--gt-radius-md);
+  padding: var(--gt-space-3);
   text-align: left;
   display: grid;
-  gap: 0.15rem;
+  gap: var(--gt-space-0-5);
 }
 
 .tileButton strong {
@@ -37,7 +37,7 @@
 .badgeRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: var(--gt-space-1);
 }
 
 .badgeWarn {
@@ -46,12 +46,12 @@
   border: 1px solid color-mix(in srgb, var(--text-muted) 40%, var(--border));
   background: color-mix(in srgb, var(--text-muted) 18%, var(--surface-elevated));
   border-radius: 999px;
-  padding: 0.16rem 0.45rem;
+  padding: var(--gt-space-0-5) var(--gt-space-2);
 }
 
 .groupSection {
   display: grid;
-  gap: 0.6rem;
+  gap: var(--gt-space-2);
 }
 
 .groupHeading {
@@ -59,7 +59,7 @@
   font-size: 0.9rem;
   color: var(--text-muted);
   border-top: 1px solid var(--border);
-  padding-top: 0.6rem;
+  padding-top: var(--gt-space-2);
 }
 
 .recipeChipAssigned,
@@ -69,7 +69,7 @@
   align-items: center;
   border-radius: 999px;
   border: 1px solid var(--border);
-  padding: 0.16rem 0.5rem;
+  padding: var(--gt-space-0-5) var(--gt-space-2);
   font-size: 0.75rem;
   line-height: 1.2;
 }
@@ -92,16 +92,16 @@
 .recipeLegendRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: var(--gt-space-1);
 }
 
 .recipeLegendItem {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: var(--gt-space-1);
   border: 1px solid color-mix(in srgb, var(--border) 74%, var(--text-muted) 26%);
   border-radius: 999px;
-  padding: 0.12rem 0.44rem;
+  padding: var(--gt-space-0-5) var(--gt-space-1);
   font-size: 0.72rem;
   color: var(--text-muted);
   background: color-mix(in srgb, var(--surface-elevated) 88%, var(--text-muted) 12%);
@@ -114,7 +114,7 @@
   justify-content: center;
   border: 1px solid color-mix(in srgb, var(--border) 74%, var(--text-muted) 26%);
   border-radius: 999px;
-  padding: 0.12rem 0.44rem;
+  padding: var(--gt-space-0-5) var(--gt-space-1);
   font-size: 0.72rem;
   line-height: 1.2;
 }
@@ -139,25 +139,25 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
 }
 
 .recipeCreateCompact {
   display: grid;
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  margin-bottom: 0.55rem;
+  margin-bottom: var(--gt-space-2);
 }
 
 .recipePopover {
   width: min(280px, calc(100vw - 2rem));
   display: grid;
-  gap: 0.55rem;
-  border-radius: 12px;
+  gap: var(--gt-space-2);
+  border-radius: var(--gt-radius-lg);
   border: 1px solid var(--border);
   background: var(--surface-elevated);
   box-shadow: 0 18px 32px rgba(0, 0, 0, 0.24);
-  padding: 0.7rem;
+  padding: var(--gt-space-3);
   z-index: 40;
 }
 
@@ -165,18 +165,18 @@
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--gt-radius-md);
   color: var(--text);
-  padding: 0.5rem 0.65rem;
+  padding: var(--gt-space-2) var(--gt-space-3);
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--gt-space-2);
   font-size: 0.88rem;
 }
 
 .recipeSelectContent {
-  border-radius: 10px;
+  border-radius: var(--gt-radius-md);
   border: 1px solid var(--border);
   background: var(--surface-elevated);
   box-shadow: 0 16px 30px rgba(0, 0, 0, 0.22);
@@ -185,19 +185,19 @@
 }
 
 .recipeSelectViewport {
-  padding: 0.3rem;
+  padding: var(--gt-space-1);
   display: grid;
-  gap: 0.2rem;
+  gap: var(--gt-space-1);
   min-width: 220px;
 }
 
 .recipeSelectItem {
-  border-radius: 8px;
-  padding: 0.38rem 0.48rem;
+  border-radius: var(--gt-radius-sm);
+  padding: var(--gt-space-1) var(--gt-space-2);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--gt-space-2);
   cursor: pointer;
   color: var(--text);
 }
@@ -216,12 +216,12 @@
 }
 
 .toolbarActionsCompact {
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
 }
 
 
 .toolbarSummaryRow {
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
 }
 
 .plantCellGrid,
@@ -231,8 +231,8 @@
 }
 
 .plantCellGridTray {
-  padding: 0.38rem 0;
-  border-radius: 10px;
+  padding: var(--gt-space-1) 0;
+  border-radius: var(--gt-radius-md);
   background: color-mix(in srgb, var(--surface) 82%, var(--text-muted) 18%);
 }
 
@@ -269,8 +269,8 @@
 
 .plantCellCheck {
   position: absolute;
-  top: 0.3rem;
-  right: 0.3rem;
+  top: var(--gt-space-1);
+  right: var(--gt-space-1);
   width: 1rem;
   height: 1rem;
   border-radius: 999px;
@@ -283,8 +283,8 @@
 
 .plantCellDirtyDot {
   position: absolute;
-  top: 0.33rem;
-  left: 0.33rem;
+  top: var(--gt-space-1);
+  left: var(--gt-space-1);
   width: 0.42rem;
   height: 0.42rem;
   border-radius: 999px;
@@ -306,29 +306,29 @@
 .plantCellMetaRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.32rem;
+  gap: var(--gt-space-1);
   align-items: center;
 }
 
 .metricSliderGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.5rem;
+  gap: var(--gt-space-2);
 }
 
 .metricSliderField {
   border: 1px solid color-mix(in srgb, var(--border) 76%, var(--text-muted) 24%);
-  border-radius: 10px;
+  border-radius: var(--gt-radius-md);
   background: color-mix(in srgb, var(--surface-elevated) 88%, var(--text-muted) 12%);
-  padding: 0.5rem 0.55rem;
+  padding: var(--gt-space-2) var(--gt-space-2);
   display: grid;
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
 }
 
 .metricSliderLabelRow {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--gt-space-1);
   font-size: 0.8rem;
   color: var(--text-muted);
 }
@@ -363,12 +363,12 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
 }
 
 .baselinePhotoControls {
   display: grid;
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
   flex: 1;
   min-width: 210px;
 }
@@ -377,7 +377,7 @@
   width: 86px;
   height: 86px;
   flex-shrink: 0;
-  border-radius: 10px;
+  border-radius: var(--gt-radius-md);
   border: 1px solid color-mix(in srgb, var(--border) 72%, var(--text-muted) 28%);
   background: color-mix(in srgb, var(--surface-elevated) 88%, var(--text-muted) 12%);
   display: grid;
@@ -399,7 +399,7 @@
 .baselineGradeRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.42rem;
+  gap: var(--gt-space-1);
   align-items: center;
 }
 
@@ -409,7 +409,7 @@
   align-items: center;
   border: 1px solid color-mix(in srgb, var(--border) 72%, var(--text-muted) 28%);
   border-radius: 999px;
-  padding: 0.18rem 0.5rem;
+  padding: var(--gt-space-0-5) var(--gt-space-2);
   font-size: 0.76rem;
   line-height: 1.2;
 }
@@ -425,7 +425,7 @@
 .baselineGradeButtonRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
 }
 
 .baselineGradeRevertButton {
@@ -453,7 +453,7 @@
 .baselineQueueStatusRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: var(--gt-space-1);
   justify-content: center;
   align-self: end;
 }
@@ -474,7 +474,7 @@
   justify-content: center;
   border: 1px solid color-mix(in srgb, var(--border) 70%, var(--text-muted) 30%);
   border-radius: 999px;
-  padding: 0.14rem 0.68rem;
+  padding: var(--gt-space-0-5) var(--gt-space-3);
   min-width: 5.5rem;
   font-size: 0.72rem;
   line-height: 1.2;
@@ -496,30 +496,30 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 0.6rem;
+  gap: var(--gt-space-2);
 }
 
 .trayHeaderMeta {
   display: grid;
-  gap: 0.2rem;
+  gap: var(--gt-space-1);
 }
 
 .trayHeaderActions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: var(--gt-space-1);
 }
 
 .trayHeaderSelect {
-  border-radius: 8px;
+  border-radius: var(--gt-radius-sm);
   border: 1px solid color-mix(in srgb, var(--border) 76%, var(--text-muted) 24%);
   background: color-mix(in srgb, var(--surface-elevated) 88%, var(--text-muted) 12%);
   color: var(--text);
-  padding: 0.26rem 0.5rem;
+  padding: var(--gt-space-1) var(--gt-space-2);
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: var(--gt-space-1);
   font-size: 0.76rem;
   cursor: pointer;
 }
@@ -531,41 +531,41 @@
 .trayControlRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
   align-items: center;
 }
 
 .selectionGrid {
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--gt-radius-md);
   max-height: 200px;
   overflow: auto;
-  padding: 0.55rem;
+  padding: var(--gt-space-2);
   display: grid;
-  gap: 0.38rem;
+  gap: var(--gt-space-1);
 }
 
 .previewGrid {
   display: grid;
-  gap: 0.5rem;
+  gap: var(--gt-space-2);
 }
 
 .previewRow {
   display: grid;
-  gap: 0.35rem;
+  gap: var(--gt-space-1);
 }
 
 .previewCells {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: var(--gt-space-1);
 }
 
 .previewCell {
   border: 1px solid var(--border);
   background: var(--surface-elevated);
-  border-radius: 8px;
-  padding: 0.18rem 0.4rem;
+  border-radius: var(--gt-radius-sm);
+  padding: var(--gt-space-0-5) var(--gt-space-1);
   font-size: 0.76rem;
   line-height: 1.2;
 }
@@ -573,23 +573,23 @@
 .slotGridInline {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: var(--gt-space-1);
 }
 
 .stepperRow {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.5rem;
+  gap: var(--gt-space-2);
 }
 
 .stepperItem {
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--gt-radius-md);
   background: var(--surface-elevated);
   color: var(--text);
-  padding: 0.45rem 0.5rem;
+  padding: var(--gt-space-2) var(--gt-space-2);
   display: flex;
-  gap: 0.35rem;
+  gap: var(--gt-space-1);
   align-items: center;
   justify-content: flex-start;
 }
@@ -621,25 +621,25 @@
 }
 
 .stepBlocker {
-  margin-top: 0.65rem;
+  margin-top: var(--gt-space-3);
   border: 1px solid color-mix(in srgb, var(--text-muted) 45%, var(--border));
   background: color-mix(in srgb, var(--text-muted) 12%, var(--surface-elevated));
-  border-radius: 10px;
-  padding: 0.6rem;
+  border-radius: var(--gt-radius-md);
+  padding: var(--gt-space-2);
   display: grid;
-  gap: 0.3rem;
+  gap: var(--gt-space-1);
 }
 
 .stepPanel {
-  margin-top: 0.75rem;
+  margin-top: var(--gt-space-3);
   animation: step-slide-in 180ms ease-out;
 }
 
 .stepNavRow {
-  margin-top: 0.8rem;
+  margin-top: var(--gt-space-3);
   display: flex;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--gt-space-2);
 }
 
 .stepNavRowForwardOnly {
@@ -698,9 +698,9 @@
 
 .trayEditorCell {
   position: relative;
-  padding: 0.55rem;
+  padding: var(--gt-space-2);
   display: grid;
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
   align-content: start;
   cursor: pointer;
 }
@@ -711,31 +711,31 @@
 
 .trayEditorInputs {
   display: grid;
-  gap: 0.42rem;
+  gap: var(--gt-space-1);
 }
 
 .tentBoardGrid {
   display: grid;
-  gap: 0.6rem;
+  gap: var(--gt-space-2);
   grid-template-columns: repeat(1, minmax(0, 1fr));
 }
 
 .tentBoardCard {
-  padding: 0.6rem;
+  padding: var(--gt-space-2);
   display: grid;
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
 }
 
 .tentSlotGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
 }
 
 .slotCell {
   border-style: dashed;
-  padding: 0.32rem;
-  gap: 0.35rem;
+  padding: var(--gt-space-1);
+  gap: var(--gt-space-1);
   align-content: start;
   min-height: 0;
 }
@@ -747,10 +747,10 @@
 
 .slotCellEmpty {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--gt-radius-sm);
   background: var(--surface-elevated);
   color: var(--text-muted);
-  padding: 0.4rem 0.46rem;
+  padding: var(--gt-space-1) var(--gt-space-2);
   text-align: left;
 }
 
@@ -762,16 +762,16 @@
 
 .overviewSlotTrayStack {
   display: grid;
-  gap: 0.38rem;
+  gap: var(--gt-space-1);
   align-content: start;
   min-height: 100%;
 }
 
 .overviewTrayCell {
   position: relative;
-  padding: 0.45rem;
+  padding: var(--gt-space-2);
   display: grid;
-  gap: 0.3rem;
+  gap: var(--gt-space-1);
   cursor: default;
   min-height: 0;
 }
@@ -785,7 +785,7 @@
 .overviewTrayMeta {
   display: grid;
   justify-items: center;
-  gap: 0.3rem;
+  gap: var(--gt-space-1);
   align-items: center;
 }
 
@@ -812,7 +812,7 @@
 .overviewPlantStatusRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.28rem;
+  gap: var(--gt-space-1);
   align-items: center;
   justify-content: center;
   min-height: 1.9rem;
@@ -821,7 +821,7 @@
 .overviewPlantChip {
   border: 1px solid color-mix(in srgb, var(--border) 72%, var(--text-muted) 28%);
   border-radius: 999px;
-  padding: 0.1rem 0.38rem;
+  padding: var(--gt-space-0-5) var(--gt-space-1);
   font-size: 0.68rem;
   line-height: 1.15;
   display: inline-flex;
@@ -844,7 +844,7 @@
 
 .overviewTentBoardGrid {
   display: grid;
-  gap: 0.6rem;
+  gap: var(--gt-space-2);
   grid-template-columns: repeat(1, minmax(0, 1fr));
   align-items: start;
 }
@@ -856,12 +856,12 @@
 
 .overviewTentShelfStack {
   display: grid;
-  gap: 0.48rem;
+  gap: var(--gt-space-2);
 }
 
 .overviewShelfGroup {
   display: grid;
-  gap: 0.32rem;
+  gap: var(--gt-space-1);
 }
 
 .overviewShelfLabel {
@@ -876,7 +876,7 @@
 
 .overviewShelfSlotGrid {
   display: grid;
-  gap: 0.45rem;
+  gap: var(--gt-space-2);
   align-items: stretch;
 }
 
@@ -898,7 +898,7 @@
   justify-content: center;
   border: 0;
   border-radius: 0;
-  padding: 0.35rem 0.45rem;
+  padding: var(--gt-space-1) var(--gt-space-2);
   background: transparent;
   color: var(--text-muted);
   font-size: 0.72rem;
@@ -935,26 +935,26 @@
 
 @media (max-width: 640px) {
   .overviewShelfSlotGrid {
-    gap: 0.35rem;
+    gap: var(--gt-space-1);
   }
 
   .overviewSlotCell {
     min-height: 104px;
-    padding: 0.26rem;
+    padding: var(--gt-space-1);
   }
 
   .overviewTrayCell {
-    padding: 0.35rem;
-    gap: 0.25rem;
+    padding: var(--gt-space-1);
+    gap: var(--gt-space-1);
   }
 
   .overviewTrayCell .plantCellGridTray {
-    gap: 0.32rem;
+    gap: var(--gt-space-1);
   }
 
   .overviewTrayCell .plantCell {
     min-height: 92px;
-    padding: 0.36rem;
+    padding: var(--gt-space-1);
   }
 
   .overviewTrayCell .plantCellId {

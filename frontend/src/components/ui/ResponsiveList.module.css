@@ -1,6 +1,6 @@
 .mobileCards {
   display: grid;
-  gap: 0.65rem;
+  gap: var(--gt-space-3);
 }
 
 .desktopTableWrap {
@@ -15,7 +15,7 @@
 .table th,
 .table td {
   text-align: left;
-  padding: 0.72rem;
+  padding: var(--gt-space-3);
   border-bottom: 1px solid var(--divider);
 }
 
@@ -33,7 +33,7 @@
     display: block;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--gt-radius-xl);
     overflow: hidden;
   }
 }

@@ -204,6 +204,14 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/app/experiments/[id]/slots/page.tsx` (removed)
     - `frontend/app/experiments/experiments.module.css`
   - Refs: local workspace (uncommitted changes)
+- `Completed` CSS Phase 3 unification sweep (Tailwind prep, no Tailwind yet):
+  - Rebased UI spacing/radius usage onto a compact token ladder with clamp-based density scaling for mobile/desktop consistency.
+  - Added shared layout shells (`gt-page`, `gt-section`, `gt-card`, `gt-panel`, `gt-toolbar`) and rewired route/component CSS spacing declarations to token-only values.
+  - Kept experiments route CSS focused on page geometry/state styling while shared primitives remain centralized in `frontend/src/styles/primitives.css`.
+  - Report:
+    - `docs/ui-css-phase3-report.md`
+  - Refs: local workspace (uncommitted changes)
+
 - `Completed` CSS Phase 2 drift-reduction sweep (Tailwind prep, no Tailwind yet):
   - Migrated setup/rotation/feeding/schedule/cockpit + experiment list/create/plants pages to shared `gt-*` primitives for repeated buttons/forms/notices/chips/cell scaffolds.
   - Reduced cockpit module primitives to route-specific layout rules and removed duplicated popover/chip/hidden-input primitives.
