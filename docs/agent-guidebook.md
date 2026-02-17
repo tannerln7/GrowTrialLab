@@ -90,6 +90,17 @@ Historical context only:
   - schedule plan
 
 ## Frontend Styling Guidance (Current Conventions)
+- Tailwind v4 scaffold is active in frontend (`frontend/postcss.config.mjs`, `frontend/tailwind.config.ts`, `frontend/src/styles/tailwind-theme.css`, and `@import "tailwindcss";` in `frontend/app/globals.css`); keep this as infrastructure only until deliberate page-by-page migration work is scheduled.
+- Keep `frontend/tailwind.config.ts` minimal (content globs + empty `extend`/plugins) until migration needs explicit customizations.
+- Maintain explicit style layering during transition:
+  - `frontend/app/layout.tsx` imports `tokens.css` then `primitives.css`.
+  - `frontend/app/globals.css` imports `tailwind-theme.css` then `tailwindcss`, then keeps app-global overrides.
+- Tailwind v4 theme bridging lives in `frontend/src/styles/tailwind-theme.css` (`@theme inline`) and should prefer referencing existing `--gt-*`/compat variables rather than introducing a second token system.
+- shadcn/ui-style scaffold is active:
+  - `frontend/components.json`
+  - `frontend/src/lib/utils.ts` (`cn(...)`)
+  - `frontend/src/components/ui/*` foundational primitives (`button`, `badge`, `card`, `dialog`)
+- During Phase S, use scaffold primitives for new isolated UI only; do not do broad route/module migration in the same change.
 - Token source of truth is `frontend/src/styles/tokens.css` (`--gt-*` variables); keep token names stable and minimal so they can map directly into future Tailwind theme config.
 - Keep density unitless (`--gt-density`) and apply it once through the spacing-token pipeline (base `--gt-space-base-*` -> scaled `--gt-space-*`); do not mix viewport length units directly into density math.
 - Shared global primitives live in `frontend/src/styles/primitives.css`; prefer these over re-defining base card/grid/cell/chip/button/form/tooltip styles in route CSS modules.
@@ -97,6 +108,13 @@ Historical context only:
 - For dense placement/recipe/baseline/overview cell layouts, use `gt-grid` with `data-cell-size="sm|md|lg"` plus `gt-cell` state modifiers instead of per-page min-width/padding forks.
 - Keep route CSS modules focused on page-specific layout/behavior overrides, not shared visual primitives.
 - Use the compact spacing ladder tokens (`--gt-space-*`) for all UI spacing declarations; if a fixed non-ladder value is truly required, document the exception inline at the declaration site.
+
+## Tailwind Migration Checklist (Codex Cloud Handoff)
+1. Convert shared primitives first (`gt-button`, `gt-input`, card/surface wrappers) into `frontend/src/components/ui/*` parity components.
+2. Migrate route UI in risk-ordered slices (`overview`/`placement`/`recipes` before lower-risk pages) with visual parity checkpoints after each slice.
+3. Keep API/data contracts unchanged while swapping presentation layers; no coupled API and styling rewrites in one step.
+4. Remove dead CSS module selectors only after route parity is confirmed and probe checks stay green.
+5. Retire/reduce legacy `gt-*` primitives only after equivalent component adoption is stable across active routes.
 
 ## Overview Page UX Conventions
 - Keep overview roster visualization aligned with physical hierarchy: `Tent -> Slot -> Tray -> Plant`.

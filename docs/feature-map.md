@@ -219,6 +219,31 @@ This file is the execution-focused feature map for product and engineering statu
     - `docs/ui-css-phase3-report.md`
   - Refs: `7a8cb8a`
 
+- `Completed` Tailwind + shadcn-style Phase S scaffold (no broad migration yet):
+  - Added minimal Tailwind config for migration scaffolding:
+    - `frontend/tailwind.config.ts`
+  - Added CSS-first theme bridge:
+    - `frontend/src/styles/tailwind-theme.css`
+  - Added shadcn/ui-style scaffolding:
+    - `frontend/components.json`
+    - `frontend/src/lib/utils.ts`
+    - `frontend/src/components/ui/button.tsx`
+    - `frontend/src/components/ui/badge.tsx`
+    - `frontend/src/components/ui/card.tsx`
+    - `frontend/src/components/ui/dialog.tsx`
+  - Expanded probe route to render scaffold primitives:
+    - `frontend/app/tailwind-probe/page.tsx`
+  - Refs: `b2010d9`
+
+- `Completed` Frontend dev cache hygiene for `.next` permission safety:
+  - Added preflight script:
+    - `frontend/scripts/prepare-dev-cache.mjs`
+  - Updated dev command to run preflight before `next dev`:
+    - `frontend/package.json`
+  - Isolated frontend build cache in Docker with `/app/.next` volume:
+    - `docker-compose.yml`
+  - Refs: `b2010d9`
+
 - `Completed` CSS Phase 2 drift-reduction sweep (Tailwind prep, no Tailwind yet):
   - Migrated setup/rotation/feeding/schedule/cockpit + experiment list/create/plants pages to shared `gt-*` primitives for repeated buttons/forms/notices/chips/cell scaffolds.
   - Reduced cockpit module primitives to route-specific layout rules and removed duplicated popover/chip/hidden-input primitives.
