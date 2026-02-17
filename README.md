@@ -26,6 +26,11 @@ Experiment flow summary:
    - API root: `http://localhost:8000/api/v1/`
    - LAN frontend (same network): `http://<HOST_LAN_IP>:3000`
 
+### Frontend dev cache hygiene
+
+- Compose now mounts a dedicated `/app/.next` volume for the frontend service, preventing root-owned `.next` artifacts on the host.
+- Local `pnpm --dir frontend run dev` runs `frontend/scripts/prepare-dev-cache.mjs` first, which quarantines non-writable or foreign-owned `.next/dev` cache directories instead of failing with lockfile permission errors.
+
 ### LAN access notes
 
 - Frontend now uses same-origin API requests (`/api/*`, `/healthz`, `/media/*`) and Next rewrites to reach backend.

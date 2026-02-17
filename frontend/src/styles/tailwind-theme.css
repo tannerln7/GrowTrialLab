@@ -1,0 +1,32 @@
+@theme inline {
+  --font-sans: var(--font-geist-sans), "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
+
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface-elevated);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-contrast);
+  --color-secondary: var(--surface-elevated);
+  --color-secondary-foreground: var(--text);
+  --color-muted: color-mix(in srgb, var(--surface-elevated) 86%, var(--text-muted) 14%);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--surface-elevated);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: var(--text);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--focus);
+
+  --radius-sm: var(--gt-radius-sm);
+  --radius-md: var(--gt-radius-md);
+  --radius-lg: var(--gt-radius-lg);
+  --radius-xl: var(--gt-radius-xl);
+
+  --spacing: var(--gt-space-base-1);
+}
