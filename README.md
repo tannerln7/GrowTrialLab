@@ -8,7 +8,7 @@ Monorepo scaffold for local development with:
 Experiment flow summary:
 - `/experiments/{id}` is the canonical experiment entry route.
 - It redirects to `/experiments/{id}/setup` until bootstrap setup is complete (plants + tents/slots + recipes).
-- After bootstrap setup, it redirects to `/experiments/{id}/overview` for readiness work (baseline + placement/tray recipes + feeding).
+- After bootstrap setup, it redirects to `/experiments/{id}/overview` for readiness work (baseline + placement + per-plant recipe assignment + feeding).
 
 ## Quick start
 
