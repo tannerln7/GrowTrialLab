@@ -3,6 +3,11 @@
 Date: 2026-02-17  
 Status: completed
 
+## Status update (post-Phase S)
+- Phase S scaffold scope is now superseded by the Tailwind-first route migration rollout.
+- Broad route migration has since been completed for the core experiment and cockpit workflows, and legacy experiment/cockpit CSS modules plus `src/styles/primitives.css` have been retired.
+- This report remains historical context for scaffold decisions; see canonical docs (`docs/unified-project-notes.md`, `docs/feature-map.md`, `docs/agent-guidebook.md`) for current styling policy/state.
+
 ## Scope completed
 - Kept scaffold-only posture: no broad CSS module migration, no page redesign.
 - Added Tailwind v4 transition infrastructure for future migration:

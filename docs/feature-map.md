@@ -254,6 +254,34 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/src/components/ui/scroll-area.tsx`
   - Refs: local workspace (this change)
 
+- `Completed` Tailwind-first route migration and legacy CSS retirement:
+  - Migrated target routes to Tailwind/shadcn-first styling while preserving existing behavior/workflow contracts:
+    - `/experiments/{id}/overview`
+    - `/experiments/{id}/recipes`
+    - `/experiments/{id}/placement`
+    - `/experiments/{id}/baseline`
+    - `/experiments/{id}/feeding`
+    - `/experiments/{id}/rotation`
+    - `/experiments/{id}/schedule`
+    - `/experiments/{id}/setup` (+ supporting setup flows: plants/create/list)
+    - `/p/{id}` cockpit
+  - Removed legacy style layers:
+    - `frontend/app/experiments/experiments.module.css` (deleted)
+    - `frontend/app/p/[id]/page.module.css` (deleted)
+    - `frontend/src/styles/primitives.css` (deleted)
+  - Added shared Tailwind-first style maps/pattern primitives for dense-grid and panel/toolbar reuse:
+    - `frontend/src/components/ui/experiments-styles.ts`
+    - `frontend/src/components/ui/cockpit-styles.ts`
+    - `frontend/src/components/ui/icon-button.tsx`
+    - `frontend/src/components/ui/table-shell.tsx`
+    - `frontend/src/components/ui/skeleton.tsx`
+    - `frontend/src/components/ui/empty-state.tsx`
+    - `frontend/src/components/ui/notice.tsx`
+    - `frontend/src/components/ui/panel-surface.tsx`
+    - `frontend/src/components/ui/toolbar-row.tsx`
+    - `frontend/src/components/ui/dense-selectable-cell.tsx`
+  - Refs: local workspace (uncommitted changes)
+
 - `Completed` Frontend dev cache hygiene for `.next` permission safety:
   - Added preflight script:
     - `frontend/scripts/prepare-dev-cache.mjs`
