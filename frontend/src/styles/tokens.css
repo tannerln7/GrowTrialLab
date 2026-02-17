@@ -1,23 +1,36 @@
 :root {
   /* Density + Tailwind-aligned spacing ladder (4px base). */
-  --gt-density: clamp(0.94, 0.91 + 0.22vw, 1.06);
-  --gt-space-0: 0;
-  --gt-space-0-5: calc(0.125rem * var(--gt-density));
-  --gt-space-1: calc(0.25rem * var(--gt-density));
-  --gt-space-2: calc(0.5rem * var(--gt-density));
-  --gt-space-3: calc(0.75rem * var(--gt-density));
-  --gt-space-4: calc(1rem * var(--gt-density));
-  --gt-space-5: calc(1.25rem * var(--gt-density));
-  --gt-space-6: calc(1.5rem * var(--gt-density));
-  --gt-space-7: calc(2rem * var(--gt-density));
-  --gt-space-8: calc(2.5rem * var(--gt-density));
+  --gt-density: 1;
+
+  /* Base ladder tokens remain static; scaled tokens apply density once. */
+  --gt-space-base-0: 0;
+  --gt-space-base-0-5: 0.125rem;
+  --gt-space-base-1: 0.25rem;
+  --gt-space-base-2: 0.5rem;
+  --gt-space-base-3: 0.75rem;
+  --gt-space-base-4: 1rem;
+  --gt-space-base-5: 1.25rem;
+  --gt-space-base-6: 1.5rem;
+  --gt-space-base-7: 2rem;
+  --gt-space-base-8: 2.5rem;
+
+  --gt-space-0: var(--gt-space-base-0);
+  --gt-space-0-5: calc(var(--gt-space-base-0-5) * var(--gt-density, 1));
+  --gt-space-1: calc(var(--gt-space-base-1) * var(--gt-density, 1));
+  --gt-space-2: calc(var(--gt-space-base-2) * var(--gt-density, 1));
+  --gt-space-3: calc(var(--gt-space-base-3) * var(--gt-density, 1));
+  --gt-space-4: calc(var(--gt-space-base-4) * var(--gt-density, 1));
+  --gt-space-5: calc(var(--gt-space-base-5) * var(--gt-density, 1));
+  --gt-space-6: calc(var(--gt-space-base-6) * var(--gt-density, 1));
+  --gt-space-7: calc(var(--gt-space-base-7) * var(--gt-density, 1));
+  --gt-space-8: calc(var(--gt-space-base-8) * var(--gt-density, 1));
 
   /* Backwards-compatible semantic aliases. */
-  --gt-space-xs: var(--gt-space-1);
-  --gt-space-sm: var(--gt-space-2);
-  --gt-space-md: var(--gt-space-3);
-  --gt-space-lg: var(--gt-space-4);
-  --gt-space-xl: var(--gt-space-6);
+  --gt-space-xs: var(--gt-space-1, 0.25rem);
+  --gt-space-sm: var(--gt-space-2, 0.5rem);
+  --gt-space-md: var(--gt-space-3, 0.75rem);
+  --gt-space-lg: var(--gt-space-4, 1rem);
+  --gt-space-xl: var(--gt-space-6, 1.5rem);
 
   /* Radius scale */
   --gt-radius-sm: 0.5rem;
@@ -73,6 +86,7 @@
 
 @media (max-width: 30rem) {
   :root {
+    /* Keep compact mode dense but readable on narrow screens. */
     --gt-density: 0.94;
   }
 }
