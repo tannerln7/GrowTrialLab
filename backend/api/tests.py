@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -20,18 +19,6 @@ from api.models import (
 )
 
 
-@override_settings(
-    MIDDLEWARE=[
-        "django.middleware.security.SecurityMiddleware",
-        "django.contrib.sessions.middleware.SessionMiddleware",
-        "django.middleware.common.CommonMiddleware",
-        "django.middleware.csrf.CsrfViewMiddleware",
-        "django.contrib.auth.middleware.AuthenticationMiddleware",
-        "django.contrib.messages.middleware.MessageMiddleware",
-        "django.middleware.clickjacking.XFrameOptionsMiddleware",
-        "api.test_middleware.TestAppUserMiddleware",
-    ]
-)
 class CanonicalApiContractTests(APITestCase):
     def setUp(self):
         self.species = Species.objects.create(name="Nepenthes ventricosa", category="nepenthes")
@@ -51,16 +38,51 @@ class CanonicalApiContractTests(APITestCase):
             status=Plant.Status.ACTIVE,
         )
 
+    def _assert_envelope(self, payload: dict):
+        self.assertEqual(set(payload.keys()), {"count", "results", "meta"})
+
+    def _assert_blocked_diagnostics(self, payload: dict, *, reason_key: str | None = None):
+        self.assertIn("detail", payload)
+        self.assertIn("diagnostics", payload)
+        diagnostics = payload["diagnostics"]
+        self.assertIn("reason_counts", diagnostics)
+        if reason_key:
+            self.assertIn(reason_key, diagnostics["reason_counts"])
+
+    def _mark_baseline(self, plant: Plant):
+        PlantWeeklyMetric.objects.update_or_create(
+            experiment=self.experiment,
+            plant=plant,
+            week_number=BASELINE_WEEK_NUMBER,
+            defaults={"metrics": {"height_cm": 4}, "notes": "seeded"},
+        )
+
+    def _prepare_ready_to_start(self) -> Plant:
+        slot = self._create_slot(1, 1)
+        Recipe.objects.create(experiment=self.experiment, code="R0", name="Control")
+        recipe = Recipe.objects.create(experiment=self.experiment, code="R1", name="Treatment")
+        plant = self._create_plant("NP-READY-001", grade="A")
+        self._mark_baseline(plant)
+        tray = Tray.objects.create(
+            experiment=self.experiment,
+            name="TR-READY-1",
+            slot=slot,
+            assigned_recipe=recipe,
+            capacity=4,
+        )
+        tray.plants.add(plant)
+        return plant
+
     def test_list_endpoints_use_envelope_shape(self):
         self._create_plant("NP-001")
 
         plants = self.client.get(f"/api/v1/experiments/{self.experiment.id}/plants/")
         self.assertEqual(plants.status_code, 200)
-        self.assertEqual(set(plants.json().keys()), {"count", "results", "meta"})
+        self._assert_envelope(plants.json())
 
         tents = self.client.get(f"/api/v1/experiments/{self.experiment.id}/tents")
         self.assertEqual(tents.status_code, 200)
-        self.assertEqual(set(tents.json().keys()), {"count", "results", "meta"})
+        self._assert_envelope(tents.json())
 
     def test_baseline_queue_uses_envelope(self):
         self._create_plant("NP-001")
@@ -68,7 +90,23 @@ class CanonicalApiContractTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertIn("plants", payload)
-        self.assertEqual(set(payload["plants"].keys()), {"count", "results", "meta"})
+        self._assert_envelope(payload["plants"])
+
+    def test_status_summary_uses_current_schema_shape(self):
+        response = self.client.get(f"/api/v1/experiments/{self.experiment.id}/status/summary")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        self.assertEqual(set(payload.keys()), {"setup", "lifecycle", "readiness", "schedule"})
+        self.assertIn("is_complete", payload["setup"])
+        self.assertIn("missing", payload["setup"])
+        self.assertIn("state", payload["lifecycle"])
+        self.assertIn("ready_to_start", payload["readiness"])
+        self.assertIn("counts", payload["readiness"])
+        self.assertIn("meta", payload["readiness"])
+        self.assertIn("next_scheduled_slot", payload["schedule"])
+        self.assertIn("due_counts_today", payload["schedule"])
+        self.assertIn("needs_tent_restriction", payload["readiness"]["counts"])
 
     def test_slots_generate_supports_safe_reshape(self):
         slot = self._create_slot(1, 1)
@@ -169,16 +207,17 @@ class CanonicalApiContractTests(APITestCase):
         response = self.client.post(f"/api/v1/experiments/{self.experiment.id}/start")
         self.assertEqual(response.status_code, 409)
         payload = response.json()
-        self.assertIn("detail", payload)
-        self.assertIn("diagnostics", payload)
+        self._assert_blocked_diagnostics(payload)
         self.assertIn("setup", payload["diagnostics"])
+        self.assertIn("ready_to_start", payload["diagnostics"])
+        self.assertIn("counts", payload["diagnostics"])
 
     def test_feed_blocked_when_not_running_includes_diagnostics(self):
         plant = self._create_plant("NP-200", grade="A")
         response = self.client.post(f"/api/v1/plants/{plant.id}/feed", {"amount_text": "1 mL"}, format="json")
         self.assertEqual(response.status_code, 409)
         payload = response.json()
-        self.assertIn("diagnostics", payload)
+        self._assert_blocked_diagnostics(payload, reason_key="experiment_not_running")
         self.assertEqual(payload["diagnostics"]["reason_counts"]["experiment_not_running"], 1)
 
     def test_auto_place_blocked_includes_diagnostics(self):
@@ -190,8 +229,7 @@ class CanonicalApiContractTests(APITestCase):
         )
         self.assertEqual(response.status_code, 409)
         payload = response.json()
-        self.assertIn("diagnostics", payload)
-        self.assertIn("reason_counts", payload["diagnostics"])
+        self._assert_blocked_diagnostics(payload)
 
     def test_grade_roundtrip_in_baseline_and_overview(self):
         plant = self._create_plant("NP-400")
@@ -220,6 +258,28 @@ class CanonicalApiContractTests(APITestCase):
         self.assertEqual(overview.status_code, 200)
         row = overview.json()["plants"]["results"][0]
         self.assertEqual(row["grade"], "A")
+
+    def test_lifecycle_start_stop_roundtrip_for_ready_experiment(self):
+        self._prepare_ready_to_start()
+
+        before = self.client.get(f"/api/v1/experiments/{self.experiment.id}/status/summary")
+        self.assertEqual(before.status_code, 200)
+        self.assertTrue(before.json()["readiness"]["ready_to_start"])
+        self.assertEqual(before.json()["lifecycle"]["state"], Experiment.LifecycleState.DRAFT)
+
+        started = self.client.post(f"/api/v1/experiments/{self.experiment.id}/start")
+        self.assertEqual(started.status_code, 200)
+        started_payload = started.json()
+        self.assertEqual(started_payload["lifecycle"]["state"], Experiment.LifecycleState.RUNNING)
+        self.assertIsNotNone(started_payload["lifecycle"]["started_at"])
+        self.assertIsNone(started_payload["lifecycle"]["stopped_at"])
+
+        stopped = self.client.post(f"/api/v1/experiments/{self.experiment.id}/stop")
+        self.assertEqual(stopped.status_code, 200)
+        stopped_payload = stopped.json()
+        self.assertEqual(stopped_payload["lifecycle"]["state"], Experiment.LifecycleState.STOPPED)
+        self.assertIsNotNone(stopped_payload["lifecycle"]["started_at"])
+        self.assertIsNotNone(stopped_payload["lifecycle"]["stopped_at"])
 
     def test_schedule_plan_is_grouped_and_enveloped(self):
         slot = self._create_slot(1, 1)
@@ -254,7 +314,7 @@ class CanonicalApiContractTests(APITestCase):
         response = self.client.get(f"/api/v1/experiments/{self.experiment.id}/schedules/plan?days=7")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(set(payload["slots"].keys()), {"count", "results", "meta"})
+        self._assert_envelope(payload["slots"])
         self.assertGreater(payload["slots"]["count"], 0)
         first_slot = payload["slots"]["results"][0]
         self.assertGreaterEqual(len(first_slot["actions"]), 2)

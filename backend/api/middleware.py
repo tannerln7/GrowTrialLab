@@ -12,23 +12,12 @@ class CloudflareAccessMiddleware:
         self.exempt_paths = {"/healthz"}
         self.verifier = None
         self.dev_email = (settings.DEV_EMAIL or settings.ADMIN_EMAIL).strip().lower()
-        self.dev_bypass_enabled = settings.DEBUG and (
-            self._is_placeholder(settings.CF_ACCESS_TEAM_DOMAIN)
-            or self._is_placeholder(settings.CF_ACCESS_AUD)
-        )
+        self.dev_bypass_enabled = settings.DEV_AUTH_BYPASS_ENABLED
 
-        if (
-            not self.dev_bypass_enabled
-            and settings.CF_ACCESS_TEAM_DOMAIN
-            and settings.CF_ACCESS_AUD
-        ):
+        if not self.dev_bypass_enabled and settings.CF_ACCESS_CONFIGURED:
             self.verifier = CloudflareJWTVerifier(
                 settings.CF_ACCESS_TEAM_DOMAIN, settings.CF_ACCESS_AUD
             )
-
-    def _is_placeholder(self, value: str):
-        normalized = (value or "").strip().lower()
-        return normalized in {"", "replace_me", "your-team.cloudflareaccess.com"}
 
     def _reject(self, detail: str):
         return JsonResponse({"detail": detail}, status=403)

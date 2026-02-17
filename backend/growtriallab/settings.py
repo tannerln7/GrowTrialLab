@@ -11,6 +11,11 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-secret-key-change-me")
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() in {"1", "true", "yes"}
 
+
+def _is_placeholder(value: str) -> bool:
+    normalized = (value or "").strip().lower()
+    return normalized in {"", "replace_me", "your-team.cloudflareaccess.com"}
+
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get(
@@ -118,6 +123,21 @@ CF_ACCESS_AUD = os.environ.get("CF_ACCESS_AUD", "").strip()
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@example.com").strip().lower()
 AUTH_MODE = os.environ.get("AUTH_MODE", "invite_only").strip().lower()
 DEV_EMAIL = os.environ.get("DEV_EMAIL", ADMIN_EMAIL).strip().lower()
+NODE_ENV = os.environ.get("NODE_ENV", "").strip().lower()
+ENABLE_DEV_AUTH_BYPASS = os.environ.get("ENABLE_DEV_AUTH_BYPASS", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
+CF_ACCESS_CONFIGURED = not _is_placeholder(CF_ACCESS_TEAM_DOMAIN) and not _is_placeholder(
+    CF_ACCESS_AUD
+)
+DEV_AUTH_BYPASS_ENABLED = (
+    NODE_ENV == "development"
+    and DEBUG
+    and ENABLE_DEV_AUTH_BYPASS
+    and not CF_ACCESS_CONFIGURED
+)
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip()
 
 REST_FRAMEWORK = {
