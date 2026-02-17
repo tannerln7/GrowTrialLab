@@ -17,13 +17,13 @@
 .surface {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--gt-radius-xl);
 }
 
 .surfaceElevated {
   background: var(--surface-elevated);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--gt-radius-xl);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);
 }
 

@@ -95,6 +95,7 @@ Historical context only:
 - Use shared utility primitives for modal/popover/accessibility shells as well (`gt-modal-backdrop`, `gt-popover`, `gt-visually-hidden`) before adding route-local equivalents.
 - For dense placement/recipe/baseline/overview cell layouts, use `gt-grid` with `data-cell-size="sm|md|lg"` plus `gt-cell` state modifiers instead of per-page min-width/padding forks.
 - Keep route CSS modules focused on page-specific layout/behavior overrides, not shared visual primitives.
+- Use the compact spacing ladder tokens (`--gt-space-*`) for all UI spacing declarations; if a fixed non-ladder value is truly required, document the exception inline at the declaration site.
 
 ## Overview Page UX Conventions
 - Keep overview roster visualization aligned with physical hierarchy: `Tent -> Slot -> Tray -> Plant`.

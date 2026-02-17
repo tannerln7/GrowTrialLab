@@ -1,15 +1,29 @@
 :root {
-  /* Spacing scale (4/8/12/16/24 baseline) */
-  --gt-space-xs: 0.25rem;
-  --gt-space-sm: 0.5rem;
-  --gt-space-md: 0.75rem;
-  --gt-space-lg: 1rem;
-  --gt-space-xl: 1.5rem;
+  /* Density + Tailwind-aligned spacing ladder (4px base). */
+  --gt-density: clamp(0.94, 0.91 + 0.22vw, 1.06);
+  --gt-space-0: 0;
+  --gt-space-0-5: calc(0.125rem * var(--gt-density));
+  --gt-space-1: calc(0.25rem * var(--gt-density));
+  --gt-space-2: calc(0.5rem * var(--gt-density));
+  --gt-space-3: calc(0.75rem * var(--gt-density));
+  --gt-space-4: calc(1rem * var(--gt-density));
+  --gt-space-5: calc(1.25rem * var(--gt-density));
+  --gt-space-6: calc(1.5rem * var(--gt-density));
+  --gt-space-7: calc(2rem * var(--gt-density));
+  --gt-space-8: calc(2.5rem * var(--gt-density));
+
+  /* Backwards-compatible semantic aliases. */
+  --gt-space-xs: var(--gt-space-1);
+  --gt-space-sm: var(--gt-space-2);
+  --gt-space-md: var(--gt-space-3);
+  --gt-space-lg: var(--gt-space-4);
+  --gt-space-xl: var(--gt-space-6);
 
   /* Radius scale */
   --gt-radius-sm: 0.5rem;
   --gt-radius-md: 0.625rem;
-  --gt-radius-lg: 1rem;
+  --gt-radius-lg: 0.75rem;
+  --gt-radius-xl: 1rem;
 
   /* Type scale */
   --gt-text-label: 0.76rem;
@@ -55,4 +69,10 @@
   --success: var(--gt-accent-2);
   --warning: var(--gt-warning);
   --focus: var(--gt-outline-focus);
+}
+
+@media (max-width: 30rem) {
+  :root {
+    --gt-density: 0.94;
+  }
 }

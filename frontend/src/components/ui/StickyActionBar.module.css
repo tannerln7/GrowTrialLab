@@ -12,9 +12,9 @@
 .inner {
   width: min(1040px, 100%);
   margin: 0 auto;
-  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  padding: var(--gt-space-3) var(--gt-space-4) calc(var(--gt-space-3) + env(safe-area-inset-bottom));
   display: flex;
-  gap: 0.5rem;
+  gap: var(--gt-space-2);
   flex-wrap: wrap;
 }
 

@@ -1,17 +1,17 @@
 .card {
   border: 1px dashed var(--border);
-  border-radius: 12px;
+  border-radius: var(--gt-radius-lg);
   background: var(--surface);
-  padding: 1rem;
+  padding: var(--gt-space-4);
   display: flex;
-  gap: 0.8rem;
+  gap: var(--gt-space-3);
   align-items: center;
 }
 
 .iconWrap {
   width: 56px;
   height: 56px;
-  border-radius: 10px;
+  border-radius: var(--gt-radius-md);
   background: var(--surface-elevated);
   display: grid;
   place-items: center;
@@ -21,7 +21,7 @@
 
 .text {
   display: grid;
-  gap: 0.2rem;
+  gap: var(--gt-space-1);
 }
 
 .text strong {
