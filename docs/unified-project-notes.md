@@ -21,15 +21,31 @@ This document is the single consolidated source for current status, architecture
   - Plants, Tents+Slots, Recipes
 - Readiness/operations pages:
   - Baseline: `/experiments/{id}/baseline`
-  - Placement: `/experiments/{id}/placement`
+  - Placement: `/experiments/{id}/placement` (4-step in-page workflow)
   - Rotation: `/experiments/{id}/rotation`
   - Feeding: `/experiments/{id}/feeding`
   - Schedule: `/experiments/{id}/schedule`
   - Recipes (recipe management): `/experiments/{id}/recipes`
+- Placement workflow structure:
+  - Step 1: Tents + Slots layout/restrictions
+  - Step 2: Trays + Capacity
+  - Step 3: Plants -> Trays (draft, apply)
+  - Step 4: Trays -> Slots (draft, apply)
+  - Step navigation behavior:
+    - Step 1 does not show Back action.
+    - Final step primary action routes to `/overview` when slot mapping requirements are met.
 - Canonical status/gating API:
   - `GET /api/v1/experiments/{id}/status/summary` (`backend/api/status_views.py`)
 - Canonical physical hierarchy:
   - `Tent -> Slot -> Tray -> Plant`
+- Placement UI behavior:
+  - Placement membership changes are staged client-side first (`stagedTrayByPlantId`) and persisted only on explicit save/confirm.
+  - Staging validates tray capacity and tent restriction compatibility before save, while backend remains source-of-truth on final apply.
+  - Placement page is physical-location only; recipe assignment/editing is handled on `/experiments/{id}/recipes`.
+- Recipes UI behavior:
+  - Recipes page uses tray/unplaced grouped plant grids for selection, with per-plant recipe mapping as the only persisted assignment state.
+  - Recipe apply/remove actions are staged in local draft mapping and persisted only on explicit save.
+  - Recipe list management is compact and uses multi-select recipe cells with contextual delete.
 - Canonical contract conventions:
   - List envelope: `{ count, results, meta }`
   - Blocked operations: `{ detail, diagnostics }`
@@ -129,6 +145,11 @@ This document is the single consolidated source for current status, architecture
 - [x] Hub-and-spoke workflow centered on Overview is active.
 - [x] Setup is bootstrap-focused; readiness work is Overview-driven.
 - [x] Dedicated pages for baseline/placement/rotation/feeding/schedule/recipes are active.
+- [x] Standalone `/slots` navigation was merged into Placement Step 1 (single-route wizard flow).
+- [x] Placement page now uses step-gated wizard UX and dense multi-select grid workflows for both plants->trays and trays->slots with explicit draft apply/discard controls.
+- [x] Recipes page now mirrors placement-grid interaction patterns for per-plant recipe mapping (tray-grouped selection, draft mapping, explicit save).
+- [x] Overview roster now uses a nested `Tent -> Slot -> Tray -> Plant` grid presentation with compact plant cells and per-plant status chips (grade, recipe, plus non-active state) instead of row-style list rendering, with top-aligned/content-sized tent cards and shelf/slot-index layout rendering to preserve real tent row/column geometry and avoid uneven spacing between adjacent tents. Overview readiness counters + operation controls now live in `Experiment State` as dynamic chips (green when value is `0`), while schedule details and the `Schedule` navigation action live in the `Schedule` card. Overview nav buttons now switch to primary styling when their linked workflow has pending work, and `Start` remains disabled until readiness requirements are met. Overview slot/tray/plant layout now removes fixed slot-column minimums in favor of responsive shrink behavior so portrait mobile screens do not overflow.
+- [x] Baseline v2 now uses species-aware 1-5 slider capture with unified `metrics.baseline_v1` keys (`vigor`, `feature_count`, `feature_quality`, `color_turgor`, `damage_pests`), auto/manual grade source handling, first-capture neutral default slider values (`3`), concise single-word descriptor labels displayed below each slider with small single-line metric titles (no per-slider helper lines), a top-row always-visible primary save action with dynamic `Save & Next`/`Save` labeling and dirty-state gating for already-captured baselines, and baseline photo upload per selected plant with inline thumbnail/`No media` empty-state behavior plus themed file-selector controls. Baseline queue and plant-baseline payloads now expose deterministic `baseline_photo` metadata so capture-page thumbnail recall does not depend on paginated global photo lists, and baseline saves persist `metrics.baseline_v1.captured_at` surfaced as `baseline_captured_at` for per-plant last-capture display shown below grade controls/chip row. Queue status chips now show baseline-only state (`No baseline`/`Captured`) with captured rendered green and anchored to the bottom of each queue tile, and queue cells retain a square minimum-height footprint for consistent alignment.
 - [x] Plant cockpit QR route (`/p/{id}`) is active with operational context and links.
 - [x] UI terminology aligns on `grade` and location context fields.
 - [x] Phase 0 and Phase 1 data-layer improvements landed:

@@ -167,8 +167,13 @@ This file is the execution-focused feature map for product and engineering statu
   - Refs: `192d4e5`, `59a5003`, `36ba433`
 - `Completed` Frontend per-plant recipe UX alignment:
   - Route and navigation moved from `/experiments/{id}/assignment` to `/experiments/{id}/recipes` (legacy assignment route removed).
-  - Placement tray cards now support staged bulk apply + per-plant override/clear, then persist via batch save (`PATCH /api/v1/experiments/{id}/plants/recipes`).
-  - Overview roster and cockpit surfaces now show explicit assigned/unassigned recipe chips, with cockpit inline recipe change popover for active plants.
+  - Placement page now remains physical-location focused (plants/trays/slots only); recipe assignment UI lives on `/experiments/{id}/recipes`.
+  - Recipes page now uses tray-grouped plant cell grids + draft per-plant mapping with explicit save (`PATCH /api/v1/experiments/{id}/plants/recipes`), plus compact multi-select recipe delete cells.
+  - Overview roster now renders as nested `Tent -> Slot -> Tray -> Plant` containers with compact centered plant cells and per-plant status chips (grade, recipe, non-active state), and cockpit surfaces continue to show inline recipe status/change controls.
+  - Overview `Experiment State` now owns readiness counters + operations controls with dynamic chips (green at zero), while the former `Readiness` card is streamlined to `Schedule` and now hosts the schedule navigation action.
+  - Overview nav controls now apply primary styling only when linked workflows have pending actions, and `Start` stays disabled until readiness requirements are satisfied.
+  - Overview tent/slot/tray/plant nested grid now drops fixed slot-column minimum widths and applies mobile-specific compact sizing so portrait phone layouts avoid horizontal overflow.
+  - Overview tent cards are top-aligned/content-sized and slot maps now render by real shelf/slot indices to prevent uneven vertical spacing while preserving true tent row/column layout.
   - Relevant files:
     - `frontend/app/experiments/[id]/recipes/page.tsx`
     - `frontend/app/experiments/[id]/placement/page.tsx`
@@ -178,6 +183,57 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/app/experiments/experiments.module.css`
     - `frontend/app/p/[id]/page.module.css`
   - Refs: `bc90c64`, `adbd34f`
+- `Completed` Placement minified grid staging workflow:
+  - Placement now uses compact multi-select plant cells for unplaced and tray containers.
+  - Bulk move/remove actions are staged in UI and applied only via explicit save/confirm.
+  - Save computes membership diffs from persisted vs staged tray mappings and applies deterministic remove-then-add backend mutations.
+  - Relevant files:
+    - `frontend/app/experiments/[id]/placement/page.tsx`
+    - `frontend/app/experiments/experiments.module.css`
+  - Refs: local workspace (uncommitted changes)
+- `Completed` Placement wizard consolidation (`/slots` merged into `/placement`):
+  - Placement is now a 4-step in-page flow: Tents+Slots -> Trays+Capacity -> Plants->Trays -> Trays->Slots.
+  - Slot setup operations moved into Placement Step 1 and `/slots` route removed from frontend navigation.
+  - Setup/rotation/schedule links now direct tent/slot edits to Placement Step 1.
+  - Step navigation keeps Step 1 forward-only (no Back) and uses a final-step gated action to return to Overview.
+  - Relevant files:
+    - `frontend/app/experiments/[id]/placement/page.tsx`
+    - `frontend/app/experiments/[id]/setup/page.tsx`
+    - `frontend/app/experiments/[id]/rotation/page.tsx`
+    - `frontend/app/experiments/[id]/schedule/page.tsx`
+    - `frontend/app/experiments/[id]/slots/page.tsx` (removed)
+    - `frontend/app/experiments/experiments.module.css`
+  - Refs: local workspace (uncommitted changes)
+- `Completed` Baseline capture UX compact-grid update:
+  - Capture controls now render above queue; queue now uses compact plant cells where selecting any cell activates that plant in the capture panel.
+  - Queue cells keep a square minimum-height footprint to prevent row misalignment when content density changes.
+  - Baseline v2 now uses fixed species-aware 1-5 sliders persisted in `metrics.baseline_v1`.
+  - Auto-grade uses backend-deterministic scoring with guardrails; manual override persists `grade_source` and selected grade.
+  - Auto-`A` gate was tightened so `A` aligns closer to ~4/5 average slider outcomes.
+  - First-capture slider state now defaults to neutral `3` values.
+  - Slider cards now use concise single-word descriptor labels rendered below each slider with small single-line species-aware metric titles and no per-slider helper text lines.
+  - Top-row baseline save action remains visible and adapts label/state:
+    - `Save & Next` while uncaptured plants remain.
+    - `Save` for already-captured selected plants.
+    - disabled for no selected plant/read-only/no-op edits on already-captured selections.
+  - Baseline photo retrieval is now deterministic and non-paginated for capture UI:
+    - `GET /api/v1/experiments/{id}/baseline/queue` rows include `baseline_photo`.
+    - `GET /api/v1/plants/{id}/baseline` includes `baseline_photo`.
+    - Baseline page thumbnail recall now uses those payloads instead of scanning `/api/v1/photos`.
+  - Baseline captures now persist a deterministic timestamp metric (`metrics.baseline_v1.captured_at`) and expose `baseline_captured_at` in queue/detail payloads for UI recall.
+  - Baseline capture UI shows a compact `Last baseline capture` timestamp per selected plant directly beneath grade controls/chip row.
+  - Baseline queue chips now show baseline capture state only (`No baseline`/`Captured`), with `Captured` rendered green and chip placement anchored at the bottom of each queue cell.
+  - Baseline photo upload remains available per selected plant using baseline tag + week 0 metadata, with inline thumbnail preview and persistent `No media` empty-state cell.
+  - Baseline file selector button/text are themed to match existing monochrome input/button styles.
+  - `GET/POST /api/v1/plants/{id}/baseline` now roundtrip `metrics.baseline_v1` + top-level `grade_source`.
+  - Relevant files:
+    - `backend/api/baseline_grade.py`
+    - `backend/api/baseline_views.py`
+    - `backend/api/serializers.py`
+    - `backend/tests/test_baseline_v2.py`
+    - `frontend/app/experiments/[id]/baseline/page.tsx`
+    - `frontend/app/experiments/experiments.module.css`
+  - Refs: local workspace (uncommitted changes)
 
 ## In Progress Features
 

@@ -46,6 +46,11 @@ Historical context only:
   - Plants, Tents + Slots, Recipes
 - Readiness/ops pages:
   - Baseline, Placement, Rotation, Feeding, Schedule, Recipes (recipe management)
+  - Placement is a single-route 4-step workflow:
+    - Step 1: Tents + Slots
+    - Step 2: Trays + Capacity
+    - Step 3: Plants -> Trays (draft then apply)
+    - Step 4: Trays -> Slots (draft then apply)
 - Recipe assignment model:
   - `Plant.assigned_recipe` is canonical for operations/readiness/feeding.
   - Trays are recipe-agnostic containers.
@@ -83,6 +88,76 @@ Historical context only:
   - placement summary
   - feeding queue
   - schedule plan
+
+## Overview Page UX Conventions
+- Keep overview roster visualization aligned with physical hierarchy: `Tent -> Slot -> Tray -> Plant`.
+- Prefer compact plant cells inside tray containers (instead of table-style rows) for dense, mobile-friendly scanning.
+- Render tent slot areas using real shelf/slot index geometry (rows by shelf, columns by slot index) instead of auto-fill-only slot wrapping.
+- Surface key per-plant status as compact centered chips in each plant cell (grade, recipe, and non-active status when applicable).
+- Keep tent cards top-aligned and content-sized (no equal-height stretch) so slot/tray stacks stay visually aligned without large vertical gaps.
+- Keep readiness counters and operational navigation controls in the `Experiment State` card, using dynamic status chips that render green when each counter is `0`; keep the `Schedule` navigation button with scheduling details in the `Schedule` card.
+- Keep overview action buttons stateful: nav buttons use primary styling when their corresponding workflow has pending work (baseline/placement/recipes/rotation/feeding/schedule) and secondary styling when clear.
+- Keep `Start` disabled until `readiness.ready_to_start` is true.
+- Keep overview slot/tray/plant grids mobile-safe: avoid hard minimum widths that cause horizontal overflow in portrait mode; cells must shrink responsively on narrow screens.
+
+## Placement Page UX Conventions
+- Keep tent/slot setup in Placement Step 1; do not reintroduce standalone `/slots` navigation links.
+- Keep Placement Step 3 focused on physical plant->tray membership only; do not embed recipe assignment controls in this step.
+- Keep step navigation intentional:
+  - do not render a Back button on Step 1
+  - final-step primary action routes to `/overview` only when Step 4 requirements are satisfied
+- Keep placement membership changes staged in page state until explicit save/confirm.
+- Canonical placement staging shape is plant-centric mapping:
+  - persisted: `persistedTrayByPlantId`
+  - staged: `stagedTrayByPlantId`
+- Enforce capacity and tent-restriction checks at staging time for fast operator feedback, then rely on backend as final source-of-truth on save.
+- Save placement membership changes in deterministic order:
+  - remove stale tray memberships first
+  - add staged tray memberships second
+- Keep multi-select behavior container-aware:
+  - main grid bulk move applies only to selected unplaced/main-grid plants
+  - tray trash removal applies only to selected plants in that tray
+
+## Recipes Page UX Conventions
+- Keep `/experiments/{id}/recipes` focused on per-plant recipe assignment with tray grouping as a selection aid only.
+- Use tray/unplaced plant container grids with Placement Step 3-style selection behavior:
+  - per-plant select/deselect
+  - tray-level select toggle for all plants in a tray
+  - species-based bulk select anchored to last clicked plant cell
+- Keep recipe assignment draft-only until explicit save:
+  - canonical state from placement summary + plant `assigned_recipe`
+  - draft mapping in page state
+  - save via `PATCH /api/v1/experiments/{id}/plants/recipes` diff updates
+- Keep recipe CRUD UI compact:
+  - compact create controls
+  - compact multi-select recipe cell grid with contextual delete action
+
+## Baseline Page UX Conventions
+- Keep baseline capture controls above the plant queue so selected-plant editing is always in view.
+- Use compact plant cell grids for queue navigation (no large row/table layout); clicking anywhere on a tile should select that plant as active for the capture panel.
+- Keep baseline queue tiles visually stable with a square footprint and minimum height so row alignment remains consistent after content changes.
+- Do not expose raw JSON editing in baseline capture UI.
+- Baseline v2 capture uses five unified sliders (1-5):
+  - `vigor`, `feature_count`, `feature_quality`, `color_turgor`, `damage_pests`
+  - persist under `metrics.baseline_v1` on baseline week metrics
+  - baseline capture timestamp persists as `metrics.baseline_v1.captured_at` and is exposed as `baseline_captured_at` in baseline API payloads
+- Baseline sliders default to `3` on first capture.
+- Baseline slider cards use small single-line metric titles (species-aware) and single-word value descriptors rendered below each slider; avoid long helper text blocks below each slider.
+- Slider labels are species/category-aware in UI only; backend schema remains unified across species.
+- Grade behavior:
+  - `grade_source=auto` computes deterministic grade server-side from slider values and stores `Plant.grade`
+  - `grade_source=manual` requires explicit grade override (`A|B|C`) and persists source in baseline metrics
+  - Auto-grade uses a stricter `A` threshold tuned around roughly 4/5 average slider performance.
+- Baseline save action is presented in the top Queue Status action row above capture fields (not sticky at page bottom), always visible with dynamic label behavior:
+  - show `Save & Next` while uncaptured plants remain
+  - show `Save` for already-captured selected plants
+  - keep disabled when no plant is selected, read-only is active, or an already-captured selection has no edits
+- Baseline photo capture/upload is per selected plant and should write with `tag=baseline` and `week_number=0`.
+- Baseline photo UI should use an inline thumbnail cell (always present) with `No media` empty-state text, positioned left of upload controls, instead of external-link navigation.
+- Baseline photo recall should be sourced from baseline endpoints (`baseline_photo` on queue rows and plant baseline payload), not from paginated global photo scans.
+- Baseline capture UI should display a small `Last baseline capture` timestamp for the selected plant, sourced from `baseline_captured_at`, directly below the grade controls/chip row.
+- Baseline queue status chips should show baseline capture state only (`No baseline`/`Captured`), with captured rendered as a green indicator and the chip anchored at the bottom of each queue tile.
+- Baseline file selector control should match the same monochrome button/input theme as the rest of the page.
 
 ## Auth and Environment Rules
 - Auth middleware is Cloudflare Access-based.
