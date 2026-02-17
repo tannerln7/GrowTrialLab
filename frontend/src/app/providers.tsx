@@ -1,11 +1,20 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
 import { useState, type ReactNode } from "react";
 
 type ProvidersProps = {
   children: ReactNode;
 };
+
+const ReactQueryDevtools = dynamic(
+  () =>
+    import("@tanstack/react-query-devtools").then((module) => ({
+      default: module.ReactQueryDevtools,
+    })),
+  { ssr: false },
+);
 
 export default function Providers({ children }: ProvidersProps) {
   const [queryClient] = useState(
@@ -27,5 +36,12 @@ export default function Providers({ children }: ProvidersProps) {
       }),
   );
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+      {process.env.NODE_ENV === "development" ? (
+        <ReactQueryDevtools initialIsOpen={false} />
+      ) : null}
+    </QueryClientProvider>
+  );
 }
