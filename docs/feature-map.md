@@ -134,8 +134,9 @@ This file is the execution-focused feature map for product and engineering statu
     - `backend/pyproject.toml`
     - `backend/uv.lock`
     - `frontend/package.json`
-    - `AGENTS.md`
-  - Refs: working tree (post-`fd3fadf`, pre-commit)
+    - `frontend/tsconfig.json`
+    - `package.json`
+  - Refs: `a33467c`, `c34f94a`
 - `Completed` Plant-canonical recipe assignment refactor:
   - `Plant.assigned_recipe` is now the only source of truth for recipe assignment.
   - Tray-level recipe field/logic removed; readiness and feeding blockers now use missing plant recipe assignment.
@@ -151,7 +152,7 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/app/experiments/[id]/schedule/page.tsx`
     - `frontend/app/experiments/[id]/placement/page.tsx`
     - `frontend/app/p/[id]/page.tsx`
-  - Refs: working tree (post-`fd3fadf`, pre-commit)
+  - Refs: `192d4e5`, `bc90c64`, `36ba433`
 - `Completed` Assignment API ergonomics and tray convenience apply endpoint:
   - `PATCH /api/v1/plants/{id}` accepts `assigned_recipe_id` for per-plant set/clear assignment.
   - `POST /api/v1/trays/{id}/plants/apply-recipe` bulk-applies a recipe to active tray plants and returns envelope summary.
@@ -163,7 +164,7 @@ This file is the execution-focused feature map for product and engineering statu
     - `backend/api/urls.py`
     - `backend/tests/test_recipe_assignment.py`
     - `backend/tests/test_location_payloads.py`
-  - Refs: working tree (post-`fd3fadf`, pre-commit)
+  - Refs: `192d4e5`, `59a5003`, `36ba433`
 - `Completed` Frontend per-plant recipe UX alignment:
   - Route and navigation moved from `/experiments/{id}/assignment` to `/experiments/{id}/recipes` (legacy assignment route removed).
   - Placement tray cards now support staged bulk apply + per-plant override/clear, then persist via batch save (`PATCH /api/v1/experiments/{id}/plants/recipes`).
@@ -176,7 +177,7 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/app/p/[id]/page.tsx`
     - `frontend/app/experiments/experiments.module.css`
     - `frontend/app/p/[id]/page.module.css`
-  - Refs: working tree (post-`fd3fadf`, pre-commit)
+  - Refs: `bc90c64`, `adbd34f`
 
 ## In Progress Features
 
