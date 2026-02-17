@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import Providers from "@/src/app/providers";
 import ServiceWorkerRegistration from "@/src/components/pwa/ServiceWorkerRegistration";
 
 import "./globals.css";
@@ -52,7 +53,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
+        <Providers>{children}</Providers>
         <ServiceWorkerRegistration />
       </body>
     </html>
