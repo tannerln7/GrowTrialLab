@@ -15,6 +15,7 @@ from .placement_views import (
     experiment_placement_summary,
     experiment_trays,
     tray_add_plant,
+    tray_apply_recipe,
     tray_remove_plant,
 )
 from .plants_views import (
@@ -22,6 +23,7 @@ from .plants_views import (
     experiment_plants_bulk_import,
     experiment_plants_generate_ids,
     experiment_plants_labels_pdf,
+    experiment_plants_recipes,
     plant_replace,
 )
 from .recipes_views import experiment_recipes, recipe_detail
@@ -115,6 +117,11 @@ urlpatterns = [
         name="experiment-plants",
     ),
     path(
+        "api/v1/experiments/<uuid:experiment_id>/plants/recipes",
+        experiment_plants_recipes,
+        name="experiment-plants-recipes",
+    ),
+    path(
         "api/v1/experiments/<uuid:experiment_id>/plants/bulk-import/",
         experiment_plants_bulk_import,
         name="experiment-plants-bulk-import",
@@ -193,6 +200,11 @@ urlpatterns = [
         "api/v1/trays/<uuid:tray_id>/plants/<uuid:tray_plant_id>",
         tray_remove_plant,
         name="tray-remove-plant",
+    ),
+    path(
+        "api/v1/trays/<uuid:tray_id>/plants/apply-recipe",
+        tray_apply_recipe,
+        name="tray-apply-recipe",
     ),
     path(
         "api/v1/experiments/<uuid:experiment_id>/rotation/summary",

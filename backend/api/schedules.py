@@ -18,7 +18,7 @@ from .models import (
     Tray,
     TrayPlant,
 )
-from .tray_assignment import experiment_tray_placements
+from .tray_placement import experiment_tray_placements
 
 WEEKDAY_ORDER = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 WEEKDAY_INDEX = {value: idx for idx, value in enumerate(WEEKDAY_ORDER)}
@@ -40,7 +40,7 @@ TIMEFRAME_ORDER = {
 }
 
 BLOCKED_EXPERIMENT_NOT_RUNNING = "Blocked: Experiment not running"
-BLOCKED_NEEDS_TRAY_RECIPE = "Blocked: Needs tray recipe"
+BLOCKED_NEEDS_RECIPE_ASSIGNMENT = "Blocked: Needs plant recipe"
 BLOCKED_UNPLACED = "Blocked: Unplaced"
 
 
@@ -96,12 +96,14 @@ def build_scope_context(experiment: Experiment) -> ScopeContext:
     trays = {
         str(item.id): item
         for item in Tray.objects.filter(experiment=experiment)
-        .select_related("slot__tent", "assigned_recipe")
+        .select_related("slot__tent")
         .order_by("name")
     }
     plants = {
         str(item.id): item
-        for item in Plant.objects.filter(experiment=experiment).select_related("species").order_by("plant_id", "id")
+        for item in Plant.objects.filter(experiment=experiment)
+        .select_related("species", "assigned_recipe")
+        .order_by("plant_id", "id")
     }
     active_ids = {
         str(item.id)
@@ -191,12 +193,13 @@ def action_blockers(
             if placement is None:
                 has_unplaced = True
                 continue
-            if placement.tray.assigned_recipe is None:
+            plant = context.plants.get(plant_id)
+            if plant is not None and plant.assigned_recipe is None:
                 has_missing_recipe = True
         if has_unplaced:
             blockers.append(BLOCKED_UNPLACED)
         if has_missing_recipe:
-            blockers.append(BLOCKED_NEEDS_TRAY_RECIPE)
+            blockers.append(BLOCKED_NEEDS_RECIPE_ASSIGNMENT)
 
     return blockers
 

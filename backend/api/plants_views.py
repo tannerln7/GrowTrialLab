@@ -18,8 +18,8 @@ from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from .contracts import list_envelope
-from .models import Experiment, Plant, Species
+from .contracts import error_with_diagnostics, list_envelope
+from .models import Experiment, Plant, Recipe, Species
 from .plant_ids import ExperimentPlantIdAllocator, prefix_for_species
 from .serializers import (
     ExperimentPlantCreateSerializer,
@@ -70,6 +70,16 @@ def _resolve_species(
         name=normalized_name,
         category=(category or "").strip().lower(),
     )
+
+
+def _recipe_summary(recipe: Recipe | None) -> dict | None:
+    if recipe is None:
+        return None
+    return {
+        "id": str(recipe.id),
+        "code": recipe.code,
+        "name": recipe.name,
+    }
 
 
 def _create_plant(
@@ -173,6 +183,96 @@ def experiment_plants(request, experiment_id: UUID):
             status=409,
         )
     return Response(ExperimentPlantSerializer(plant).data, status=201)
+
+
+@api_view(["PATCH"])
+def experiment_plants_recipes(request, experiment_id: UUID):
+    rejection = _require_app_user(request)
+    if rejection:
+        return rejection
+
+    experiment = _get_experiment(experiment_id)
+    if experiment is None:
+        return Response({"detail": "Experiment not found."}, status=404)
+
+    raw_updates = request.data.get("updates")
+    if not isinstance(raw_updates, list) or len(raw_updates) == 0:
+        return Response({"detail": "updates must be a non-empty list."}, status=400)
+
+    invalid_updates: list[dict[str, str]] = []
+    parsed_updates: list[tuple[str, str | None]] = []
+
+    for index, item in enumerate(raw_updates):
+        if not isinstance(item, dict):
+            invalid_updates.append(
+                {"plant_id": "", "reason": f"invalid_update_payload_at_index_{index}"}
+            )
+            continue
+        plant_id = item.get("plant_id")
+        if not plant_id:
+            invalid_updates.append({"plant_id": "", "reason": "plant_id_missing"})
+            continue
+        assigned_recipe_id = item.get("assigned_recipe_id")
+        if assigned_recipe_id not in {None, ""} and not isinstance(assigned_recipe_id, str):
+            invalid_updates.append({"plant_id": str(plant_id), "reason": "assigned_recipe_id_invalid"})
+            continue
+        parsed_updates.append(
+            (str(plant_id), str(assigned_recipe_id) if assigned_recipe_id not in {None, ""} else None)
+        )
+
+    plant_ids = {plant_id for plant_id, _ in parsed_updates}
+    plants_by_id = {
+        str(plant.id): plant
+        for plant in Plant.objects.filter(id__in=plant_ids, experiment=experiment).select_related("assigned_recipe")
+    }
+    recipe_ids = {recipe_id for _, recipe_id in parsed_updates if recipe_id is not None}
+    recipes_by_id = {
+        str(recipe.id): recipe
+        for recipe in Recipe.objects.filter(id__in=recipe_ids, experiment=experiment).only("id", "code", "name")
+    }
+
+    for plant_id, recipe_id in parsed_updates:
+        plant = plants_by_id.get(plant_id)
+        if plant is None:
+            invalid_updates.append({"plant_id": plant_id, "reason": "not_in_experiment"})
+            continue
+        if recipe_id is not None and recipes_by_id.get(recipe_id) is None:
+            invalid_updates.append({"plant_id": plant_id, "reason": "recipe_not_found"})
+
+    if invalid_updates:
+        return error_with_diagnostics(
+            "One or more recipe updates are invalid.",
+            diagnostics={
+                "reason_counts": {"invalid_updates": len(invalid_updates)},
+                "invalid_updates": invalid_updates,
+            },
+        )
+
+    results: list[dict[str, object]] = []
+    plants_to_update_by_id: dict[str, Plant] = {}
+
+    for plant_id, recipe_id in parsed_updates:
+        plant = plants_by_id[plant_id]
+        recipe = recipes_by_id.get(recipe_id) if recipe_id is not None else None
+        current_recipe_id = str(plant.assigned_recipe.id) if plant.assigned_recipe else None
+        next_recipe_id = str(recipe.id) if recipe else None
+        status = "noop" if current_recipe_id == next_recipe_id else "updated"
+        if status == "updated":
+            plant.assigned_recipe = recipe
+            plants_to_update_by_id[plant_id] = plant
+        results.append(
+            {
+                "plant_id": plant_id,
+                "assigned_recipe_id": next_recipe_id,
+                "assigned_recipe": _recipe_summary(recipe),
+                "status": status,
+            }
+        )
+
+    if plants_to_update_by_id:
+        Plant.objects.bulk_update(list(plants_to_update_by_id.values()), ["assigned_recipe", "updated_at"])
+
+    return Response(list_envelope(results))
 
 
 @api_view(["POST"])
@@ -459,7 +559,13 @@ def plant_replace(request, plant_id: UUID):
                 "plant_id": replacement.plant_id,
                 "status": replacement.status,
                 "replaces_uuid": str(original.id),
-                "assigned_recipe_code": replacement.assigned_recipe.code if replacement.assigned_recipe else None,
+                "assigned_recipe": {
+                    "id": str(replacement.assigned_recipe.id),
+                    "code": replacement.assigned_recipe.code,
+                    "name": replacement.assigned_recipe.name,
+                }
+                if replacement.assigned_recipe
+                else None,
                 "grade": replacement.grade,
                 "has_baseline": False,
             },

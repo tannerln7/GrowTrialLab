@@ -6,7 +6,7 @@ from .baseline import BASELINE_WEEK_NUMBER
 from .models import Experiment, Plant, PlantWeeklyMetric, Recipe, Slot, Tent
 from .schedules import plan_for_experiment
 from .tent_restrictions import tent_allows_species
-from .tray_assignment import experiment_tray_placements
+from .tray_placement import experiment_tray_placements
 
 
 @dataclass(frozen=True)
@@ -24,7 +24,7 @@ class ReadinessCounts:
     needs_baseline: int
     needs_assignment: int
     needs_placement: int
-    needs_tray_recipe: int
+    needs_plant_recipe: int
     needs_tent_restriction: int
 
     @property
@@ -32,7 +32,7 @@ class ReadinessCounts:
         return (
             self.needs_baseline == 0
             and self.needs_placement == 0
-            and self.needs_tray_recipe == 0
+            and self.needs_plant_recipe == 0
             and self.needs_tent_restriction == 0
         )
 
@@ -59,8 +59,8 @@ def compute_setup_status(experiment: Experiment) -> SetupStatus:
 def compute_readiness_counts(experiment: Experiment) -> ReadinessCounts:
     active_plants = list(
         Plant.objects.filter(experiment=experiment, status=Plant.Status.ACTIVE)
-        .select_related("species")
-        .only("id", "grade", "species")
+        .select_related("species", "assigned_recipe")
+        .only("id", "grade", "species", "assigned_recipe")
         .order_by("id")
     )
     baseline_plant_ids = {
@@ -72,8 +72,9 @@ def compute_readiness_counts(experiment: Experiment) -> ReadinessCounts:
     }
 
     needs_baseline = 0
+    needs_assignment = 0
     needs_placement = 0
-    needs_tray_recipe = 0
+    needs_plant_recipe = 0
     needs_tent_restriction = 0
     tray_placements = experiment_tray_placements(experiment.id)
 
@@ -84,20 +85,21 @@ def compute_readiness_counts(experiment: Experiment) -> ReadinessCounts:
         tray_placement = tray_placements.get(str(plant.id))
         if tray_placement is None:
             needs_placement += 1
-            continue
-
-        tray = tray_placement.tray
-        if tray.assigned_recipe is None:
-            needs_tray_recipe += 1
-        if tray.slot and tray.slot.tent and not tent_allows_species(tray.slot.tent, plant.species.id):
+        elif tray_placement.tray.slot and tray_placement.tray.slot.tent and not tent_allows_species(
+            tray_placement.tray.slot.tent, plant.species.id
+        ):
             needs_tent_restriction += 1
+        if plant.assigned_recipe is None:
+            needs_plant_recipe += 1
+        if tray_placement is None or plant.assigned_recipe is None:
+            needs_assignment += 1
 
     return ReadinessCounts(
         active_plants=len(active_plants),
         needs_baseline=needs_baseline,
-        needs_assignment=needs_placement + needs_tray_recipe,
+        needs_assignment=needs_assignment,
         needs_placement=needs_placement,
-        needs_tray_recipe=needs_tray_recipe,
+        needs_plant_recipe=needs_plant_recipe,
         needs_tent_restriction=needs_tent_restriction,
     )
 
@@ -108,8 +110,8 @@ def readiness_diagnostics(counts: ReadinessCounts, setup: SetupStatus) -> dict:
         reason_counts["needs_baseline"] = counts.needs_baseline
     if counts.needs_placement:
         reason_counts["needs_placement"] = counts.needs_placement
-    if counts.needs_tray_recipe:
-        reason_counts["needs_tray_recipe"] = counts.needs_tray_recipe
+    if counts.needs_plant_recipe:
+        reason_counts["needs_plant_recipe"] = counts.needs_plant_recipe
     if counts.needs_tent_restriction:
         reason_counts["needs_tent_restriction"] = counts.needs_tent_restriction
 
@@ -158,7 +160,7 @@ def experiment_status_summary_payload(experiment: Experiment) -> dict:
                 "needs_baseline": readiness_counts.needs_baseline,
                 "needs_assignment": readiness_counts.needs_assignment,
                 "needs_placement": readiness_counts.needs_placement,
-                "needs_tray_recipe": readiness_counts.needs_tray_recipe,
+                "needs_plant_recipe": readiness_counts.needs_plant_recipe,
                 "needs_tent_restriction": readiness_counts.needs_tent_restriction,
             },
             "meta": readiness_diagnostics(readiness_counts, setup),
