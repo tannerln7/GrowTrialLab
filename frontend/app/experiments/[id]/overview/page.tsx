@@ -1,18 +1,18 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { backendFetch, normalizeBackendError } from "@/lib/backend";
-import {
-  fetchExperimentStatusSummary,
-  type ExperimentStatusSummary,
-} from "@/lib/experiment-status";
+import type { ExperimentStatusSummary } from "@/lib/experiment-status";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { api, isApiError } from "@/src/lib/api";
+import { queryKeys } from "@/src/lib/queryKeys";
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
 import styles from "../../experiments.module.css";
 
@@ -25,7 +25,12 @@ type FilterId =
   | "active"
   | "removed";
 
-type LocationNode = { id: string; code?: string | null; name?: string | null; label?: string | null };
+type LocationNode = {
+  id: string;
+  code?: string | null;
+  name?: string | null;
+  label?: string | null;
+};
 
 type OverviewPlant = {
   uuid: string;
@@ -74,6 +79,13 @@ const FILTERS: Array<{ id: FilterId; label: string }> = [
   { id: "removed", label: "Removed" },
 ];
 
+const DIAGNOSTIC_LABELS: Record<string, string> = {
+  needs_baseline: "needs baseline",
+  needs_placement: "needs placement",
+  needs_tray_recipe: "needs tray recipe",
+  needs_tent_restriction: "violates tent restrictions",
+};
+
 function formatScheduleSlot(
   slot: ExperimentStatusSummary["schedule"]["next_scheduled_slot"],
 ): string {
@@ -88,7 +100,9 @@ function formatScheduleSlot(
         month: "short",
         day: "numeric",
       });
-  const moment = slot.exact_time ? slot.exact_time.slice(0, 5) : slot.timeframe?.toLowerCase() || "time";
+  const moment = slot.exact_time
+    ? slot.exact_time.slice(0, 5)
+    : slot.timeframe?.toLowerCase() || "time";
   return `${day} · ${moment} (${slot.actions_count} action${slot.actions_count === 1 ? "" : "s"})`;
 }
 
@@ -105,10 +119,77 @@ function locationSummary(plant: OverviewPlant): string {
   return `Slot ${slotLabel} > Tray ${trayLabel}${occupancy}`;
 }
 
+function formatActionError(error: unknown, fallback: string): string {
+  if (isApiError(error)) {
+    const detail = error.detail || fallback;
+    if (error.status === 409) {
+      const diagnosticsText = formatDiagnostics(error.diagnostics);
+      if (diagnosticsText) {
+        return `${detail} ${diagnosticsText}`;
+      }
+    }
+    return detail;
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return fallback;
+}
+
+function formatDiagnostics(diagnostics: unknown): string {
+  if (!diagnostics || typeof diagnostics !== "object") {
+    return "";
+  }
+
+  const pieces: string[] = [];
+  const reasonCounts =
+    "reason_counts" in diagnostics &&
+    diagnostics.reason_counts &&
+    typeof diagnostics.reason_counts === "object"
+      ? (diagnostics.reason_counts as Record<string, unknown>)
+      : null;
+
+  if (reasonCounts) {
+    const reasons = Object.entries(reasonCounts)
+      .filter(([, count]) => typeof count === "number" && count > 0)
+      .map(([key, count]) => {
+        const label = DIAGNOSTIC_LABELS[key] || key.replaceAll("_", " ");
+        return `${count} ${label}`;
+      });
+    if (reasons.length > 0) {
+      pieces.push(`Blocked by: ${reasons.join(", ")}.`);
+    }
+  }
+
+  const missingSetup =
+    "missing_setup" in diagnostics && Array.isArray(diagnostics.missing_setup)
+      ? diagnostics.missing_setup
+          .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+          .map((item) => item.replaceAll("_", " "))
+      : [];
+
+  if (missingSetup.length > 0) {
+    pieces.push(`Missing setup: ${missingSetup.join(", ")}.`);
+  }
+
+  return pieces.join(" ");
+}
+
+function isOfflineError(error: unknown): boolean {
+  if (!isApiError(error)) {
+    return false;
+  }
+  if (error.status === null) {
+    return true;
+  }
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
 export default function ExperimentOverviewPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
 
   const experimentId = useMemo(() => {
     if (typeof params.id === "string") {
@@ -138,79 +219,152 @@ export default function ExperimentOverviewPage() {
   const queryValue = searchParams.get("q") ?? "";
   const refreshToken = searchParams.get("refresh");
 
-  const [loading, setLoading] = useState(true);
-  const [notInvited, setNotInvited] = useState(false);
-  const [offline, setOffline] = useState(false);
-  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [summary, setSummary] = useState<ExperimentStatusSummary | null>(null);
+  const [actionError, setActionError] = useState("");
   const [experimentName, setExperimentName] = useState("");
-  const [data, setData] = useState<OverviewResponse | null>(null);
-  const [busy, setBusy] = useState(false);
 
-  const refreshStatusSummary = useCallback(async () => {
-    const status = await fetchExperimentStatusSummary(experimentId);
-    if (!status) {
-      setError("Unable to load status summary.");
-      return null;
+  const statusQuery = useQuery({
+    queryKey: queryKeys.experimentStatus(experimentId),
+    queryFn: () =>
+      api.get<ExperimentStatusSummary>(
+        `/api/v1/experiments/${experimentId}/status/summary`,
+      ),
+    enabled: Boolean(experimentId),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const overviewQuery = useQuery({
+    queryKey: queryKeys.experimentOverviewPlants(experimentId),
+    queryFn: () =>
+      api.get<OverviewResponse>(
+        `/api/v1/experiments/${experimentId}/overview/plants`,
+      ),
+    enabled: Boolean(experimentId) && Boolean(statusQuery.data?.setup.is_complete),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const statusPageState = usePageQueryState(statusQuery);
+  const overviewPageState = usePageQueryState(overviewQuery);
+
+  const invalidateOverviewData = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.experimentStatus(experimentId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.experimentOverviewPlants(experimentId),
+      }),
+    ]);
+  }, [experimentId, queryClient]);
+
+  const startMutation = useMutation({
+    mutationFn: () =>
+      api.post<ExperimentStatusSummary>(`/api/v1/experiments/${experimentId}/start`),
+    onMutate: () => {
+      setActionError("");
+      setNotice("");
+    },
+    onSuccess: async () => {
+      setNotice("Experiment started.");
+      await invalidateOverviewData();
+    },
+    onError: (error) => {
+      setActionError(formatActionError(error, "Unable to start experiment."));
+    },
+  });
+
+  const stopMutation = useMutation({
+    mutationFn: () =>
+      api.post<ExperimentStatusSummary>(`/api/v1/experiments/${experimentId}/stop`),
+    onMutate: () => {
+      setActionError("");
+      setNotice("");
+    },
+    onSuccess: async () => {
+      setNotice("Experiment stopped.");
+      await invalidateOverviewData();
+    },
+    onError: (error) => {
+      setActionError(formatActionError(error, "Unable to stop experiment."));
+    },
+  });
+
+  useEffect(() => {
+    if (!experimentId) {
+      return;
     }
-    setSummary(status);
-    return status;
+
+    let isMounted = true;
+    void (async () => {
+      try {
+        const payload = await api.get<{ name?: string }>(
+          `/api/v1/experiments/${experimentId}/`,
+        );
+        if (isMounted) {
+          setExperimentName(payload.name ?? "");
+        }
+      } catch {
+        if (isMounted) {
+          setExperimentName("");
+        }
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
   }, [experimentId]);
 
   useEffect(() => {
-    async function load() {
-      if (!experimentId) {
-        return;
-      }
-      setLoading(true);
-      setError("");
-      setOffline(false);
-      try {
-        const meResponse = await backendFetch("/api/me");
-        if (meResponse.status === 403) {
-          setNotInvited(true);
-          return;
-        }
-
-        const status = await refreshStatusSummary();
-        if (!status) {
-          return;
-        }
-        if (!status.setup.is_complete) {
-          router.replace(`/experiments/${experimentId}/setup`);
-          return;
-        }
-
-        const [overviewResponse, experimentResponse] = await Promise.all([
-          backendFetch(`/api/v1/experiments/${experimentId}/overview/plants`),
-          backendFetch(`/api/v1/experiments/${experimentId}/`),
-        ]);
-
-        if (!overviewResponse.ok) {
-          setError("Unable to load overview roster.");
-          return;
-        }
-        const overviewPayload = (await overviewResponse.json()) as OverviewResponse;
-        setData(overviewPayload);
-
-        if (experimentResponse.ok) {
-          const experimentPayload = (await experimentResponse.json()) as { name?: string };
-          setExperimentName(experimentPayload.name ?? "");
-        }
-      } catch (requestError) {
-        const normalized = normalizeBackendError(requestError);
-        if (normalized.kind === "offline") {
-          setOffline(true);
-        }
-        setError("Unable to load overview.");
-      } finally {
-        setLoading(false);
-      }
+    if (!experimentId || !refreshToken) {
+      return;
     }
+    void invalidateOverviewData();
+  }, [experimentId, invalidateOverviewData, refreshToken]);
 
-    void load();
-  }, [experimentId, refreshToken, refreshStatusSummary, router]);
+  useEffect(() => {
+    if (!experimentId) {
+      return;
+    }
+    if (statusQuery.data && !statusQuery.data.setup.is_complete) {
+      router.replace(`/experiments/${experimentId}/setup`);
+    }
+  }, [experimentId, router, statusQuery.data]);
+
+  const summary = statusQuery.data ?? null;
+  const data = overviewQuery.data ?? null;
+  const busy = startMutation.isPending || stopMutation.isPending;
+
+  const notInvited =
+    statusPageState.errorKind === "forbidden" ||
+    overviewPageState.errorKind === "forbidden";
+
+  const loading =
+    statusPageState.isLoading ||
+    (Boolean(statusQuery.data?.setup.is_complete) && overviewPageState.isLoading);
+
+  const queryError = useMemo(() => {
+    if (notInvited) {
+      return "";
+    }
+    if (statusPageState.isError) {
+      return statusPageState.message || "Unable to load status summary.";
+    }
+    if (overviewPageState.isError) {
+      return overviewPageState.message || "Unable to load overview roster.";
+    }
+    return "";
+  }, [notInvited, overviewPageState.isError, overviewPageState.message, statusPageState.isError, statusPageState.message]);
+
+  const error = actionError || queryError;
+
+  const offline =
+    statusPageState.errorKind === "offline" ||
+    overviewPageState.errorKind === "offline" ||
+    isOfflineError(startMutation.error) ||
+    isOfflineError(stopMutation.error);
 
   const filteredPlants = useMemo(() => {
     const normalizedQuery = queryValue.trim().toLowerCase();
@@ -220,7 +374,9 @@ export default function ExperimentOverviewPage() {
       const needsGrade = plant.status === "active" && !plant.grade;
       const needsPlacement = plant.status === "active" && plant.location.status !== "placed";
       const needsTrayRecipe =
-        plant.status === "active" && plant.location.status === "placed" && !plant.assigned_recipe_code;
+        plant.status === "active" &&
+        plant.location.status === "placed" &&
+        !plant.assigned_recipe_code;
 
       let matchesFilter = true;
       if (activeFilter === "needs_baseline") {
@@ -249,7 +405,7 @@ export default function ExperimentOverviewPage() {
         plant.species_name.toLowerCase().includes(normalizedQuery)
       );
     });
-  }, [data?.plants.results, activeFilter, queryValue]);
+  }, [activeFilter, data?.plants.results, queryValue]);
 
   const sortedPlants = useMemo(() => {
     return [...filteredPlants].sort((left, right) => {
@@ -316,55 +472,15 @@ export default function ExperimentOverviewPage() {
     router.replace(`/experiments/${experimentId}/overview${query ? `?${query}` : ""}`);
   }
 
-  async function startExperiment() {
+  function startExperiment() {
     if (!summary?.readiness.ready_to_start) {
       return;
     }
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/experiments/${experimentId}/start`, { method: "POST" });
-      const payload = (await response.json()) as ExperimentStatusSummary | { detail?: string };
-      if (!response.ok) {
-        setError((payload as { detail?: string }).detail || "Unable to start experiment.");
-        return;
-      }
-      setSummary(payload as ExperimentStatusSummary);
-      setNotice("Experiment started.");
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to start experiment.");
-    } finally {
-      setBusy(false);
-    }
+    startMutation.mutate();
   }
 
-  async function stopExperiment() {
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/experiments/${experimentId}/stop`, { method: "POST" });
-      const payload = (await response.json()) as ExperimentStatusSummary | { detail?: string };
-      if (!response.ok) {
-        setError((payload as { detail?: string }).detail || "Unable to stop experiment.");
-        return;
-      }
-      setSummary(payload as ExperimentStatusSummary);
-      setNotice("Experiment stopped.");
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to stop experiment.");
-    } finally {
-      setBusy(false);
-    }
+  function stopExperiment() {
+    stopMutation.mutate();
   }
 
   function plantLink(plant: OverviewPlant): string {
@@ -392,16 +508,14 @@ export default function ExperimentOverviewPage() {
       <SectionCard title="Experiment State">
         <p className={styles.mutedText}>State: {summary?.lifecycle.state.toUpperCase() || "UNKNOWN"}</p>
         {summary?.readiness.ready_to_start ? (
-          <button className={styles.buttonPrimary} type="button" disabled={busy} onClick={() => void startExperiment()}>
+          <button className={styles.buttonPrimary} type="button" disabled={busy} onClick={startExperiment}>
             Start
           </button>
         ) : (
-          <p className={styles.inlineNote}>
-            Start blocked until readiness is complete.
-          </p>
+          <p className={styles.inlineNote}>Start blocked until readiness is complete.</p>
         )}
         {summary?.lifecycle.state === "running" ? (
-          <button className={styles.buttonDanger} type="button" disabled={busy} onClick={() => void stopExperiment()}>
+          <button className={styles.buttonDanger} type="button" disabled={busy} onClick={stopExperiment}>
             Stop
           </button>
         ) : null}
@@ -431,7 +545,9 @@ export default function ExperimentOverviewPage() {
             Schedule
           </Link>
         </div>
-        <p className={styles.mutedText}>Next schedule slot: {formatScheduleSlot(summary?.schedule.next_scheduled_slot || null)}</p>
+        <p className={styles.mutedText}>
+          Next schedule slot: {formatScheduleSlot(summary?.schedule.next_scheduled_slot || null)}
+        </p>
       </SectionCard>
 
       <SectionCard title="Filters">
