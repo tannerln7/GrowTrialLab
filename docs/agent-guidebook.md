@@ -91,6 +91,7 @@ Historical context only:
 
 ## Frontend Styling Guidance (Current Conventions)
 - Token source of truth is `frontend/src/styles/tokens.css` (`--gt-*` variables); keep token names stable and minimal so they can map directly into future Tailwind theme config.
+- Keep density unitless (`--gt-density`) and apply it once through the spacing-token pipeline (base `--gt-space-base-*` -> scaled `--gt-space-*`); do not mix viewport length units directly into density math.
 - Shared global primitives live in `frontend/src/styles/primitives.css`; prefer these over re-defining base card/grid/cell/chip/button/form/tooltip styles in route CSS modules.
 - Use shared utility primitives for modal/popover/accessibility shells as well (`gt-modal-backdrop`, `gt-popover`, `gt-visually-hidden`) before adding route-local equivalents.
 - For dense placement/recipe/baseline/overview cell layouts, use `gt-grid` with `data-cell-size="sm|md|lg"` plus `gt-cell` state modifiers instead of per-page min-width/padding forks.

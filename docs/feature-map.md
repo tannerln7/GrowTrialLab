@@ -205,12 +205,19 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/app/experiments/experiments.module.css`
   - Refs: local workspace (uncommitted changes)
 - `Completed` CSS Phase 3 unification sweep (Tailwind prep, no Tailwind yet):
-  - Rebased UI spacing/radius usage onto a compact token ladder with clamp-based density scaling for mobile/desktop consistency.
+  - Rebased UI spacing/radius usage onto a compact token ladder with shared density controls for mobile/desktop consistency.
   - Added shared layout shells (`gt-page`, `gt-section`, `gt-card`, `gt-panel`, `gt-toolbar`) and rewired route/component CSS spacing declarations to token-only values.
   - Kept experiments route CSS focused on page geometry/state styling while shared primitives remain centralized in `frontend/src/styles/primitives.css`.
   - Report:
     - `docs/ui-css-phase3-report.md`
-  - Refs: local workspace (uncommitted changes)
+  - Refs: `fff2eef`
+- `Completed` CSS Phase 3 spacing regression stabilization:
+  - Fixed global spacing collapse caused by an invalid `--gt-density` expression that broke shared `var(--gt-space-*)` declarations.
+  - Updated token pipeline to base spacing (`--gt-space-base-*`) + single-pass scaled spacing (`--gt-space-*`) with unitless default density and compact mobile floor.
+  - Relevant files:
+    - `frontend/src/styles/tokens.css`
+    - `docs/ui-css-phase3-report.md`
+  - Refs: `7a8cb8a`
 
 - `Completed` CSS Phase 2 drift-reduction sweep (Tailwind prep, no Tailwind yet):
   - Migrated setup/rotation/feeding/schedule/cockpit + experiment list/create/plants pages to shared `gt-*` primitives for repeated buttons/forms/notices/chips/cell scaffolds.

@@ -5,7 +5,7 @@ Status: completed
 
 ## What changed
 - Consolidated spacing onto a compact token ladder in `frontend/src/styles/tokens.css` using a Tailwind-aligned 4px mental model (`--gt-space-1` = 4px through `--gt-space-8` = 40px), with compatibility aliases retained for existing `xs/sm/md/lg/xl` usage.
-- Added a single global density control (`--gt-density`) with clamp-based scaling, plus a small-screen cap, so spacing stays dense but readable on phones and does not bloat on desktop.
+- Added a single global density control (`--gt-density`) with a unitless default plus small-screen compact override, so spacing stays dense but readable on phones and stable across shared shells/primitives.
 - Expanded shared primitives in `frontend/src/styles/primitives.css` with common layout shells (`gt-page`, `gt-section`, `gt-card`, `gt-panel`, `gt-toolbar`) and normalized existing primitive spacing to the same token ladder.
 - Refactored route/component CSS modules to use spacing/radius tokens for UI spacing primitives (`padding`, `margin`, `gap`, row/column gaps, offsets) instead of ad-hoc values.
 - Kept `frontend/app/experiments/experiments.module.css` focused on experiments-area geometry/state styling while preserving shared base visual patterns in global primitives.
@@ -17,3 +17,11 @@ Status: completed
 
 ## Explicit exception
 - `PageShell.module.css` keeps a documented fixed `padding-bottom: 5.25rem` sticky-offset value as a deliberate safe-area/sticky-action-bar clearance value.
+
+## Post-Phase Stabilization (2026-02-17)
+- Root cause: the original density expression mixed unitless numbers and viewport units (`vw`) inside `--gt-density`, which made many downstream `var(--gt-space-*)` declarations invalid at compute time.
+- User-visible effect: global `padding`/`gap` declarations in shared shells/cards/toolbars/cells fell back to defaults (`0`/`normal`), causing stacked and overlapping layout density regressions.
+- Fix applied in `frontend/src/styles/tokens.css`:
+  - moved to base spacing tokens (`--gt-space-base-*`) plus scaled tokens (`--gt-space-*`) so density is applied exactly once;
+  - set unitless safe default `--gt-density: 1`;
+  - retained compact small-screen override (`--gt-density: 0.94`) as the density floor.
