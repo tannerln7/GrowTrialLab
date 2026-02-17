@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 
-import styles from "./SectionCard.module.css";
+import { cn } from "@/src/lib/utils";
 
 type SectionCardProps = {
   className?: string;
@@ -10,26 +10,19 @@ type SectionCardProps = {
   children: ReactNode;
 };
 
-export default function SectionCard({
-  className,
-  title,
-  subtitle,
-  actions,
-  children,
-}: SectionCardProps) {
-  const cardClassName = className ? `${styles.card} ${className}` : styles.card;
+export default function SectionCard({ className, title, subtitle, actions, children }: SectionCardProps) {
   return (
-    <section className={cardClassName}>
+    <section className={cn("rounded-lg border border-border bg-card text-card-foreground shadow-sm", className)}>
       {title || subtitle || actions ? (
-        <header className={styles.header}>
+        <header className="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-start md:justify-between">
           <div>
-            {title ? <h2>{title}</h2> : null}
-            {subtitle ? <p>{subtitle}</p> : null}
+            {title ? <h2 className="text-base font-semibold">{title}</h2> : null}
+            {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
           </div>
-          {actions ? <div className={styles.actions}>{actions}</div> : null}
+          {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
         </header>
       ) : null}
-      <div className={styles.body}>{children}</div>
+      <div className="p-4">{children}</div>
     </section>
   );
 }

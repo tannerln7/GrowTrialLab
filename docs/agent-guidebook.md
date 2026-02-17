@@ -99,7 +99,8 @@ Historical context only:
 - shadcn/ui-style scaffold is active:
   - `frontend/components.json`
   - `frontend/src/lib/utils.ts` (`cn(...)`)
-  - `frontend/src/components/ui/*` foundational primitives (`button`, `badge`, `card`, `dialog`)
+  - `frontend/src/components/ui/*` baseline primitives (`button`, `badge`, `card`, `dialog`, `input`, `textarea`, `select`, `tabs`, `tooltip`, `dropdown-menu`, `popover`, `separator`, `scroll-area`)
+- Route-agnostic shared layout wrappers should be Tailwind-first in JSX and avoid dedicated CSS modules unless geometry is truly non-utility-friendly (`PageShell`, `SectionCard`, `StickyActionBar`, `ResponsiveList` are canonical examples).
 - During Phase S, use scaffold primitives for new isolated UI only; do not do broad route/module migration in the same change.
 - Token source of truth is `frontend/src/styles/tokens.css` (`--gt-*` variables); keep token names stable and minimal so they can map directly into future Tailwind theme config.
 - Keep density unitless (`--gt-density`) and apply it once through the spacing-token pipeline (base `--gt-space-base-*` -> scaled `--gt-space-*`); do not mix viewport length units directly into density math.

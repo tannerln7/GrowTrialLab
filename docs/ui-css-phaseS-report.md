@@ -37,3 +37,7 @@ Status: completed
 3. Keep API/data-flow behavior unchanged while swapping presentation classes.
 4. Remove dead module selectors only after each route reaches parity.
 5. Retire or reduce legacy `gt-*` primitives once equivalent component usage is stable.
+
+## Follow-up applied after Phase S
+- Expanded the shadcn-style UI kit with baseline controls needed for route migration work (`input`, `textarea`, `select`, `tabs`, `tooltip`, `dropdown-menu`, `popover`, `separator`, `scroll-area`).
+- Migrated shared route-agnostic shells/lists to Tailwind utilities directly in JSX and removed associated CSS modules (`PageShell`, `SectionCard`, `StickyActionBar`, `ResponsiveList`) to reduce style drift and keep component behavior close to markup.
