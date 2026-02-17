@@ -13,7 +13,6 @@ import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 
-import styles from "../../experiments.module.css";
 
 type ChecklistItem = {
   id: "plants" | "tents_blocks" | "recipes";
@@ -127,26 +126,26 @@ export default function ExperimentSetupPage() {
       title="Setup"
       subtitle="Complete bootstrap setup: plants, tents + slots, and recipes."
       actions={
-        <Link className={styles.buttonSecondary} href="/experiments">
+        <Link className="gt-button gt-button--secondary" href="/experiments">
           Back to experiments
         </Link>
       }
     >
-      {loading ? <p className={styles.mutedText}>Loading setup checklist...</p> : null}
-      {error ? <p className={styles.errorText}>{error}</p> : null}
+      {loading ? <p className="gt-text-muted">Loading setup checklist...</p> : null}
+      {error ? <p className="gt-text-danger">{error}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       {!loading ? (
         <SectionCard title="Bootstrap Checklist">
-          <div className={styles.blocksList}>
+          <div className="gt-stack">
             {checklist.map((item) => (
-              <article className={styles.blockRow} key={item.id}>
+              <article className="gt-cell gt-cell--muted" key={item.id}>
                 <strong>{item.title}</strong>
-                <p className={styles.mutedText}>
+                <p className="gt-text-muted">
                   {item.complete ? "Complete" : "Incomplete"}
                 </p>
-                <div className={styles.actions}>
-                  <Link className={styles.buttonPrimary} href={item.href}>
+                <div className="gt-btnbar">
+                  <Link className="gt-button gt-button--primary" href={item.href}>
                     {item.actionLabel}
                   </Link>
                 </div>

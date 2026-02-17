@@ -747,7 +747,7 @@ export default function ExperimentOverviewPage() {
             </Link>
           </div>
           {!startReady ? (
-            <p className={styles.inlineNote}>Start blocked until readiness is complete.</p>
+            <p className={"gt-text-muted"}>Start blocked until readiness is complete.</p>
           ) : null}
         </div>
       </SectionCard>
@@ -757,7 +757,7 @@ export default function ExperimentOverviewPage() {
           <p className="gt-text-muted">
             Next schedule slot: {formatScheduleSlot(summary?.schedule.next_scheduled_slot || null)}
           </p>
-          <div className={styles.actions}>
+          <div className={"gt-btnbar"}>
             <Link className={actionButtonClass(scheduleNeedsAttention)} href={`/experiments/${experimentId}/schedule`}>
               Schedule
             </Link>

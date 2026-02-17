@@ -204,6 +204,16 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/app/experiments/[id]/slots/page.tsx` (removed)
     - `frontend/app/experiments/experiments.module.css`
   - Refs: local workspace (uncommitted changes)
+- `Completed` CSS Phase 2 drift-reduction sweep (Tailwind prep, no Tailwind yet):
+  - Migrated setup/rotation/feeding/schedule/cockpit + experiment list/create/plants pages to shared `gt-*` primitives for repeated buttons/forms/notices/chips/cell scaffolds.
+  - Reduced cockpit module primitives to route-specific layout rules and removed duplicated popover/chip/hidden-input primitives.
+  - Reduced `experiments.module.css` primitive duplication by removing top-level shared button/form/text blocks now provided by `frontend/src/styles/primitives.css`.
+  - Added shared modal/popover/visually-hidden helpers:
+    - `frontend/src/styles/primitives.css`
+  - Report:
+    - `docs/ui-css-phase2-report.md`
+  - Refs: local workspace (uncommitted changes)
+
 - `Completed` CSS Phase 1 token/primitives cleanup (Tailwind prep, no Tailwind yet):
   - Added shared design tokens and a small global primitive layer to reduce module drift while preserving the existing dark/material look.
   - Placement and Recipes were rewired first (with Overview/Baseline plus shared button/form/tooltip primitive adoption) to use shared `gt-*` surface/grid/cell primitives and attribute-driven cell sizing (`data-cell-size="sm|md|lg"`).

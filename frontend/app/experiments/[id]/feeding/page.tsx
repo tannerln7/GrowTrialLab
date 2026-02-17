@@ -15,7 +15,6 @@ import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
 
-import styles from "../../experiments.module.css";
 
 type Location = {
   status: "placed" | "unplaced";
@@ -332,20 +331,20 @@ export default function FeedingPage() {
       title="Feeding"
       subtitle="Record feeding quickly for active plants."
       actions={
-        <Link className={styles.buttonPrimary} href={overviewHref}>
+        <Link className={"gt-button gt-button--primary"} href={overviewHref}>
           ← Overview
         </Link>
       }
     >
-      {loading ? <p className={styles.mutedText}>Loading feeding queue...</p> : null}
-      {error ? <p className={styles.errorText}>{error}</p> : null}
-      {notice ? <p className={styles.successText}>{notice}</p> : null}
+      {loading ? <p className={"gt-text-muted"}>Loading feeding queue...</p> : null}
+      {error ? <p className={"gt-text-danger"}>{error}</p> : null}
+      {notice ? <p className={"gt-text-success"}>{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       {statusSummary && statusSummary.lifecycle.state !== "running" ? (
         <SectionCard title="Feeding Requires Running State">
-          <p className={styles.mutedText}>Feeding is available only while an experiment is running.</p>
-          <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+          <p className={"gt-text-muted"}>Feeding is available only while an experiment is running.</p>
+          <Link className={"gt-button gt-button--primary"} href={`/experiments/${experimentId}/overview`}>
             Start experiment from Overview
           </Link>
         </SectionCard>
@@ -354,15 +353,15 @@ export default function FeedingPage() {
       {statusSummary && statusSummary.lifecycle.state === "running" && queue ? (
         <>
           <SectionCard title="Queue Status">
-            <div className={styles.stack}>
-              <span className={styles.badgeWarn}>Remaining feedings: {queue.remaining_count}</span>
-              <p className={styles.mutedText}>Window: feed plants at least once every {queue.window_days} days.</p>
+            <div className={"gt-stack"}>
+              <span className={"gt-badge"}>Remaining feedings: {queue.remaining_count}</span>
+              <p className={"gt-text-muted"}>Window: feed plants at least once every {queue.window_days} days.</p>
               {selectedPlant && !selectedPlant.needs_feeding ? (
-                <p className={styles.inlineNote}>This plant is already within the feeding window.</p>
+                <p className={"gt-text-muted"}>This plant is already within the feeding window.</p>
               ) : null}
               {queue.remaining_count > 0 ? (
                 <button
-                  className={styles.buttonSecondary}
+                  className={"gt-button gt-button--secondary"}
                   type="button"
                   onClick={() => {
                     const next = pickNextNeedingFeed(queuePlants, selectedPlantId);
@@ -374,26 +373,26 @@ export default function FeedingPage() {
                   Next needing feeding
                 </button>
               ) : (
-                <p className={styles.successText}>All plants are up to date.</p>
+                <p className={"gt-text-success"}>All plants are up to date.</p>
               )}
             </div>
           </SectionCard>
 
           {queue.remaining_count === 0 && !selectedPlant ? (
             <SectionCard title="All Feedings Complete">
-              <p className={styles.mutedText}>No active plants currently need feeding.</p>
-              <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+              <p className={"gt-text-muted"}>No active plants currently need feeding.</p>
+              <Link className={"gt-button gt-button--primary"} href={`/experiments/${experimentId}/overview`}>
                 Back to Overview
               </Link>
             </SectionCard>
           ) : null}
 
           <SectionCard title="Feed Plant">
-            <div className={styles.formGrid}>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Plant</span>
+            <div className={"gt-stack"}>
+              <label className={"gt-col"}>
+                <span className={"gt-text-muted"}>Plant</span>
                 <select
-                  className={styles.select}
+                  className={"gt-select"}
                   value={selectedPlantId ?? ""}
                   onChange={(event) => selectPlant(event.target.value || null, true)}
                 >
@@ -406,36 +405,36 @@ export default function FeedingPage() {
                 </select>
               </label>
               {selectedPlant ? (
-                <div className={styles.stack}>
-                  <p className={styles.mutedText}>Last fed: {formatLastFed(selectedPlant.last_fed_at)}</p>
-                  <p className={styles.mutedText}>
+                <div className={"gt-stack"}>
+                  <p className={"gt-text-muted"}>Last fed: {formatLastFed(selectedPlant.last_fed_at)}</p>
+                  <p className={"gt-text-muted"}>
                     Assigned recipe:{" "}
                     {selectedPlant.assigned_recipe
                       ? `${selectedPlant.assigned_recipe.code}${selectedPlant.assigned_recipe.name ? ` - ${selectedPlant.assigned_recipe.name}` : ""}`
                       : "Unassigned"}
                   </p>
-                  <p className={styles.mutedText}>Location: {locationLabel(selectedPlant)}</p>
+                  <p className={"gt-text-muted"}>Location: {locationLabel(selectedPlant)}</p>
                   {selectedPlant.blocked_reason ? (
-                    <p className={styles.errorText}>Blocked: {selectedPlant.blocked_reason}</p>
+                    <p className={"gt-text-danger"}>Blocked: {selectedPlant.blocked_reason}</p>
                   ) : null}
                 </div>
               ) : null}
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Amount (optional)</span>
+              <label className={"gt-col"}>
+                <span className={"gt-text-muted"}>Amount (optional)</span>
                 <input
-                  className={styles.input}
+                  className={"gt-input"}
                   value={amountText}
                   onChange={(event) => setAmountText(event.target.value)}
                   placeholder="3 drops"
                 />
               </label>
-              <button className={styles.buttonSecondary} type="button" onClick={() => setShowNote((current) => !current)}>
+              <button className={"gt-button gt-button--secondary"} type="button" onClick={() => setShowNote((current) => !current)}>
                 {showNote ? "Hide note" : "Add note"}
               </button>
               {showNote ? (
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Note (optional)</span>
-                  <textarea className={styles.textarea} value={note} onChange={(event) => setNote(event.target.value)} />
+                <label className={"gt-col"}>
+                  <span className={"gt-text-muted"}>Note (optional)</span>
+                  <textarea className={"gt-textarea"} value={note} onChange={(event) => setNote(event.target.value)} />
                 </label>
               ) : null}
             </div>
@@ -443,16 +442,16 @@ export default function FeedingPage() {
 
           {saveBlocked ? (
             <SectionCard title="Feeding Blocked">
-              <p className={styles.mutedText}>
+              <p className={"gt-text-muted"}>
                 {saveBlockedReason === "Unplaced"
                   ? "This plant needs placement in a tray before feeding."
                   : "This plant needs a plant recipe before feeding."}
               </p>
-              <div className={styles.actions}>
-                <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/placement`}>
+              <div className={"gt-btnbar"}>
+                <Link className={"gt-button gt-button--primary"} href={`/experiments/${experimentId}/placement`}>
                   Fix placement
                 </Link>
-                <Link className={styles.buttonSecondary} href={overviewHref}>
+                <Link className={"gt-button gt-button--secondary"} href={overviewHref}>
                   Back to Overview
                 </Link>
               </div>
@@ -482,14 +481,14 @@ export default function FeedingPage() {
                   },
                 ]}
                 renderMobileCard={(plant) => (
-                  <div className={styles.cardKeyValue}>
+                  <div className={"gt-col"}>
                     <span>Plant</span>
                     <strong>{plant.plant_id || "(pending)"}</strong>
                     <span>Species</span>
                     <strong>{plant.species_name}</strong>
                     <span>Last fed</span>
                     <strong>{formatLastFed(plant.last_fed_at)}</strong>
-                    <button className={styles.buttonSecondary} type="button" onClick={() => selectPlant(plant.uuid, true)}>
+                    <button className={"gt-button gt-button--secondary"} type="button" onClick={() => selectPlant(plant.uuid, true)}>
                       Select
                     </button>
                   </div>
@@ -500,7 +499,7 @@ export default function FeedingPage() {
 
           <StickyActionBar>
             <button
-              className={styles.buttonPrimary}
+              className={"gt-button gt-button--primary"}
               type="button"
               disabled={!selectedPlantId || saving || saveBlocked}
               onClick={() => void saveFeeding(false)}
@@ -508,7 +507,7 @@ export default function FeedingPage() {
               {saving ? "Saving..." : "Save"}
             </button>
             <button
-              className={styles.buttonSecondary}
+              className={"gt-button gt-button--secondary"}
               type="button"
               disabled={!selectedPlantId || saving || !canSaveAndNext || saveBlocked}
               onClick={() => void saveFeeding(true)}

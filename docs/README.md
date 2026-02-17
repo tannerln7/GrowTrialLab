@@ -8,6 +8,8 @@
   - `docs/agent-guidebook.md`
 - UI styling refactor notes:
   - `docs/ui-css-phase1-notes.md`
+  - `docs/ui-css-phase1-report.md`
+  - `docs/ui-css-phase2-report.md`
 - Legacy source documents (preserved, pre-consolidation):
   - `docs/legacy/README.md`
   - `docs/legacy/decisions.md`

@@ -248,3 +248,34 @@
   outline: 2px solid var(--gt-outline-focus);
   outline-offset: 2px;
 }
+
+
+.gt-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--gt-bg) 40%, #000000);
+  display: grid;
+  place-items: center;
+  padding: var(--gt-space-md);
+  z-index: 30;
+}
+
+.gt-popover {
+  width: min(19rem, calc(100vw - 2rem));
+  border: 1px solid var(--gt-border);
+  border-radius: var(--gt-radius-lg);
+  background: var(--gt-surface-2);
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.24);
+  padding: var(--gt-space-md);
+  display: grid;
+  gap: var(--gt-space-sm);
+  z-index: 40;
+}
+
+.gt-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}

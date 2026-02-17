@@ -22,7 +22,6 @@ import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
 
-import sharedStyles from "../../experiments/experiments.module.css";
 import styles from "./page.module.css";
 
 type PlantPhoto = {
@@ -583,7 +582,7 @@ export default function PlantQrPage() {
       <PageShell
         title="Plant Cockpit"
         actions={
-          <Link className={sharedStyles.buttonPrimary} href={overviewHref}>
+          <Link className={"gt-button gt-button--primary"} href={overviewHref}>
             ← Overview
           </Link>
         }
@@ -600,7 +599,7 @@ export default function PlantQrPage() {
       <PageShell
         title="Plant Cockpit"
         actions={
-          <Link className={sharedStyles.buttonPrimary} href={overviewHref}>
+          <Link className={"gt-button gt-button--primary"} href={overviewHref}>
             ← Overview
           </Link>
         }
@@ -623,14 +622,14 @@ export default function PlantQrPage() {
       subtitle={plantUuid || "Unknown plant"}
       stickyOffset
       actions={
-        <Link className={sharedStyles.buttonPrimary} href={overviewHref}>
+        <Link className={"gt-button gt-button--primary"} href={overviewHref}>
           ← Overview
         </Link>
       }
     >
       {loading ? (
         <SectionCard>
-          <p className={sharedStyles.mutedText}>Loading plant cockpit...</p>
+          <p className={"gt-text-muted"}>Loading plant cockpit...</p>
         </SectionCard>
       ) : null}
 
@@ -663,14 +662,14 @@ export default function PlantQrPage() {
                   {cockpit.plant.cultivar ? ` · ${cockpit.plant.cultivar}` : ""}
                 </p>
               </div>
-              <div className={styles.badges}>
-                <span className={styles.badge}>Status: {cockpit.plant.status}</span>
-                <span className={styles.badge}>Grade: {cockpit.plant.grade || "Missing"}</span>
-                <span className={styles.badge}>
+              <div className="gt-row">
+                <span className="gt-badge">Status: {cockpit.plant.status}</span>
+                <span className="gt-badge">Grade: {cockpit.plant.grade || "Missing"}</span>
+                <span className="gt-badge">
                   Tent: {cockpit.derived.location.tent?.code || cockpit.derived.location.tent?.name || "Unplaced"}
                 </span>
-                <span className={styles.badge}>Slot: {cockpit.derived.location.slot?.code || "Unplaced"}</span>
-                <span className={styles.badge}>
+                <span className="gt-badge">Slot: {cockpit.derived.location.slot?.code || "Unplaced"}</span>
+                <span className="gt-badge">
                   Tray:{" "}
                   {cockpit.derived.location.tray?.code ||
                     cockpit.derived.location.tray?.name ||
@@ -678,34 +677,34 @@ export default function PlantQrPage() {
                   {trayOccupancyLabel(cockpit)}
                 </span>
                 {cockpit.derived.assigned_recipe ? (
-                  <span className={styles.badge}>
+                  <span className="gt-badge">
                     Recipe: {recipeLabel(cockpit.derived.assigned_recipe)}
                   </span>
                 ) : (
-                  <span className={sharedStyles.badgeWarn}>Recipe: Unassigned</span>
+                  <span className={"gt-badge"}>Recipe: Unassigned</span>
                 )}
-                {cockpit.derived.location.status !== "placed" ? <span className={styles.badge}>Unplaced</span> : null}
+                {cockpit.derived.location.status !== "placed" ? <span className="gt-badge">Unplaced</span> : null}
               </div>
             </div>
           </SectionCard>
 
           {cockpit.plant.status !== "active" ? (
             <SectionCard title="Removed Plant">
-              <div className={styles.alertBox}>
-                <p className={sharedStyles.mutedText}>
+              <div className="gt-stack">
+                <p className={"gt-text-muted"}>
                   This plant was removed
                   {cockpit.plant.removed_at
                     ? ` on ${formatShortDate(cockpit.plant.removed_at)}`
                     : ""}.
                 </p>
                 {cockpit.plant.removed_reason ? (
-                  <p className={sharedStyles.mutedText}>
+                  <p className={"gt-text-muted"}>
                     Reason: {cockpit.plant.removed_reason}
                   </p>
                 ) : null}
                 {cockpit.derived.replaced_by_uuid ? (
                   <Link
-                    className={sharedStyles.buttonPrimary}
+                    className={"gt-button gt-button--primary"}
                     href={replacementHref(cockpit.derived.replaced_by_uuid)}
                   >
                     Open Replacement
@@ -717,19 +716,19 @@ export default function PlantQrPage() {
 
           {cockpit.derived.replaces_uuid ? (
             <SectionCard title="Replacement Chain">
-              <p className={sharedStyles.mutedText}>
+              <p className={"gt-text-muted"}>
                 {cockpit.derived.chain_label || "This plant is a replacement."}
               </p>
-              <div className={sharedStyles.actions}>
+              <div className={"gt-btnbar"}>
                 <Link
-                  className={sharedStyles.buttonSecondary}
+                  className={"gt-button gt-button--secondary"}
                   href={replacementHref(cockpit.derived.replaces_uuid)}
                 >
                   Open Previous Plant
                 </Link>
                 {cockpit.derived.replaced_by_uuid ? (
                   <Link
-                    className={sharedStyles.buttonSecondary}
+                    className={"gt-button gt-button--secondary"}
                     href={replacementHref(cockpit.derived.replaced_by_uuid)}
                   >
                     Open Next Replacement
@@ -740,47 +739,47 @@ export default function PlantQrPage() {
           ) : null}
 
           <SectionCard title="Now" subtitle="Next best action for this plant">
-            <div className={styles.nowCard}>
+            <div className="gt-stack">
               <div className={styles.nowHeading}>
                 <nowAction.icon size={18} />
                 <strong>{nowAction.title}</strong>
               </div>
-              <p className={sharedStyles.mutedText}>{nowAction.detail}</p>
+              <p className={"gt-text-muted"}>{nowAction.detail}</p>
               {cockpit.plant.status === "active" && !cockpit.derived.assigned_recipe ? (
-                <span className={sharedStyles.badgeWarn}>
+                <span className={"gt-badge"}>
                   Needs placement / recipe assignment before feeding
                 </span>
               ) : null}
               {cockpit.plant.status !== "active" ? (
-                <p className={sharedStyles.mutedText}>
+                <p className={"gt-text-muted"}>
                   Removed plants are read-only. Use chain links to review related plants.
                 </p>
               ) : nowAction.href && nowAction.buttonLabel ? (
-                <div className={sharedStyles.actions}>
-                  <Link className={sharedStyles.buttonPrimary} href={nowAction.href}>
+                <div className={"gt-btnbar"}>
+                  <Link className={"gt-button gt-button--primary"} href={nowAction.href}>
                     {nowAction.buttonLabel}
                   </Link>
                   {feedingHref ? (
-                    <Link className={sharedStyles.buttonSecondary} href={feedingHref}>
+                    <Link className={"gt-button gt-button--secondary"} href={feedingHref}>
                       Feed
                     </Link>
                   ) : null}
                 </div>
               ) : (
-                <div className={sharedStyles.stack}>
+                <div className={"gt-stack"}>
                   {feedingHref ? (
-                    <Link className={sharedStyles.buttonPrimary} href={feedingHref}>
+                    <Link className={"gt-button gt-button--primary"} href={feedingHref}>
                       Feed
                     </Link>
                   ) : null}
                   <ul className={styles.comingSoonList}>
                     <li>
                       <span>Record weekly metrics</span>
-                      <span className={styles.comingSoonTag}>Coming soon</span>
+                      <span className="gt-badge">Coming soon</span>
                     </li>
                     <li>
                       <span>Take weekly photo</span>
-                      <span className={styles.comingSoonTag}>Coming soon</span>
+                      <span className="gt-badge">Coming soon</span>
                     </li>
                   </ul>
                 </div>
@@ -790,23 +789,23 @@ export default function PlantQrPage() {
 
           {cockpit.plant.status === "active" ? (
             <SectionCard title="Manage">
-              <div className={sharedStyles.stack}>
-                <div className={sharedStyles.actions}>
+              <div className={"gt-stack"}>
+                <div className={"gt-btnbar"}>
                   <Popover.Root>
                     <Popover.Trigger asChild>
-                      <button className={sharedStyles.buttonSecondary} type="button" disabled={recipeSaving}>
+                      <button className={"gt-button gt-button--secondary"} type="button" disabled={recipeSaving}>
                         <ChevronDown size={14} />
                         Change recipe
                       </button>
                     </Popover.Trigger>
                     <Popover.Portal>
-                      <Popover.Content className={styles.recipePopover} sideOffset={8} align="start">
-                        <p className={sharedStyles.fieldLabel}>Set recipe assignment</p>
+                      <Popover.Content className="gt-popover" sideOffset={8} align="start">
+                        <p className={"gt-text-muted"}>Set recipe assignment</p>
                         {recipes.length > 0 ? (
-                          <label className={sharedStyles.field}>
-                            <span className={sharedStyles.fieldLabel}>Recipe</span>
+                          <label className={"gt-col"}>
+                            <span className={"gt-text-muted"}>Recipe</span>
                             <select
-                              className={sharedStyles.select}
+                              className={"gt-select"}
                               value={recipeSelection}
                               onChange={(event) => setRecipeSelection(event.target.value)}
                               disabled={recipeSaving}
@@ -820,11 +819,11 @@ export default function PlantQrPage() {
                             </select>
                           </label>
                         ) : (
-                          <p className={sharedStyles.mutedText}>No recipes available yet.</p>
+                          <p className={"gt-text-muted"}>No recipes available yet.</p>
                         )}
-                        <div className={sharedStyles.actions}>
+                        <div className={"gt-btnbar"}>
                           <button
-                            className={sharedStyles.buttonPrimary}
+                            className={"gt-button gt-button--primary"}
                             type="button"
                             disabled={
                               recipeSaving ||
@@ -837,7 +836,7 @@ export default function PlantQrPage() {
                             {recipeSaving ? "Saving..." : "Save recipe"}
                           </button>
                           <button
-                            className={sharedStyles.buttonSecondary}
+                            className={"gt-button gt-button--secondary"}
                             type="button"
                             disabled={recipeSaving || !cockpit.derived.assigned_recipe}
                             onClick={() => void handleRecipeChange(null)}
@@ -849,11 +848,11 @@ export default function PlantQrPage() {
                     </Popover.Portal>
                   </Popover.Root>
                 </div>
-                <p className={sharedStyles.mutedText}>
+                <p className={"gt-text-muted"}>
                   Replace this plant if it was removed from trial or needs substitution.
                 </p>
                 <button
-                  className={sharedStyles.buttonDanger}
+                  className={"gt-button gt-button--danger"}
                   type="button"
                   onClick={() => setShowReplaceModal(true)}
                 >
@@ -865,11 +864,11 @@ export default function PlantQrPage() {
           ) : null}
 
           <SectionCard title="Quick Actions">
-            <div className={sharedStyles.formGrid}>
-              <div className={sharedStyles.field}>
-                <span className={sharedStyles.fieldLabel}>Photo tag</span>
+            <div className={"gt-stack"}>
+              <div className={"gt-col"}>
+                <span className={"gt-text-muted"}>Photo tag</span>
                 <select
-                  className={sharedStyles.select}
+                  className={"gt-select"}
                   value={uploadTag}
                   onChange={(event) => setUploadTag(event.target.value as UploadTag)}
                   disabled={uploading}
@@ -884,16 +883,16 @@ export default function PlantQrPage() {
 
               <input
                 ref={fileInputRef}
-                className={styles.hiddenInput}
+                className="gt-visually-hidden"
                 type="file"
                 accept="image/*"
                 capture="environment"
                 onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
               />
 
-              <div className={sharedStyles.actions}>
+              <div className={"gt-btnbar"}>
                 <button
-                  className={sharedStyles.buttonSecondary}
+                  className={"gt-button gt-button--secondary"}
                   type="button"
                   disabled={uploading}
                   onClick={() => fileInputRef.current?.click()}
@@ -902,7 +901,7 @@ export default function PlantQrPage() {
                   Choose photo
                 </button>
                 <button
-                  className={sharedStyles.buttonPrimary}
+                  className={"gt-button gt-button--primary"}
                   type="button"
                   disabled={!photoFile || uploading}
                   onClick={handlePhotoUpload}
@@ -912,16 +911,16 @@ export default function PlantQrPage() {
               </div>
 
               {photoFile ? (
-                <p className={sharedStyles.mutedText}>Selected: {photoFile.name}</p>
+                <p className={"gt-text-muted"}>Selected: {photoFile.name}</p>
               ) : null}
-              {notice ? <p className={sharedStyles.successText}>{notice}</p> : null}
+              {notice ? <p className={"gt-text-success"}>{notice}</p> : null}
 
-              <div className={sharedStyles.actions}>
-                <button className={sharedStyles.buttonSecondary} type="button" disabled>
+              <div className={"gt-btnbar"}>
+                <button className={"gt-button gt-button--secondary"} type="button" disabled>
                   <ClipboardPlus size={16} />
                   Add note (Coming soon)
                 </button>
-                <button className={sharedStyles.buttonSecondary} type="button" disabled>
+                <button className={"gt-button gt-button--secondary"} type="button" disabled>
                   <ShieldAlert size={16} />
                   Report issue (Coming soon)
                 </button>
@@ -988,9 +987,9 @@ export default function PlantQrPage() {
 
           <SectionCard title="Scheduled">
             {cockpit.derived.scheduled_upcoming.length === 0 ? (
-              <p className={sharedStyles.mutedText}>No upcoming scheduled actions for this plant.</p>
+              <p className={"gt-text-muted"}>No upcoming scheduled actions for this plant.</p>
             ) : (
-              <div className={sharedStyles.stack}>
+              <div className={"gt-stack"}>
                 {cockpit.derived.scheduled_upcoming.map((item, index) => (
                   <div className={styles.activityRow} key={`${item.title}-${item.date}-${index}`}>
                     <Tag size={16} />
@@ -998,7 +997,7 @@ export default function PlantQrPage() {
                       {item.title} ({formatScheduleSlot(item.date, item.timeframe, item.exact_time)})
                     </span>
                     {item.blocked_reasons.map((reason) => (
-                      <span className={sharedStyles.badgeWarn} key={reason}>
+                      <span className={"gt-badge"} key={reason}>
                         {reason}
                       </span>
                     ))}
@@ -1007,8 +1006,8 @@ export default function PlantQrPage() {
               </div>
             )}
             {scheduleHref ? (
-              <div className={sharedStyles.actions}>
-                <Link className={sharedStyles.buttonSecondary} href={scheduleHref}>
+              <div className={"gt-btnbar"}>
+                <Link className={"gt-button gt-button--secondary"} href={scheduleHref}>
                   Open Schedule
                 </Link>
               </div>
@@ -1016,23 +1015,23 @@ export default function PlantQrPage() {
           </SectionCard>
 
           <StickyActionBar>
-            <Link className={sharedStyles.buttonSecondary} href={overviewHref}>
+            <Link className={"gt-button gt-button--secondary"} href={overviewHref}>
               ← Overview
             </Link>
             {cockpit.plant.status !== "active" && cockpit.derived.replaced_by_uuid ? (
               <Link
-                className={sharedStyles.buttonPrimary}
+                className={"gt-button gt-button--primary"}
                 href={replacementHref(cockpit.derived.replaced_by_uuid)}
               >
                 Open Replacement
               </Link>
             ) : nowAction.href && nowAction.buttonLabel ? (
-              <Link className={sharedStyles.buttonPrimary} href={nowAction.href}>
+              <Link className={"gt-button gt-button--primary"} href={nowAction.href}>
                 {nowAction.buttonLabel}
               </Link>
             ) : (
               <button
-                className={sharedStyles.buttonPrimary}
+                className={"gt-button gt-button--primary"}
                 type="button"
                 disabled={uploading}
                 onClick={() => fileInputRef.current?.click()}
@@ -1046,31 +1045,31 @@ export default function PlantQrPage() {
       ) : null}
 
       {showReplaceModal ? (
-        <div className={sharedStyles.modalBackdrop} role="presentation">
+        <div className={"gt-modal-backdrop"} role="presentation">
           <SectionCard title="Replace Plant">
-            <div className={sharedStyles.stack}>
-              <p className={sharedStyles.mutedText}>
+            <div className={"gt-stack"}>
+              <p className={"gt-text-muted"}>
                 This creates a new plant record and marks the current plant as removed.
                 Baseline must be recaptured for the replacement.
               </p>
-              <label className={sharedStyles.field}>
-                <span className={sharedStyles.fieldLabel}>Removed reason (optional)</span>
+              <label className={"gt-col"}>
+                <span className={"gt-text-muted"}>Removed reason (optional)</span>
                 <textarea
-                  className={sharedStyles.textarea}
+                  className={"gt-textarea"}
                   value={removedReason}
                   onChange={(event) => setRemovedReason(event.target.value)}
                 />
               </label>
-              <label className={sharedStyles.field}>
-                <span className={sharedStyles.fieldLabel}>New Plant ID (optional)</span>
+              <label className={"gt-col"}>
+                <span className={"gt-text-muted"}>New Plant ID (optional)</span>
                 <input
-                  className={sharedStyles.input}
+                  className={"gt-input"}
                   placeholder="Leave blank for pending ID"
                   value={newPlantId}
                   onChange={(event) => setNewPlantId(event.target.value)}
                 />
               </label>
-              <label className={sharedStyles.checkboxRow}>
+              <label className={"gt-row"}>
                 <input
                   type="checkbox"
                   checked={inheritAssignment}
@@ -1078,7 +1077,7 @@ export default function PlantQrPage() {
                 />
                 <span>Inherit recipe assignment (recommended)</span>
               </label>
-              <label className={sharedStyles.checkboxRow}>
+              <label className={"gt-row"}>
                 <input
                   type="checkbox"
                   checked={copyIdentity}
@@ -1086,7 +1085,7 @@ export default function PlantQrPage() {
                 />
                 <span>Copy identity fields (species/cultivar/notes)</span>
               </label>
-              <label className={sharedStyles.checkboxRow}>
+              <label className={"gt-row"}>
                 <input
                   type="checkbox"
                   checked={inheritGrade}
@@ -1094,11 +1093,11 @@ export default function PlantQrPage() {
                 />
                 <span>Inherit grade</span>
               </label>
-              <label className={sharedStyles.checkboxRow}>
+              <label className={"gt-row"}>
                 <input type="checkbox" checked readOnly />
                 <span>Mark original plant as removed</span>
               </label>
-              <label className={sharedStyles.checkboxRow}>
+              <label className={"gt-row"}>
                 <input
                   type="checkbox"
                   checked={replaceConfirmed}
@@ -1106,9 +1105,9 @@ export default function PlantQrPage() {
                 />
                 <span>I have read and understand.</span>
               </label>
-              <div className={sharedStyles.actions}>
+              <div className={"gt-btnbar"}>
                 <button
-                  className={sharedStyles.buttonSecondary}
+                  className={"gt-button gt-button--secondary"}
                   type="button"
                   disabled={replacing}
                   onClick={() => {
@@ -1119,7 +1118,7 @@ export default function PlantQrPage() {
                   Cancel
                 </button>
                 <button
-                  className={sharedStyles.buttonDanger}
+                  className={"gt-button gt-button--danger"}
                   type="button"
                   disabled={!replaceConfirmed || replacing}
                   onClick={() => void handleReplacePlant()}

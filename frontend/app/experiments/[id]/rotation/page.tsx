@@ -14,7 +14,6 @@ import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 
-import styles from "../../experiments.module.css";
 
 type Location = {
   status: "placed" | "unplaced";
@@ -301,28 +300,28 @@ export default function RotationPage() {
       title="Rotation"
       subtitle="Log tray moves and review recent rotation history."
       actions={
-        <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+        <Link className={"gt-button gt-button--primary"} href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
     >
-      {loading ? <p className={styles.mutedText}>Loading rotation...</p> : null}
-      {error ? <p className={styles.errorText}>{error}</p> : null}
-      {notice ? <p className={styles.successText}>{notice}</p> : null}
+      {loading ? <p className={"gt-text-muted"}>Loading rotation...</p> : null}
+      {error ? <p className={"gt-text-danger"}>{error}</p> : null}
+      {notice ? <p className={"gt-text-success"}>{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       {statusSummary ? (
         <SectionCard title="Experiment State">
-          <span className={styles.badgeWarn}>{statusSummary.lifecycle.state.toUpperCase()}</span>
+          <span className={"gt-badge"}>{statusSummary.lifecycle.state.toUpperCase()}</span>
         </SectionCard>
       ) : null}
 
       {!running ? (
         <SectionCard title="Rotation Requires Running State">
-          <p className={styles.mutedText}>
+          <p className={"gt-text-muted"}>
             Rotation logs are intended for running experiments. Start the experiment first.
           </p>
-          <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+          <Link className={"gt-button gt-button--primary"} href={`/experiments/${experimentId}/overview`}>
             Start experiment from Overview
           </Link>
         </SectionCard>
@@ -331,10 +330,10 @@ export default function RotationPage() {
       {running && summary ? (
         <>
           <SectionCard title="Log a Move">
-            <div className={styles.formGrid}>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Tray</span>
-                <select className={styles.select} value={selectedTrayId} onChange={(event) => setSelectedTrayId(event.target.value)}>
+            <div className={"gt-stack"}>
+              <label className={"gt-col"}>
+                <span className={"gt-text-muted"}>Tray</span>
+                <select className={"gt-select"} value={selectedTrayId} onChange={(event) => setSelectedTrayId(event.target.value)}>
                   <option value="">Select tray</option>
                   {trays.map((tray) => (
                     <option key={tray.tray_id} value={tray.tray_id}>
@@ -343,9 +342,9 @@ export default function RotationPage() {
                   ))}
                 </select>
               </label>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Destination slot</span>
-                <select className={styles.select} value={selectedToSlotId} onChange={(event) => setSelectedToSlotId(event.target.value)}>
+              <label className={"gt-col"}>
+                <span className={"gt-text-muted"}>Destination slot</span>
+                <select className={"gt-select"} value={selectedToSlotId} onChange={(event) => setSelectedToSlotId(event.target.value)}>
                   <option value="">None / Unassigned</option>
                   {compatibleSlotsForSelectedTray.map((slot) => (
                     <option key={slot.id} value={slot.id}>
@@ -354,18 +353,18 @@ export default function RotationPage() {
                   ))}
                 </select>
                 {selectedTrayBlocked ? (
-                  <p className={styles.inlineNote}>
+                  <p className={"gt-text-muted"}>
                     No compatible destination slots for this tray. This tray contains plants not allowed in restricted tents.
                     <Link href={`/experiments/${experimentId}/placement?step=1`}> Adjust tent restrictions</Link>.
                   </p>
                 ) : null}
               </label>
-              <label className={styles.field}>
-                <span className={styles.fieldLabel}>Note (optional)</span>
-                <textarea className={styles.textarea} value={note} onChange={(event) => setNote(event.target.value)} />
+              <label className={"gt-col"}>
+                <span className={"gt-text-muted"}>Note (optional)</span>
+                <textarea className={"gt-textarea"} value={note} onChange={(event) => setNote(event.target.value)} />
               </label>
               <button
-                className={styles.buttonPrimary}
+                className={"gt-button gt-button--primary"}
                 type="button"
                 disabled={saving || !selectedTrayId || selectedTrayBlocked}
                 onClick={() => void submitLogMove()}
@@ -376,7 +375,7 @@ export default function RotationPage() {
           </SectionCard>
 
           <SectionCard title="Current Tray Locations">
-            <p className={styles.mutedText}>Unplaced trays: {summary.unplaced_trays_count}</p>
+            <p className={"gt-text-muted"}>Unplaced trays: {summary.unplaced_trays_count}</p>
             <ResponsiveList
               items={trays}
               getKey={(tray) => tray.tray_id}
@@ -393,7 +392,7 @@ export default function RotationPage() {
                   label: "Action",
                   render: (tray) => (
                     <button
-                      className={styles.buttonSecondary}
+                      className={"gt-button gt-button--secondary"}
                       type="button"
                       onClick={() => {
                         setSelectedTrayId(tray.tray_id);
@@ -406,7 +405,7 @@ export default function RotationPage() {
                 },
               ]}
               renderMobileCard={(tray) => (
-                <div className={styles.cardKeyValue}>
+                <div className={"gt-col"}>
                   <span>Tray</span>
                   <strong>{tray.tray_name}</strong>
                   <span>Current slot</span>
@@ -414,7 +413,7 @@ export default function RotationPage() {
                   <span>Plants</span>
                   <strong>{tray.plant_count}</strong>
                   <button
-                    className={styles.buttonSecondary}
+                    className={"gt-button gt-button--secondary"}
                     type="button"
                     onClick={() => {
                       setSelectedTrayId(tray.tray_id);
@@ -443,7 +442,7 @@ export default function RotationPage() {
                 { key: "note", label: "Note", render: (log) => log.note || "-" },
               ]}
               renderMobileCard={(log) => (
-                <div className={styles.cardKeyValue}>
+                <div className={"gt-col"}>
                   <span>Tray</span>
                   <strong>{log.tray_name}</strong>
                   <span>Move</span>
@@ -458,7 +457,7 @@ export default function RotationPage() {
                   <strong>{log.note || "-"}</strong>
                 </div>
               )}
-              emptyState={<p className={styles.mutedText}>No moves logged yet.</p>}
+              emptyState={<p className={"gt-text-muted"}>No moves logged yet.</p>}
             />
           </SectionCard>
         </>

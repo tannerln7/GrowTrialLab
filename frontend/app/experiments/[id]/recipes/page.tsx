@@ -862,7 +862,7 @@ export default function RecipesPage() {
         </div>
 
         {diagnostics?.reason_counts ? (
-          <div className={styles.cardKeyValue}>
+          <div className={"gt-col"}>
             <span>Diagnostics</span>
             <strong>{Object.entries(diagnostics.reason_counts).map(([key, value]) => `${key}: ${value}`).join(" · ")}</strong>
             {diagnostics.invalid_updates?.slice(0, 8).map((item) => (

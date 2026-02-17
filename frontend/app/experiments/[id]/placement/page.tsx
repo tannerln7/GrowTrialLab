@@ -1861,7 +1861,7 @@ export default function PlacementPage() {
 
       {placementLocked ? (
         <SectionCard title="Placement Locked">
-          <p className={styles.inlineNote}>{RUNNING_LOCK_MESSAGE}</p>
+          <p className={"gt-text-muted"}>{RUNNING_LOCK_MESSAGE}</p>
         </SectionCard>
       ) : null}
 
@@ -1901,15 +1901,15 @@ export default function PlacementPage() {
 
         <div key={currentStep} className={styles.stepPanel}>
           {currentStep === 1 ? (
-            <div className={styles.stack}>
+            <div className={"gt-stack"}>
               <SectionCard title="Add Tent">
-                <div className={styles.formGrid}>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>Tent name</span>
+                <div className={"gt-stack"}>
+                  <label className={"gt-col"}>
+                    <span className={"gt-text-muted"}>Tent name</span>
                     <input className="gt-input" value={newTentName} onChange={(event) => setNewTentName(event.target.value)} />
                   </label>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>Tent code</span>
+                  <label className={"gt-col"}>
+                    <span className={"gt-text-muted"}>Tent code</span>
                     <input className="gt-input" value={newTentCode} onChange={(event) => setNewTentCode(event.target.value)} />
                   </label>
                   <button className="gt-button gt-button--primary" type="button" disabled={saving} onClick={() => void createTent()}>
@@ -1926,7 +1926,7 @@ export default function PlacementPage() {
 
                 return (
                   <SectionCard key={tent.tent_id} title={`${tent.name}${tent.code ? ` (${tent.code})` : ""}`}>
-                    <div className={styles.formGrid}>
+                    <div className={"gt-stack"}>
                       <div className={styles.trayControlRow}>
                         <input
                           className="gt-input"
@@ -1961,13 +1961,13 @@ export default function PlacementPage() {
                         </button>
                       </div>
 
-                      <div className={styles.field}>
-                        <span className={styles.fieldLabel}>Allowed species restrictions</span>
+                      <div className={"gt-col"}>
+                        <span className={"gt-text-muted"}>Allowed species restrictions</span>
                         <div className={styles.selectionGrid}>
                           {species.map((item) => {
                             const checked = selectedSpecies.has(item.id);
                             return (
-                              <label key={item.id} className={styles.checkboxRow}>
+                              <label key={item.id} className={"gt-row"}>
                                 <input
                                   type="checkbox"
                                   checked={checked}
@@ -1988,9 +1988,9 @@ export default function PlacementPage() {
                         </div>
                       </div>
 
-                      <div className={styles.field}>
-                        <span className={styles.fieldLabel}>Shelves layout</span>
-                        <div className={styles.actions}>
+                      <div className={"gt-col"}>
+                        <span className={"gt-text-muted"}>Shelves layout</span>
+                        <div className={"gt-btnbar"}>
                           <button className="gt-button gt-button--secondary" type="button" onClick={() => addShelf(tent.tent_id)}>
                             Add shelf
                           </button>
@@ -1999,8 +1999,8 @@ export default function PlacementPage() {
                           </button>
                         </div>
                         {shelfCounts.map((count, index) => (
-                          <label className={styles.field} key={`${tent.tent_id}-shelf-${index + 1}`}>
-                            <span className={styles.fieldLabel}>Shelf {index + 1} slot count</span>
+                          <label className={"gt-col"} key={`${tent.tent_id}-shelf-${index + 1}`}>
+                            <span className={"gt-text-muted"}>Shelf {index + 1} slot count</span>
                             <input
                               className="gt-input"
                               type="number"
@@ -2014,8 +2014,8 @@ export default function PlacementPage() {
                         ))}
                       </div>
 
-                      <div className={styles.field}>
-                        <span className={styles.fieldLabel}>Live preview</span>
+                      <div className={"gt-col"}>
+                        <span className={"gt-text-muted"}>Live preview</span>
                         <div className={styles.previewGrid}>
                           {shelfCounts.map((count, index) => (
                             <div className={styles.previewRow} key={`${tent.tent_id}-preview-${index + 1}`}>
@@ -2063,15 +2063,15 @@ export default function PlacementPage() {
           ) : null}
 
           {currentStep === 2 ? (
-            <div className={styles.stack}>
+            <div className={"gt-stack"}>
               <SectionCard title="Add Tray">
-                <div className={styles.formGrid}>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>Tray code/name</span>
+                <div className={"gt-stack"}>
+                  <label className={"gt-col"}>
+                    <span className={"gt-text-muted"}>Tray code/name</span>
                     <input className="gt-input" value={newTrayName} onChange={(event) => setNewTrayName(event.target.value)} />
                   </label>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>Capacity</span>
+                  <label className={"gt-col"}>
+                    <span className={"gt-text-muted"}>Capacity</span>
                     <input
                       className="gt-input"
                       type="number"
@@ -2208,7 +2208,7 @@ export default function PlacementPage() {
           ) : null}
 
           {currentStep === 3 ? (
-            <div className={styles.stack}>
+            <div className={"gt-stack"}>
               <SectionCard title="Plants -> Trays (Draft)">
                 <Tooltip.Provider delayDuration={150}>
                   <div className={[styles.placementToolbar, "gt-stack"].join(" ")}>
@@ -2266,11 +2266,11 @@ export default function PlacementPage() {
                 <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
                   <span className="gt-text-muted">Unplaced active plants: {mainGridPlantIds.length}</span>
                   <span className="gt-text-muted">Selected in main grid: {selectedInMainGrid.length}</span>
-                  {trays.length === 0 ? <span className={styles.badgeWarn}>Create at least one tray.</span> : null}
+                  {trays.length === 0 ? <span className={"gt-badge"}>Create at least one tray.</span> : null}
                 </div>
 
                 {diagnostics?.reason_counts ? (
-                  <div className={styles.cardKeyValue}>
+                  <div className={"gt-col"}>
                     <span>Move diagnostics</span>
                     <strong>{Object.entries(diagnostics.reason_counts).map(([key, value]) => `${key}: ${value}`).join(" · ")}</strong>
                     {diagnostics.unplaceable_plants?.slice(0, 8).map((plant) => (
@@ -2345,7 +2345,7 @@ export default function PlacementPage() {
           ) : null}
 
           {currentStep === 4 ? (
-            <div className={styles.stack}>
+            <div className={"gt-stack"}>
               <SectionCard title="Trays -> Slots (Draft)">
                 <Tooltip.Provider delayDuration={150}>
                   <div className={[styles.placementToolbar, "gt-stack"].join(" ")}>
