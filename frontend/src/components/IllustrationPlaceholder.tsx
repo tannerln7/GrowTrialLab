@@ -74,7 +74,7 @@ export default function IllustrationPlaceholder({
   title,
   subtitle,
 }: IllustrationPlaceholderProps) {
-  const config = KIND_CONFIG[kind];
+  const config = KIND_CONFIG[kind] ?? KIND_CONFIG.generic;
   const Icon = config.icon;
 
   return (

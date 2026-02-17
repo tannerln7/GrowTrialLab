@@ -518,7 +518,7 @@ export default function ExperimentOverviewPage() {
 
       {!loading && groupedPlants.length === 0 ? (
         <SectionCard>
-          <IllustrationPlaceholder inventoryId="ILL-201" kind="empty" />
+          <IllustrationPlaceholder inventoryId="ILL-201" kind="generic" />
           <p className={styles.mutedText}>No plants match the current filters.</p>
         </SectionCard>
       ) : null}
