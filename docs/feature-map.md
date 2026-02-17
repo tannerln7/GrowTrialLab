@@ -235,6 +235,25 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/app/tailwind-probe/page.tsx`
   - Refs: `b2010d9`
 
+- `Completed` Tailwind migration baseline component expansion + shared layout utility pivot:
+  - Added missing shadcn-style primitives for form/nav/overlay/scroll coverage under `frontend/src/components/ui/` (`input`, `textarea`, `select`, `tabs`, `tooltip`, `dropdown-menu`, `popover`, `separator`, `scroll-area`).
+  - Reworked shared shells/lists to Tailwind-first JSX utilities and removed their route-agnostic CSS modules (`PageShell`, `SectionCard`, `StickyActionBar`, `ResponsiveList`).
+  - Relevant files:
+    - `frontend/src/components/ui/PageShell.tsx`
+    - `frontend/src/components/ui/SectionCard.tsx`
+    - `frontend/src/components/ui/StickyActionBar.tsx`
+    - `frontend/src/components/ui/ResponsiveList.tsx`
+    - `frontend/src/components/ui/input.tsx`
+    - `frontend/src/components/ui/textarea.tsx`
+    - `frontend/src/components/ui/select.tsx`
+    - `frontend/src/components/ui/tabs.tsx`
+    - `frontend/src/components/ui/tooltip.tsx`
+    - `frontend/src/components/ui/dropdown-menu.tsx`
+    - `frontend/src/components/ui/popover.tsx`
+    - `frontend/src/components/ui/separator.tsx`
+    - `frontend/src/components/ui/scroll-area.tsx`
+  - Refs: local workspace (this change)
+
 - `Completed` Frontend dev cache hygiene for `.next` permission safety:
   - Added preflight script:
     - `frontend/scripts/prepare-dev-cache.mjs`
