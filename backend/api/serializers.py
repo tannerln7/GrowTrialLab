@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from .baseline_grade import (
+    GRADE_SOURCE_AUTO,
+    GRADE_SOURCE_MANUAL,
+    validate_baseline_v1_metrics,
+)
 from .models import (
     AdverseEvent,
     BatchLot,
@@ -162,7 +167,24 @@ class ExperimentPlantCreateSerializer(serializers.Serializer):
 class PlantBaselineSaveSerializer(serializers.Serializer):
     metrics = serializers.JSONField(required=True)
     notes = serializers.CharField(required=False, allow_blank=True)
-    grade = serializers.ChoiceField(choices=Plant.Grade.choices, required=False)
+    grade = serializers.ChoiceField(choices=Plant.Grade.choices, required=False, allow_null=True)
+    grade_source = serializers.ChoiceField(
+        choices=[GRADE_SOURCE_AUTO, GRADE_SOURCE_MANUAL],
+        required=False,
+        default=GRADE_SOURCE_AUTO,
+    )
+
+    def validate(self, attrs):
+        baseline_v1 = validate_baseline_v1_metrics(attrs.get("metrics"))
+        attrs["baseline_v1"] = baseline_v1
+
+        grade_source = attrs.get("grade_source", GRADE_SOURCE_AUTO)
+        if grade_source == GRADE_SOURCE_MANUAL and not attrs.get("grade"):
+            raise serializers.ValidationError({"grade": ["grade is required when grade_source is manual."]})
+
+        if grade_source == GRADE_SOURCE_AUTO and attrs.get("grade") is None:
+            attrs.pop("grade", None)
+        return attrs
 
 
 class PlantReplaceSerializer(serializers.Serializer):
