@@ -71,19 +71,19 @@ export default function ExperimentsPage() {
       title="Experiments"
       subtitle="Create experiments and complete bootstrap setup."
       actions={
-        <div className={"gt-btnbar"}>
-          <Link className={"gt-button gt-button--primary"} href="/experiments/new">
+        <div className={"flex flex-wrap items-center gap-2"}>
+          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href="/experiments/new">
             New experiment
           </Link>
-          <Link className={"gt-button gt-button--secondary"} href="/">
+          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href="/">
             Back home
           </Link>
         </div>
       }
     >
       <SectionCard title="All Experiments">
-        {loading ? <p className={"gt-text-muted"}>Loading...</p> : null}
-        {error ? <p className={"gt-text-danger"}>{error}</p> : null}
+        {loading ? <p className={"text-sm text-muted-foreground"}>Loading...</p> : null}
+        {error ? <p className={"text-sm text-destructive"}>{error}</p> : null}
 
         {!loading && !error ? (
           <ResponsiveList
@@ -109,7 +109,7 @@ export default function ExperimentsPage() {
               },
             ]}
             renderMobileCard={(item) => (
-              <div className={"gt-col"}>
+              <div className={"grid gap-2"}>
                 <span>Name</span>
                 <strong>{item.name}</strong>
                 <span>Status</span>
@@ -130,11 +130,11 @@ export default function ExperimentsPage() {
         ) : null}
       </SectionCard>
       <SectionCard>
-        <div className={"gt-btnbar"}>
-          <Link className={"gt-button gt-button--primary"} href="/experiments/new">
+        <div className={"flex flex-wrap items-center gap-2"}>
+          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href="/experiments/new">
             New experiment
           </Link>
-          <Link className={"gt-button gt-button--secondary"} href="/">
+          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href="/">
             Back home
           </Link>
         </div>

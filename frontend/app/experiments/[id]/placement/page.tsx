@@ -25,7 +25,7 @@ import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
 
-import styles from "../../experiments.module.css";
+import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
 type Species = { id: string; name: string; category: string };
 
@@ -252,7 +252,7 @@ function ToolIconButton({
       <Tooltip.Root>
         <Tooltip.Trigger asChild>
           <button
-            className={danger ? "gt-icon-button gt-icon-button--danger" : "gt-icon-button"}
+            className={danger ? "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-secondary text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90" : "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-secondary text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:pointer-events-none disabled:opacity-50"}
             type="button"
             onClick={onClick}
             disabled={disabled}
@@ -263,9 +263,9 @@ function ToolIconButton({
           </button>
         </Tooltip.Trigger>
         <Tooltip.Portal>
-          <Tooltip.Content className="gt-tooltip" sideOffset={6}>
+          <Tooltip.Content className="z-50 rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md" sideOffset={6}>
             {label}
-            <Tooltip.Arrow className="gt-tooltip-arrow" />
+            <Tooltip.Arrow className="fill-popover" />
           </Tooltip.Content>
         </Tooltip.Portal>
       </Tooltip.Root>
@@ -1552,8 +1552,8 @@ export default function PlacementPage() {
         key={plant.uuid}
         className={[
           styles.plantCell,
-          "gt-cell gt-cell--interactive",
-          selected ? "gt-cell--selected" : "",
+          "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] cursor-pointer hover:border-ring/70",
+          selected ? "border-ring bg-muted/40" : "",
           selected ? styles.plantCellSelected : "",
         ]
           .filter(Boolean)
@@ -1596,8 +1596,8 @@ export default function PlacementPage() {
         key={trayId}
         className={[
           styles.trayGridCell,
-          "gt-cell gt-cell--interactive",
-          selected ? "gt-cell--selected" : "",
+          "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] cursor-pointer hover:border-ring/70",
+          selected ? "border-ring bg-muted/40" : "",
           selected ? styles.plantCellSelected : "",
         ]
           .filter(Boolean)
@@ -1849,19 +1849,19 @@ export default function PlacementPage() {
       title="Placement"
       subtitle="Step through tent/slot setup, tray setup, then staged placement applies."
       actions={
-        <Link className="gt-button gt-button--primary" href={`/experiments/${experimentId}/overview`}>
+        <Link className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
     >
-      {loading ? <p className="gt-text-muted">Loading placement...</p> : null}
-      {error ? <p className="gt-text-danger">{error}</p> : null}
-      {notice ? <p className="gt-text-success">{notice}</p> : null}
+      {loading ? <p className="text-sm text-muted-foreground">Loading placement...</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {notice ? <p className="text-sm text-emerald-400">{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       {placementLocked ? (
         <SectionCard title="Placement Locked">
-          <p className={"gt-text-muted"}>{RUNNING_LOCK_MESSAGE}</p>
+          <p className={"text-sm text-muted-foreground"}>{RUNNING_LOCK_MESSAGE}</p>
         </SectionCard>
       ) : null}
 
@@ -1893,26 +1893,26 @@ export default function PlacementPage() {
         </div>
 
         {!isStepComplete(currentStep) ? (
-          <div className={[styles.stepBlocker, "gt-surface"].join(" ")}>
+          <div className={[styles.stepBlocker, "rounded-lg border border-border bg-card"].join(" ")}>
             <strong>Step blocker</strong>
-            <p className="gt-text-muted">{stepBlockedMessage(currentStep)}</p>
+            <p className="text-sm text-muted-foreground">{stepBlockedMessage(currentStep)}</p>
           </div>
         ) : null}
 
         <div key={currentStep} className={styles.stepPanel}>
           {currentStep === 1 ? (
-            <div className={"gt-stack"}>
+            <div className={"grid gap-3"}>
               <SectionCard title="Add Tent">
-                <div className={"gt-stack"}>
-                  <label className={"gt-col"}>
-                    <span className={"gt-text-muted"}>Tent name</span>
-                    <input className="gt-input" value={newTentName} onChange={(event) => setNewTentName(event.target.value)} />
+                <div className={"grid gap-3"}>
+                  <label className={"grid gap-2"}>
+                    <span className={"text-sm text-muted-foreground"}>Tent name</span>
+                    <input className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50" value={newTentName} onChange={(event) => setNewTentName(event.target.value)} />
                   </label>
-                  <label className={"gt-col"}>
-                    <span className={"gt-text-muted"}>Tent code</span>
-                    <input className="gt-input" value={newTentCode} onChange={(event) => setNewTentCode(event.target.value)} />
+                  <label className={"grid gap-2"}>
+                    <span className={"text-sm text-muted-foreground"}>Tent code</span>
+                    <input className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50" value={newTentCode} onChange={(event) => setNewTentCode(event.target.value)} />
                   </label>
-                  <button className="gt-button gt-button--primary" type="button" disabled={saving} onClick={() => void createTent()}>
+                  <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" type="button" disabled={saving} onClick={() => void createTent()}>
                     {saving ? "Saving..." : "Add tent"}
                   </button>
                 </div>
@@ -1926,10 +1926,10 @@ export default function PlacementPage() {
 
                 return (
                   <SectionCard key={tent.tent_id} title={`${tent.name}${tent.code ? ` (${tent.code})` : ""}`}>
-                    <div className={"gt-stack"}>
+                    <div className={"grid gap-3"}>
                       <div className={styles.trayControlRow}>
                         <input
-                          className="gt-input"
+                          className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                           value={tentDraft.name}
                           onChange={(event) =>
                             setTentDraftById((current) => ({
@@ -1943,7 +1943,7 @@ export default function PlacementPage() {
                           aria-label="Tent name"
                         />
                         <input
-                          className="gt-input"
+                          className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                           value={tentDraft.code}
                           onChange={(event) =>
                             setTentDraftById((current) => ({
@@ -1956,18 +1956,18 @@ export default function PlacementPage() {
                           }
                           aria-label="Tent code"
                         />
-                        <button className="gt-button gt-button--secondary" type="button" disabled={saving} onClick={() => void saveTentDetails(tent)}>
+                        <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" disabled={saving} onClick={() => void saveTentDetails(tent)}>
                           Save tent
                         </button>
                       </div>
 
-                      <div className={"gt-col"}>
-                        <span className={"gt-text-muted"}>Allowed species restrictions</span>
+                      <div className={"grid gap-2"}>
+                        <span className={"text-sm text-muted-foreground"}>Allowed species restrictions</span>
                         <div className={styles.selectionGrid}>
                           {species.map((item) => {
                             const checked = selectedSpecies.has(item.id);
                             return (
-                              <label key={item.id} className={"gt-row"}>
+                              <label key={item.id} className={"flex flex-wrap items-center gap-2"}>
                                 <input
                                   type="checkbox"
                                   checked={checked}
@@ -1988,21 +1988,21 @@ export default function PlacementPage() {
                         </div>
                       </div>
 
-                      <div className={"gt-col"}>
-                        <span className={"gt-text-muted"}>Shelves layout</span>
-                        <div className={"gt-btnbar"}>
-                          <button className="gt-button gt-button--secondary" type="button" onClick={() => addShelf(tent.tent_id)}>
+                      <div className={"grid gap-2"}>
+                        <span className={"text-sm text-muted-foreground"}>Shelves layout</span>
+                        <div className={"flex flex-wrap items-center gap-2"}>
+                          <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" onClick={() => addShelf(tent.tent_id)}>
                             Add shelf
                           </button>
-                          <button className="gt-button gt-button--secondary" type="button" onClick={() => removeShelf(tent.tent_id)}>
+                          <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" onClick={() => removeShelf(tent.tent_id)}>
                             Remove shelf
                           </button>
                         </div>
                         {shelfCounts.map((count, index) => (
-                          <label className={"gt-col"} key={`${tent.tent_id}-shelf-${index + 1}`}>
-                            <span className={"gt-text-muted"}>Shelf {index + 1} slot count</span>
+                          <label className={"grid gap-2"} key={`${tent.tent_id}-shelf-${index + 1}`}>
+                            <span className={"text-sm text-muted-foreground"}>Shelf {index + 1} slot count</span>
                             <input
-                              className="gt-input"
+                              className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                               type="number"
                               min={0}
                               value={count}
@@ -2014,26 +2014,26 @@ export default function PlacementPage() {
                         ))}
                       </div>
 
-                      <div className={"gt-col"}>
-                        <span className={"gt-text-muted"}>Live preview</span>
+                      <div className={"grid gap-2"}>
+                        <span className={"text-sm text-muted-foreground"}>Live preview</span>
                         <div className={styles.previewGrid}>
                           {shelfCounts.map((count, index) => (
                             <div className={styles.previewRow} key={`${tent.tent_id}-preview-${index + 1}`}>
-                              <strong className="gt-text-muted">Shelf {index + 1}</strong>
+                              <strong className="text-sm text-muted-foreground">Shelf {index + 1}</strong>
                               <div className={styles.previewCells}>
                                 {Array.from({ length: Math.max(0, count) }).map((_, slotIndex) => (
                                   <span className={styles.previewCell} key={`${tent.tent_id}-${index + 1}-${slotIndex + 1}`}>
                                     {`S${index + 1}-${slotIndex + 1}`}
                                   </span>
                                 ))}
-                                {count === 0 ? <span className="gt-text-muted">No slots</span> : null}
+                                {count === 0 ? <span className="text-sm text-muted-foreground">No slots</span> : null}
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
 
-                      <button className="gt-button gt-button--primary" type="button" disabled={saving} onClick={() => void generateSlots(tent.tent_id)}>
+                      <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" type="button" disabled={saving} onClick={() => void generateSlots(tent.tent_id)}>
                         {saving ? "Generating..." : `Generate slots (${totalSlots})`}
                       </button>
 
@@ -2053,7 +2053,7 @@ export default function PlacementPage() {
                               {slot.code}
                             </span>
                           ))}
-                        {tent.slots.length === 0 ? <span className="gt-text-muted">No slots generated yet.</span> : null}
+                        {tent.slots.length === 0 ? <span className="text-sm text-muted-foreground">No slots generated yet.</span> : null}
                       </div>
                     </div>
                   </SectionCard>
@@ -2063,34 +2063,34 @@ export default function PlacementPage() {
           ) : null}
 
           {currentStep === 2 ? (
-            <div className={"gt-stack"}>
+            <div className={"grid gap-3"}>
               <SectionCard title="Add Tray">
-                <div className={"gt-stack"}>
-                  <label className={"gt-col"}>
-                    <span className={"gt-text-muted"}>Tray code/name</span>
-                    <input className="gt-input" value={newTrayName} onChange={(event) => setNewTrayName(event.target.value)} />
+                <div className={"grid gap-3"}>
+                  <label className={"grid gap-2"}>
+                    <span className={"text-sm text-muted-foreground"}>Tray code/name</span>
+                    <input className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50" value={newTrayName} onChange={(event) => setNewTrayName(event.target.value)} />
                   </label>
-                  <label className={"gt-col"}>
-                    <span className={"gt-text-muted"}>Capacity</span>
+                  <label className={"grid gap-2"}>
+                    <span className={"text-sm text-muted-foreground"}>Capacity</span>
                     <input
-                      className="gt-input"
+                      className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       min={1}
                       value={newTrayCapacity}
                       onChange={(event) => setNewTrayCapacity(Number.parseInt(event.target.value || "1", 10))}
                     />
                   </label>
-                  <button className="gt-button gt-button--primary" type="button" disabled={saving} onClick={() => void createTray()}>
+                  <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" type="button" disabled={saving} onClick={() => void createTray()}>
                     {saving ? "Saving..." : "Create tray"}
                   </button>
                 </div>
               </SectionCard>
 
               <SectionCard title={`Tray Manager (${trays.length})`}>
-                <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
-                  <span className="gt-text-muted">Total trays: {sortedTrayIds.length}</span>
-                  <span className="gt-text-muted">Selected: {selectedTrayManagerIds.size}</span>
-                  <div className={[styles.toolbarActionsCompact, "gt-btnbar"].join(" ")}>
+                <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
+                  <span className="text-sm text-muted-foreground">Total trays: {sortedTrayIds.length}</span>
+                  <span className="text-sm text-muted-foreground">Selected: {selectedTrayManagerIds.size}</span>
+                  <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
                     <ToolIconButton
                       label="Select all trays"
                       icon={<CheckSquare size={16} />}
@@ -2114,7 +2114,7 @@ export default function PlacementPage() {
                   </div>
                 </div>
 
-                <div className={[styles.trayManagerGrid, "gt-grid"].join(" ")} data-cell-size="lg">
+                <div className={[styles.trayManagerGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="lg">
                   {sortedTrayIds.map((trayId) => {
                     const tray = trayById.get(trayId);
                     if (!tray) {
@@ -2127,8 +2127,8 @@ export default function PlacementPage() {
                         key={trayId}
                         className={[
                           styles.trayEditorCell,
-                          "gt-surface-2",
-                          selected ? "gt-cell--selected" : "",
+                          "rounded-lg border border-border bg-secondary/60 shadow-sm",
+                          selected ? "border-ring bg-muted/40" : "",
                           selected ? styles.plantCellSelected : "",
                         ]
                           .filter(Boolean)
@@ -2152,10 +2152,10 @@ export default function PlacementPage() {
                         <strong className={styles.trayGridCellId}>
                           {formatTrayDisplay(draft.name || tray.name, tray.tray_id)}
                         </strong>
-                        <span className="gt-text-muted">Current occupancy: {tray.current_count}/{tray.capacity}</span>
+                        <span className="text-sm text-muted-foreground">Current occupancy: {tray.current_count}/{tray.capacity}</span>
                         <div className={styles.trayEditorInputs}>
                           <input
-                            className="gt-input"
+                            className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                             value={draft.name}
                             onClick={(event) => event.stopPropagation()}
                             onChange={(event) =>
@@ -2170,7 +2170,7 @@ export default function PlacementPage() {
                             aria-label="Tray name"
                           />
                           <input
-                            className="gt-input"
+                            className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                             type="number"
                             min={1}
                             value={draft.capacity}
@@ -2187,7 +2187,7 @@ export default function PlacementPage() {
                             aria-label="Tray capacity"
                           />
                           <button
-                            className="gt-button gt-button--secondary"
+                            className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"
                             type="button"
                             disabled={saving}
                             onClick={(event) => {
@@ -2201,19 +2201,19 @@ export default function PlacementPage() {
                       </article>
                     );
                   })}
-                  {trays.length === 0 ? <p className="gt-text-muted">No trays yet.</p> : null}
+                  {trays.length === 0 ? <p className="text-sm text-muted-foreground">No trays yet.</p> : null}
                 </div>
               </SectionCard>
             </div>
           ) : null}
 
           {currentStep === 3 ? (
-            <div className={"gt-stack"}>
+            <div className={"grid gap-3"}>
               <SectionCard title="Plants -> Trays (Draft)">
                 <Tooltip.Provider delayDuration={150}>
-                  <div className={[styles.placementToolbar, "gt-stack"].join(" ")}>
+                  <div className={[styles.placementToolbar, "grid gap-3"].join(" ")}>
                     <select
-                      className="gt-select"
+                      className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                       value={destinationTrayId}
                       onChange={(event) => setDestinationTrayId(event.target.value)}
                       aria-label="Destination tray"
@@ -2231,7 +2231,7 @@ export default function PlacementPage() {
                         );
                       })}
                     </select>
-                    <div className={[styles.toolbarActionsCompact, "gt-btnbar"].join(" ")}>
+                    <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
                       <ToolIconButton
                         label="Select all unplaced plants"
                         icon={<CheckSquare size={16} />}
@@ -2251,7 +2251,7 @@ export default function PlacementPage() {
                         disabled={selectedPlantIds.size === 0}
                       />
                       <button
-                        className="gt-button gt-button--primary"
+                        className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
                         type="button"
                         disabled={placementLocked || !destinationTrayId || selectedInMainGrid.length === 0}
                         onClick={stageMovePlantsToTray}
@@ -2263,14 +2263,14 @@ export default function PlacementPage() {
                   </div>
                 </Tooltip.Provider>
 
-                <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
-                  <span className="gt-text-muted">Unplaced active plants: {mainGridPlantIds.length}</span>
-                  <span className="gt-text-muted">Selected in main grid: {selectedInMainGrid.length}</span>
-                  {trays.length === 0 ? <span className={"gt-badge"}>Create at least one tray.</span> : null}
+                <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
+                  <span className="text-sm text-muted-foreground">Unplaced active plants: {mainGridPlantIds.length}</span>
+                  <span className="text-sm text-muted-foreground">Selected in main grid: {selectedInMainGrid.length}</span>
+                  {trays.length === 0 ? <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"}>Create at least one tray.</span> : null}
                 </div>
 
                 {diagnostics?.reason_counts ? (
-                  <div className={"gt-col"}>
+                  <div className={"grid gap-2"}>
                     <span>Move diagnostics</span>
                     <strong>{Object.entries(diagnostics.reason_counts).map(([key, value]) => `${key}: ${value}`).join(" · ")}</strong>
                     {diagnostics.unplaceable_plants?.slice(0, 8).map((plant) => (
@@ -2279,13 +2279,13 @@ export default function PlacementPage() {
                   </div>
                 ) : null}
 
-                <div className={[styles.plantCellGrid, "gt-grid"].join(" ")} data-cell-size="sm">
+                <div className={[styles.plantCellGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="sm">
                   {mainGridPlantIds.map((plantId) => renderPlantCell(plantId))}
                 </div>
               </SectionCard>
 
               <SectionCard title="Tray Containers">
-                <div className={[styles.trayManagerGrid, "gt-grid"].join(" ")} data-cell-size="lg">
+                <div className={[styles.trayManagerGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="lg">
                   {sortedTrayIds.map((trayId) => {
                     const tray = trayById.get(trayId);
                     if (!tray) {
@@ -2295,11 +2295,11 @@ export default function PlacementPage() {
                     const selectedInTray = selectedInTrayByTrayId[trayId] || [];
 
                     return (
-                      <article key={trayId} className={[styles.trayEditorCell, "gt-surface-2"].join(" ")}>
+                      <article key={trayId} className={[styles.trayEditorCell, "rounded-lg border border-border bg-secondary/60 shadow-sm"].join(" ")}>
                         <div className={styles.trayHeaderRow}>
                           <div className={styles.trayHeaderMeta}>
                             <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
-                            <span className="gt-text-muted">Occupancy: {draftPlantCountByTray[trayId] || 0}/{tray.capacity}</span>
+                            <span className="text-sm text-muted-foreground">Occupancy: {draftPlantCountByTray[trayId] || 0}/{tray.capacity}</span>
                           </div>
                           <div className={styles.trayHeaderActions}>
                             {selectedInTray.length > 0 ? (
@@ -2313,7 +2313,7 @@ export default function PlacementPage() {
                           </div>
                         </div>
 
-                        <div className={[styles.plantCellGridTray, "gt-grid"].join(" ")} data-cell-size="sm">
+                        <div className={[styles.plantCellGridTray, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="sm">
                           {trayPlantIds.map((plantId) => renderPlantCell(plantId))}
                         </div>
                       </article>
@@ -2325,7 +2325,7 @@ export default function PlacementPage() {
               <StickyActionBar>
                 <span className={styles.recipeLegendItem}>{placementDraftChangeCount} plant layout change(s)</span>
                 <button
-                  className="gt-button gt-button--primary"
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
                   type="button"
                   disabled={saving || placementDraftChangeCount === 0}
                   onClick={() => void applyPlantToTrayLayout()}
@@ -2333,7 +2333,7 @@ export default function PlacementPage() {
                   {saving ? "Applying..." : "Apply Plant -> Tray Layout"}
                 </button>
                 <button
-                  className="gt-button gt-button--secondary"
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"
                   type="button"
                   disabled={saving || placementDraftChangeCount === 0}
                   onClick={resetPlantDrafts}
@@ -2345,12 +2345,12 @@ export default function PlacementPage() {
           ) : null}
 
           {currentStep === 4 ? (
-            <div className={"gt-stack"}>
+            <div className={"grid gap-3"}>
               <SectionCard title="Trays -> Slots (Draft)">
                 <Tooltip.Provider delayDuration={150}>
-                  <div className={[styles.placementToolbar, "gt-stack"].join(" ")}>
+                  <div className={[styles.placementToolbar, "grid gap-3"].join(" ")}>
                     <select
-                      className="gt-select"
+                      className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                       value={destinationSlotId}
                       onChange={(event) => setDestinationSlotId(event.target.value)}
                       aria-label="Destination slot"
@@ -2368,7 +2368,7 @@ export default function PlacementPage() {
                         );
                       })}
                     </select>
-                    <div className={[styles.toolbarActionsCompact, "gt-btnbar"].join(" ")}>
+                    <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
                       <ToolIconButton
                         label="Select all unplaced trays"
                         icon={<CheckSquare size={16} />}
@@ -2382,7 +2382,7 @@ export default function PlacementPage() {
                         disabled={selectedTrayIds.size === 0}
                       />
                       <button
-                        className="gt-button gt-button--primary"
+                        className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
                         type="button"
                         disabled={placementLocked || !destinationSlotId || selectedTrayIds.size === 0}
                         onClick={stageMoveTraysToSlots}
@@ -2394,12 +2394,12 @@ export default function PlacementPage() {
                   </div>
                 </Tooltip.Provider>
 
-                <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
-                  <span className="gt-text-muted">Unplaced trays: {mainGridTrayIds.length}</span>
-                  <span className="gt-text-muted">Selected trays: {selectedTrayIds.size}</span>
+                <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
+                  <span className="text-sm text-muted-foreground">Unplaced trays: {mainGridTrayIds.length}</span>
+                  <span className="text-sm text-muted-foreground">Selected trays: {selectedTrayIds.size}</span>
                 </div>
 
-                <div className={[styles.trayMainGrid, "gt-grid"].join(" ")} data-cell-size="md">
+                <div className={[styles.trayMainGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="md">
                   {mainGridTrayIds.map((trayId) => renderTrayCell(trayId))}
                 </div>
               </SectionCard>
@@ -2410,11 +2410,11 @@ export default function PlacementPage() {
                     const selectedInTent = selectedTraysByTentId[tent.tent_id] || [];
 
                     return (
-                      <article key={tent.tent_id} className={[styles.tentBoardCard, "gt-surface"].join(" ")}>
+                      <article key={tent.tent_id} className={[styles.tentBoardCard, "rounded-lg border border-border bg-card"].join(" ")}>
                         <div className={styles.trayHeaderRow}>
                           <div className={styles.trayHeaderMeta}>
                             <strong>{tent.name}</strong>
-                            <span className="gt-text-muted">{tent.code || ""}</span>
+                            <span className="text-sm text-muted-foreground">{tent.code || ""}</span>
                           </div>
                           <div className={styles.trayHeaderActions}>
                             <span className={styles.recipeLegendItem}>{tent.slots.length} slot(s)</span>
@@ -2443,7 +2443,7 @@ export default function PlacementPage() {
                             .map((slot) => {
                               const trayId = draftSlotToTray.get(slot.slot_id) || null;
                               return (
-                                <div key={slot.slot_id} className={[styles.slotCell, "gt-cell gt-cell--muted"].join(" ")}>
+                                <div key={slot.slot_id} className={[styles.slotCell, "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"].join(" ")}>
                                   <span className={styles.slotCellLabel}>{slot.code}</span>
                                   {trayId ? (
                                     renderTrayCell(trayId, true)
@@ -2464,7 +2464,7 @@ export default function PlacementPage() {
                                 </div>
                               );
                             })}
-                          {tent.slots.length === 0 ? <span className="gt-text-muted">No slots generated.</span> : null}
+                          {tent.slots.length === 0 ? <span className="text-sm text-muted-foreground">No slots generated.</span> : null}
                         </div>
                       </article>
                     );
@@ -2475,7 +2475,7 @@ export default function PlacementPage() {
               <StickyActionBar>
                 <span className={styles.recipeLegendItem}>{traySlotDraftChangeCount} tray/slot change(s)</span>
                 <button
-                  className="gt-button gt-button--primary"
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
                   type="button"
                   disabled={saving || traySlotDraftChangeCount === 0}
                   onClick={() => void applyTrayToSlotLayout()}
@@ -2483,7 +2483,7 @@ export default function PlacementPage() {
                   {saving ? "Applying..." : "Apply Tray -> Slot Layout"}
                 </button>
                 <button
-                  className="gt-button gt-button--secondary"
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"
                   type="button"
                   disabled={saving || traySlotDraftChangeCount === 0}
                   onClick={resetTraySlotDrafts}
@@ -2499,12 +2499,12 @@ export default function PlacementPage() {
           className={[styles.stepNavRow, currentStep === 1 ? styles.stepNavRowForwardOnly : ""].filter(Boolean).join(" ")}
         >
           {currentStep > 1 ? (
-            <button className="gt-button gt-button--secondary" type="button" onClick={goPreviousStep}>
+            <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" onClick={goPreviousStep}>
               Back
             </button>
           ) : null}
           <button
-            className="gt-button gt-button--primary"
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
             type="button"
             disabled={!isStepComplete(currentStep)}
             onClick={goNextStep}

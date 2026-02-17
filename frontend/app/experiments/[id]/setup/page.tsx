@@ -126,26 +126,26 @@ export default function ExperimentSetupPage() {
       title="Setup"
       subtitle="Complete bootstrap setup: plants, tents + slots, and recipes."
       actions={
-        <Link className="gt-button gt-button--secondary" href="/experiments">
+        <Link className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" href="/experiments">
           Back to experiments
         </Link>
       }
     >
-      {loading ? <p className="gt-text-muted">Loading setup checklist...</p> : null}
-      {error ? <p className="gt-text-danger">{error}</p> : null}
+      {loading ? <p className="text-sm text-muted-foreground">Loading setup checklist...</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       {!loading ? (
         <SectionCard title="Bootstrap Checklist">
-          <div className="gt-stack">
+          <div className="grid gap-3">
             {checklist.map((item) => (
-              <article className="gt-cell gt-cell--muted" key={item.id}>
+              <article className="relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40" key={item.id}>
                 <strong>{item.title}</strong>
-                <p className="gt-text-muted">
+                <p className="text-sm text-muted-foreground">
                   {item.complete ? "Complete" : "Incomplete"}
                 </p>
-                <div className="gt-btnbar">
-                  <Link className="gt-button gt-button--primary" href={item.href}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" href={item.href}>
                     {item.actionLabel}
                   </Link>
                 </div>

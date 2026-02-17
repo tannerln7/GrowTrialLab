@@ -22,7 +22,7 @@ import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
 
-import styles from "./page.module.css";
+import { cockpitStyles as styles } from "@/src/components/ui/cockpit-styles";
 
 type PlantPhoto = {
   id: string;
@@ -582,7 +582,7 @@ export default function PlantQrPage() {
       <PageShell
         title="Plant Cockpit"
         actions={
-          <Link className={"gt-button gt-button--primary"} href={overviewHref}>
+          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={overviewHref}>
             ← Overview
           </Link>
         }
@@ -599,7 +599,7 @@ export default function PlantQrPage() {
       <PageShell
         title="Plant Cockpit"
         actions={
-          <Link className={"gt-button gt-button--primary"} href={overviewHref}>
+          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={overviewHref}>
             ← Overview
           </Link>
         }
@@ -622,14 +622,14 @@ export default function PlantQrPage() {
       subtitle={plantUuid || "Unknown plant"}
       stickyOffset
       actions={
-        <Link className={"gt-button gt-button--primary"} href={overviewHref}>
+        <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={overviewHref}>
           ← Overview
         </Link>
       }
     >
       {loading ? (
         <SectionCard>
-          <p className={"gt-text-muted"}>Loading plant cockpit...</p>
+          <p className={"text-sm text-muted-foreground"}>Loading plant cockpit...</p>
         </SectionCard>
       ) : null}
 
@@ -662,14 +662,14 @@ export default function PlantQrPage() {
                   {cockpit.plant.cultivar ? ` · ${cockpit.plant.cultivar}` : ""}
                 </p>
               </div>
-              <div className="gt-row">
-                <span className="gt-badge">Status: {cockpit.plant.status}</span>
-                <span className="gt-badge">Grade: {cockpit.plant.grade || "Missing"}</span>
-                <span className="gt-badge">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">Status: {cockpit.plant.status}</span>
+                <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">Grade: {cockpit.plant.grade || "Missing"}</span>
+                <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">
                   Tent: {cockpit.derived.location.tent?.code || cockpit.derived.location.tent?.name || "Unplaced"}
                 </span>
-                <span className="gt-badge">Slot: {cockpit.derived.location.slot?.code || "Unplaced"}</span>
-                <span className="gt-badge">
+                <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">Slot: {cockpit.derived.location.slot?.code || "Unplaced"}</span>
+                <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">
                   Tray:{" "}
                   {cockpit.derived.location.tray?.code ||
                     cockpit.derived.location.tray?.name ||
@@ -677,34 +677,34 @@ export default function PlantQrPage() {
                   {trayOccupancyLabel(cockpit)}
                 </span>
                 {cockpit.derived.assigned_recipe ? (
-                  <span className="gt-badge">
+                  <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">
                     Recipe: {recipeLabel(cockpit.derived.assigned_recipe)}
                   </span>
                 ) : (
-                  <span className={"gt-badge"}>Recipe: Unassigned</span>
+                  <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"}>Recipe: Unassigned</span>
                 )}
-                {cockpit.derived.location.status !== "placed" ? <span className="gt-badge">Unplaced</span> : null}
+                {cockpit.derived.location.status !== "placed" ? <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">Unplaced</span> : null}
               </div>
             </div>
           </SectionCard>
 
           {cockpit.plant.status !== "active" ? (
             <SectionCard title="Removed Plant">
-              <div className="gt-stack">
-                <p className={"gt-text-muted"}>
+              <div className="grid gap-3">
+                <p className={"text-sm text-muted-foreground"}>
                   This plant was removed
                   {cockpit.plant.removed_at
                     ? ` on ${formatShortDate(cockpit.plant.removed_at)}`
                     : ""}.
                 </p>
                 {cockpit.plant.removed_reason ? (
-                  <p className={"gt-text-muted"}>
+                  <p className={"text-sm text-muted-foreground"}>
                     Reason: {cockpit.plant.removed_reason}
                   </p>
                 ) : null}
                 {cockpit.derived.replaced_by_uuid ? (
                   <Link
-                    className={"gt-button gt-button--primary"}
+                    className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
                     href={replacementHref(cockpit.derived.replaced_by_uuid)}
                   >
                     Open Replacement
@@ -716,19 +716,19 @@ export default function PlantQrPage() {
 
           {cockpit.derived.replaces_uuid ? (
             <SectionCard title="Replacement Chain">
-              <p className={"gt-text-muted"}>
+              <p className={"text-sm text-muted-foreground"}>
                 {cockpit.derived.chain_label || "This plant is a replacement."}
               </p>
-              <div className={"gt-btnbar"}>
+              <div className={"flex flex-wrap items-center gap-2"}>
                 <Link
-                  className={"gt-button gt-button--secondary"}
+                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
                   href={replacementHref(cockpit.derived.replaces_uuid)}
                 >
                   Open Previous Plant
                 </Link>
                 {cockpit.derived.replaced_by_uuid ? (
                   <Link
-                    className={"gt-button gt-button--secondary"}
+                    className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
                     href={replacementHref(cockpit.derived.replaced_by_uuid)}
                   >
                     Open Next Replacement
@@ -739,47 +739,47 @@ export default function PlantQrPage() {
           ) : null}
 
           <SectionCard title="Now" subtitle="Next best action for this plant">
-            <div className="gt-stack">
+            <div className="grid gap-3">
               <div className={styles.nowHeading}>
                 <nowAction.icon size={18} />
                 <strong>{nowAction.title}</strong>
               </div>
-              <p className={"gt-text-muted"}>{nowAction.detail}</p>
+              <p className={"text-sm text-muted-foreground"}>{nowAction.detail}</p>
               {cockpit.plant.status === "active" && !cockpit.derived.assigned_recipe ? (
-                <span className={"gt-badge"}>
+                <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"}>
                   Needs placement / recipe assignment before feeding
                 </span>
               ) : null}
               {cockpit.plant.status !== "active" ? (
-                <p className={"gt-text-muted"}>
+                <p className={"text-sm text-muted-foreground"}>
                   Removed plants are read-only. Use chain links to review related plants.
                 </p>
               ) : nowAction.href && nowAction.buttonLabel ? (
-                <div className={"gt-btnbar"}>
-                  <Link className={"gt-button gt-button--primary"} href={nowAction.href}>
+                <div className={"flex flex-wrap items-center gap-2"}>
+                  <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={nowAction.href}>
                     {nowAction.buttonLabel}
                   </Link>
                   {feedingHref ? (
-                    <Link className={"gt-button gt-button--secondary"} href={feedingHref}>
+                    <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href={feedingHref}>
                       Feed
                     </Link>
                   ) : null}
                 </div>
               ) : (
-                <div className={"gt-stack"}>
+                <div className={"grid gap-3"}>
                   {feedingHref ? (
-                    <Link className={"gt-button gt-button--primary"} href={feedingHref}>
+                    <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={feedingHref}>
                       Feed
                     </Link>
                   ) : null}
                   <ul className={styles.comingSoonList}>
                     <li>
                       <span>Record weekly metrics</span>
-                      <span className="gt-badge">Coming soon</span>
+                      <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">Coming soon</span>
                     </li>
                     <li>
                       <span>Take weekly photo</span>
-                      <span className="gt-badge">Coming soon</span>
+                      <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">Coming soon</span>
                     </li>
                   </ul>
                 </div>
@@ -789,23 +789,23 @@ export default function PlantQrPage() {
 
           {cockpit.plant.status === "active" ? (
             <SectionCard title="Manage">
-              <div className={"gt-stack"}>
-                <div className={"gt-btnbar"}>
+              <div className={"grid gap-3"}>
+                <div className={"flex flex-wrap items-center gap-2"}>
                   <Popover.Root>
                     <Popover.Trigger asChild>
-                      <button className={"gt-button gt-button--secondary"} type="button" disabled={recipeSaving}>
+                      <button className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} type="button" disabled={recipeSaving}>
                         <ChevronDown size={14} />
                         Change recipe
                       </button>
                     </Popover.Trigger>
                     <Popover.Portal>
-                      <Popover.Content className="gt-popover" sideOffset={8} align="start">
-                        <p className={"gt-text-muted"}>Set recipe assignment</p>
+                      <Popover.Content className="z-50 w-[min(280px,calc(100vw-2rem))] rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg" sideOffset={8} align="start">
+                        <p className={"text-sm text-muted-foreground"}>Set recipe assignment</p>
                         {recipes.length > 0 ? (
-                          <label className={"gt-col"}>
-                            <span className={"gt-text-muted"}>Recipe</span>
+                          <label className={"grid gap-2"}>
+                            <span className={"text-sm text-muted-foreground"}>Recipe</span>
                             <select
-                              className={"gt-select"}
+                              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                               value={recipeSelection}
                               onChange={(event) => setRecipeSelection(event.target.value)}
                               disabled={recipeSaving}
@@ -819,11 +819,11 @@ export default function PlantQrPage() {
                             </select>
                           </label>
                         ) : (
-                          <p className={"gt-text-muted"}>No recipes available yet.</p>
+                          <p className={"text-sm text-muted-foreground"}>No recipes available yet.</p>
                         )}
-                        <div className={"gt-btnbar"}>
+                        <div className={"flex flex-wrap items-center gap-2"}>
                           <button
-                            className={"gt-button gt-button--primary"}
+                            className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
                             type="button"
                             disabled={
                               recipeSaving ||
@@ -836,7 +836,7 @@ export default function PlantQrPage() {
                             {recipeSaving ? "Saving..." : "Save recipe"}
                           </button>
                           <button
-                            className={"gt-button gt-button--secondary"}
+                            className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
                             type="button"
                             disabled={recipeSaving || !cockpit.derived.assigned_recipe}
                             onClick={() => void handleRecipeChange(null)}
@@ -848,11 +848,11 @@ export default function PlantQrPage() {
                     </Popover.Portal>
                   </Popover.Root>
                 </div>
-                <p className={"gt-text-muted"}>
+                <p className={"text-sm text-muted-foreground"}>
                   Replace this plant if it was removed from trial or needs substitution.
                 </p>
                 <button
-                  className={"gt-button gt-button--danger"}
+                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90"}
                   type="button"
                   onClick={() => setShowReplaceModal(true)}
                 >
@@ -864,11 +864,11 @@ export default function PlantQrPage() {
           ) : null}
 
           <SectionCard title="Quick Actions">
-            <div className={"gt-stack"}>
-              <div className={"gt-col"}>
-                <span className={"gt-text-muted"}>Photo tag</span>
+            <div className={"grid gap-3"}>
+              <div className={"grid gap-2"}>
+                <span className={"text-sm text-muted-foreground"}>Photo tag</span>
                 <select
-                  className={"gt-select"}
+                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                   value={uploadTag}
                   onChange={(event) => setUploadTag(event.target.value as UploadTag)}
                   disabled={uploading}
@@ -883,16 +883,16 @@ export default function PlantQrPage() {
 
               <input
                 ref={fileInputRef}
-                className="gt-visually-hidden"
+                className="sr-only"
                 type="file"
                 accept="image/*"
                 capture="environment"
                 onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
               />
 
-              <div className={"gt-btnbar"}>
+              <div className={"flex flex-wrap items-center gap-2"}>
                 <button
-                  className={"gt-button gt-button--secondary"}
+                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
                   type="button"
                   disabled={uploading}
                   onClick={() => fileInputRef.current?.click()}
@@ -901,7 +901,7 @@ export default function PlantQrPage() {
                   Choose photo
                 </button>
                 <button
-                  className={"gt-button gt-button--primary"}
+                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
                   type="button"
                   disabled={!photoFile || uploading}
                   onClick={handlePhotoUpload}
@@ -911,16 +911,16 @@ export default function PlantQrPage() {
               </div>
 
               {photoFile ? (
-                <p className={"gt-text-muted"}>Selected: {photoFile.name}</p>
+                <p className={"text-sm text-muted-foreground"}>Selected: {photoFile.name}</p>
               ) : null}
-              {notice ? <p className={"gt-text-success"}>{notice}</p> : null}
+              {notice ? <p className={"text-sm text-emerald-400"}>{notice}</p> : null}
 
-              <div className={"gt-btnbar"}>
-                <button className={"gt-button gt-button--secondary"} type="button" disabled>
+              <div className={"flex flex-wrap items-center gap-2"}>
+                <button className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} type="button" disabled>
                   <ClipboardPlus size={16} />
                   Add note (Coming soon)
                 </button>
-                <button className={"gt-button gt-button--secondary"} type="button" disabled>
+                <button className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} type="button" disabled>
                   <ShieldAlert size={16} />
                   Report issue (Coming soon)
                 </button>
@@ -987,9 +987,9 @@ export default function PlantQrPage() {
 
           <SectionCard title="Scheduled">
             {cockpit.derived.scheduled_upcoming.length === 0 ? (
-              <p className={"gt-text-muted"}>No upcoming scheduled actions for this plant.</p>
+              <p className={"text-sm text-muted-foreground"}>No upcoming scheduled actions for this plant.</p>
             ) : (
-              <div className={"gt-stack"}>
+              <div className={"grid gap-3"}>
                 {cockpit.derived.scheduled_upcoming.map((item, index) => (
                   <div className={styles.activityRow} key={`${item.title}-${item.date}-${index}`}>
                     <Tag size={16} />
@@ -997,7 +997,7 @@ export default function PlantQrPage() {
                       {item.title} ({formatScheduleSlot(item.date, item.timeframe, item.exact_time)})
                     </span>
                     {item.blocked_reasons.map((reason) => (
-                      <span className={"gt-badge"} key={reason}>
+                      <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"} key={reason}>
                         {reason}
                       </span>
                     ))}
@@ -1006,8 +1006,8 @@ export default function PlantQrPage() {
               </div>
             )}
             {scheduleHref ? (
-              <div className={"gt-btnbar"}>
-                <Link className={"gt-button gt-button--secondary"} href={scheduleHref}>
+              <div className={"flex flex-wrap items-center gap-2"}>
+                <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href={scheduleHref}>
                   Open Schedule
                 </Link>
               </div>
@@ -1015,23 +1015,23 @@ export default function PlantQrPage() {
           </SectionCard>
 
           <StickyActionBar>
-            <Link className={"gt-button gt-button--secondary"} href={overviewHref}>
+            <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href={overviewHref}>
               ← Overview
             </Link>
             {cockpit.plant.status !== "active" && cockpit.derived.replaced_by_uuid ? (
               <Link
-                className={"gt-button gt-button--primary"}
+                className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
                 href={replacementHref(cockpit.derived.replaced_by_uuid)}
               >
                 Open Replacement
               </Link>
             ) : nowAction.href && nowAction.buttonLabel ? (
-              <Link className={"gt-button gt-button--primary"} href={nowAction.href}>
+              <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={nowAction.href}>
                 {nowAction.buttonLabel}
               </Link>
             ) : (
               <button
-                className={"gt-button gt-button--primary"}
+                className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
                 type="button"
                 disabled={uploading}
                 onClick={() => fileInputRef.current?.click()}
@@ -1045,31 +1045,31 @@ export default function PlantQrPage() {
       ) : null}
 
       {showReplaceModal ? (
-        <div className={"gt-modal-backdrop"} role="presentation">
+        <div className={"fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"} role="presentation">
           <SectionCard title="Replace Plant">
-            <div className={"gt-stack"}>
-              <p className={"gt-text-muted"}>
+            <div className={"grid gap-3"}>
+              <p className={"text-sm text-muted-foreground"}>
                 This creates a new plant record and marks the current plant as removed.
                 Baseline must be recaptured for the replacement.
               </p>
-              <label className={"gt-col"}>
-                <span className={"gt-text-muted"}>Removed reason (optional)</span>
+              <label className={"grid gap-2"}>
+                <span className={"text-sm text-muted-foreground"}>Removed reason (optional)</span>
                 <textarea
-                  className={"gt-textarea"}
+                  className={"flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                   value={removedReason}
                   onChange={(event) => setRemovedReason(event.target.value)}
                 />
               </label>
-              <label className={"gt-col"}>
-                <span className={"gt-text-muted"}>New Plant ID (optional)</span>
+              <label className={"grid gap-2"}>
+                <span className={"text-sm text-muted-foreground"}>New Plant ID (optional)</span>
                 <input
-                  className={"gt-input"}
+                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                   placeholder="Leave blank for pending ID"
                   value={newPlantId}
                   onChange={(event) => setNewPlantId(event.target.value)}
                 />
               </label>
-              <label className={"gt-row"}>
+              <label className={"flex flex-wrap items-center gap-2"}>
                 <input
                   type="checkbox"
                   checked={inheritAssignment}
@@ -1077,7 +1077,7 @@ export default function PlantQrPage() {
                 />
                 <span>Inherit recipe assignment (recommended)</span>
               </label>
-              <label className={"gt-row"}>
+              <label className={"flex flex-wrap items-center gap-2"}>
                 <input
                   type="checkbox"
                   checked={copyIdentity}
@@ -1085,7 +1085,7 @@ export default function PlantQrPage() {
                 />
                 <span>Copy identity fields (species/cultivar/notes)</span>
               </label>
-              <label className={"gt-row"}>
+              <label className={"flex flex-wrap items-center gap-2"}>
                 <input
                   type="checkbox"
                   checked={inheritGrade}
@@ -1093,11 +1093,11 @@ export default function PlantQrPage() {
                 />
                 <span>Inherit grade</span>
               </label>
-              <label className={"gt-row"}>
+              <label className={"flex flex-wrap items-center gap-2"}>
                 <input type="checkbox" checked readOnly />
                 <span>Mark original plant as removed</span>
               </label>
-              <label className={"gt-row"}>
+              <label className={"flex flex-wrap items-center gap-2"}>
                 <input
                   type="checkbox"
                   checked={replaceConfirmed}
@@ -1105,9 +1105,9 @@ export default function PlantQrPage() {
                 />
                 <span>I have read and understand.</span>
               </label>
-              <div className={"gt-btnbar"}>
+              <div className={"flex flex-wrap items-center gap-2"}>
                 <button
-                  className={"gt-button gt-button--secondary"}
+                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
                   type="button"
                   disabled={replacing}
                   onClick={() => {
@@ -1118,7 +1118,7 @@ export default function PlantQrPage() {
                   Cancel
                 </button>
                 <button
-                  className={"gt-button gt-button--danger"}
+                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90"}
                   type="button"
                   disabled={!replaceConfirmed || replacing}
                   onClick={() => void handleReplacePlant()}

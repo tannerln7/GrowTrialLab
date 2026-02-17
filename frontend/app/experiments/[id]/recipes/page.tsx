@@ -12,7 +12,7 @@ import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
 
-import styles from "../../experiments.module.css";
+import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
 type Recipe = {
   id: string;
@@ -129,7 +129,7 @@ function ToolIconButton({
     <Tooltip.Root>
       <Tooltip.Trigger asChild>
         <button
-          className={danger ? "gt-icon-button gt-icon-button--danger" : "gt-icon-button"}
+          className={danger ? "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-secondary text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90" : "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-secondary text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:pointer-events-none disabled:opacity-50"}
           type="button"
           onClick={onClick}
           disabled={disabled}
@@ -140,9 +140,9 @@ function ToolIconButton({
         </button>
       </Tooltip.Trigger>
       <Tooltip.Portal>
-        <Tooltip.Content className="gt-tooltip" sideOffset={6}>
+        <Tooltip.Content className="z-50 rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md" sideOffset={6}>
           {label}
-          <Tooltip.Arrow className="gt-tooltip-arrow" />
+          <Tooltip.Arrow className="fill-popover" />
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>
@@ -645,8 +645,8 @@ export default function RecipesPage() {
         key={plant.uuid}
         className={[
           styles.plantCell,
-          "gt-cell gt-cell--interactive",
-          selected ? "gt-cell--selected" : "",
+          "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] cursor-pointer hover:border-ring/70",
+          selected ? "border-ring bg-muted/40" : "",
           selected ? styles.plantCellSelected : "",
           dirty ? styles.plantCellDirty : "",
         ]
@@ -696,49 +696,49 @@ export default function RecipesPage() {
       title="Recipes"
       subtitle="Assign recipes to individual plants using tray-grouped selection and draft saves."
       actions={
-        <Link className="gt-button gt-button--primary" href={`/experiments/${experimentId}/overview`}>
+        <Link className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
     >
-      {loading ? <p className="gt-text-muted">Loading recipes...</p> : null}
-      {error ? <p className="gt-text-danger">{error}</p> : null}
-      {notice ? <p className="gt-text-success">{notice}</p> : null}
+      {loading ? <p className="text-sm text-muted-foreground">Loading recipes...</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {notice ? <p className="text-sm text-emerald-400">{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Recipe Tools">
         <form className={styles.recipeCreateCompact} onSubmit={(event) => void createRecipe(event)}>
           <input
-            className="gt-input"
+            className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
             value={code}
             onChange={(event) => setCode(event.target.value)}
             placeholder="Code (R0)"
             aria-label="Recipe code"
           />
           <input
-            className="gt-input"
+            className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Name"
             aria-label="Recipe name"
           />
           <input
-            className="gt-input"
+            className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             placeholder="Notes (optional)"
             aria-label="Recipe notes"
           />
-          <button className="gt-button gt-button--primary" type="submit" disabled={saving}>
+          <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" type="submit" disabled={saving}>
             {saving ? "Saving..." : "Create recipe"}
           </button>
         </form>
 
         <Tooltip.Provider delayDuration={150}>
-          <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
-            <span className="gt-text-muted">Recipes: {recipes.length}</span>
-            <span className="gt-text-muted">Selected: {selectedRecipeIds.size}</span>
-            <div className={[styles.toolbarActionsCompact, "gt-btnbar"].join(" ")}>
+          <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
+            <span className="text-sm text-muted-foreground">Recipes: {recipes.length}</span>
+            <span className="text-sm text-muted-foreground">Selected: {selectedRecipeIds.size}</span>
+            <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
               <ToolIconButton
                 label="Clear recipe selection"
                 icon={<X size={16} />}
@@ -758,7 +758,7 @@ export default function RecipesPage() {
           </div>
         </Tooltip.Provider>
 
-        <div className={[styles.trayMainGrid, "gt-grid"].join(" ")} data-cell-size="md">
+        <div className={[styles.trayMainGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="md">
           {recipes.map((recipe) => {
             const selected = selectedRecipeIds.has(recipe.id);
             return (
@@ -767,8 +767,8 @@ export default function RecipesPage() {
                 className={[
                   styles.trayGridCell,
                   styles.recipeCell,
-                  "gt-cell gt-cell--interactive",
-                  selected ? "gt-cell--selected" : "",
+                  "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] cursor-pointer hover:border-ring/70",
+                  selected ? "border-ring bg-muted/40" : "",
                   selected ? styles.plantCellSelected : "",
                 ]
                   .filter(Boolean)
@@ -794,15 +794,15 @@ export default function RecipesPage() {
               </article>
             );
           })}
-          {recipes.length === 0 ? <p className="gt-text-muted">No recipes yet.</p> : null}
+          {recipes.length === 0 ? <p className="text-sm text-muted-foreground">No recipes yet.</p> : null}
         </div>
       </SectionCard>
 
       <SectionCard title="Plants by Tray (Draft)">
         <Tooltip.Provider delayDuration={150}>
-          <div className={[styles.placementToolbar, "gt-stack"].join(" ")}>
+          <div className={[styles.placementToolbar, "grid gap-3"].join(" ")}>
             <select
-              className="gt-select"
+              className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
               value={selectedBulkRecipeId}
               onChange={(event) => setSelectedBulkRecipeId(event.target.value)}
               aria-label="Recipe for selected plants"
@@ -814,7 +814,7 @@ export default function RecipesPage() {
                 </option>
               ))}
             </select>
-            <div className={[styles.toolbarActionsCompact, "gt-btnbar"].join(" ")}>
+            <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
               <ToolIconButton
                 label="Select all plants"
                 icon={<CheckSquare size={16} />}
@@ -834,7 +834,7 @@ export default function RecipesPage() {
                 disabled={selectedPlantIds.size === 0}
               />
               <button
-                className="gt-button gt-button--primary"
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
                 type="button"
                 disabled={selectedPlantIds.size === 0 || !selectedBulkRecipeId}
                 onClick={stageApplyRecipeToSelection}
@@ -843,7 +843,7 @@ export default function RecipesPage() {
                 Apply to selected
               </button>
               <button
-                className="gt-button gt-button--secondary"
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"
                 type="button"
                 disabled={selectedPlantIds.size === 0}
                 onClick={stageRemoveRecipeFromSelection}
@@ -855,14 +855,14 @@ export default function RecipesPage() {
           </div>
         </Tooltip.Provider>
 
-        <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
-          <span className="gt-text-muted">Plants in view: {allPlantIds.length}</span>
-          <span className="gt-text-muted">Selected plants: {selectedPlantIds.size}</span>
-          <span className="gt-text-muted">Draft changes: {draftChangeCount}</span>
+        <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
+          <span className="text-sm text-muted-foreground">Plants in view: {allPlantIds.length}</span>
+          <span className="text-sm text-muted-foreground">Selected plants: {selectedPlantIds.size}</span>
+          <span className="text-sm text-muted-foreground">Draft changes: {draftChangeCount}</span>
         </div>
 
         {diagnostics?.reason_counts ? (
-          <div className={"gt-col"}>
+          <div className={"grid gap-2"}>
             <span>Diagnostics</span>
             <strong>{Object.entries(diagnostics.reason_counts).map(([key, value]) => `${key}: ${value}`).join(" · ")}</strong>
             {diagnostics.invalid_updates?.slice(0, 8).map((item) => (
@@ -871,21 +871,21 @@ export default function RecipesPage() {
           </div>
         ) : null}
 
-        <div className={[styles.trayManagerGrid, "gt-grid"].join(" ")} data-cell-size="lg">
+        <div className={[styles.trayManagerGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="lg">
           {sortedTrays.map((tray) => {
             const trayPlantIds = trayPlantIdsByTray[tray.tray_id] || [];
             const selectedCount = trayPlantIds.filter((plantId) => selectedPlantIds.has(plantId)).length;
             const allSelected = trayPlantIds.length > 0 && selectedCount === trayPlantIds.length;
 
             return (
-              <article key={tray.tray_id} className={[styles.trayEditorCell, "gt-surface-2"].join(" ")}>
+              <article key={tray.tray_id} className={[styles.trayEditorCell, "rounded-lg border border-border bg-secondary/60 shadow-sm"].join(" ")}>
                 <div className={styles.trayHeaderRow}>
                   <div className={styles.trayHeaderMeta}>
                     <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
-                    <span className="gt-text-muted">Occupancy: {trayPlantIds.length}/{tray.capacity}</span>
+                    <span className="text-sm text-muted-foreground">Occupancy: {trayPlantIds.length}/{tray.capacity}</span>
                   </div>
                   <div className={styles.trayHeaderActions}>
-                    <span className="gt-text-muted">Selected: {selectedCount}</span>
+                    <span className="text-sm text-muted-foreground">Selected: {selectedCount}</span>
                     <TrayHeaderToggle
                       onClick={() => togglePlantsSelectionByContainer(trayPlantIds)}
                       allSelected={allSelected}
@@ -894,7 +894,7 @@ export default function RecipesPage() {
                     />
                   </div>
                 </div>
-                <div className={[styles.plantCellGridTray, "gt-grid"].join(" ")} data-cell-size="sm">
+                <div className={[styles.plantCellGridTray, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="sm">
                   {trayPlantIds.map((plantId) => renderPlantCell(plantId))}
                 </div>
               </article>
@@ -902,14 +902,14 @@ export default function RecipesPage() {
           })}
 
           {unplacedPlantIds.length > 0 ? (
-            <article className={[styles.trayEditorCell, "gt-surface-2"].join(" ")}>
+            <article className={[styles.trayEditorCell, "rounded-lg border border-border bg-secondary/60 shadow-sm"].join(" ")}>
               <div className={styles.trayHeaderRow}>
                 <div className={styles.trayHeaderMeta}>
                   <strong>Unplaced</strong>
-                  <span className="gt-text-muted">Plants: {unplacedPlantIds.length}</span>
+                  <span className="text-sm text-muted-foreground">Plants: {unplacedPlantIds.length}</span>
                 </div>
                 <div className={styles.trayHeaderActions}>
-                  <span className="gt-text-muted">
+                  <span className="text-sm text-muted-foreground">
                     Selected: {unplacedPlantIds.filter((plantId) => selectedPlantIds.has(plantId)).length}
                   </span>
                   <TrayHeaderToggle
@@ -920,7 +920,7 @@ export default function RecipesPage() {
                   />
                 </div>
               </div>
-              <div className={[styles.plantCellGridTray, "gt-grid"].join(" ")} data-cell-size="sm">
+              <div className={[styles.plantCellGridTray, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="sm">
                 {unplacedPlantIds.map((plantId) => renderPlantCell(plantId))}
               </div>
             </article>
@@ -930,11 +930,11 @@ export default function RecipesPage() {
 
       <StickyActionBar>
         <span className={styles.recipeLegendItem}>{draftChangeCount} recipe mapping change(s)</span>
-        <button className="gt-button gt-button--primary" type="button" disabled={saving || draftChangeCount === 0} onClick={() => void saveDrafts()}>
+        <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" type="button" disabled={saving || draftChangeCount === 0} onClick={() => void saveDrafts()}>
           <Save size={16} />
           {saving ? "Saving..." : "Save Recipe Mapping"}
         </button>
-        <button className="gt-button gt-button--secondary" type="button" disabled={saving || draftChangeCount === 0} onClick={resetDrafts}>
+        <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" disabled={saving || draftChangeCount === 0} onClick={resetDrafts}>
           Discard drafts
         </button>
       </StickyActionBar>

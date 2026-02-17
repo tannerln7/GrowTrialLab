@@ -687,27 +687,27 @@ export default function ExperimentSchedulePage() {
       title="Schedule"
       subtitle={plantFilter ? "Filtered for selected plant" : "Recurring actions plan"}
       actions={
-        <Link className={"gt-button gt-button--secondary"} href={`/experiments/${experimentId}/overview`}>
+        <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
     >
-      {loading ? <p className={"gt-text-muted"}>Loading schedules...</p> : null}
-      {error ? <p className={"gt-text-danger"}>{error}</p> : null}
-      {notice ? <p className={"gt-text-success"}>{notice}</p> : null}
+      {loading ? <p className={"text-sm text-muted-foreground"}>Loading schedules...</p> : null}
+      {error ? <p className={"text-sm text-destructive"}>{error}</p> : null}
+      {notice ? <p className={"text-sm text-emerald-400"}>{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Upcoming plan">
-        <div className={"gt-btnbar"}>
+        <div className={"flex flex-wrap items-center gap-2"}>
           <button
-            className={daysWindow === 7 ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
+            className={daysWindow === 7 ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
             type="button"
             onClick={() => setDaysWindow(7)}
           >
             7 days
           </button>
           <button
-            className={daysWindow === 14 ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
+            className={daysWindow === 14 ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
             type="button"
             onClick={() => setDaysWindow(14)}
           >
@@ -715,19 +715,19 @@ export default function ExperimentSchedulePage() {
           </button>
         </div>
         {plan && unwrapList<SchedulePlan["slots"]["results"][number]>(plan.slots).length ? (
-          <div className={"gt-stack"}>
+          <div className={"grid gap-3"}>
             {unwrapList<SchedulePlan["slots"]["results"][number]>(plan.slots).map((slot) => (
-              <article className={"gt-cell gt-cell--muted"} key={`${slot.date}-${slot.exact_time || slot.timeframe}`}>
+              <article className={"relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"} key={`${slot.date}-${slot.exact_time || slot.timeframe}`}>
                 <strong>{formatSlotTitle(slot.date, slot.timeframe, slot.exact_time)}</strong>
-                <div className={"gt-stack"}>
+                <div className={"grid gap-3"}>
                   {slot.actions.map((item) => (
-                    <div className={"gt-col"} key={`${slot.date}-${item.schedule_id}-${item.title}`}>
+                    <div className={"grid gap-2"} key={`${slot.date}-${item.schedule_id}-${item.title}`}>
                       <span>{item.title}</span>
                       <strong>{item.scope_summary || "No scope"}</strong>
                       {item.blocked_reasons.length > 0 ? (
-                        <div className={"gt-row"}>
+                        <div className={"flex flex-wrap items-center gap-2"}>
                           {item.blocked_reasons.map((reason) => (
-                            <span className={"gt-badge"} key={reason}>
+                            <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"} key={reason}>
                               {reason}
                             </span>
                           ))}
@@ -740,16 +740,16 @@ export default function ExperimentSchedulePage() {
             ))}
           </div>
         ) : (
-          <p className={"gt-text-muted"}>No upcoming scheduled actions in this window.</p>
+          <p className={"text-sm text-muted-foreground"}>No upcoming scheduled actions in this window.</p>
         )}
       </SectionCard>
 
       <SectionCard title={editingId ? "Edit action" : "Create action"}>
-        <div className={"gt-stack"}>
-          <label className={"gt-col"}>
-            <span className={"gt-text-muted"}>Action type</span>
+        <div className={"grid gap-3"}>
+          <label className={"grid gap-2"}>
+            <span className={"text-sm text-muted-foreground"}>Action type</span>
             <select
-              className={"gt-select"}
+              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
               value={actionType}
               onChange={(event) => setActionType(event.target.value as ActionType)}
               disabled={saving}
@@ -762,10 +762,10 @@ export default function ExperimentSchedulePage() {
             </select>
           </label>
 
-          <label className={"gt-col"}>
-            <span className={"gt-text-muted"}>Title</span>
+          <label className={"grid gap-2"}>
+            <span className={"text-sm text-muted-foreground"}>Title</span>
             <input
-              className={"gt-input"}
+              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
               value={title}
               onChange={(event) => {
                 setTitle(event.target.value);
@@ -773,20 +773,20 @@ export default function ExperimentSchedulePage() {
               }}
               disabled={saving}
             />
-            <span className={"gt-text-muted"}>Suggestion: {suggestedTitle}</span>
+            <span className={"text-sm text-muted-foreground"}>Suggestion: {suggestedTitle}</span>
           </label>
 
-          <label className={"gt-col"}>
-            <span className={"gt-text-muted"}>Description (optional)</span>
+          <label className={"grid gap-2"}>
+            <span className={"text-sm text-muted-foreground"}>Description (optional)</span>
             <textarea
-              className={"gt-textarea"}
+              className={"flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               disabled={saving}
             />
           </label>
 
-          <label className={"gt-row"}>
+          <label className={"flex flex-wrap items-center gap-2"}>
             <input
               type="checkbox"
               checked={enabled}
@@ -796,23 +796,23 @@ export default function ExperimentSchedulePage() {
             <span>Enabled</span>
           </label>
 
-          <div className={"gt-btnbar"}>
+          <div className={"flex flex-wrap items-center gap-2"}>
             <button
-              className={recurrenceMode === "weekly" ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
+              className={recurrenceMode === "weekly" ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
               type="button"
               onClick={() => setRecurrenceMode("weekly")}
             >
               Weekly pattern
             </button>
             <button
-              className={recurrenceMode === "interval" ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
+              className={recurrenceMode === "interval" ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
               type="button"
               onClick={() => setRecurrenceMode("interval")}
             >
               Every X days
             </button>
             <button
-              className={recurrenceMode === "daily" ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
+              className={recurrenceMode === "daily" ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
               type="button"
               onClick={() => setRecurrenceMode("daily")}
             >
@@ -821,13 +821,13 @@ export default function ExperimentSchedulePage() {
           </div>
 
           {recurrenceMode === "weekly" ? (
-            <div className={"gt-stack"}>
+            <div className={"grid gap-3"}>
               {weeklyRules.map((rule, index) => (
-                <article className={"gt-cell gt-cell--muted"} key={`${rule.weekday}-${index}`}>
-                  <label className={"gt-col"}>
-                    <span className={"gt-text-muted"}>Weekday</span>
+                <article className={"relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"} key={`${rule.weekday}-${index}`}>
+                  <label className={"grid gap-2"}>
+                    <span className={"text-sm text-muted-foreground"}>Weekday</span>
                     <select
-                      className={"gt-select"}
+                      className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                       value={rule.weekday}
                       onChange={(event) =>
                         setWeeklyRules((current) =>
@@ -844,10 +844,10 @@ export default function ExperimentSchedulePage() {
                       ))}
                     </select>
                   </label>
-                  <label className={"gt-col"}>
-                    <span className={"gt-text-muted"}>Timeframe</span>
+                  <label className={"grid gap-2"}>
+                    <span className={"text-sm text-muted-foreground"}>Timeframe</span>
                     <select
-                      className={"gt-select"}
+                      className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                       value={rule.timeframe}
                       onChange={(event) =>
                         setWeeklyRules((current) =>
@@ -866,10 +866,10 @@ export default function ExperimentSchedulePage() {
                       ))}
                     </select>
                   </label>
-                  <label className={"gt-col"}>
-                    <span className={"gt-text-muted"}>Exact time (optional)</span>
+                  <label className={"grid gap-2"}>
+                    <span className={"text-sm text-muted-foreground"}>Exact time (optional)</span>
                     <input
-                      className={"gt-input"}
+                      className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                       type="time"
                       value={rule.exact_time}
                       onChange={(event) =>
@@ -881,10 +881,10 @@ export default function ExperimentSchedulePage() {
                       }
                     />
                   </label>
-                  <div className={"gt-btnbar"}>
+                  <div className={"flex flex-wrap items-center gap-2"}>
                     {weeklyRules.length > 1 ? (
                       <button
-                        className={"gt-button gt-button--secondary"}
+                        className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
                         type="button"
                         onClick={() =>
                           setWeeklyRules((current) => current.filter((_, itemIndex) => itemIndex !== index))
@@ -897,7 +897,7 @@ export default function ExperimentSchedulePage() {
                 </article>
               ))}
               <button
-                className={"gt-button gt-button--secondary"}
+                className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
                 type="button"
                 onClick={() =>
                   setWeeklyRules((current) => [
@@ -912,21 +912,21 @@ export default function ExperimentSchedulePage() {
           ) : null}
 
           {recurrenceMode === "interval" ? (
-            <div className={"gt-stack"}>
-              <label className={"gt-col"}>
-                <span className={"gt-text-muted"}>Interval days</span>
+            <div className={"grid gap-3"}>
+              <label className={"grid gap-2"}>
+                <span className={"text-sm text-muted-foreground"}>Interval days</span>
                 <input
-                  className={"gt-input"}
+                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                   type="number"
                   min={1}
                   value={intervalDays}
                   onChange={(event) => setIntervalDays(Math.max(1, Number(event.target.value) || 1))}
                 />
               </label>
-              <label className={"gt-col"}>
-                <span className={"gt-text-muted"}>Timeframe</span>
+              <label className={"grid gap-2"}>
+                <span className={"text-sm text-muted-foreground"}>Timeframe</span>
                 <select
-                  className={"gt-select"}
+                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                   value={intervalTimeframe}
                   onChange={(event) => setIntervalTimeframe(event.target.value as Timeframe)}
                 >
@@ -937,10 +937,10 @@ export default function ExperimentSchedulePage() {
                   ))}
                 </select>
               </label>
-              <label className={"gt-col"}>
-                <span className={"gt-text-muted"}>Exact time (optional)</span>
+              <label className={"grid gap-2"}>
+                <span className={"text-sm text-muted-foreground"}>Exact time (optional)</span>
                 <input
-                  className={"gt-input"}
+                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                   type="time"
                   value={intervalExactTime}
                   onChange={(event) => setIntervalExactTime(event.target.value)}
@@ -950,11 +950,11 @@ export default function ExperimentSchedulePage() {
           ) : null}
 
           {recurrenceMode === "daily" ? (
-            <div className={"gt-stack"}>
-              <label className={"gt-col"}>
-                <span className={"gt-text-muted"}>Timeframe</span>
+            <div className={"grid gap-3"}>
+              <label className={"grid gap-2"}>
+                <span className={"text-sm text-muted-foreground"}>Timeframe</span>
                 <select
-                  className={"gt-select"}
+                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                   value={dailyTimeframe}
                   onChange={(event) => setDailyTimeframe(event.target.value as Timeframe)}
                 >
@@ -965,10 +965,10 @@ export default function ExperimentSchedulePage() {
                   ))}
                 </select>
               </label>
-              <label className={"gt-col"}>
-                <span className={"gt-text-muted"}>Exact time (optional)</span>
+              <label className={"grid gap-2"}>
+                <span className={"text-sm text-muted-foreground"}>Exact time (optional)</span>
                 <input
-                  className={"gt-input"}
+                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                   type="time"
                   value={dailyExactTime}
                   onChange={(event) => setDailyExactTime(event.target.value)}
@@ -977,9 +977,9 @@ export default function ExperimentSchedulePage() {
             </div>
           ) : null}
 
-          <div className={"gt-btnbar"}>
+          <div className={"flex flex-wrap items-center gap-2"}>
             <button
-              className={scopeType === "TENT" ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
+              className={scopeType === "TENT" ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
               type="button"
               onClick={() => {
                 setScopeType("TENT");
@@ -989,7 +989,7 @@ export default function ExperimentSchedulePage() {
               Tents
             </button>
             <button
-              className={scopeType === "TRAY" ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
+              className={scopeType === "TRAY" ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
               type="button"
               onClick={() => {
                 setScopeType("TRAY");
@@ -999,7 +999,7 @@ export default function ExperimentSchedulePage() {
               Trays
             </button>
             <button
-              className={scopeType === "PLANT" ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
+              className={scopeType === "PLANT" ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
               type="button"
               onClick={() => {
                 setScopeType("PLANT");
@@ -1011,9 +1011,9 @@ export default function ExperimentSchedulePage() {
           </div>
 
           {scopeType === "TENT" ? (
-            <div className={"gt-stack"}>
+            <div className={"grid gap-3"}>
               {(placementSummary ? unwrapList<PlacementSummary["tents"]["results"][number]>(placementSummary.tents) : []).map((tent) => (
-                <label className={"gt-row"} key={tent.tent_id}>
+                <label className={"flex flex-wrap items-center gap-2"} key={tent.tent_id}>
                   <input
                     type="checkbox"
                     checked={selectedScopeIds.includes(tent.tent_id)}
@@ -1025,18 +1025,18 @@ export default function ExperimentSchedulePage() {
                 </label>
               ))}
               {(placementSummary ? unwrapList<PlacementSummary["tents"]["results"][number]>(placementSummary.tents).length : 0) === 0 ? (
-                <p className={"gt-text-muted"}>No tents available yet. Add tents in Placement step 1.</p>
+                <p className={"text-sm text-muted-foreground"}>No tents available yet. Add tents in Placement step 1.</p>
               ) : null}
             </div>
           ) : null}
 
           {scopeType === "TRAY" ? (
-            <div className={"gt-stack"}>
+            <div className={"grid gap-3"}>
               {traysGroupedByTent.map(([group, trays]) => (
-                <article className={"gt-cell gt-cell--muted"} key={group}>
+                <article className={"relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"} key={group}>
                   <strong>{group}</strong>
                   {trays.map((tray) => (
-                    <label className={"gt-row"} key={tray.tray_id}>
+                    <label className={"flex flex-wrap items-center gap-2"} key={tray.tray_id}>
                       <input
                         type="checkbox"
                         checked={selectedScopeIds.includes(tray.tray_id)}
@@ -1053,18 +1053,18 @@ export default function ExperimentSchedulePage() {
                 </article>
               ))}
               {(placementSummary ? unwrapList<PlacementSummary["trays"]["results"][number]>(placementSummary.trays).length : 0) === 0 ? (
-                <p className={"gt-text-muted"}>No trays available yet. Add trays in Placement.</p>
+                <p className={"text-sm text-muted-foreground"}>No trays available yet. Add trays in Placement.</p>
               ) : null}
             </div>
           ) : null}
 
           {scopeType === "PLANT" ? (
-            <div className={"gt-stack"}>
+            <div className={"grid gap-3"}>
               {plantsGroupedByLocation.map(([group, plants]) => (
-                <article className={"gt-cell gt-cell--muted"} key={group}>
+                <article className={"relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"} key={group}>
                   <strong>{group}</strong>
                   {plants.map((plant) => (
-                    <label className={"gt-row"} key={plant.uuid}>
+                    <label className={"flex flex-wrap items-center gap-2"} key={plant.uuid}>
                       <input
                         type="checkbox"
                         checked={selectedScopeIds.includes(plant.uuid)}
@@ -1079,24 +1079,24 @@ export default function ExperimentSchedulePage() {
                 </article>
               ))}
               {activePlants.length === 0 ? (
-                <p className={"gt-text-muted"}>No active plants available for scheduling.</p>
+                <p className={"text-sm text-muted-foreground"}>No active plants available for scheduling.</p>
               ) : null}
             </div>
           ) : null}
 
           {feedWarnings.length > 0 ? (
-            <div className={"gt-row"}>
+            <div className={"flex flex-wrap items-center gap-2"}>
               {feedWarnings.map((warning) => (
-                <span className={"gt-badge"} key={warning}>
+                <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"} key={warning}>
                   {warning}
                 </span>
               ))}
             </div>
           ) : null}
 
-          <div className={"gt-btnbar"}>
+          <div className={"flex flex-wrap items-center gap-2"}>
             <button
-              className={"gt-button gt-button--primary"}
+              className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
               type="button"
               disabled={saving}
               onClick={() => void saveScheduleAction()}
@@ -1105,7 +1105,7 @@ export default function ExperimentSchedulePage() {
             </button>
             {editingId ? (
               <button
-                className={"gt-button gt-button--secondary"}
+                className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
                 type="button"
                 disabled={saving}
                 onClick={resetForm}
@@ -1119,32 +1119,32 @@ export default function ExperimentSchedulePage() {
 
       <SectionCard title="Existing actions">
         {actions.length === 0 ? (
-          <p className={"gt-text-muted"}>No schedule actions yet.</p>
+          <p className={"text-sm text-muted-foreground"}>No schedule actions yet.</p>
         ) : (
-          <div className={"gt-stack"}>
+          <div className={"grid gap-3"}>
             {actions.map((action) => (
-              <article className={"gt-cell gt-cell--muted"} key={action.id}>
-                <div className={"gt-btnbar"}>
+              <article className={"relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"} key={action.id}>
+                <div className={"flex flex-wrap items-center gap-2"}>
                   <strong>{action.title}</strong>
-                  <span className={"gt-text-muted"}>{actionTypeLabel(action.action_type)}</span>
+                  <span className={"text-sm text-muted-foreground"}>{actionTypeLabel(action.action_type)}</span>
                 </div>
-                <p className={"gt-text-muted"}>
+                <p className={"text-sm text-muted-foreground"}>
                   {action.rules.map((rule) => summarizeRule(rule)).join(" · ")}
                 </p>
-                <p className={"gt-text-muted"}>
+                <p className={"text-sm text-muted-foreground"}>
                   {action.scopes.map((scope) => scope.label).join(", ")}
                 </p>
                 {action.current_blockers.length > 0 ? (
-                  <div className={"gt-row"}>
+                  <div className={"flex flex-wrap items-center gap-2"}>
                     {action.current_blockers.map((reason) => (
-                      <span className={"gt-badge"} key={reason}>
+                      <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"} key={reason}>
                         {reason}
                       </span>
                     ))}
                   </div>
                 ) : null}
-                <div className={"gt-btnbar"}>
-                  <label className={"gt-row"}>
+                <div className={"flex flex-wrap items-center gap-2"}>
+                  <label className={"flex flex-wrap items-center gap-2"}>
                     <input
                       type="checkbox"
                       checked={action.enabled}
@@ -1154,7 +1154,7 @@ export default function ExperimentSchedulePage() {
                     <span>Enabled</span>
                   </label>
                   <button
-                    className={"gt-button gt-button--secondary"}
+                    className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
                     type="button"
                     disabled={saving}
                     onClick={() => startEdit(action)}
@@ -1162,7 +1162,7 @@ export default function ExperimentSchedulePage() {
                     Edit
                   </button>
                   <button
-                    className={"gt-button gt-button--danger"}
+                    className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90"}
                     type="button"
                     disabled={saving}
                     onClick={() => void deleteScheduleAction(action.id)}

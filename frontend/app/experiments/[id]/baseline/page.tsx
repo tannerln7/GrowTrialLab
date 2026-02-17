@@ -10,7 +10,7 @@ import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 
-import styles from "../../experiments.module.css";
+import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
 type QueuePlant = {
   uuid: string;
@@ -726,39 +726,39 @@ export default function BaselinePage() {
       title="Baseline"
       subtitle="Record week 0 baseline metrics and grade."
       actions={
-        <Link className="gt-button gt-button--primary" href={`/experiments/${experimentId}/overview`}>
+        <Link className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
     >
-      {loading ? <p className="gt-text-muted">Loading baseline queue...</p> : null}
-      {error ? <p className="gt-text-danger">{error}</p> : null}
-      {notice ? <p className="gt-text-success">{notice}</p> : null}
+      {loading ? <p className="text-sm text-muted-foreground">Loading baseline queue...</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {notice ? <p className="text-sm text-emerald-400">{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Queue Status">
-        <p className="gt-text-muted">Remaining baselines: {queue?.remaining_count ?? 0}</p>
+        <p className="text-sm text-muted-foreground">Remaining baselines: {queue?.remaining_count ?? 0}</p>
         {baselineLocked ? (
-          <p className={"gt-text-muted"}>Baseline is locked in UI. Unlock editing for this session to continue.</p>
+          <p className={"text-sm text-muted-foreground"}>Baseline is locked in UI. Unlock editing for this session to continue.</p>
         ) : null}
-        <div className={"gt-btnbar"}>
+        <div className={"flex flex-wrap items-center gap-2"}>
           {baselineLocked && !editingUnlocked ? (
-            <button className="gt-button gt-button--danger" type="button" onClick={() => setEditingUnlocked(true)}>
+            <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90" type="button" onClick={() => setEditingUnlocked(true)}>
               Unlock editing
             </button>
           ) : null}
           {baselineLocked && editingUnlocked ? (
-            <button className="gt-button gt-button--secondary" type="button" onClick={() => setEditingUnlocked(false)}>
+            <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" onClick={() => setEditingUnlocked(false)}>
               Re-lock UI
             </button>
           ) : null}
           {!baselineLocked && allBaselinesCaptured ? (
-            <button className="gt-button gt-button--secondary" type="button" disabled={saving} onClick={() => void lockBaseline()}>
+            <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" disabled={saving} onClick={() => void lockBaseline()}>
               Finish and Lock
             </button>
           ) : null}
           <button
-            className="gt-button gt-button--primary"
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
             type="button"
             disabled={primarySaveDisabled}
             onClick={() => void saveBaseline(primarySaveLabel === "Save & Next")}
@@ -770,11 +770,11 @@ export default function BaselinePage() {
 
       {selectedPlantId ? (
         <SectionCard title="Capture Baseline">
-          <div className={"gt-stack"}>
-            <label className={"gt-col"}>
-              <span className={"gt-text-muted"}>Plant</span>
+          <div className={"grid gap-3"}>
+            <label className={"grid gap-2"}>
+              <span className={"text-sm text-muted-foreground"}>Plant</span>
               <select
-                className="gt-select"
+                className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                 value={selectedPlantId}
                 onChange={(event) => jumpToPlant(event.target.value)}
                 disabled={saving}
@@ -787,8 +787,8 @@ export default function BaselinePage() {
               </select>
             </label>
 
-            <div className={"gt-col"}>
-              <span className={"gt-text-muted"}>Baseline metrics (1-5)</span>
+            <div className={"grid gap-2"}>
+              <span className={"text-sm text-muted-foreground"}>Baseline metrics (1-5)</span>
               <div className={styles.metricSliderGrid}>
                 {sliderDefinitions.map((slider) => {
                   const value = sliderValues[slider.key];
@@ -829,8 +829,8 @@ export default function BaselinePage() {
               </div>
             </div>
 
-            <div className={"gt-col"}>
-              <span className={"gt-text-muted"}>Grade</span>
+            <div className={"grid gap-2"}>
+              <span className={"text-sm text-muted-foreground"}>Grade</span>
               <div className={styles.baselineGradeRow}>
                 <span className={styles.baselineGradePill}>{gradeStatusChipText}</span>
                 {manualOverrideActive ? (
@@ -855,7 +855,7 @@ export default function BaselinePage() {
                   return (
                     <button
                       key={grade}
-                      className={selected ? "gt-button gt-button--primary" : "gt-button gt-button--secondary"}
+                      className={selected ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
                       type="button"
                       disabled={saving || readOnly}
                       onClick={() => {
@@ -874,14 +874,14 @@ export default function BaselinePage() {
                 })}
               </div>
               {selectedBaselineCapturedAt ? (
-                <p className={"gt-text-muted"}>
+                <p className={"text-sm text-muted-foreground"}>
                   Last baseline capture: {new Date(selectedBaselineCapturedAt).toLocaleString()}
                 </p>
               ) : null}
             </div>
 
-            <div className={"gt-col"}>
-              <span className={"gt-text-muted"}>Baseline photo</span>
+            <div className={"grid gap-2"}>
+              <span className={"text-sm text-muted-foreground"}>Baseline photo</span>
               <div className={styles.baselinePhotoRow}>
                 <div className={styles.baselinePhotoThumbCell}>
                   {photoThumbnailSrc ? (
@@ -897,7 +897,7 @@ export default function BaselinePage() {
                 </div>
                 <div className={styles.baselinePhotoControls}>
                   <input
-                    className={`gt-input ${styles.baselineFileInput}`}
+                    className={`flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ${styles.baselineFileInput}`}
                     type="file"
                     accept="image/*"
                     capture="environment"
@@ -905,7 +905,7 @@ export default function BaselinePage() {
                     onChange={(event) => setPhotoFile(event.target.files?.[0] || null)}
                   />
                   <button
-                    className="gt-button gt-button--secondary"
+                    className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"
                     type="button"
                     disabled={readOnly || uploadingPhoto || saving || !photoFile}
                     onClick={() => void uploadBaselinePhoto()}
@@ -915,16 +915,16 @@ export default function BaselinePage() {
                 </div>
               </div>
               {selectedBaselinePhoto ? (
-                <p className={"gt-text-muted"}>
+                <p className={"text-sm text-muted-foreground"}>
                   Latest upload: {new Date(selectedBaselinePhoto.created_at).toLocaleString()}
                 </p>
               ) : null}
             </div>
 
-            <label className={"gt-col"}>
-              <span className={"gt-text-muted"}>Notes</span>
+            <label className={"grid gap-2"}>
+              <span className={"text-sm text-muted-foreground"}>Notes</span>
               <textarea
-                className="gt-textarea"
+                className="flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 disabled={saving || readOnly}
@@ -936,7 +936,7 @@ export default function BaselinePage() {
 
       <SectionCard title="Plant Queue">
         {queuePlants.length > 0 ? (
-          <div className={[styles.plantCellGrid, "gt-grid"].join(" ")} data-cell-size="sm">
+          <div className={[styles.plantCellGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="sm">
             {queuePlants.map((plant) => {
               const selected = plant.uuid === selectedPlantId;
               return (
@@ -945,8 +945,8 @@ export default function BaselinePage() {
                   className={[
                     styles.plantCell,
                     styles.baselineQueuePlantCell,
-                    "gt-cell gt-cell--interactive",
-                    selected ? "gt-cell--selected" : "",
+                    "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] cursor-pointer hover:border-ring/70",
+                    selected ? "border-ring bg-muted/40" : "",
                     selected ? styles.plantCellSelected : "",
                   ]
                     .filter(Boolean)
@@ -973,7 +973,7 @@ export default function BaselinePage() {
             })}
           </div>
         ) : (
-          <p className={"gt-text-muted"}>No active plants found in this queue.</p>
+          <p className={"text-sm text-muted-foreground"}>No active plants found in this queue.</p>
         )}
       </SectionCard>
 

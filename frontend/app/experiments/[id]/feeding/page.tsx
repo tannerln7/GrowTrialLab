@@ -331,20 +331,20 @@ export default function FeedingPage() {
       title="Feeding"
       subtitle="Record feeding quickly for active plants."
       actions={
-        <Link className={"gt-button gt-button--primary"} href={overviewHref}>
+        <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={overviewHref}>
           ← Overview
         </Link>
       }
     >
-      {loading ? <p className={"gt-text-muted"}>Loading feeding queue...</p> : null}
-      {error ? <p className={"gt-text-danger"}>{error}</p> : null}
-      {notice ? <p className={"gt-text-success"}>{notice}</p> : null}
+      {loading ? <p className={"text-sm text-muted-foreground"}>Loading feeding queue...</p> : null}
+      {error ? <p className={"text-sm text-destructive"}>{error}</p> : null}
+      {notice ? <p className={"text-sm text-emerald-400"}>{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       {statusSummary && statusSummary.lifecycle.state !== "running" ? (
         <SectionCard title="Feeding Requires Running State">
-          <p className={"gt-text-muted"}>Feeding is available only while an experiment is running.</p>
-          <Link className={"gt-button gt-button--primary"} href={`/experiments/${experimentId}/overview`}>
+          <p className={"text-sm text-muted-foreground"}>Feeding is available only while an experiment is running.</p>
+          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={`/experiments/${experimentId}/overview`}>
             Start experiment from Overview
           </Link>
         </SectionCard>
@@ -353,15 +353,15 @@ export default function FeedingPage() {
       {statusSummary && statusSummary.lifecycle.state === "running" && queue ? (
         <>
           <SectionCard title="Queue Status">
-            <div className={"gt-stack"}>
-              <span className={"gt-badge"}>Remaining feedings: {queue.remaining_count}</span>
-              <p className={"gt-text-muted"}>Window: feed plants at least once every {queue.window_days} days.</p>
+            <div className={"grid gap-3"}>
+              <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"}>Remaining feedings: {queue.remaining_count}</span>
+              <p className={"text-sm text-muted-foreground"}>Window: feed plants at least once every {queue.window_days} days.</p>
               {selectedPlant && !selectedPlant.needs_feeding ? (
-                <p className={"gt-text-muted"}>This plant is already within the feeding window.</p>
+                <p className={"text-sm text-muted-foreground"}>This plant is already within the feeding window.</p>
               ) : null}
               {queue.remaining_count > 0 ? (
                 <button
-                  className={"gt-button gt-button--secondary"}
+                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
                   type="button"
                   onClick={() => {
                     const next = pickNextNeedingFeed(queuePlants, selectedPlantId);
@@ -373,26 +373,26 @@ export default function FeedingPage() {
                   Next needing feeding
                 </button>
               ) : (
-                <p className={"gt-text-success"}>All plants are up to date.</p>
+                <p className={"text-sm text-emerald-400"}>All plants are up to date.</p>
               )}
             </div>
           </SectionCard>
 
           {queue.remaining_count === 0 && !selectedPlant ? (
             <SectionCard title="All Feedings Complete">
-              <p className={"gt-text-muted"}>No active plants currently need feeding.</p>
-              <Link className={"gt-button gt-button--primary"} href={`/experiments/${experimentId}/overview`}>
+              <p className={"text-sm text-muted-foreground"}>No active plants currently need feeding.</p>
+              <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={`/experiments/${experimentId}/overview`}>
                 Back to Overview
               </Link>
             </SectionCard>
           ) : null}
 
           <SectionCard title="Feed Plant">
-            <div className={"gt-stack"}>
-              <label className={"gt-col"}>
-                <span className={"gt-text-muted"}>Plant</span>
+            <div className={"grid gap-3"}>
+              <label className={"grid gap-2"}>
+                <span className={"text-sm text-muted-foreground"}>Plant</span>
                 <select
-                  className={"gt-select"}
+                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                   value={selectedPlantId ?? ""}
                   onChange={(event) => selectPlant(event.target.value || null, true)}
                 >
@@ -405,36 +405,36 @@ export default function FeedingPage() {
                 </select>
               </label>
               {selectedPlant ? (
-                <div className={"gt-stack"}>
-                  <p className={"gt-text-muted"}>Last fed: {formatLastFed(selectedPlant.last_fed_at)}</p>
-                  <p className={"gt-text-muted"}>
+                <div className={"grid gap-3"}>
+                  <p className={"text-sm text-muted-foreground"}>Last fed: {formatLastFed(selectedPlant.last_fed_at)}</p>
+                  <p className={"text-sm text-muted-foreground"}>
                     Assigned recipe:{" "}
                     {selectedPlant.assigned_recipe
                       ? `${selectedPlant.assigned_recipe.code}${selectedPlant.assigned_recipe.name ? ` - ${selectedPlant.assigned_recipe.name}` : ""}`
                       : "Unassigned"}
                   </p>
-                  <p className={"gt-text-muted"}>Location: {locationLabel(selectedPlant)}</p>
+                  <p className={"text-sm text-muted-foreground"}>Location: {locationLabel(selectedPlant)}</p>
                   {selectedPlant.blocked_reason ? (
-                    <p className={"gt-text-danger"}>Blocked: {selectedPlant.blocked_reason}</p>
+                    <p className={"text-sm text-destructive"}>Blocked: {selectedPlant.blocked_reason}</p>
                   ) : null}
                 </div>
               ) : null}
-              <label className={"gt-col"}>
-                <span className={"gt-text-muted"}>Amount (optional)</span>
+              <label className={"grid gap-2"}>
+                <span className={"text-sm text-muted-foreground"}>Amount (optional)</span>
                 <input
-                  className={"gt-input"}
+                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
                   value={amountText}
                   onChange={(event) => setAmountText(event.target.value)}
                   placeholder="3 drops"
                 />
               </label>
-              <button className={"gt-button gt-button--secondary"} type="button" onClick={() => setShowNote((current) => !current)}>
+              <button className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} type="button" onClick={() => setShowNote((current) => !current)}>
                 {showNote ? "Hide note" : "Add note"}
               </button>
               {showNote ? (
-                <label className={"gt-col"}>
-                  <span className={"gt-text-muted"}>Note (optional)</span>
-                  <textarea className={"gt-textarea"} value={note} onChange={(event) => setNote(event.target.value)} />
+                <label className={"grid gap-2"}>
+                  <span className={"text-sm text-muted-foreground"}>Note (optional)</span>
+                  <textarea className={"flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"} value={note} onChange={(event) => setNote(event.target.value)} />
                 </label>
               ) : null}
             </div>
@@ -442,16 +442,16 @@ export default function FeedingPage() {
 
           {saveBlocked ? (
             <SectionCard title="Feeding Blocked">
-              <p className={"gt-text-muted"}>
+              <p className={"text-sm text-muted-foreground"}>
                 {saveBlockedReason === "Unplaced"
                   ? "This plant needs placement in a tray before feeding."
                   : "This plant needs a plant recipe before feeding."}
               </p>
-              <div className={"gt-btnbar"}>
-                <Link className={"gt-button gt-button--primary"} href={`/experiments/${experimentId}/placement`}>
+              <div className={"flex flex-wrap items-center gap-2"}>
+                <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={`/experiments/${experimentId}/placement`}>
                   Fix placement
                 </Link>
-                <Link className={"gt-button gt-button--secondary"} href={overviewHref}>
+                <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href={overviewHref}>
                   Back to Overview
                 </Link>
               </div>
@@ -481,14 +481,14 @@ export default function FeedingPage() {
                   },
                 ]}
                 renderMobileCard={(plant) => (
-                  <div className={"gt-col"}>
+                  <div className={"grid gap-2"}>
                     <span>Plant</span>
                     <strong>{plant.plant_id || "(pending)"}</strong>
                     <span>Species</span>
                     <strong>{plant.species_name}</strong>
                     <span>Last fed</span>
                     <strong>{formatLastFed(plant.last_fed_at)}</strong>
-                    <button className={"gt-button gt-button--secondary"} type="button" onClick={() => selectPlant(plant.uuid, true)}>
+                    <button className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} type="button" onClick={() => selectPlant(plant.uuid, true)}>
                       Select
                     </button>
                   </div>
@@ -499,7 +499,7 @@ export default function FeedingPage() {
 
           <StickyActionBar>
             <button
-              className={"gt-button gt-button--primary"}
+              className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
               type="button"
               disabled={!selectedPlantId || saving || saveBlocked}
               onClick={() => void saveFeeding(false)}
@@ -507,7 +507,7 @@ export default function FeedingPage() {
               {saving ? "Saving..." : "Save"}
             </button>
             <button
-              className={"gt-button gt-button--secondary"}
+              className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
               type="button"
               disabled={!selectedPlantId || saving || !canSaveAndNext || saveBlocked}
               onClick={() => void saveFeeding(true)}

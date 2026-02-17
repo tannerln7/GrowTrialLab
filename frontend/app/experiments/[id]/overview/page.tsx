@@ -13,7 +13,7 @@ import { api, isApiError } from "@/src/lib/api";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
-import styles from "../../experiments.module.css";
+import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
 type LocationNode = {
   id: string;
@@ -388,7 +388,7 @@ export default function ExperimentOverviewPage() {
     (summary?.schedule.due_counts_today ?? 0) > 0 || summary?.schedule.next_scheduled_slot == null;
 
   function actionButtonClass(needsAttention: boolean): string {
-    return [needsAttention ? "gt-button gt-button--primary" : "gt-button gt-button--secondary", styles.overviewActionButton].join(" ");
+    return [needsAttention ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80", styles.overviewActionButton].join(" ");
   }
 
   const readinessItems = [
@@ -646,7 +646,7 @@ export default function ExperimentOverviewPage() {
           styles.plantCell,
           styles.overviewPlantCellLink,
           styles.overviewPlantCell,
-          "gt-cell gt-cell--interactive",
+          "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] cursor-pointer hover:border-ring/70",
         ].join(" ")}
       >
         <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
@@ -690,14 +690,14 @@ export default function ExperimentOverviewPage() {
 
   return (
     <PageShell title="Overview" subtitle={experimentName || experimentId}>
-      {loading ? <p className="gt-text-muted">Loading overview...</p> : null}
-      {error ? <p className="gt-text-danger">{error}</p> : null}
-      {notice ? <p className="gt-text-success">{notice}</p> : null}
+      {loading ? <p className="text-sm text-muted-foreground">Loading overview...</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {notice ? <p className="text-sm text-emerald-400">{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Experiment State">
         <div className={styles.overviewStateCard}>
-          <p className="gt-text-muted">State: {summary?.lifecycle.state.toUpperCase() || "UNKNOWN"}</p>
+          <p className="text-sm text-muted-foreground">State: {summary?.lifecycle.state.toUpperCase() || "UNKNOWN"}</p>
           <div className={styles.overviewReadinessRow}>
             {readinessItems.map((item) => (
               <span
@@ -713,7 +713,7 @@ export default function ExperimentOverviewPage() {
           </div>
           <div className={styles.overviewStateActionRow}>
             <button
-              className={["gt-button gt-button--primary", styles.overviewActionButton].join(" ")}
+              className={["inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90", styles.overviewActionButton].join(" ")}
               type="button"
               disabled={busy || !startReady}
               onClick={startExperiment}
@@ -722,7 +722,7 @@ export default function ExperimentOverviewPage() {
             </button>
             {summary?.lifecycle.state === "running" ? (
               <button
-                className={["gt-button gt-button--danger", styles.overviewActionButton].join(" ")}
+                className={["inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90", styles.overviewActionButton].join(" ")}
                 type="button"
                 disabled={busy}
                 onClick={stopExperiment}
@@ -747,17 +747,17 @@ export default function ExperimentOverviewPage() {
             </Link>
           </div>
           {!startReady ? (
-            <p className={"gt-text-muted"}>Start blocked until readiness is complete.</p>
+            <p className={"text-sm text-muted-foreground"}>Start blocked until readiness is complete.</p>
           ) : null}
         </div>
       </SectionCard>
 
       <SectionCard title="Schedule">
         <div className={styles.overviewScheduleCard}>
-          <p className="gt-text-muted">
+          <p className="text-sm text-muted-foreground">
             Next schedule slot: {formatScheduleSlot(summary?.schedule.next_scheduled_slot || null)}
           </p>
-          <div className={"gt-btnbar"}>
+          <div className={"flex flex-wrap items-center gap-2"}>
             <Link className={actionButtonClass(scheduleNeedsAttention)} href={`/experiments/${experimentId}/schedule`}>
               Schedule
             </Link>
@@ -772,7 +772,7 @@ export default function ExperimentOverviewPage() {
               return (
                 <article
                   key={tentGroup.tent.id}
-                  className={[styles.tentBoardCard, styles.overviewTentBoardCard, "gt-surface"].join(" ")}
+                  className={[styles.tentBoardCard, styles.overviewTentBoardCard, "rounded-lg border border-border bg-card"].join(" ")}
                 >
                   <div className={styles.trayHeaderRow}>
                     <div className={styles.trayHeaderMeta}>
@@ -808,7 +808,7 @@ export default function ExperimentOverviewPage() {
                                     styles.slotCell,
                                     styles.overviewSlotCell,
                                     styles.overviewSlotCellEmpty,
-                                    "gt-cell gt-cell--muted",
+                                    "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40",
                                   ].join(" ")}
                                 >
                                   <span className={styles.slotCellLabel}>Slot {slotIndex}</span>
@@ -820,7 +820,7 @@ export default function ExperimentOverviewPage() {
                             return (
                               <div
                                 key={slotGroup.slot.id}
-                                className={[styles.slotCell, styles.overviewSlotCell, "gt-cell gt-cell--muted"].join(" ")}
+                                className={[styles.slotCell, styles.overviewSlotCell, "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"].join(" ")}
                                 style={{ gridColumnStart: slotIndex }}
                               >
                                 <span className={styles.slotCellLabel}>Slot {slotIndex}</span>
@@ -828,7 +828,7 @@ export default function ExperimentOverviewPage() {
                                   {slotGroup.trays.map((trayGroup) => (
                                     <article
                                       key={trayGroup.tray.id}
-                                      className={[styles.overviewTrayCell, "gt-surface"].join(" ")}
+                                      className={[styles.overviewTrayCell, "rounded-lg border border-border bg-card"].join(" ")}
                                     >
                                     <div className={styles.overviewTrayMeta}>
                                       <strong className={styles.trayGridCellId}>
@@ -840,7 +840,7 @@ export default function ExperimentOverviewPage() {
                                           </span>
                                         ) : null}
                                       </div>
-                                      <div className={[styles.plantCellGridTray, "gt-grid"].join(" ")} data-cell-size="sm">
+                                      <div className={[styles.plantCellGridTray, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="sm">
                                         {trayGroup.plants.map((plant) => renderPlantCell(plant))}
                                       </div>
                                     </article>
@@ -857,7 +857,7 @@ export default function ExperimentOverviewPage() {
                       );
                     })}
                     {tentGroup.shelves.length === 0 ? (
-                      <p className="gt-text-muted">No mapped slots.</p>
+                      <p className="text-sm text-muted-foreground">No mapped slots.</p>
                     ) : null}
                   </div>
                 </article>
@@ -869,7 +869,7 @@ export default function ExperimentOverviewPage() {
 
       {placementGroups.unplaced.length > 0 ? (
         <SectionCard title="Unplaced Plants">
-          <div className={[styles.plantCellGrid, "gt-grid"].join(" ")} data-cell-size="sm">
+          <div className={[styles.plantCellGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="sm">
             {placementGroups.unplaced.map((plant) => renderPlantCell(plant))}
           </div>
         </SectionCard>
@@ -878,7 +878,7 @@ export default function ExperimentOverviewPage() {
       {!loading && sortedPlants.length === 0 ? (
         <SectionCard>
           <IllustrationPlaceholder inventoryId="ILL-201" kind="generic" />
-          <p className="gt-text-muted">No plants available for this experiment.</p>
+          <p className="text-sm text-muted-foreground">No plants available for this experiment.</p>
         </SectionCard>
       ) : null}
     </PageShell>
