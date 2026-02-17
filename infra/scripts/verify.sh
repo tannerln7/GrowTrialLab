@@ -5,7 +5,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 echo "[verify] Running backend tests..."
-(cd backend && uv run python manage.py test)
+(cd backend && uv run pytest)
 
 echo "[verify] Running pyright..."
 pnpm pyright
