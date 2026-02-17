@@ -87,6 +87,24 @@ Context7/WebSearch MCP servers were not available in this workspace session (`un
    Notes:
    - Devtools, portals, and dynamic client-only widgets should avoid SSR mismatch by using client-only dynamic imports where needed.
 
+## Phase 1 Notes (React Query + Devtools MCP Refresh)
+Sources:
+- https://tanstack.com/query/latest/docs/framework/react/guides/advanced-ssr
+- https://tanstack.com/query/latest/docs/framework/react/devtools
+
+Key integration notes for this repo:
+1. **Keep Query client/provider in client-only boundary**  
+   `QueryClientProvider` must live in a `"use client"` provider in App Router; query hooks stay in client components.
+
+2. **Use non-zero stale windows on operator pages**  
+   TanStack guidance for SSR/App Router setups recommends non-zero `staleTime` to avoid immediate client refetch churn after hydration. For this app, conservative stale windows + explicit mutation invalidation are preferred.
+
+3. **Query key discipline is mandatory before broad rollout**  
+   Query invalidation is key-driven; stable key builders should be centralized early so future pages don’t fragment cache behavior.
+
+4. **Devtools should remain dev-only and client-only**  
+   React Query devtools are documented as dev-oriented and Next App Dir notes call out installing as a dev dependency; keep rendering gated to `NODE_ENV === "development"` and client-only loading.
+
 ## Additional Library Suggestions (Not in Required Set)
 1. **`sonner` (toasts)** — **Phase 1**  
    Problem solved here:
@@ -314,4 +332,3 @@ Smallest migration slice:
 5. **Virtualization on mobile**: dynamic row heights + sticky headers can degrade UX if introduced too early.
 6. **URL-state loops**: pages syncing `searchParams` with local state need careful migration ordering to avoid navigation churn.
 7. **Offline/error handling consistency**: centralize typed error handling before broad page conversion to prevent regressions.
-

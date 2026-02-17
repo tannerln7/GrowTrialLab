@@ -24,6 +24,16 @@ This file records architecture/product decisions and why they were made.
 
 ## Decision Entries
 
+### 2026-02-17: React Query Phase 1 pattern standardizes key factory + API client + page-state normalization
+- Decision: Phase 1 adopts a shared React Query integration pattern before wider page migrations:
+  - canonical key builders in `frontend/src/lib/queryKeys.ts` (`experimentStatus`, `experimentOverviewPlants`)
+  - typed fetch wrappers in `frontend/src/lib/api.ts` (`get/post/patch/delete`) with normalized `ApiError { status, detail, diagnostics }`
+  - shared query-state classification hook in `frontend/src/lib/usePageQueryState.ts` (`offline|unauthorized|forbidden|not_found|server|unknown`)
+- Decision: `/experiments/{id}/overview` is the first migration target, with `useQuery` for status/roster and `useMutation` for lifecycle start/stop plus invalidate-on-success.
+- Rationale: Establishing a stable cache-key/error contract early avoids per-page drift and reduces repeated loading/error boilerplate during later migrations.
+- Refs: `e8aa02c`, `d08a56f`.
+- Guardrails: Keep operator pages on conservative refetch defaults (`staleTime`, no focus refetch by default) and avoid coupling query keys to local URL-search sync unless the backend query actually depends on those params.
+
 ### 2026-02-17: Adopt Radix + TanStack Query/Table/Virtual + RHF+Zod + AutoAnimate as UI refactor stack
 - Decision: Standardize upcoming frontend refactors on:
   - Radix UI primitives for accessible headless interactive controls

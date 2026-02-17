@@ -65,6 +65,10 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
   - Refs: `02ecbdd7`, `58d6c60a`
   - Files: `frontend/src/app/providers.tsx`, `frontend/app/layout.tsx`, `docs/phase0-ui-refactor-findings.md`.
   - Notes: Added Radix/TanStack/RHF+Zod/AutoAnimate dependency baseline, stable App Router `QueryClientProvider` scaffold, dev-only React Query devtools gating, and a migration map report for Setup/Overview/Cockpit/Baseline/Placement/Rotation/Feeding/Schedule.
+- [x] Phase 1 React Query overview migration + shared cache/error foundations (owner: Codex)
+  - Refs: `e8aa02c`, `d08a56f`
+  - Files/routes: `frontend/src/lib/queryKeys.ts`, `frontend/src/lib/api.ts`, `frontend/src/lib/usePageQueryState.ts`, `/experiments/{id}/overview`.
+  - Notes: Introduced canonical Query key builders, normalized API error helper, reusable query page-state classification hook, and moved Overview status/roster + start/stop lifecycle actions to `useQuery`/`useMutation` with invalidate-on-success.
 - [x] Cloudflare Access auth middleware with invite-only provisioning and bootstrap admin (owner: Codex)
   - Refs: `262849c8`, `bba65cd9`, `f00306e5`
   - Routes: `GET /api/me`, middleware exemption `GET /healthz`.
