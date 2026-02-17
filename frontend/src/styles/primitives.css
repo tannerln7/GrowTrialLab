@@ -65,6 +65,89 @@
   border-bottom: 1px solid var(--gt-border-subtle);
 }
 
+.gt-text-muted,
+.gt-text-danger,
+.gt-text-success {
+  margin: 0;
+}
+
+.gt-text-muted {
+  color: var(--gt-text-muted);
+}
+
+.gt-text-danger {
+  color: color-mix(in srgb, var(--gt-danger) 84%, var(--gt-text));
+}
+
+.gt-text-success {
+  color: color-mix(in srgb, var(--gt-accent-2) 82%, var(--gt-text));
+}
+
+.gt-button {
+  border-radius: var(--gt-radius-md);
+  padding: 0.62rem 0.9rem;
+  border: 1px solid var(--gt-border);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.gt-button--primary {
+  background: var(--gt-text-muted);
+  color: var(--gt-surface);
+  border-color: color-mix(in srgb, var(--gt-text-muted) 65%, var(--gt-border));
+}
+
+.gt-button--primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--gt-text-muted) 88%, #ffffff);
+}
+
+.gt-button--secondary {
+  background: color-mix(in srgb, var(--gt-surface-2) 88%, var(--gt-text-muted) 12%);
+  color: var(--gt-text);
+  border-color: color-mix(in srgb, var(--gt-border) 78%, var(--gt-text-muted) 22%);
+}
+
+.gt-button--secondary:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--gt-text-muted) 56%, var(--gt-border));
+  background: color-mix(in srgb, var(--gt-surface-2) 82%, var(--gt-text-muted) 18%);
+}
+
+.gt-button--danger {
+  background: color-mix(in srgb, var(--gt-text-muted) 35%, var(--gt-surface-2));
+  color: var(--gt-text);
+  border-color: color-mix(in srgb, var(--gt-text-muted) 60%, var(--gt-border));
+}
+
+.gt-button--danger:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--gt-text-muted) 75%, var(--gt-border));
+}
+
+.gt-button:disabled,
+.gt-icon-button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.gt-input,
+.gt-textarea,
+.gt-select {
+  width: 100%;
+  background: var(--gt-surface-2);
+  border: 1px solid var(--gt-border);
+  border-radius: var(--gt-radius-md);
+  color: var(--gt-text);
+  padding: 0.64rem 0.72rem;
+}
+
+.gt-textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
 .gt-chip,
 .gt-badge {
   display: inline-flex;
@@ -112,12 +195,53 @@
   border-color: color-mix(in srgb, var(--gt-text-muted) 56%, var(--gt-border));
 }
 
+.gt-icon-button {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--gt-radius-md);
+  border: 1px solid color-mix(in srgb, var(--gt-border) 76%, var(--gt-text-muted) 24%);
+  background: color-mix(in srgb, var(--gt-surface-2) 86%, var(--gt-text-muted) 14%);
+  color: var(--gt-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.gt-icon-button:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--gt-text-muted) 58%, var(--gt-border));
+  background: color-mix(in srgb, var(--gt-surface-2) 80%, var(--gt-text-muted) 20%);
+}
+
+.gt-icon-button--danger {
+  border-color: color-mix(in srgb, var(--gt-text-muted) 55%, var(--gt-border));
+  background: color-mix(in srgb, var(--gt-text-muted) 22%, var(--gt-surface-2));
+}
+
+.gt-icon-button--danger:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--gt-text-muted) 75%, var(--gt-border));
+}
+
+.gt-tooltip {
+  border-radius: var(--gt-radius-sm);
+  border: 1px solid var(--gt-border);
+  background: var(--gt-surface);
+  color: var(--gt-text);
+  padding: 0.3rem 0.45rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.gt-tooltip-arrow {
+  fill: var(--gt-surface);
+}
+
 :where(
     .gt-cell,
     .gt-chip,
     .gt-badge,
-    .gt-iconButton,
-    .gt-action,
+    .gt-icon-button,
+    .gt-button,
     .gt-stickyFooter button,
     .gt-stickyFooter a
   ):focus-visible {

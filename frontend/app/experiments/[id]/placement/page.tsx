@@ -252,7 +252,7 @@ function ToolIconButton({
       <Tooltip.Root>
         <Tooltip.Trigger asChild>
           <button
-            className={danger ? styles.toolbarIconDanger : styles.toolbarIconButton}
+            className={danger ? "gt-icon-button gt-icon-button--danger" : "gt-icon-button"}
             type="button"
             onClick={onClick}
             disabled={disabled}
@@ -263,9 +263,9 @@ function ToolIconButton({
           </button>
         </Tooltip.Trigger>
         <Tooltip.Portal>
-          <Tooltip.Content className={styles.toolbarTooltip} sideOffset={6}>
+          <Tooltip.Content className="gt-tooltip" sideOffset={6}>
             {label}
-            <Tooltip.Arrow className={styles.toolbarTooltipArrow} />
+            <Tooltip.Arrow className="gt-tooltip-arrow" />
           </Tooltip.Content>
         </Tooltip.Portal>
       </Tooltip.Root>
@@ -1849,14 +1849,14 @@ export default function PlacementPage() {
       title="Placement"
       subtitle="Step through tent/slot setup, tray setup, then staged placement applies."
       actions={
-        <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
+        <Link className="gt-button gt-button--primary" href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
     >
-      {loading ? <p className={styles.mutedText}>Loading placement...</p> : null}
-      {error ? <p className={styles.errorText}>{error}</p> : null}
-      {notice ? <p className={styles.successText}>{notice}</p> : null}
+      {loading ? <p className="gt-text-muted">Loading placement...</p> : null}
+      {error ? <p className="gt-text-danger">{error}</p> : null}
+      {notice ? <p className="gt-text-success">{notice}</p> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       {placementLocked ? (
@@ -1895,7 +1895,7 @@ export default function PlacementPage() {
         {!isStepComplete(currentStep) ? (
           <div className={[styles.stepBlocker, "gt-surface"].join(" ")}>
             <strong>Step blocker</strong>
-            <p className={styles.mutedText}>{stepBlockedMessage(currentStep)}</p>
+            <p className="gt-text-muted">{stepBlockedMessage(currentStep)}</p>
           </div>
         ) : null}
 
@@ -1906,13 +1906,13 @@ export default function PlacementPage() {
                 <div className={styles.formGrid}>
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>Tent name</span>
-                    <input className={styles.input} value={newTentName} onChange={(event) => setNewTentName(event.target.value)} />
+                    <input className="gt-input" value={newTentName} onChange={(event) => setNewTentName(event.target.value)} />
                   </label>
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>Tent code</span>
-                    <input className={styles.input} value={newTentCode} onChange={(event) => setNewTentCode(event.target.value)} />
+                    <input className="gt-input" value={newTentCode} onChange={(event) => setNewTentCode(event.target.value)} />
                   </label>
-                  <button className={styles.buttonPrimary} type="button" disabled={saving} onClick={() => void createTent()}>
+                  <button className="gt-button gt-button--primary" type="button" disabled={saving} onClick={() => void createTent()}>
                     {saving ? "Saving..." : "Add tent"}
                   </button>
                 </div>
@@ -1929,7 +1929,7 @@ export default function PlacementPage() {
                     <div className={styles.formGrid}>
                       <div className={styles.trayControlRow}>
                         <input
-                          className={styles.input}
+                          className="gt-input"
                           value={tentDraft.name}
                           onChange={(event) =>
                             setTentDraftById((current) => ({
@@ -1943,7 +1943,7 @@ export default function PlacementPage() {
                           aria-label="Tent name"
                         />
                         <input
-                          className={styles.input}
+                          className="gt-input"
                           value={tentDraft.code}
                           onChange={(event) =>
                             setTentDraftById((current) => ({
@@ -1956,7 +1956,7 @@ export default function PlacementPage() {
                           }
                           aria-label="Tent code"
                         />
-                        <button className={styles.buttonSecondary} type="button" disabled={saving} onClick={() => void saveTentDetails(tent)}>
+                        <button className="gt-button gt-button--secondary" type="button" disabled={saving} onClick={() => void saveTentDetails(tent)}>
                           Save tent
                         </button>
                       </div>
@@ -1991,10 +1991,10 @@ export default function PlacementPage() {
                       <div className={styles.field}>
                         <span className={styles.fieldLabel}>Shelves layout</span>
                         <div className={styles.actions}>
-                          <button className={styles.buttonSecondary} type="button" onClick={() => addShelf(tent.tent_id)}>
+                          <button className="gt-button gt-button--secondary" type="button" onClick={() => addShelf(tent.tent_id)}>
                             Add shelf
                           </button>
-                          <button className={styles.buttonSecondary} type="button" onClick={() => removeShelf(tent.tent_id)}>
+                          <button className="gt-button gt-button--secondary" type="button" onClick={() => removeShelf(tent.tent_id)}>
                             Remove shelf
                           </button>
                         </div>
@@ -2002,7 +2002,7 @@ export default function PlacementPage() {
                           <label className={styles.field} key={`${tent.tent_id}-shelf-${index + 1}`}>
                             <span className={styles.fieldLabel}>Shelf {index + 1} slot count</span>
                             <input
-                              className={styles.input}
+                              className="gt-input"
                               type="number"
                               min={0}
                               value={count}
@@ -2019,21 +2019,21 @@ export default function PlacementPage() {
                         <div className={styles.previewGrid}>
                           {shelfCounts.map((count, index) => (
                             <div className={styles.previewRow} key={`${tent.tent_id}-preview-${index + 1}`}>
-                              <strong className={styles.mutedText}>Shelf {index + 1}</strong>
+                              <strong className="gt-text-muted">Shelf {index + 1}</strong>
                               <div className={styles.previewCells}>
                                 {Array.from({ length: Math.max(0, count) }).map((_, slotIndex) => (
                                   <span className={styles.previewCell} key={`${tent.tent_id}-${index + 1}-${slotIndex + 1}`}>
                                     {`S${index + 1}-${slotIndex + 1}`}
                                   </span>
                                 ))}
-                                {count === 0 ? <span className={styles.mutedText}>No slots</span> : null}
+                                {count === 0 ? <span className="gt-text-muted">No slots</span> : null}
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
 
-                      <button className={styles.buttonPrimary} type="button" disabled={saving} onClick={() => void generateSlots(tent.tent_id)}>
+                      <button className="gt-button gt-button--primary" type="button" disabled={saving} onClick={() => void generateSlots(tent.tent_id)}>
                         {saving ? "Generating..." : `Generate slots (${totalSlots})`}
                       </button>
 
@@ -2053,7 +2053,7 @@ export default function PlacementPage() {
                               {slot.code}
                             </span>
                           ))}
-                        {tent.slots.length === 0 ? <span className={styles.mutedText}>No slots generated yet.</span> : null}
+                        {tent.slots.length === 0 ? <span className="gt-text-muted">No slots generated yet.</span> : null}
                       </div>
                     </div>
                   </SectionCard>
@@ -2068,19 +2068,19 @@ export default function PlacementPage() {
                 <div className={styles.formGrid}>
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>Tray code/name</span>
-                    <input className={styles.input} value={newTrayName} onChange={(event) => setNewTrayName(event.target.value)} />
+                    <input className="gt-input" value={newTrayName} onChange={(event) => setNewTrayName(event.target.value)} />
                   </label>
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>Capacity</span>
                     <input
-                      className={styles.input}
+                      className="gt-input"
                       type="number"
                       min={1}
                       value={newTrayCapacity}
                       onChange={(event) => setNewTrayCapacity(Number.parseInt(event.target.value || "1", 10))}
                     />
                   </label>
-                  <button className={styles.buttonPrimary} type="button" disabled={saving} onClick={() => void createTray()}>
+                  <button className="gt-button gt-button--primary" type="button" disabled={saving} onClick={() => void createTray()}>
                     {saving ? "Saving..." : "Create tray"}
                   </button>
                 </div>
@@ -2088,8 +2088,8 @@ export default function PlacementPage() {
 
               <SectionCard title={`Tray Manager (${trays.length})`}>
                 <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
-                  <span className={styles.mutedText}>Total trays: {sortedTrayIds.length}</span>
-                  <span className={styles.mutedText}>Selected: {selectedTrayManagerIds.size}</span>
+                  <span className="gt-text-muted">Total trays: {sortedTrayIds.length}</span>
+                  <span className="gt-text-muted">Selected: {selectedTrayManagerIds.size}</span>
                   <div className={[styles.toolbarActionsCompact, "gt-btnbar"].join(" ")}>
                     <ToolIconButton
                       label="Select all trays"
@@ -2152,10 +2152,10 @@ export default function PlacementPage() {
                         <strong className={styles.trayGridCellId}>
                           {formatTrayDisplay(draft.name || tray.name, tray.tray_id)}
                         </strong>
-                        <span className={styles.mutedText}>Current occupancy: {tray.current_count}/{tray.capacity}</span>
+                        <span className="gt-text-muted">Current occupancy: {tray.current_count}/{tray.capacity}</span>
                         <div className={styles.trayEditorInputs}>
                           <input
-                            className={styles.input}
+                            className="gt-input"
                             value={draft.name}
                             onClick={(event) => event.stopPropagation()}
                             onChange={(event) =>
@@ -2170,7 +2170,7 @@ export default function PlacementPage() {
                             aria-label="Tray name"
                           />
                           <input
-                            className={styles.input}
+                            className="gt-input"
                             type="number"
                             min={1}
                             value={draft.capacity}
@@ -2187,7 +2187,7 @@ export default function PlacementPage() {
                             aria-label="Tray capacity"
                           />
                           <button
-                            className={styles.buttonSecondary}
+                            className="gt-button gt-button--secondary"
                             type="button"
                             disabled={saving}
                             onClick={(event) => {
@@ -2201,7 +2201,7 @@ export default function PlacementPage() {
                       </article>
                     );
                   })}
-                  {trays.length === 0 ? <p className={styles.mutedText}>No trays yet.</p> : null}
+                  {trays.length === 0 ? <p className="gt-text-muted">No trays yet.</p> : null}
                 </div>
               </SectionCard>
             </div>
@@ -2213,7 +2213,7 @@ export default function PlacementPage() {
                 <Tooltip.Provider delayDuration={150}>
                   <div className={[styles.placementToolbar, "gt-stack"].join(" ")}>
                     <select
-                      className={styles.select}
+                      className="gt-select"
                       value={destinationTrayId}
                       onChange={(event) => setDestinationTrayId(event.target.value)}
                       aria-label="Destination tray"
@@ -2251,7 +2251,7 @@ export default function PlacementPage() {
                         disabled={selectedPlantIds.size === 0}
                       />
                       <button
-                        className={styles.buttonPrimary}
+                        className="gt-button gt-button--primary"
                         type="button"
                         disabled={placementLocked || !destinationTrayId || selectedInMainGrid.length === 0}
                         onClick={stageMovePlantsToTray}
@@ -2264,8 +2264,8 @@ export default function PlacementPage() {
                 </Tooltip.Provider>
 
                 <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
-                  <span className={styles.mutedText}>Unplaced active plants: {mainGridPlantIds.length}</span>
-                  <span className={styles.mutedText}>Selected in main grid: {selectedInMainGrid.length}</span>
+                  <span className="gt-text-muted">Unplaced active plants: {mainGridPlantIds.length}</span>
+                  <span className="gt-text-muted">Selected in main grid: {selectedInMainGrid.length}</span>
                   {trays.length === 0 ? <span className={styles.badgeWarn}>Create at least one tray.</span> : null}
                 </div>
 
@@ -2299,7 +2299,7 @@ export default function PlacementPage() {
                         <div className={styles.trayHeaderRow}>
                           <div className={styles.trayHeaderMeta}>
                             <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
-                            <span className={styles.mutedText}>Occupancy: {draftPlantCountByTray[trayId] || 0}/{tray.capacity}</span>
+                            <span className="gt-text-muted">Occupancy: {draftPlantCountByTray[trayId] || 0}/{tray.capacity}</span>
                           </div>
                           <div className={styles.trayHeaderActions}>
                             {selectedInTray.length > 0 ? (
@@ -2325,7 +2325,7 @@ export default function PlacementPage() {
               <StickyActionBar>
                 <span className={styles.recipeLegendItem}>{placementDraftChangeCount} plant layout change(s)</span>
                 <button
-                  className={styles.buttonPrimary}
+                  className="gt-button gt-button--primary"
                   type="button"
                   disabled={saving || placementDraftChangeCount === 0}
                   onClick={() => void applyPlantToTrayLayout()}
@@ -2333,7 +2333,7 @@ export default function PlacementPage() {
                   {saving ? "Applying..." : "Apply Plant -> Tray Layout"}
                 </button>
                 <button
-                  className={styles.buttonSecondary}
+                  className="gt-button gt-button--secondary"
                   type="button"
                   disabled={saving || placementDraftChangeCount === 0}
                   onClick={resetPlantDrafts}
@@ -2350,7 +2350,7 @@ export default function PlacementPage() {
                 <Tooltip.Provider delayDuration={150}>
                   <div className={[styles.placementToolbar, "gt-stack"].join(" ")}>
                     <select
-                      className={styles.select}
+                      className="gt-select"
                       value={destinationSlotId}
                       onChange={(event) => setDestinationSlotId(event.target.value)}
                       aria-label="Destination slot"
@@ -2382,7 +2382,7 @@ export default function PlacementPage() {
                         disabled={selectedTrayIds.size === 0}
                       />
                       <button
-                        className={styles.buttonPrimary}
+                        className="gt-button gt-button--primary"
                         type="button"
                         disabled={placementLocked || !destinationSlotId || selectedTrayIds.size === 0}
                         onClick={stageMoveTraysToSlots}
@@ -2395,8 +2395,8 @@ export default function PlacementPage() {
                 </Tooltip.Provider>
 
                 <div className={[styles.toolbarSummaryRow, "gt-row"].join(" ")}>
-                  <span className={styles.mutedText}>Unplaced trays: {mainGridTrayIds.length}</span>
-                  <span className={styles.mutedText}>Selected trays: {selectedTrayIds.size}</span>
+                  <span className="gt-text-muted">Unplaced trays: {mainGridTrayIds.length}</span>
+                  <span className="gt-text-muted">Selected trays: {selectedTrayIds.size}</span>
                 </div>
 
                 <div className={[styles.trayMainGrid, "gt-grid"].join(" ")} data-cell-size="md">
@@ -2414,7 +2414,7 @@ export default function PlacementPage() {
                         <div className={styles.trayHeaderRow}>
                           <div className={styles.trayHeaderMeta}>
                             <strong>{tent.name}</strong>
-                            <span className={styles.mutedText}>{tent.code || ""}</span>
+                            <span className="gt-text-muted">{tent.code || ""}</span>
                           </div>
                           <div className={styles.trayHeaderActions}>
                             <span className={styles.recipeLegendItem}>{tent.slots.length} slot(s)</span>
@@ -2464,7 +2464,7 @@ export default function PlacementPage() {
                                 </div>
                               );
                             })}
-                          {tent.slots.length === 0 ? <span className={styles.mutedText}>No slots generated.</span> : null}
+                          {tent.slots.length === 0 ? <span className="gt-text-muted">No slots generated.</span> : null}
                         </div>
                       </article>
                     );
@@ -2475,7 +2475,7 @@ export default function PlacementPage() {
               <StickyActionBar>
                 <span className={styles.recipeLegendItem}>{traySlotDraftChangeCount} tray/slot change(s)</span>
                 <button
-                  className={styles.buttonPrimary}
+                  className="gt-button gt-button--primary"
                   type="button"
                   disabled={saving || traySlotDraftChangeCount === 0}
                   onClick={() => void applyTrayToSlotLayout()}
@@ -2483,7 +2483,7 @@ export default function PlacementPage() {
                   {saving ? "Applying..." : "Apply Tray -> Slot Layout"}
                 </button>
                 <button
-                  className={styles.buttonSecondary}
+                  className="gt-button gt-button--secondary"
                   type="button"
                   disabled={saving || traySlotDraftChangeCount === 0}
                   onClick={resetTraySlotDrafts}
@@ -2499,12 +2499,12 @@ export default function PlacementPage() {
           className={[styles.stepNavRow, currentStep === 1 ? styles.stepNavRowForwardOnly : ""].filter(Boolean).join(" ")}
         >
           {currentStep > 1 ? (
-            <button className={styles.buttonSecondary} type="button" onClick={goPreviousStep}>
+            <button className="gt-button gt-button--secondary" type="button" onClick={goPreviousStep}>
               Back
             </button>
           ) : null}
           <button
-            className={styles.buttonPrimary}
+            className="gt-button gt-button--primary"
             type="button"
             disabled={!isStepComplete(currentStep)}
             onClick={goNextStep}

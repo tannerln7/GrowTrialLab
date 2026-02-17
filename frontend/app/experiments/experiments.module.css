@@ -472,53 +472,6 @@
   gap: 0.45rem;
 }
 
-.toolbarIconButton,
-.toolbarIconDanger {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--border) 76%, var(--text-muted) 24%);
-  background: color-mix(in srgb, var(--surface-elevated) 86%, var(--text-muted) 14%);
-  color: var(--text);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.toolbarIconButton:not(:disabled):hover {
-  border-color: color-mix(in srgb, var(--text-muted) 58%, var(--border));
-  background: color-mix(in srgb, var(--surface-elevated) 80%, var(--text-muted) 20%);
-}
-
-.toolbarIconDanger {
-  border-color: color-mix(in srgb, var(--text-muted) 55%, var(--border));
-  background: color-mix(in srgb, var(--text-muted) 22%, var(--surface-elevated));
-}
-
-.toolbarIconDanger:not(:disabled):hover {
-  border-color: color-mix(in srgb, var(--text-muted) 75%, var(--border));
-}
-
-.toolbarIconButton:disabled,
-.toolbarIconDanger:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.toolbarTooltip {
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  padding: 0.3rem 0.45rem;
-  font-size: 0.75rem;
-  line-height: 1.2;
-}
-
-.toolbarTooltipArrow {
-  fill: var(--surface);
-}
 
 .toolbarSummaryRow {
   gap: 0.45rem;
