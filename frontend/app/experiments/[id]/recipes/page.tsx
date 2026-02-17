@@ -7,7 +7,10 @@ import { useParams } from "next/navigation";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import { buttonVariants } from "@/src/components/ui/button";
+import { Input } from "@/src/components/ui/input";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
@@ -645,8 +648,9 @@ export default function RecipesPage() {
         key={plant.uuid}
         className={[
           styles.plantCell,
-          "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] cursor-pointer hover:border-ring/70",
-          selected ? "border-ring bg-muted/40" : "",
+          styles.cellFrame,
+          styles.cellSurfaceLevel1,
+          styles.cellInteractive,
           selected ? styles.plantCellSelected : "",
           dirty ? styles.plantCellDirty : "",
         ]
@@ -696,7 +700,7 @@ export default function RecipesPage() {
       title="Recipes"
       subtitle="Assign recipes to individual plants using tray-grouped selection and draft saves."
       actions={
-        <Link className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" href={`/experiments/${experimentId}/overview`}>
+        <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
@@ -708,28 +712,25 @@ export default function RecipesPage() {
 
       <SectionCard title="Recipe Tools">
         <form className={styles.recipeCreateCompact} onSubmit={(event) => void createRecipe(event)}>
-          <input
-            className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+          <Input
             value={code}
             onChange={(event) => setCode(event.target.value)}
             placeholder="Code (R0)"
             aria-label="Recipe code"
           />
-          <input
-            className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+          <Input
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Name"
             aria-label="Recipe name"
           />
-          <input
-            className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+          <Input
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             placeholder="Notes (optional)"
             aria-label="Recipe notes"
           />
-          <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" type="submit" disabled={saving}>
+          <button className={cn(buttonVariants({ variant: "default" }), "border border-border")} type="submit" disabled={saving}>
             {saving ? "Saving..." : "Create recipe"}
           </button>
         </form>
@@ -758,7 +759,7 @@ export default function RecipesPage() {
           </div>
         </Tooltip.Provider>
 
-        <div className={[styles.trayMainGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="md">
+        <div className={[styles.trayMainGrid, styles.cellGridResponsive].join(" ")} data-cell-size="md">
           {recipes.map((recipe) => {
             const selected = selectedRecipeIds.has(recipe.id);
             return (
@@ -767,8 +768,9 @@ export default function RecipesPage() {
                 className={[
                   styles.trayGridCell,
                   styles.recipeCell,
-                  "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] cursor-pointer hover:border-ring/70",
-                  selected ? "border-ring bg-muted/40" : "",
+                  styles.cellFrame,
+                  styles.cellSurfaceLevel1,
+                  styles.cellInteractive,
                   selected ? styles.plantCellSelected : "",
                 ]
                   .filter(Boolean)
@@ -800,9 +802,9 @@ export default function RecipesPage() {
 
       <SectionCard title="Plants by Tray (Draft)">
         <Tooltip.Provider delayDuration={150}>
-          <div className={[styles.placementToolbar, "grid gap-3"].join(" ")}>
+          <div className={styles.placementToolbar}>
             <select
-              className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+              className={[styles.nativeSelect, styles.toolbarInlineSelect].join(" ")}
               value={selectedBulkRecipeId}
               onChange={(event) => setSelectedBulkRecipeId(event.target.value)}
               aria-label="Recipe for selected plants"
@@ -834,7 +836,7 @@ export default function RecipesPage() {
                 disabled={selectedPlantIds.size === 0}
               />
               <button
-                className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
+                className={cn(buttonVariants({ variant: "default" }), "border border-border")}
                 type="button"
                 disabled={selectedPlantIds.size === 0 || !selectedBulkRecipeId}
                 onClick={stageApplyRecipeToSelection}
@@ -843,7 +845,7 @@ export default function RecipesPage() {
                 Apply to selected
               </button>
               <button
-                className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                 type="button"
                 disabled={selectedPlantIds.size === 0}
                 onClick={stageRemoveRecipeFromSelection}
@@ -871,14 +873,14 @@ export default function RecipesPage() {
           </div>
         ) : null}
 
-        <div className={[styles.trayManagerGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="lg">
+        <div className={[styles.trayManagerGrid, styles.cellGridResponsive].join(" ")} data-cell-size="lg">
           {sortedTrays.map((tray) => {
             const trayPlantIds = trayPlantIdsByTray[tray.tray_id] || [];
             const selectedCount = trayPlantIds.filter((plantId) => selectedPlantIds.has(plantId)).length;
             const allSelected = trayPlantIds.length > 0 && selectedCount === trayPlantIds.length;
 
             return (
-              <article key={tray.tray_id} className={[styles.trayEditorCell, "rounded-lg border border-border bg-secondary/60 shadow-sm"].join(" ")}>
+              <article key={tray.tray_id} className={[styles.trayEditorCell, "rounded-lg border border-border shadow-sm", styles.cellSurfaceLevel2].join(" ")}>
                 <div className={styles.trayHeaderRow}>
                   <div className={styles.trayHeaderMeta}>
                     <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
@@ -894,7 +896,7 @@ export default function RecipesPage() {
                     />
                   </div>
                 </div>
-                <div className={[styles.plantCellGridTray, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="sm">
+                <div className={[styles.plantCellGridTray, styles.cellGridResponsive].join(" ")} data-cell-size="sm">
                   {trayPlantIds.map((plantId) => renderPlantCell(plantId))}
                 </div>
               </article>
@@ -902,7 +904,7 @@ export default function RecipesPage() {
           })}
 
           {unplacedPlantIds.length > 0 ? (
-            <article className={[styles.trayEditorCell, "rounded-lg border border-border bg-secondary/60 shadow-sm"].join(" ")}>
+            <article className={[styles.trayEditorCell, "rounded-lg border border-border shadow-sm", styles.cellSurfaceLevel2].join(" ")}>
               <div className={styles.trayHeaderRow}>
                 <div className={styles.trayHeaderMeta}>
                   <strong>Unplaced</strong>
@@ -920,7 +922,7 @@ export default function RecipesPage() {
                   />
                 </div>
               </div>
-              <div className={[styles.plantCellGridTray, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="sm">
+              <div className={[styles.plantCellGridTray, styles.cellGridResponsive].join(" ")} data-cell-size="sm">
                 {unplacedPlantIds.map((plantId) => renderPlantCell(plantId))}
               </div>
             </article>
@@ -930,11 +932,16 @@ export default function RecipesPage() {
 
       <StickyActionBar>
         <span className={styles.recipeLegendItem}>{draftChangeCount} recipe mapping change(s)</span>
-        <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" type="button" disabled={saving || draftChangeCount === 0} onClick={() => void saveDrafts()}>
+        <button
+          className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+          type="button"
+          disabled={saving || draftChangeCount === 0}
+          onClick={() => void saveDrafts()}
+        >
           <Save size={16} />
           {saving ? "Saving..." : "Save Recipe Mapping"}
         </button>
-        <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" disabled={saving || draftChangeCount === 0} onClick={resetDrafts}>
+        <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" disabled={saving || draftChangeCount === 0} onClick={resetDrafts}>
           Discard drafts
         </button>
       </StickyActionBar>

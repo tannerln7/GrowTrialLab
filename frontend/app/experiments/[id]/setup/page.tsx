@@ -5,11 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
 } from "@/lib/experiment-status";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import { buttonVariants } from "@/src/components/ui/button";
+import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 
@@ -126,7 +129,7 @@ export default function ExperimentSetupPage() {
       title="Setup"
       subtitle="Complete bootstrap setup: plants, tents + slots, and recipes."
       actions={
-        <Link className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" href="/experiments">
+        <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href="/experiments">
           Back to experiments
         </Link>
       }
@@ -139,13 +142,13 @@ export default function ExperimentSetupPage() {
         <SectionCard title="Bootstrap Checklist">
           <div className="grid gap-3">
             {checklist.map((item) => (
-              <article className="relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40" key={item.id}>
+              <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={item.id}>
                 <strong>{item.title}</strong>
                 <p className="text-sm text-muted-foreground">
                   {item.complete ? "Complete" : "Incomplete"}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Link className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" href={item.href}>
+                  <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={item.href}>
                     {item.actionLabel}
                   </Link>
                 </div>

@@ -43,8 +43,9 @@ services:
   frontend:
     build:
       context: ./frontend
-    command: pnpm dev --hostname 0.0.0.0 --port 3000
+    command: sh -c "pnpm install --frozen-lockfile --prod=false && pnpm dev --hostname 0.0.0.0 --port 3000"
     environment:
+      NODE_ENV: "development"
       CHOKIDAR_USEPOLLING: "1"
       WATCHPACK_POLLING: "true"
       CI: "true"

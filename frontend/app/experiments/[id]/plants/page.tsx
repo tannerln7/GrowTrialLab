@@ -5,11 +5,16 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 import { suggestPlantId } from "@/lib/id-suggestions";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import { buttonVariants } from "@/src/components/ui/button";
+import { Input } from "@/src/components/ui/input";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import { Textarea } from "@/src/components/ui/textarea";
 
 
 type PlantRow = {
@@ -310,7 +315,7 @@ export default function ExperimentPlantsPage() {
       subtitle={`Experiment: ${experimentId}`}
       actions={
         <div className={"flex flex-wrap items-center gap-2"}>
-          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={`/experiments/${experimentId}/overview`}>
+          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
             ← Overview
           </Link>
         </div>
@@ -326,7 +331,7 @@ export default function ExperimentPlantsPage() {
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Plant preset</span>
             <select
-              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+              className={styles.nativeSelect}
               value={selectedPresetId}
               onChange={(event) => {
                 const nextPresetId = event.target.value;
@@ -354,8 +359,7 @@ export default function ExperimentPlantsPage() {
           </label>
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Species name</span>
-            <input
-              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+            <Input
               value={manualSpeciesName}
               onChange={(event) => setManualSpeciesName(event.target.value)}
               placeholder="Nepenthes ventricosa"
@@ -363,8 +367,7 @@ export default function ExperimentPlantsPage() {
           </label>
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Category</span>
-            <input
-              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+            <Input
               value={manualCategory}
               onChange={(event) => setManualCategory(event.target.value)}
               placeholder="nepenthes"
@@ -372,16 +375,14 @@ export default function ExperimentPlantsPage() {
           </label>
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Cultivar</span>
-            <input
-              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+            <Input
               value={manualCultivar}
               onChange={(event) => setManualCultivar(event.target.value)}
             />
           </label>
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Quantity</span>
-            <input
-              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+            <Input
               type="number"
               min={1}
               value={manualQuantity}
@@ -390,8 +391,7 @@ export default function ExperimentPlantsPage() {
           </label>
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Plant ID (optional)</span>
-            <input
-              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+            <Input
               value={manualPlantId}
               onChange={(event) => setManualPlantId(event.target.value)}
               placeholder={suggestedPlantId}
@@ -399,14 +399,13 @@ export default function ExperimentPlantsPage() {
           </label>
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Baseline notes</span>
-            <textarea
-              className={"flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+            <Textarea
               value={manualBaselineNotes}
               onChange={(event) => setManualBaselineNotes(event.target.value)}
             />
           </label>
           <button
-            className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+            className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
             type="button"
             disabled={saving || !manualSpeciesName.trim()}
             onClick={() => void addPlantsQuick()}
@@ -421,22 +420,20 @@ export default function ExperimentPlantsPage() {
           Columns: species_name, category, cultivar, quantity, plant_id, baseline_notes
         </p>
         <div className={"grid gap-3"}>
-          <textarea
-            className={"flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+          <Textarea
             value={csvText}
             onChange={(event) => setCsvText(event.target.value)}
             placeholder={
               "species_name,category,cultivar,quantity,plant_id,baseline_notes\\nNepenthes alata,nepenthes,,3,,batch A"
             }
           />
-          <input
-            className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+          <Input
             type="file"
             accept=".csv,text/csv"
             onChange={(event) => setCsvFile(event.target.files?.[0] ?? null)}
           />
           <button
-            className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+            className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
             type="button"
             disabled={saving || (!csvFile && !csvText.trim())}
             onClick={() => void importPlantsCsv()}
@@ -449,14 +446,14 @@ export default function ExperimentPlantsPage() {
       <SectionCard title="Tools">
         <div className={"flex flex-wrap items-center gap-2"}>
           <button
-            className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+            className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
             type="button"
             disabled={saving}
             onClick={() => void generateMissingIds()}
           >
             Generate IDs for pending plants
           </button>
-          <button className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} type="button" onClick={downloadLabels}>
+          <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" onClick={downloadLabels}>
             Download labels PDF
           </button>
         </div>

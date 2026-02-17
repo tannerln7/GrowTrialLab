@@ -66,6 +66,11 @@
   --gt-cell: var(--gt-surface-2);
   --gt-cell-selected: var(--gt-selected-bg);
   --gt-cell-muted: color-mix(in srgb, var(--gt-surface) 84%, var(--gt-text-muted) 16%);
+  /* Nested cell surface scale: 1 is smallest/leaf (lightest), 4 is outermost (card-dark). */
+  --gt-cell-surface-1: var(--gt-surface-2);
+  --gt-cell-surface-2: color-mix(in srgb, var(--gt-surface-2) 60%, var(--gt-surface) 40%);
+  --gt-cell-surface-3: color-mix(in srgb, var(--gt-surface-2) 30%, var(--gt-surface) 70%);
+  --gt-cell-surface-4: var(--gt-surface);
   --gt-outline-focus: #86c6ff;
 
   /* Compatibility aliases for existing modules */

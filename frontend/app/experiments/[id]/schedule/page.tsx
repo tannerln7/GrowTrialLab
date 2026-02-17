@@ -5,13 +5,19 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
 } from "@/lib/experiment-status";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import { Badge } from "@/src/components/ui/badge";
+import { buttonVariants } from "@/src/components/ui/button";
+import { Input } from "@/src/components/ui/input";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import { Textarea } from "@/src/components/ui/textarea";
 
 
 type Timeframe = "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT";
@@ -687,7 +693,7 @@ export default function ExperimentSchedulePage() {
       title="Schedule"
       subtitle={plantFilter ? "Filtered for selected plant" : "Recurring actions plan"}
       actions={
-        <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href={`/experiments/${experimentId}/overview`}>
+        <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
@@ -700,14 +706,14 @@ export default function ExperimentSchedulePage() {
       <SectionCard title="Upcoming plan">
         <div className={"flex flex-wrap items-center gap-2"}>
           <button
-            className={daysWindow === 7 ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+            className={daysWindow === 7 ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
             type="button"
             onClick={() => setDaysWindow(7)}
           >
             7 days
           </button>
           <button
-            className={daysWindow === 14 ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+            className={daysWindow === 14 ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
             type="button"
             onClick={() => setDaysWindow(14)}
           >
@@ -717,7 +723,7 @@ export default function ExperimentSchedulePage() {
         {plan && unwrapList<SchedulePlan["slots"]["results"][number]>(plan.slots).length ? (
           <div className={"grid gap-3"}>
             {unwrapList<SchedulePlan["slots"]["results"][number]>(plan.slots).map((slot) => (
-              <article className={"relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"} key={`${slot.date}-${slot.exact_time || slot.timeframe}`}>
+              <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={`${slot.date}-${slot.exact_time || slot.timeframe}`}>
                 <strong>{formatSlotTitle(slot.date, slot.timeframe, slot.exact_time)}</strong>
                 <div className={"grid gap-3"}>
                   {slot.actions.map((item) => (
@@ -727,9 +733,9 @@ export default function ExperimentSchedulePage() {
                       {item.blocked_reasons.length > 0 ? (
                         <div className={"flex flex-wrap items-center gap-2"}>
                           {item.blocked_reasons.map((reason) => (
-                            <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"} key={reason}>
+                            <Badge key={reason} variant="secondary">
                               {reason}
-                            </span>
+                            </Badge>
                           ))}
                         </div>
                       ) : null}
@@ -749,7 +755,7 @@ export default function ExperimentSchedulePage() {
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Action type</span>
             <select
-              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+              className={styles.nativeSelect}
               value={actionType}
               onChange={(event) => setActionType(event.target.value as ActionType)}
               disabled={saving}
@@ -764,8 +770,7 @@ export default function ExperimentSchedulePage() {
 
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Title</span>
-            <input
-              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+            <Input
               value={title}
               onChange={(event) => {
                 setTitle(event.target.value);
@@ -778,8 +783,7 @@ export default function ExperimentSchedulePage() {
 
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Description (optional)</span>
-            <textarea
-              className={"flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+            <Textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               disabled={saving}
@@ -798,21 +802,21 @@ export default function ExperimentSchedulePage() {
 
           <div className={"flex flex-wrap items-center gap-2"}>
             <button
-              className={recurrenceMode === "weekly" ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+              className={recurrenceMode === "weekly" ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
               type="button"
               onClick={() => setRecurrenceMode("weekly")}
             >
               Weekly pattern
             </button>
             <button
-              className={recurrenceMode === "interval" ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+              className={recurrenceMode === "interval" ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
               type="button"
               onClick={() => setRecurrenceMode("interval")}
             >
               Every X days
             </button>
             <button
-              className={recurrenceMode === "daily" ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+              className={recurrenceMode === "daily" ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
               type="button"
               onClick={() => setRecurrenceMode("daily")}
             >
@@ -823,11 +827,11 @@ export default function ExperimentSchedulePage() {
           {recurrenceMode === "weekly" ? (
             <div className={"grid gap-3"}>
               {weeklyRules.map((rule, index) => (
-                <article className={"relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"} key={`${rule.weekday}-${index}`}>
+                <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={`${rule.weekday}-${index}`}>
                   <label className={"grid gap-2"}>
                     <span className={"text-sm text-muted-foreground"}>Weekday</span>
                     <select
-                      className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                      className={styles.nativeSelect}
                       value={rule.weekday}
                       onChange={(event) =>
                         setWeeklyRules((current) =>
@@ -847,7 +851,7 @@ export default function ExperimentSchedulePage() {
                   <label className={"grid gap-2"}>
                     <span className={"text-sm text-muted-foreground"}>Timeframe</span>
                     <select
-                      className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                      className={styles.nativeSelect}
                       value={rule.timeframe}
                       onChange={(event) =>
                         setWeeklyRules((current) =>
@@ -868,8 +872,7 @@ export default function ExperimentSchedulePage() {
                   </label>
                   <label className={"grid gap-2"}>
                     <span className={"text-sm text-muted-foreground"}>Exact time (optional)</span>
-                    <input
-                      className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                    <Input
                       type="time"
                       value={rule.exact_time}
                       onChange={(event) =>
@@ -884,7 +887,7 @@ export default function ExperimentSchedulePage() {
                   <div className={"flex flex-wrap items-center gap-2"}>
                     {weeklyRules.length > 1 ? (
                       <button
-                        className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                        className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                         type="button"
                         onClick={() =>
                           setWeeklyRules((current) => current.filter((_, itemIndex) => itemIndex !== index))
@@ -897,7 +900,7 @@ export default function ExperimentSchedulePage() {
                 </article>
               ))}
               <button
-                className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                 type="button"
                 onClick={() =>
                   setWeeklyRules((current) => [
@@ -915,8 +918,7 @@ export default function ExperimentSchedulePage() {
             <div className={"grid gap-3"}>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Interval days</span>
-                <input
-                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                <Input
                   type="number"
                   min={1}
                   value={intervalDays}
@@ -926,7 +928,7 @@ export default function ExperimentSchedulePage() {
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Timeframe</span>
                 <select
-                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                  className={styles.nativeSelect}
                   value={intervalTimeframe}
                   onChange={(event) => setIntervalTimeframe(event.target.value as Timeframe)}
                 >
@@ -939,8 +941,7 @@ export default function ExperimentSchedulePage() {
               </label>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Exact time (optional)</span>
-                <input
-                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                <Input
                   type="time"
                   value={intervalExactTime}
                   onChange={(event) => setIntervalExactTime(event.target.value)}
@@ -954,7 +955,7 @@ export default function ExperimentSchedulePage() {
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Timeframe</span>
                 <select
-                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                  className={styles.nativeSelect}
                   value={dailyTimeframe}
                   onChange={(event) => setDailyTimeframe(event.target.value as Timeframe)}
                 >
@@ -967,8 +968,7 @@ export default function ExperimentSchedulePage() {
               </label>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Exact time (optional)</span>
-                <input
-                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                <Input
                   type="time"
                   value={dailyExactTime}
                   onChange={(event) => setDailyExactTime(event.target.value)}
@@ -979,7 +979,7 @@ export default function ExperimentSchedulePage() {
 
           <div className={"flex flex-wrap items-center gap-2"}>
             <button
-              className={scopeType === "TENT" ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+              className={scopeType === "TENT" ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
               type="button"
               onClick={() => {
                 setScopeType("TENT");
@@ -989,7 +989,7 @@ export default function ExperimentSchedulePage() {
               Tents
             </button>
             <button
-              className={scopeType === "TRAY" ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+              className={scopeType === "TRAY" ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
               type="button"
               onClick={() => {
                 setScopeType("TRAY");
@@ -999,7 +999,7 @@ export default function ExperimentSchedulePage() {
               Trays
             </button>
             <button
-              className={scopeType === "PLANT" ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+              className={scopeType === "PLANT" ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
               type="button"
               onClick={() => {
                 setScopeType("PLANT");
@@ -1033,7 +1033,7 @@ export default function ExperimentSchedulePage() {
           {scopeType === "TRAY" ? (
             <div className={"grid gap-3"}>
               {traysGroupedByTent.map(([group, trays]) => (
-                <article className={"relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"} key={group}>
+                <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={group}>
                   <strong>{group}</strong>
                   {trays.map((tray) => (
                     <label className={"flex flex-wrap items-center gap-2"} key={tray.tray_id}>
@@ -1061,7 +1061,7 @@ export default function ExperimentSchedulePage() {
           {scopeType === "PLANT" ? (
             <div className={"grid gap-3"}>
               {plantsGroupedByLocation.map(([group, plants]) => (
-                <article className={"relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"} key={group}>
+                <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={group}>
                   <strong>{group}</strong>
                   {plants.map((plant) => (
                     <label className={"flex flex-wrap items-center gap-2"} key={plant.uuid}>
@@ -1087,16 +1087,16 @@ export default function ExperimentSchedulePage() {
           {feedWarnings.length > 0 ? (
             <div className={"flex flex-wrap items-center gap-2"}>
               {feedWarnings.map((warning) => (
-                <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"} key={warning}>
+                <Badge key={warning} variant="secondary">
                   {warning}
-                </span>
+                </Badge>
               ))}
             </div>
           ) : null}
 
           <div className={"flex flex-wrap items-center gap-2"}>
             <button
-              className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
+              className={cn(buttonVariants({ variant: "default" }), "border border-border")}
               type="button"
               disabled={saving}
               onClick={() => void saveScheduleAction()}
@@ -1105,7 +1105,7 @@ export default function ExperimentSchedulePage() {
             </button>
             {editingId ? (
               <button
-                className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                 type="button"
                 disabled={saving}
                 onClick={resetForm}
@@ -1123,7 +1123,7 @@ export default function ExperimentSchedulePage() {
         ) : (
           <div className={"grid gap-3"}>
             {actions.map((action) => (
-              <article className={"relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"} key={action.id}>
+              <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={action.id}>
                 <div className={"flex flex-wrap items-center gap-2"}>
                   <strong>{action.title}</strong>
                   <span className={"text-sm text-muted-foreground"}>{actionTypeLabel(action.action_type)}</span>
@@ -1137,9 +1137,9 @@ export default function ExperimentSchedulePage() {
                 {action.current_blockers.length > 0 ? (
                   <div className={"flex flex-wrap items-center gap-2"}>
                     {action.current_blockers.map((reason) => (
-                      <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"} key={reason}>
+                      <Badge key={reason} variant="secondary">
                         {reason}
-                      </span>
+                      </Badge>
                     ))}
                   </div>
                 ) : null}
@@ -1154,7 +1154,7 @@ export default function ExperimentSchedulePage() {
                     <span>Enabled</span>
                   </label>
                   <button
-                    className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                    className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                     type="button"
                     disabled={saving}
                     onClick={() => startEdit(action)}
@@ -1162,7 +1162,7 @@ export default function ExperimentSchedulePage() {
                     Edit
                   </button>
                   <button
-                    className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90"}
+                    className={cn(buttonVariants({ variant: "destructive" }), "border border-border")}
                     type="button"
                     disabled={saving}
                     onClick={() => void deleteScheduleAction(action.id)}

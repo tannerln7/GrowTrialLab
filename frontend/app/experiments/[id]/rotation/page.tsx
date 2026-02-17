@@ -5,14 +5,19 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
 } from "@/lib/experiment-status";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import { Badge } from "@/src/components/ui/badge";
+import { buttonVariants } from "@/src/components/ui/button";
+import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { Textarea } from "@/src/components/ui/textarea";
 
 
 type Location = {
@@ -300,7 +305,7 @@ export default function RotationPage() {
       title="Rotation"
       subtitle="Log tray moves and review recent rotation history."
       actions={
-        <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={`/experiments/${experimentId}/overview`}>
+        <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
@@ -312,7 +317,7 @@ export default function RotationPage() {
 
       {statusSummary ? (
         <SectionCard title="Experiment State">
-          <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"}>{statusSummary.lifecycle.state.toUpperCase()}</span>
+          <Badge variant="secondary">{statusSummary.lifecycle.state.toUpperCase()}</Badge>
         </SectionCard>
       ) : null}
 
@@ -321,7 +326,7 @@ export default function RotationPage() {
           <p className={"text-sm text-muted-foreground"}>
             Rotation logs are intended for running experiments. Start the experiment first.
           </p>
-          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={`/experiments/${experimentId}/overview`}>
+          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
             Start experiment from Overview
           </Link>
         </SectionCard>
@@ -333,7 +338,7 @@ export default function RotationPage() {
             <div className={"grid gap-3"}>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Tray</span>
-                <select className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"} value={selectedTrayId} onChange={(event) => setSelectedTrayId(event.target.value)}>
+                <select className={styles.nativeSelect} value={selectedTrayId} onChange={(event) => setSelectedTrayId(event.target.value)}>
                   <option value="">Select tray</option>
                   {trays.map((tray) => (
                     <option key={tray.tray_id} value={tray.tray_id}>
@@ -344,7 +349,7 @@ export default function RotationPage() {
               </label>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Destination slot</span>
-                <select className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"} value={selectedToSlotId} onChange={(event) => setSelectedToSlotId(event.target.value)}>
+                <select className={styles.nativeSelect} value={selectedToSlotId} onChange={(event) => setSelectedToSlotId(event.target.value)}>
                   <option value="">None / Unassigned</option>
                   {compatibleSlotsForSelectedTray.map((slot) => (
                     <option key={slot.id} value={slot.id}>
@@ -361,10 +366,10 @@ export default function RotationPage() {
               </label>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Note (optional)</span>
-                <textarea className={"flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"} value={note} onChange={(event) => setNote(event.target.value)} />
+                <Textarea value={note} onChange={(event) => setNote(event.target.value)} />
               </label>
               <button
-                className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
+                className={cn(buttonVariants({ variant: "default" }), "border border-border")}
                 type="button"
                 disabled={saving || !selectedTrayId || selectedTrayBlocked}
                 onClick={() => void submitLogMove()}
@@ -392,7 +397,7 @@ export default function RotationPage() {
                   label: "Action",
                   render: (tray) => (
                     <button
-                      className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                      className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                       type="button"
                       onClick={() => {
                         setSelectedTrayId(tray.tray_id);
@@ -413,7 +418,7 @@ export default function RotationPage() {
                   <span>Plants</span>
                   <strong>{tray.plant_count}</strong>
                   <button
-                    className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                    className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                     type="button"
                     onClick={() => {
                       setSelectedTrayId(tray.tray_id);

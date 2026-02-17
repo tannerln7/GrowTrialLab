@@ -1,6 +1,5 @@
 "use client";
 
-import * as Tooltip from "@radix-ui/react-tooltip";
 import {
   ArrowRight,
   Check,
@@ -21,9 +20,19 @@ import {
 } from "@/lib/experiment-status";
 import { suggestTentCode, suggestTentName, suggestTrayName } from "@/lib/id-suggestions";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { IconButton } from "@/src/components/ui/icon-button";
+import { Input } from "@/src/components/ui/input";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
-import StickyActionBar from "@/src/components/ui/StickyActionBar";
+import { ToolbarRow } from "@/src/components/ui/toolbar-row";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/src/components/ui/tooltip";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -153,11 +162,6 @@ type TentDraft = {
   code: string;
 };
 
-type TrayDraft = {
-  name: string;
-  capacity: number;
-};
-
 const RUNNING_LOCK_MESSAGE =
   "Placement cannot be edited while the experiment is running. Stop the experiment to change placement.";
 
@@ -193,6 +197,44 @@ function buildDefaultShelves(tent: TentSummary): number[] {
     }
   }
   return [4];
+}
+
+function buildPersistedShelfCounts(tent: TentSummary): number[] {
+  const layoutCounts = (tent.layout?.shelves || [])
+    .slice()
+    .sort((left, right) => left.index - right.index)
+    .map((shelf) => Math.max(0, shelf.tray_count));
+
+  if (tent.slots.length === 0) {
+    return layoutCounts;
+  }
+
+  const slotCountByShelf = new Map<number, number>();
+  for (const slot of tent.slots) {
+    slotCountByShelf.set(slot.shelf_index, (slotCountByShelf.get(slot.shelf_index) || 0) + 1);
+  }
+
+  const maxShelfIndex = Math.max(
+    layoutCounts.length,
+    ...Array.from(slotCountByShelf.keys(), (shelfIndex) => Math.max(1, shelfIndex)),
+  );
+  const counts: number[] = [];
+  for (let index = 1; index <= maxShelfIndex; index += 1) {
+    counts.push(slotCountByShelf.get(index) || 0);
+  }
+  return counts;
+}
+
+function areShelfCountsEqual(left: number[], right: number[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function parseStep(rawStep: string | null): number {
@@ -248,28 +290,23 @@ function ToolIconButton({
   danger?: boolean;
 }) {
   return (
-    <Tooltip.Provider delayDuration={150}>
-      <Tooltip.Root>
-        <Tooltip.Trigger asChild>
-          <button
-            className={danger ? "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-secondary text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90" : "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-secondary text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:pointer-events-none disabled:opacity-50"}
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <IconButton
             type="button"
+            variant={danger ? "danger" : "default"}
             onClick={onClick}
             disabled={disabled}
             aria-label={label}
             title={label}
           >
             {icon}
-          </button>
-        </Tooltip.Trigger>
-        <Tooltip.Portal>
-          <Tooltip.Content className="z-50 rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md" sideOffset={6}>
-            {label}
-            <Tooltip.Arrow className="fill-popover" />
-          </Tooltip.Content>
-        </Tooltip.Portal>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+          </IconButton>
+        </TooltipTrigger>
+        <TooltipContent className="px-2 py-1">{label}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -306,10 +343,10 @@ export default function PlacementPage() {
   const [newTentCode, setNewTentCode] = useState("");
   const [shelfCountsByTent, setShelfCountsByTent] = useState<Record<string, number[]>>({});
   const [tentDraftById, setTentDraftById] = useState<Record<string, TentDraft>>({});
+  const [tentAllowedSpeciesDraftById, setTentAllowedSpeciesDraftById] = useState<Record<string, string[]>>({});
 
   const [newTrayName, setNewTrayName] = useState("");
   const [newTrayCapacity, setNewTrayCapacity] = useState(1);
-  const [trayDraftById, setTrayDraftById] = useState<Record<string, TrayDraft>>({});
 
   const [persistedPlantToTray, setPersistedPlantToTray] = useState<Record<string, string | null>>({});
   const [draftPlantToTray, setDraftPlantToTray] = useState<Record<string, string | null>>({});
@@ -637,14 +674,10 @@ export default function PlacementPage() {
       }
       return next;
     });
-
-    setTrayDraftById((current) => {
+    setTentAllowedSpeciesDraftById((current) => {
       const next = { ...current };
-      for (const tray of trays) {
-        next[tray.tray_id] = {
-          name: tray.name,
-          capacity: tray.capacity,
-        };
+      for (const tent of tents) {
+        next[tent.tent_id] = tent.allowed_species.map((item) => item.id);
       }
       return next;
     });
@@ -775,6 +808,22 @@ export default function PlacementPage() {
     return count;
   }, [draftTrayToSlot, persistedTrayToSlot, sortedTrayIds]);
 
+  const tentSlotDraftChangeCount = useMemo(() => {
+    let count = 0;
+    for (const tent of tents) {
+      const draftShelfCounts = (shelfCountsByTent[tent.tent_id] || buildDefaultShelves(tent)).map((value) =>
+        Math.max(0, value),
+      );
+      const persistedShelfCounts = buildPersistedShelfCounts(tent);
+      const hasNoPersistedSlots = tent.slots.length === 0;
+
+      if (hasNoPersistedSlots || !areShelfCountsEqual(draftShelfCounts, persistedShelfCounts)) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [shelfCountsByTent, tents]);
+
   function stepBlockedMessage(step: number): string {
     if (step === 1 && !step1Complete) {
       return "Add at least one tent and generate slots for each tent before continuing.";
@@ -898,6 +947,7 @@ export default function PlacementPage() {
       name: tent.name,
       code: tent.code,
     };
+    const allowedSpeciesIds = tentAllowedSpeciesDraftById[tent.tent_id] || tent.allowed_species.map((item) => item.id);
 
     setSaving(true);
     setError("");
@@ -910,6 +960,7 @@ export default function PlacementPage() {
         body: JSON.stringify({
           name: draft.name,
           code: draft.code,
+          allowed_species: allowedSpeciesIds,
         }),
       });
 
@@ -932,48 +983,10 @@ export default function PlacementPage() {
     }
   }
 
-  async function saveTentRestrictions(tent: TentSummary, allowedSpeciesIds: string[]) {
-    if (placementLocked) {
-      setError(RUNNING_LOCK_MESSAGE);
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-    setNotice("");
-
-    try {
-      const response = await backendFetch(`/api/v1/tents/${tent.tent_id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          allowed_species: allowedSpeciesIds,
-        }),
-      });
-
-      const payload = (await response.json()) as { detail?: string };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to update tent restrictions.");
-        return;
-      }
-
-      setNotice(`Updated restrictions for ${tent.name}.`);
-      await loadPage();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to update tent restrictions.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function updateShelfCount(tentId: string, shelfIndex: number, nextCount: number) {
+  function adjustShelfSlotCount(tentId: string, shelfIndex: number, delta: number) {
     setShelfCountsByTent((current) => {
       const next = [...(current[tentId] || [4])];
-      next[shelfIndex] = Math.max(0, nextCount);
+      next[shelfIndex] = Math.max(0, (next[shelfIndex] || 0) + delta);
       return { ...current, [tentId]: next };
     });
   }
@@ -996,57 +1009,79 @@ export default function PlacementPage() {
     });
   }
 
-  async function generateSlots(tentId: string) {
+  async function applyTentSlotLayouts() {
     if (placementLocked) {
       setError(RUNNING_LOCK_MESSAGE);
       return;
     }
 
-    const shelfCounts = shelfCountsByTent[tentId] || [4];
-    const layout = {
-      schema_version: 1,
-      shelves: shelfCounts.map((trayCount, index) => ({
-        index: index + 1,
-        tray_count: Math.max(0, trayCount),
-      })),
-    };
+    const changedTents = tents.filter((tent) => {
+      const draftShelfCounts = (shelfCountsByTent[tent.tent_id] || buildDefaultShelves(tent)).map((count) =>
+        Math.max(0, count),
+      );
+      const persistedShelfCounts = buildPersistedShelfCounts(tent);
+      return tent.slots.length === 0 || !areShelfCountsEqual(draftShelfCounts, persistedShelfCounts);
+    });
+
+    if (changedTents.length === 0) {
+      setNotice("No tent slot layout changes to apply.");
+      return;
+    }
 
     setSaving(true);
     setError("");
     setNotice("");
+    setDiagnostics(null);
 
     try {
-      const response = await backendFetch(`/api/v1/tents/${tentId}/slots/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ layout }),
-      });
-
-      const payload = (await response.json()) as {
-        detail?: string;
-        diagnostics?: {
-          would_orphan_trays?: Array<{ tray_code: string; slot_shelf_index: number; slot_index: number }>;
+      let appliedCount = 0;
+      for (const tent of changedTents) {
+        const shelfCounts = shelfCountsByTent[tent.tent_id] || [4];
+        const layout = {
+          schema_version: 1,
+          shelves: shelfCounts.map((trayCount, index) => ({
+            index: index + 1,
+            tray_count: Math.max(0, trayCount),
+          })),
         };
-      };
 
-      if (!response.ok) {
-        const orphanMessage = payload.diagnostics?.would_orphan_trays?.length
-          ? ` Would orphan: ${payload.diagnostics.would_orphan_trays
-              .map((item) => `${item.tray_code} @ S${item.slot_shelf_index}-${item.slot_index}`)
-              .join(", ")}.`
-          : "";
-        setError((payload.detail || "Unable to generate slots.") + orphanMessage);
-        return;
+        const response = await backendFetch(`/api/v1/tents/${tent.tent_id}/slots/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ layout }),
+        });
+
+        const payload = (await response.json()) as {
+          detail?: string;
+          diagnostics?: {
+            would_orphan_trays?: Array<{ tray_code: string; slot_shelf_index: number; slot_index: number }>;
+          };
+        };
+
+        if (!response.ok) {
+          const orphanMessage = payload.diagnostics?.would_orphan_trays?.length
+            ? ` Would orphan: ${payload.diagnostics.would_orphan_trays
+                .map((item) => `${item.tray_code} @ S${item.slot_shelf_index}-${item.slot_index}`)
+                .join(", ")}.`
+            : "";
+          setError(`${tent.name}: ${(payload.detail || "Unable to generate slots.") + orphanMessage}`);
+          if (appliedCount > 0) {
+            await loadPage();
+          }
+          return;
+        }
+
+        appliedCount += 1;
       }
 
-      setNotice("Slots generated.");
+      setNotice(`Applied tent slot layout for ${appliedCount} tent(s).`);
       await loadPage();
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
       if (normalized.kind === "offline") {
         setOffline(true);
       }
-      setError("Unable to generate slots.");
+      setError("Unable to apply tent slot layout changes.");
     } finally {
       setSaving(false);
     }
@@ -1097,50 +1132,6 @@ export default function PlacementPage() {
         setOffline(true);
       }
       setError("Unable to create tray.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function saveTrayDetails(tray: TrayCell) {
-    if (placementLocked) {
-      setError(RUNNING_LOCK_MESSAGE);
-      return;
-    }
-
-    const draft = trayDraftById[tray.tray_id] || {
-      name: tray.name,
-      capacity: tray.capacity,
-    };
-
-    setSaving(true);
-    setError("");
-    setNotice("");
-
-    try {
-      const response = await backendFetch(`/api/v1/trays/${tray.tray_id}/`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: draft.name,
-          capacity: Math.max(1, Number(draft.capacity || 1)),
-        }),
-      });
-
-      const payload = (await response.json()) as { detail?: string };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to update tray.");
-        return;
-      }
-
-      setNotice(`Saved tray details for ${draft.name}.`);
-      await loadPage();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to update tray.");
     } finally {
       setSaving(false);
     }
@@ -1546,14 +1537,17 @@ export default function PlacementPage() {
     }
 
     const selected = selectedPlantIds.has(plantId);
+    const gradeLabel = plant.grade ? `Grade ${plant.grade}` : "Grade -";
 
     return (
       <article
         key={plant.uuid}
         className={[
           styles.plantCell,
-          "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] cursor-pointer hover:border-ring/70",
-          selected ? "border-ring bg-muted/40" : "",
+          styles.cellFrame,
+          styles.cellSurfaceLevel1,
+          styles.cellInteractive,
+          "justify-items-center text-center",
           selected ? styles.plantCellSelected : "",
         ]
           .filter(Boolean)
@@ -1576,8 +1570,8 @@ export default function PlacementPage() {
         ) : null}
         <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
         <span className={styles.plantCellSpecies}>{plant.species_name}</span>
-        <div className={styles.plantCellMetaRow}>
-          <span className={styles.recipeLegendItem}>{plant.grade || "No grade"}</span>
+        <div className={[styles.plantCellMetaRow, "justify-center"].join(" ")}>
+          <Badge variant={plant.grade ? "secondary" : "outline"}>{gradeLabel}</Badge>
         </div>
       </article>
     );
@@ -1596,8 +1590,9 @@ export default function PlacementPage() {
         key={trayId}
         className={[
           styles.trayGridCell,
-          "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] cursor-pointer hover:border-ring/70",
-          selected ? "border-ring bg-muted/40" : "",
+          inSlot ? styles.cellFrameCompact : styles.cellFrame,
+          styles.cellSurfaceLevel1,
+          styles.cellInteractive,
           selected ? styles.plantCellSelected : "",
         ]
           .filter(Boolean)
@@ -1618,9 +1613,14 @@ export default function PlacementPage() {
             <Check size={12} />
           </span>
         ) : null}
-        <strong className={styles.trayGridCellId}>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
-        <span className={styles.plantCellSpecies}>{tray.current_count}/{tray.capacity}</span>
-        {inSlot ? <span className={styles.recipeLegendItem}>Placed</span> : null}
+        <strong className={[styles.trayGridCellId, inSlot ? "truncate" : ""].filter(Boolean).join(" ")}>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
+        <Badge
+          variant="secondary"
+          className={[styles.recipeLegendItemCompact, inSlot ? "justify-self-center" : ""].filter(Boolean).join(" ")}
+        >
+          {tray.current_count}/{tray.capacity}
+        </Badge>
+        {inSlot ? <span className={styles.slotPlacedChip}>Placed</span> : null}
       </article>
     );
   }
@@ -1802,24 +1802,6 @@ export default function PlacementPage() {
     }
   }
 
-  function resetPlantDrafts() {
-    setDraftPlantToTray(persistedPlantToTray);
-    setSelectedPlantIds(new Set());
-    setActivePlantAnchorId(null);
-    setDiagnostics(null);
-    setError("");
-    setNotice("Plant/tray drafts discarded.");
-  }
-
-  function resetTraySlotDrafts() {
-    setDraftTrayToSlot(persistedTrayToSlot);
-    setSelectedTrayIds(new Set());
-    setDestinationSlotId("");
-    setDiagnostics(null);
-    setError("");
-    setNotice("Tray/slot drafts discarded.");
-  }
-
   const sameSpeciesDisabled = useMemo(() => {
     if (!activePlantAnchorId) {
       return true;
@@ -1849,9 +1831,9 @@ export default function PlacementPage() {
       title="Placement"
       subtitle="Step through tent/slot setup, tray setup, then staged placement applies."
       actions={
-        <Link className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" href={`/experiments/${experimentId}/overview`}>
-          ← Overview
-        </Link>
+        <Button asChild className={styles.buttonChrome}>
+          <Link href={`/experiments/${experimentId}/overview`}>← Overview</Link>
+        </Button>
       }
     >
       {loading ? <p className="text-sm text-muted-foreground">Loading placement...</p> : null}
@@ -1903,33 +1885,90 @@ export default function PlacementPage() {
           {currentStep === 1 ? (
             <div className={"grid gap-3"}>
               <SectionCard title="Add Tent">
-                <div className={"grid gap-3"}>
+                <div className={styles.entryFormGrid}>
                   <label className={"grid gap-2"}>
                     <span className={"text-sm text-muted-foreground"}>Tent name</span>
-                    <input className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50" value={newTentName} onChange={(event) => setNewTentName(event.target.value)} />
+                    <Input value={newTentName} onChange={(event) => setNewTentName(event.target.value)} />
                   </label>
                   <label className={"grid gap-2"}>
                     <span className={"text-sm text-muted-foreground"}>Tent code</span>
-                    <input className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50" value={newTentCode} onChange={(event) => setNewTentCode(event.target.value)} />
+                    <Input value={newTentCode} onChange={(event) => setNewTentCode(event.target.value)} />
                   </label>
-                  <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" type="button" disabled={saving} onClick={() => void createTent()}>
-                    {saving ? "Saving..." : "Add tent"}
-                  </button>
+                  <div className={styles.entryFormActions}>
+                    <Button className={styles.buttonChrome} type="button" disabled={saving} onClick={() => void createTent()}>
+                      {saving ? "Saving..." : "Add tent"}
+                    </Button>
+                  </div>
                 </div>
               </SectionCard>
 
               {tents.map((tent) => {
+                type PreviewSlot = SlotSummary & { isDraft?: boolean };
                 const shelfCounts = shelfCountsByTent[tent.tent_id] || buildDefaultShelves(tent);
-                const totalSlots = shelfCounts.reduce((acc, value) => acc + Math.max(0, value), 0);
-                const selectedSpecies = new Set(tent.allowed_species.map((item) => item.id));
+                const normalizedDraftShelfCounts = shelfCounts.map((value) => Math.max(0, value));
+                const selectedSpecies = new Set(
+                  tentAllowedSpeciesDraftById[tent.tent_id] || tent.allowed_species.map((item) => item.id),
+                );
                 const tentDraft = tentDraftById[tent.tent_id] || { name: tent.name, code: tent.code };
+                const sortedTentSlots = [...tent.slots].sort((left, right) => {
+                  if (left.shelf_index !== right.shelf_index) {
+                    return left.shelf_index - right.shelf_index;
+                  }
+                  if (left.slot_index !== right.slot_index) {
+                    return left.slot_index - right.slot_index;
+                  }
+                  return left.slot_id.localeCompare(right.slot_id);
+                });
+                const slotsByShelf = new Map<number, SlotSummary[]>();
+                for (const slot of sortedTentSlots) {
+                  const shelfSlots = slotsByShelf.get(slot.shelf_index);
+                  if (shelfSlots) {
+                    shelfSlots.push(slot);
+                  } else {
+                    slotsByShelf.set(slot.shelf_index, [slot]);
+                  }
+                }
+                const previewShelfSlotGroups = normalizedDraftShelfCounts.map((draftSlotCount, index) => {
+                  const shelfIndex = index + 1;
+                  const persistedSlots: PreviewSlot[] = (slotsByShelf.get(shelfIndex) || []).map((slot) => ({
+                    ...slot,
+                    isDraft: false,
+                  }));
+                  const usePersistedShelfPreview =
+                    tent.slots.length > 0 && draftSlotCount === persistedSlots.length;
+
+                  if (usePersistedShelfPreview) {
+                    return {
+                      shelfIndex,
+                      slots: persistedSlots,
+                    };
+                  }
+
+                  const previewSlots = persistedSlots.slice(0, draftSlotCount);
+                  for (let slotIndex = previewSlots.length; slotIndex < draftSlotCount; slotIndex += 1) {
+                    previewSlots.push({
+                      slot_id: `draft-${tent.tent_id}-${shelfIndex}-${slotIndex + 1}`,
+                      code: `Slot ${slotIndex + 1}`,
+                      label: `Shelf ${shelfIndex} Slot ${slotIndex + 1}`,
+                      shelf_index: shelfIndex,
+                      slot_index: slotIndex + 1,
+                      tray_count: 0,
+                      isDraft: true,
+                    });
+                  }
+
+                  return {
+                    shelfIndex,
+                    slots: previewSlots,
+                  };
+                });
 
                 return (
                   <SectionCard key={tent.tent_id} title={`${tent.name}${tent.code ? ` (${tent.code})` : ""}`}>
                     <div className={"grid gap-3"}>
                       <div className={styles.trayControlRow}>
-                        <input
-                          className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                        <Input
+                          className="sm:w-auto sm:min-w-[11rem] sm:flex-1"
                           value={tentDraft.name}
                           onChange={(event) =>
                             setTentDraftById((current) => ({
@@ -1942,8 +1981,8 @@ export default function PlacementPage() {
                           }
                           aria-label="Tent name"
                         />
-                        <input
-                          className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                        <Input
+                          className="sm:w-auto sm:min-w-[11rem] sm:flex-1"
                           value={tentDraft.code}
                           onChange={(event) =>
                             setTentDraftById((current) => ({
@@ -1956,133 +1995,176 @@ export default function PlacementPage() {
                           }
                           aria-label="Tent code"
                         />
-                        <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" disabled={saving} onClick={() => void saveTentDetails(tent)}>
+                        <Button variant="secondary" className={styles.buttonChrome} type="button" disabled={saving} onClick={() => void saveTentDetails(tent)}>
                           Save tent
-                        </button>
+                        </Button>
                       </div>
 
                       <div className={"grid gap-2"}>
-                        <span className={"text-sm text-muted-foreground"}>Allowed species restrictions</span>
-                        <div className={styles.selectionGrid}>
-                          {species.map((item) => {
-                            const checked = selectedSpecies.has(item.id);
-                            return (
-                              <label key={item.id} className={"flex flex-wrap items-center gap-2"}>
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={(event) => {
+                        <details className={["rounded-lg border border-border", styles.cellSurfaceLevel1].join(" ")}>
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm text-foreground">
+                            <span>Allowed species restrictions</span>
+                            <span className={styles.recipeLegendItem}>
+                              {selectedSpecies.size === 0 ? "All species" : `${selectedSpecies.size} selected`}
+                            </span>
+                          </summary>
+                          <div className={"grid gap-2 border-t border-border p-2"}>
+                            {species.map((item) => {
+                              const checked = selectedSpecies.has(item.id);
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  className={[
+                                    "flex min-h-10 w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm",
+                                    checked
+                                      ? "border-ring bg-[color:var(--gt-cell-selected)] text-foreground"
+                                      : "border-border bg-[color:var(--gt-cell-surface-1)] text-foreground",
+                                  ].join(" ")}
+                                  onClick={() => {
                                     const next = new Set(selectedSpecies);
-                                    if (event.target.checked) {
-                                      next.add(item.id);
-                                    } else {
+                                    if (checked) {
                                       next.delete(item.id);
+                                    } else {
+                                      next.add(item.id);
                                     }
-                                    void saveTentRestrictions(tent, Array.from(next));
+                                    setTentAllowedSpeciesDraftById((current) => ({
+                                      ...current,
+                                      [tent.tent_id]: Array.from(next),
+                                    }));
                                   }}
-                                />
-                                <span>{item.name}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
+                                  aria-pressed={checked}
+                                >
+                                  <span>{item.name}</span>
+                                  <span className={styles.recipeLegendItem}>{checked ? "Selected" : "Tap to add"}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </details>
                       </div>
 
                       <div className={"grid gap-2"}>
                         <span className={"text-sm text-muted-foreground"}>Shelves layout</span>
                         <div className={"flex flex-wrap items-center gap-2"}>
-                          <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" onClick={() => addShelf(tent.tent_id)}>
+                          <Button variant="secondary" className={styles.buttonChrome} type="button" onClick={() => addShelf(tent.tent_id)}>
                             Add shelf
-                          </button>
-                          <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" onClick={() => removeShelf(tent.tent_id)}>
+                          </Button>
+                          <Button variant="secondary" className={styles.buttonChrome} type="button" onClick={() => removeShelf(tent.tent_id)}>
                             Remove shelf
-                          </button>
+                          </Button>
                         </div>
-                        {shelfCounts.map((count, index) => (
-                          <label className={"grid gap-2"} key={`${tent.tent_id}-shelf-${index + 1}`}>
-                            <span className={"text-sm text-muted-foreground"}>Shelf {index + 1} slot count</span>
-                            <input
-                              className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
-                              type="number"
-                              min={0}
-                              value={count}
-                              onChange={(event) =>
-                                updateShelfCount(tent.tent_id, index, Number.parseInt(event.target.value || "0", 10))
-                              }
-                            />
-                          </label>
-                        ))}
                       </div>
 
                       <div className={"grid gap-2"}>
-                        <span className={"text-sm text-muted-foreground"}>Live preview</span>
-                        <div className={styles.previewGrid}>
-                          {shelfCounts.map((count, index) => (
-                            <div className={styles.previewRow} key={`${tent.tent_id}-preview-${index + 1}`}>
-                              <strong className="text-sm text-muted-foreground">Shelf {index + 1}</strong>
-                              <div className={styles.previewCells}>
-                                {Array.from({ length: Math.max(0, count) }).map((_, slotIndex) => (
-                                  <span className={styles.previewCell} key={`${tent.tent_id}-${index + 1}-${slotIndex + 1}`}>
-                                    {`S${index + 1}-${slotIndex + 1}`}
+                        <span className={"text-sm text-muted-foreground"}>Current slots</span>
+                        <div className="grid grid-flow-col auto-cols-[minmax(220px,1fr)] gap-2 overflow-x-auto pb-1">
+                          {previewShelfSlotGroups.map((group) => (
+                            <article key={`${tent.tent_id}-shelf-${group.shelfIndex}`} className={[styles.trayEditorCell, "min-w-[220px] rounded-lg border border-border", styles.cellSurfaceLevel2].join(" ")}>
+                              <div className={styles.trayHeaderRow}>
+                                <div className={styles.trayHeaderMeta}>
+                                  <strong>{`Shelf ${group.shelfIndex}`}</strong>
+                                </div>
+                                <div className={styles.trayHeaderActions}>
+                                  <span className={styles.recipeLegendItem}>
+                                    {group.slots.length} {group.slots.length === 1 ? "slot" : "slots"}
                                   </span>
-                                ))}
-                                {count === 0 ? <span className="text-sm text-muted-foreground">No slots</span> : null}
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className={styles.buttonChrome}
+                                    type="button"
+                                    onClick={() => adjustShelfSlotCount(tent.tent_id, group.shelfIndex - 1, -1)}
+                                    disabled={(shelfCounts[group.shelfIndex - 1] || 0) <= 0}
+                                  >
+                                    -
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className={styles.buttonChrome}
+                                    type="button"
+                                    onClick={() => adjustShelfSlotCount(tent.tent_id, group.shelfIndex - 1, 1)}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
                               </div>
-                            </div>
+
+                              <div className={[styles.plantCellGridTray, styles.cellGridResponsive].join(" ")} data-cell-size="sm">
+                                {group.slots.map((slot) => (
+                                  <article
+                                    key={slot.slot_id}
+                                    className={[
+                                      styles.trayGridCell,
+                                      styles.cellFrame,
+                                      styles.cellSurfaceLevel1,
+                                      "justify-items-center text-center",
+                                      slot.isDraft ? "[grid-template-rows:auto_1fr]" : "",
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" ")}
+                                  >
+                                    <strong className={styles.trayGridCellId}>{`Slot ${slot.slot_index}`}</strong>
+                                    {!slot.isDraft && slot.code !== `Slot ${slot.slot_index}` ? (
+                                      <span className="text-sm text-muted-foreground">{slot.code}</span>
+                                    ) : null}
+                                    {slot.isDraft ? (
+                                      <span className={[styles.slotPlacedChip, "self-end"].join(" ")}>New</span>
+                                    ) : null}
+                                  </article>
+                                ))}
+                                {group.slots.length === 0 ? <span className="text-sm text-muted-foreground">No slots.</span> : null}
+                              </div>
+                            </article>
                           ))}
+                          {previewShelfSlotGroups.length === 0 ? <span className="text-sm text-muted-foreground">No shelves configured yet.</span> : null}
                         </div>
                       </div>
 
-                      <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" type="button" disabled={saving} onClick={() => void generateSlots(tent.tent_id)}>
-                        {saving ? "Generating..." : `Generate slots (${totalSlots})`}
-                      </button>
-
-                      <div className={styles.slotGridInline}>
-                        {[...tent.slots]
-                          .sort((left, right) => {
-                            if (left.shelf_index !== right.shelf_index) {
-                              return left.shelf_index - right.shelf_index;
-                            }
-                            if (left.slot_index !== right.slot_index) {
-                              return left.slot_index - right.slot_index;
-                            }
-                            return left.slot_id.localeCompare(right.slot_id);
-                          })
-                          .map((slot) => (
-                            <span key={slot.slot_id} className={styles.previewCell}>
-                              {slot.code}
-                            </span>
-                          ))}
-                        {tent.slots.length === 0 ? <span className="text-sm text-muted-foreground">No slots generated yet.</span> : null}
-                      </div>
                     </div>
                   </SectionCard>
                 );
               })}
+
+              <ToolbarRow className="mt-3">
+                <span className={styles.recipeLegendItem}>{tentSlotDraftChangeCount} tent layout change(s)</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    className={styles.buttonChrome}
+                    type="button"
+                    disabled={saving || placementLocked || tentSlotDraftChangeCount === 0}
+                    onClick={() => void applyTentSlotLayouts()}
+                  >
+                    {saving ? "Applying..." : "Apply Tent -> Slot Layout"}
+                  </Button>
+                </div>
+              </ToolbarRow>
             </div>
           ) : null}
 
           {currentStep === 2 ? (
             <div className={"grid gap-3"}>
               <SectionCard title="Add Tray">
-                <div className={"grid gap-3"}>
+                <div className={styles.entryFormGrid}>
                   <label className={"grid gap-2"}>
                     <span className={"text-sm text-muted-foreground"}>Tray code/name</span>
-                    <input className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50" value={newTrayName} onChange={(event) => setNewTrayName(event.target.value)} />
+                    <Input value={newTrayName} onChange={(event) => setNewTrayName(event.target.value)} />
                   </label>
                   <label className={"grid gap-2"}>
                     <span className={"text-sm text-muted-foreground"}>Capacity</span>
-                    <input
-                      className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                    <Input
                       type="number"
                       min={1}
                       value={newTrayCapacity}
                       onChange={(event) => setNewTrayCapacity(Number.parseInt(event.target.value || "1", 10))}
                     />
                   </label>
-                  <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" type="button" disabled={saving} onClick={() => void createTray()}>
-                    {saving ? "Saving..." : "Create tray"}
-                  </button>
+                  <div className={styles.entryFormActions}>
+                    <Button className={styles.buttonChrome} type="button" disabled={saving} onClick={() => void createTray()}>
+                      {saving ? "Saving..." : "Create tray"}
+                    </Button>
+                  </div>
                 </div>
               </SectionCard>
 
@@ -2114,21 +2196,20 @@ export default function PlacementPage() {
                   </div>
                 </div>
 
-                <div className={[styles.trayManagerGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="lg">
+                <div className={[styles.trayManagerGrid, styles.cellGridResponsive].join(" ")} data-cell-size="lg">
                   {sortedTrayIds.map((trayId) => {
                     const tray = trayById.get(trayId);
                     if (!tray) {
                       return null;
                     }
-                    const draft = trayDraftById[trayId] || { name: tray.name, capacity: tray.capacity };
                     const selected = selectedTrayManagerIds.has(trayId);
                     return (
                       <article
                         key={trayId}
                         className={[
                           styles.trayEditorCell,
-                          "rounded-lg border border-border bg-secondary/60 shadow-sm",
-                          selected ? "border-ring bg-muted/40" : "",
+                          "rounded-lg border border-border",
+                          styles.cellSurfaceLevel1,
                           selected ? styles.plantCellSelected : "",
                         ]
                           .filter(Boolean)
@@ -2150,53 +2231,15 @@ export default function PlacementPage() {
                           </span>
                         ) : null}
                         <strong className={styles.trayGridCellId}>
-                          {formatTrayDisplay(draft.name || tray.name, tray.tray_id)}
+                          {formatTrayDisplay(tray.name, tray.tray_id)}
                         </strong>
-                        <span className="text-sm text-muted-foreground">Current occupancy: {tray.current_count}/{tray.capacity}</span>
+                        <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
+                          {tray.current_count}/{tray.capacity}
+                        </Badge>
                         <div className={styles.trayEditorInputs}>
-                          <input
-                            className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
-                            value={draft.name}
-                            onClick={(event) => event.stopPropagation()}
-                            onChange={(event) =>
-                              setTrayDraftById((current) => ({
-                                ...current,
-                                [trayId]: {
-                                  ...(current[trayId] || { name: tray.name, capacity: tray.capacity }),
-                                  name: event.target.value,
-                                },
-                              }))
-                            }
-                            aria-label="Tray name"
-                          />
-                          <input
-                            className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
-                            type="number"
-                            min={1}
-                            value={draft.capacity}
-                            onClick={(event) => event.stopPropagation()}
-                            onChange={(event) =>
-                              setTrayDraftById((current) => ({
-                                ...current,
-                                [trayId]: {
-                                  ...(current[trayId] || { name: tray.name, capacity: tray.capacity }),
-                                  capacity: Number.parseInt(event.target.value || "1", 10),
-                                },
-                              }))
-                            }
-                            aria-label="Tray capacity"
-                          />
-                          <button
-                            className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                            type="button"
-                            disabled={saving}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void saveTrayDetails(tray);
-                            }}
-                          >
-                            Save tray
-                          </button>
+                          <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
+                            {tray.capacity} {tray.capacity === 1 ? "slot" : "slots"}
+                          </Badge>
                         </div>
                       </article>
                     );
@@ -2210,63 +2253,61 @@ export default function PlacementPage() {
           {currentStep === 3 ? (
             <div className={"grid gap-3"}>
               <SectionCard title="Plants -> Trays (Draft)">
-                <Tooltip.Provider delayDuration={150}>
-                  <div className={[styles.placementToolbar, "grid gap-3"].join(" ")}>
-                    <select
-                      className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
-                      value={destinationTrayId}
-                      onChange={(event) => setDestinationTrayId(event.target.value)}
-                      aria-label="Destination tray"
+                <div className={styles.placementToolbar}>
+                  <select
+                    className={[styles.nativeSelect, styles.toolbarInlineSelect].join(" ")}
+                    value={destinationTrayId}
+                    onChange={(event) => setDestinationTrayId(event.target.value)}
+                    aria-label="Destination tray"
+                  >
+                    <option value="">Select destination tray</option>
+                    {sortedTrayIds.map((trayId) => {
+                      const tray = trayById.get(trayId);
+                      if (!tray) {
+                        return null;
+                      }
+                      return (
+                        <option key={trayId} value={trayId}>
+                          {formatTrayDisplay(tray.name, tray.tray_id)} ({draftPlantCountByTray[trayId] || 0}/{tray.capacity})
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
+                    <ToolIconButton
+                      label="Select all unplaced plants"
+                      icon={<CheckSquare size={16} />}
+                      onClick={selectAllPlantsInMainGrid}
+                      disabled={mainGridPlantIds.length === 0}
+                    />
+                    <ToolIconButton
+                      label="Select same species"
+                      icon={<Layers size={16} />}
+                      onClick={selectSameSpeciesInMainGrid}
+                      disabled={sameSpeciesDisabled}
+                    />
+                    <ToolIconButton
+                      label="Clear plant selection"
+                      icon={<X size={16} />}
+                      onClick={clearPlantSelection}
+                      disabled={selectedPlantIds.size === 0}
+                    />
+                    <Button
+                      className={styles.buttonChrome}
+                      type="button"
+                      disabled={placementLocked || !destinationTrayId || selectedInMainGrid.length === 0}
+                      onClick={stageMovePlantsToTray}
                     >
-                      <option value="">Select destination tray</option>
-                      {sortedTrayIds.map((trayId) => {
-                        const tray = trayById.get(trayId);
-                        if (!tray) {
-                          return null;
-                        }
-                        return (
-                          <option key={trayId} value={trayId}>
-                            {formatTrayDisplay(tray.name, tray.tray_id)} ({draftPlantCountByTray[trayId] || 0}/{tray.capacity})
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
-                      <ToolIconButton
-                        label="Select all unplaced plants"
-                        icon={<CheckSquare size={16} />}
-                        onClick={selectAllPlantsInMainGrid}
-                        disabled={mainGridPlantIds.length === 0}
-                      />
-                      <ToolIconButton
-                        label="Select same species"
-                        icon={<Layers size={16} />}
-                        onClick={selectSameSpeciesInMainGrid}
-                        disabled={sameSpeciesDisabled}
-                      />
-                      <ToolIconButton
-                        label="Clear plant selection"
-                        icon={<X size={16} />}
-                        onClick={clearPlantSelection}
-                        disabled={selectedPlantIds.size === 0}
-                      />
-                      <button
-                        className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
-                        type="button"
-                        disabled={placementLocked || !destinationTrayId || selectedInMainGrid.length === 0}
-                        onClick={stageMovePlantsToTray}
-                      >
-                        <MoveRight size={16} />
-                        Move selected
-                      </button>
-                    </div>
+                      <MoveRight size={16} />
+                      Move selected
+                    </Button>
                   </div>
-                </Tooltip.Provider>
+                </div>
 
                 <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
                   <span className="text-sm text-muted-foreground">Unplaced active plants: {mainGridPlantIds.length}</span>
                   <span className="text-sm text-muted-foreground">Selected in main grid: {selectedInMainGrid.length}</span>
-                  {trays.length === 0 ? <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"}>Create at least one tray.</span> : null}
+                  {trays.length === 0 ? <Badge variant="secondary">Create at least one tray.</Badge> : null}
                 </div>
 
                 {diagnostics?.reason_counts ? (
@@ -2279,13 +2320,13 @@ export default function PlacementPage() {
                   </div>
                 ) : null}
 
-                <div className={[styles.plantCellGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="sm">
+                <div className={[styles.plantCellGrid, styles.cellGridResponsive].join(" ")} data-cell-size="sm">
                   {mainGridPlantIds.map((plantId) => renderPlantCell(plantId))}
                 </div>
               </SectionCard>
 
               <SectionCard title="Tray Containers">
-                <div className={[styles.trayManagerGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="lg">
+                <div className={[styles.trayManagerGrid, styles.cellGridResponsive].join(" ")} data-cell-size="lg">
                   {sortedTrayIds.map((trayId) => {
                     const tray = trayById.get(trayId);
                     if (!tray) {
@@ -2295,11 +2336,13 @@ export default function PlacementPage() {
                     const selectedInTray = selectedInTrayByTrayId[trayId] || [];
 
                     return (
-                      <article key={trayId} className={[styles.trayEditorCell, "rounded-lg border border-border bg-secondary/60 shadow-sm"].join(" ")}>
+                      <article key={trayId} className={[styles.trayEditorCell, "rounded-lg border border-border", styles.cellSurfaceLevel2].join(" ")}>
                         <div className={styles.trayHeaderRow}>
                           <div className={styles.trayHeaderMeta}>
                             <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
-                            <span className="text-sm text-muted-foreground">Occupancy: {draftPlantCountByTray[trayId] || 0}/{tray.capacity}</span>
+                            <span className={styles.recipeLegendItemCompact}>
+                              {(draftPlantCountByTray[trayId] || 0)}/{tray.capacity}
+                            </span>
                           </div>
                           <div className={styles.trayHeaderActions}>
                             {selectedInTray.length > 0 ? (
@@ -2313,7 +2356,7 @@ export default function PlacementPage() {
                           </div>
                         </div>
 
-                        <div className={[styles.plantCellGridTray, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="sm">
+                        <div className={[styles.plantCellGridTray, styles.cellGridResponsive].join(" ")} data-cell-size="sm">
                           {trayPlantIds.map((plantId) => renderPlantCell(plantId))}
                         </div>
                       </article>
@@ -2322,84 +2365,76 @@ export default function PlacementPage() {
                 </div>
               </SectionCard>
 
-              <StickyActionBar>
+              <ToolbarRow className="mt-3">
                 <span className={styles.recipeLegendItem}>{placementDraftChangeCount} plant layout change(s)</span>
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
-                  type="button"
-                  disabled={saving || placementDraftChangeCount === 0}
-                  onClick={() => void applyPlantToTrayLayout()}
-                >
-                  {saving ? "Applying..." : "Apply Plant -> Tray Layout"}
-                </button>
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                  type="button"
-                  disabled={saving || placementDraftChangeCount === 0}
-                  onClick={resetPlantDrafts}
-                >
-                  Discard drafts
-                </button>
-              </StickyActionBar>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    className={styles.buttonChrome}
+                    type="button"
+                    disabled={saving || placementDraftChangeCount === 0}
+                    onClick={() => void applyPlantToTrayLayout()}
+                  >
+                    {saving ? "Applying..." : "Apply Plant -> Tray Layout"}
+                  </Button>
+                </div>
+              </ToolbarRow>
             </div>
           ) : null}
 
           {currentStep === 4 ? (
             <div className={"grid gap-3"}>
               <SectionCard title="Trays -> Slots (Draft)">
-                <Tooltip.Provider delayDuration={150}>
-                  <div className={[styles.placementToolbar, "grid gap-3"].join(" ")}>
-                    <select
-                      className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
-                      value={destinationSlotId}
-                      onChange={(event) => setDestinationSlotId(event.target.value)}
-                      aria-label="Destination slot"
+                <div className={styles.placementToolbar}>
+                  <select
+                    className={[styles.nativeSelect, styles.toolbarInlineSelect].join(" ")}
+                    value={destinationSlotId}
+                    onChange={(event) => setDestinationSlotId(event.target.value)}
+                    aria-label="Destination slot"
+                  >
+                    <option value="">Select destination slot</option>
+                    {sortedSlots.map((slot) => {
+                      const occupant = draftSlotToTray.get(slot.slot_id) || null;
+                      const occupantName = occupant
+                        ? formatTrayDisplay(trayById.get(occupant)?.name, occupant)
+                        : "Empty";
+                      return (
+                        <option key={slot.slot_id} value={slot.slot_id}>
+                          {slot.label} ({occupantName})
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
+                    <ToolIconButton
+                      label="Select all unplaced trays"
+                      icon={<CheckSquare size={16} />}
+                      onClick={selectAllTraysInMainGrid}
+                      disabled={mainGridTrayIds.length === 0}
+                    />
+                    <ToolIconButton
+                      label="Clear tray selection"
+                      icon={<X size={16} />}
+                      onClick={clearTraySelection}
+                      disabled={selectedTrayIds.size === 0}
+                    />
+                    <Button
+                      className={styles.buttonChrome}
+                      type="button"
+                      disabled={placementLocked || !destinationSlotId || selectedTrayIds.size === 0}
+                      onClick={stageMoveTraysToSlots}
                     >
-                      <option value="">Select destination slot</option>
-                      {sortedSlots.map((slot) => {
-                        const occupant = draftSlotToTray.get(slot.slot_id) || null;
-                        const occupantName = occupant
-                          ? formatTrayDisplay(trayById.get(occupant)?.name, occupant)
-                          : "Empty";
-                        return (
-                          <option key={slot.slot_id} value={slot.slot_id}>
-                            {slot.label} ({occupantName})
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
-                      <ToolIconButton
-                        label="Select all unplaced trays"
-                        icon={<CheckSquare size={16} />}
-                        onClick={selectAllTraysInMainGrid}
-                        disabled={mainGridTrayIds.length === 0}
-                      />
-                      <ToolIconButton
-                        label="Clear tray selection"
-                        icon={<X size={16} />}
-                        onClick={clearTraySelection}
-                        disabled={selectedTrayIds.size === 0}
-                      />
-                      <button
-                        className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
-                        type="button"
-                        disabled={placementLocked || !destinationSlotId || selectedTrayIds.size === 0}
-                        onClick={stageMoveTraysToSlots}
-                      >
-                        <ArrowRight size={16} />
-                        Move selected
-                      </button>
-                    </div>
+                      <ArrowRight size={16} />
+                      Move selected
+                    </Button>
                   </div>
-                </Tooltip.Provider>
+                </div>
 
                 <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
                   <span className="text-sm text-muted-foreground">Unplaced trays: {mainGridTrayIds.length}</span>
                   <span className="text-sm text-muted-foreground">Selected trays: {selectedTrayIds.size}</span>
                 </div>
 
-                <div className={[styles.trayMainGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="md">
+                <div className={[styles.trayMainGrid, styles.cellGridResponsive].join(" ")} data-cell-size="md">
                   {mainGridTrayIds.map((trayId) => renderTrayCell(trayId))}
                 </div>
               </SectionCard>
@@ -2410,14 +2445,15 @@ export default function PlacementPage() {
                     const selectedInTent = selectedTraysByTentId[tent.tent_id] || [];
 
                     return (
-                      <article key={tent.tent_id} className={[styles.tentBoardCard, "rounded-lg border border-border bg-card"].join(" ")}>
-                        <div className={styles.trayHeaderRow}>
-                          <div className={styles.trayHeaderMeta}>
-                            <strong>{tent.name}</strong>
-                            <span className="text-sm text-muted-foreground">{tent.code || ""}</span>
+                      <article key={tent.tent_id} className={[styles.tentBoardCard, "rounded-lg border border-border", styles.cellSurfaceLevel3].join(" ")}>
+                        <div className={[styles.trayHeaderRow, "items-center"].join(" ")}>
+                          <div className={[styles.trayHeaderMeta, "py-0.5"].join(" ")}>
+                            <strong className={styles.trayGridCellId}>{tent.name}</strong>
                           </div>
                           <div className={styles.trayHeaderActions}>
-                            <span className={styles.recipeLegendItem}>{tent.slots.length} slot(s)</span>
+                            <span className={styles.recipeLegendItem}>
+                              {tent.slots.length} {tent.slots.length === 1 ? "slot" : "slots"}
+                            </span>
                             {selectedInTent.length > 0 ? (
                               <ToolIconButton
                                 label="Return selected trays to unplaced"
@@ -2443,7 +2479,7 @@ export default function PlacementPage() {
                             .map((slot) => {
                               const trayId = draftSlotToTray.get(slot.slot_id) || null;
                               return (
-                                <div key={slot.slot_id} className={[styles.slotCell, "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] bg-muted/40"].join(" ")}>
+                                <div key={slot.slot_id} className={[styles.slotCell, styles.slotContainerCellFrame, styles.cellSurfaceLevel2].join(" ")}>
                                   <span className={styles.slotCellLabel}>{slot.code}</span>
                                   {trayId ? (
                                     renderTrayCell(trayId, true)
@@ -2472,25 +2508,19 @@ export default function PlacementPage() {
                 </div>
               </SectionCard>
 
-              <StickyActionBar>
+              <ToolbarRow className="mt-3">
                 <span className={styles.recipeLegendItem}>{traySlotDraftChangeCount} tray/slot change(s)</span>
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
-                  type="button"
-                  disabled={saving || traySlotDraftChangeCount === 0}
-                  onClick={() => void applyTrayToSlotLayout()}
-                >
-                  {saving ? "Applying..." : "Apply Tray -> Slot Layout"}
-                </button>
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                  type="button"
-                  disabled={saving || traySlotDraftChangeCount === 0}
-                  onClick={resetTraySlotDrafts}
-                >
-                  Discard drafts
-                </button>
-              </StickyActionBar>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    className={styles.buttonChrome}
+                    type="button"
+                    disabled={saving || traySlotDraftChangeCount === 0}
+                    onClick={() => void applyTrayToSlotLayout()}
+                  >
+                    {saving ? "Applying..." : "Apply Tray -> Slot Layout"}
+                  </Button>
+                </div>
+              </ToolbarRow>
             </div>
           ) : null}
         </div>
@@ -2499,18 +2529,18 @@ export default function PlacementPage() {
           className={[styles.stepNavRow, currentStep === 1 ? styles.stepNavRowForwardOnly : ""].filter(Boolean).join(" ")}
         >
           {currentStep > 1 ? (
-            <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" onClick={goPreviousStep}>
+            <Button variant="secondary" className={styles.buttonChrome} type="button" onClick={goPreviousStep}>
               Back
-            </button>
+            </Button>
           ) : null}
-          <button
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
+          <Button
+            className={styles.buttonChrome}
             type="button"
             disabled={!isStepComplete(currentStep)}
             onClick={goNextStep}
           >
             {currentStep === 4 ? "Go to Overview" : "Next"}
-          </button>
+          </Button>
         </div>
       </SectionCard>
     </PageShell>

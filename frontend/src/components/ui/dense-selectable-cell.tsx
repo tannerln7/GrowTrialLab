@@ -21,8 +21,8 @@ function DenseSelectableCell({
     <article
       className={cn(
         "relative grid min-h-[5.25rem] content-start gap-1 rounded-md border p-2",
-        muted ? "bg-muted/40" : "bg-card",
-        selected ? "border-ring bg-muted/40" : "border-border",
+        muted ? "bg-[color:var(--gt-cell-surface-2)]" : "bg-[color:var(--gt-cell-surface-1)]",
+        selected ? "border-ring bg-[color:var(--gt-cell-selected)]" : "border-border",
         interactive ? "cursor-pointer hover:border-ring/70" : "",
         dirty ? "ring-1 ring-ring/50" : "",
         className,

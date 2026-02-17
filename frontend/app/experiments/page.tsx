@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import { buttonVariants } from "@/src/components/ui/button";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
@@ -72,10 +74,10 @@ export default function ExperimentsPage() {
       subtitle="Create experiments and complete bootstrap setup."
       actions={
         <div className={"flex flex-wrap items-center gap-2"}>
-          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href="/experiments/new">
+          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href="/experiments/new">
             New experiment
           </Link>
-          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href="/">
+          <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href="/">
             Back home
           </Link>
         </div>
@@ -131,10 +133,10 @@ export default function ExperimentsPage() {
       </SectionCard>
       <SectionCard>
         <div className={"flex flex-wrap items-center gap-2"}>
-          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href="/experiments/new">
+          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href="/experiments/new">
             New experiment
           </Link>
-          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href="/">
+          <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href="/">
             Back home
           </Link>
         </div>

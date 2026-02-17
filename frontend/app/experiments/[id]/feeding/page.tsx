@@ -5,15 +5,21 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
 } from "@/lib/experiment-status";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import { Badge } from "@/src/components/ui/badge";
+import { buttonVariants } from "@/src/components/ui/button";
+import { Input } from "@/src/components/ui/input";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
+import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import { Textarea } from "@/src/components/ui/textarea";
 
 
 type Location = {
@@ -331,7 +337,7 @@ export default function FeedingPage() {
       title="Feeding"
       subtitle="Record feeding quickly for active plants."
       actions={
-        <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={overviewHref}>
+        <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={overviewHref}>
           ← Overview
         </Link>
       }
@@ -344,7 +350,7 @@ export default function FeedingPage() {
       {statusSummary && statusSummary.lifecycle.state !== "running" ? (
         <SectionCard title="Feeding Requires Running State">
           <p className={"text-sm text-muted-foreground"}>Feeding is available only while an experiment is running.</p>
-          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={`/experiments/${experimentId}/overview`}>
+          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
             Start experiment from Overview
           </Link>
         </SectionCard>
@@ -354,14 +360,14 @@ export default function FeedingPage() {
         <>
           <SectionCard title="Queue Status">
             <div className={"grid gap-3"}>
-              <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"}>Remaining feedings: {queue.remaining_count}</span>
+              <Badge variant="secondary">Remaining feedings: {queue.remaining_count}</Badge>
               <p className={"text-sm text-muted-foreground"}>Window: feed plants at least once every {queue.window_days} days.</p>
               {selectedPlant && !selectedPlant.needs_feeding ? (
                 <p className={"text-sm text-muted-foreground"}>This plant is already within the feeding window.</p>
               ) : null}
               {queue.remaining_count > 0 ? (
                 <button
-                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                  className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                   type="button"
                   onClick={() => {
                     const next = pickNextNeedingFeed(queuePlants, selectedPlantId);
@@ -381,7 +387,7 @@ export default function FeedingPage() {
           {queue.remaining_count === 0 && !selectedPlant ? (
             <SectionCard title="All Feedings Complete">
               <p className={"text-sm text-muted-foreground"}>No active plants currently need feeding.</p>
-              <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={`/experiments/${experimentId}/overview`}>
+              <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
                 Back to Overview
               </Link>
             </SectionCard>
@@ -392,7 +398,7 @@ export default function FeedingPage() {
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Plant</span>
                 <select
-                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                  className={styles.nativeSelect}
                   value={selectedPlantId ?? ""}
                   onChange={(event) => selectPlant(event.target.value || null, true)}
                 >
@@ -421,20 +427,19 @@ export default function FeedingPage() {
               ) : null}
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Amount (optional)</span>
-                <input
-                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                <Input
                   value={amountText}
                   onChange={(event) => setAmountText(event.target.value)}
                   placeholder="3 drops"
                 />
               </label>
-              <button className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} type="button" onClick={() => setShowNote((current) => !current)}>
+              <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" onClick={() => setShowNote((current) => !current)}>
                 {showNote ? "Hide note" : "Add note"}
               </button>
               {showNote ? (
                 <label className={"grid gap-2"}>
                   <span className={"text-sm text-muted-foreground"}>Note (optional)</span>
-                  <textarea className={"flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"} value={note} onChange={(event) => setNote(event.target.value)} />
+                  <Textarea value={note} onChange={(event) => setNote(event.target.value)} />
                 </label>
               ) : null}
             </div>
@@ -448,10 +453,10 @@ export default function FeedingPage() {
                   : "This plant needs a plant recipe before feeding."}
               </p>
               <div className={"flex flex-wrap items-center gap-2"}>
-                <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={`/experiments/${experimentId}/placement`}>
+                <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/placement`}>
                   Fix placement
                 </Link>
-                <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href={overviewHref}>
+                <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href={overviewHref}>
                   Back to Overview
                 </Link>
               </div>
@@ -488,7 +493,7 @@ export default function FeedingPage() {
                     <strong>{plant.species_name}</strong>
                     <span>Last fed</span>
                     <strong>{formatLastFed(plant.last_fed_at)}</strong>
-                    <button className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} type="button" onClick={() => selectPlant(plant.uuid, true)}>
+                    <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" onClick={() => selectPlant(plant.uuid, true)}>
                       Select
                     </button>
                   </div>
@@ -499,7 +504,7 @@ export default function FeedingPage() {
 
           <StickyActionBar>
             <button
-              className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
+              className={cn(buttonVariants({ variant: "default" }), "border border-border")}
               type="button"
               disabled={!selectedPlantId || saving || saveBlocked}
               onClick={() => void saveFeeding(false)}
@@ -507,7 +512,7 @@ export default function FeedingPage() {
               {saving ? "Saving..." : "Save"}
             </button>
             <button
-              className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+              className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
               type="button"
               disabled={!selectedPlantId || saving || !canSaveAndNext || saveBlocked}
               onClick={() => void saveFeeding(true)}

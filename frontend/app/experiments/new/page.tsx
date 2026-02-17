@@ -5,9 +5,13 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
 import { backendFetch, normalizeBackendError } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import { buttonVariants } from "@/src/components/ui/button";
+import { Input } from "@/src/components/ui/input";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { Textarea } from "@/src/components/ui/textarea";
 
 export default function NewExperimentPage() {
   const router = useRouter();
@@ -85,7 +89,7 @@ export default function NewExperimentPage() {
       title="New Experiment"
       subtitle="Create an experiment and finish bootstrap setup."
       actions={
-        <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href="/experiments">
+        <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href="/experiments">
           Cancel
         </Link>
       }
@@ -94,32 +98,23 @@ export default function NewExperimentPage() {
         <form className={"grid gap-3"} onSubmit={onSubmit}>
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Name</span>
-            <input
-              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              required
-            />
+            <Input value={name} onChange={(event) => setName(event.target.value)} required />
           </label>
 
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Description</span>
-            <textarea
-              className={"flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-            />
+            <Textarea value={description} onChange={(event) => setDescription(event.target.value)} />
           </label>
 
           <div className={"flex flex-wrap items-center gap-2"}>
             <button
-              className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
+              className={cn(buttonVariants({ variant: "default" }), "border border-border")}
               disabled={saving}
               type="submit"
             >
               {saving ? "Creating..." : "Create experiment"}
             </button>
-            <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href="/experiments">
+            <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href="/experiments">
               Cancel
             </Link>
           </div>

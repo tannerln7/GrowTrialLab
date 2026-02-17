@@ -3,12 +3,15 @@
 import { RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import { buttonVariants } from "@/src/components/ui/button";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { Textarea } from "@/src/components/ui/textarea";
+import { cn } from "@/src/lib/utils";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -289,6 +292,7 @@ function baselineLabelSkin(plant: QueuePlant | null) {
 }
 
 export default function BaselinePage() {
+  const baselinePhotoInputId = useId();
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -726,7 +730,7 @@ export default function BaselinePage() {
       title="Baseline"
       subtitle="Record week 0 baseline metrics and grade."
       actions={
-        <Link className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" href={`/experiments/${experimentId}/overview`}>
+        <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
@@ -743,22 +747,35 @@ export default function BaselinePage() {
         ) : null}
         <div className={"flex flex-wrap items-center gap-2"}>
           {baselineLocked && !editingUnlocked ? (
-            <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90" type="button" onClick={() => setEditingUnlocked(true)}>
+            <button
+              className={cn(buttonVariants({ variant: "destructive" }), "border border-border")}
+              type="button"
+              onClick={() => setEditingUnlocked(true)}
+            >
               Unlock editing
             </button>
           ) : null}
           {baselineLocked && editingUnlocked ? (
-            <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" onClick={() => setEditingUnlocked(false)}>
+            <button
+              className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              type="button"
+              onClick={() => setEditingUnlocked(false)}
+            >
               Re-lock UI
             </button>
           ) : null}
           {!baselineLocked && allBaselinesCaptured ? (
-            <button className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80" type="button" disabled={saving} onClick={() => void lockBaseline()}>
+            <button
+              className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              type="button"
+              disabled={saving}
+              onClick={() => void lockBaseline()}
+            >
               Finish and Lock
             </button>
           ) : null}
           <button
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
+            className={cn(buttonVariants({ variant: "default" }), "border border-border")}
             type="button"
             disabled={primarySaveDisabled}
             onClick={() => void saveBaseline(primarySaveLabel === "Save & Next")}
@@ -774,7 +791,7 @@ export default function BaselinePage() {
             <label className={"grid gap-2"}>
               <span className={"text-sm text-muted-foreground"}>Plant</span>
               <select
-                className="flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                className={styles.nativeSelect}
                 value={selectedPlantId}
                 onChange={(event) => jumpToPlant(event.target.value)}
                 disabled={saving}
@@ -855,7 +872,7 @@ export default function BaselinePage() {
                   return (
                     <button
                       key={grade}
-                      className={selected ? "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90" : "inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                      className={selected ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                       type="button"
                       disabled={saving || readOnly}
                       onClick={() => {
@@ -896,16 +913,32 @@ export default function BaselinePage() {
                   )}
                 </div>
                 <div className={styles.baselinePhotoControls}>
-                  <input
-                    className={`flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ${styles.baselineFileInput}`}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    disabled={readOnly || uploadingPhoto || saving}
-                    onChange={(event) => setPhotoFile(event.target.files?.[0] || null)}
-                  />
+                  <div className="flex h-9 w-full items-center gap-3 rounded-md border border-input bg-background px-2 text-sm text-foreground shadow-xs transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background">
+                    <label
+                      htmlFor={baselinePhotoInputId}
+                      className={cn(
+                        buttonVariants({ variant: "secondary", size: "sm" }),
+                        "h-7 px-3 text-sm",
+                        (readOnly || uploadingPhoto || saving) && "pointer-events-none opacity-50",
+                      )}
+                    >
+                      Choose file
+                    </label>
+                    <span className="min-w-0 truncate text-sm text-muted-foreground">
+                      {photoFile ? photoFile.name : "No file chosen"}
+                    </span>
+                    <input
+                      id={baselinePhotoInputId}
+                      className="sr-only"
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      disabled={readOnly || uploadingPhoto || saving}
+                      onChange={(event) => setPhotoFile(event.target.files?.[0] || null)}
+                    />
+                  </div>
                   <button
-                    className="inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                    className={cn(buttonVariants({ variant: "secondary" }), "w-fit self-start")}
                     type="button"
                     disabled={readOnly || uploadingPhoto || saving || !photoFile}
                     onClick={() => void uploadBaselinePhoto()}
@@ -923,8 +956,7 @@ export default function BaselinePage() {
 
             <label className={"grid gap-2"}>
               <span className={"text-sm text-muted-foreground"}>Notes</span>
-              <textarea
-                className="flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+              <Textarea
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 disabled={saving || readOnly}
@@ -936,7 +968,7 @@ export default function BaselinePage() {
 
       <SectionCard title="Plant Queue">
         {queuePlants.length > 0 ? (
-          <div className={[styles.plantCellGrid, "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(var(--gt-cell-min,8.75rem),1fr))] data-[cell-size=sm]:[--gt-cell-min:6.9rem] data-[cell-size=sm]:[--gt-cell-min-height:6.5rem] data-[cell-size=sm]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=md]:[--gt-cell-min:8.75rem] data-[cell-size=md]:[--gt-cell-min-height:5.25rem] data-[cell-size=md]:[--gt-cell-pad:var(--gt-space-sm)] data-[cell-size=lg]:[--gt-cell-min:12.5rem] data-[cell-size=lg]:[--gt-cell-min-height:6rem] data-[cell-size=lg]:[--gt-cell-pad:calc(var(--gt-space-sm)+var(--gt-space-xs))]"].join(" ")} data-cell-size="sm">
+          <div className={[styles.plantCellGrid, styles.cellGridResponsive].join(" ")} data-cell-size="sm">
             {queuePlants.map((plant) => {
               const selected = plant.uuid === selectedPlantId;
               return (
@@ -945,8 +977,9 @@ export default function BaselinePage() {
                   className={[
                     styles.plantCell,
                     styles.baselineQueuePlantCell,
-                    "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border bg-card p-[var(--gt-cell-pad,var(--gt-space-sm))] cursor-pointer hover:border-ring/70",
-                    selected ? "border-ring bg-muted/40" : "",
+                    styles.cellFrame,
+                    styles.cellSurfaceLevel1,
+                    styles.cellInteractive,
                     selected ? styles.plantCellSelected : "",
                   ]
                     .filter(Boolean)

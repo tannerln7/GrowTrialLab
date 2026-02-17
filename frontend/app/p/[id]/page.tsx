@@ -16,11 +16,17 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import { Badge } from "@/src/components/ui/badge";
+import { buttonVariants } from "@/src/components/ui/button";
+import { experimentsStyles as formStyles } from "@/src/components/ui/experiments-styles";
+import { Input } from "@/src/components/ui/input";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
+import { Textarea } from "@/src/components/ui/textarea";
 
 import { cockpitStyles as styles } from "@/src/components/ui/cockpit-styles";
 
@@ -582,7 +588,7 @@ export default function PlantQrPage() {
       <PageShell
         title="Plant Cockpit"
         actions={
-          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={overviewHref}>
+          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={overviewHref}>
             ← Overview
           </Link>
         }
@@ -599,7 +605,7 @@ export default function PlantQrPage() {
       <PageShell
         title="Plant Cockpit"
         actions={
-          <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={overviewHref}>
+          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={overviewHref}>
             ← Overview
           </Link>
         }
@@ -622,7 +628,7 @@ export default function PlantQrPage() {
       subtitle={plantUuid || "Unknown plant"}
       stickyOffset
       actions={
-        <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={overviewHref}>
+        <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={overviewHref}>
           ← Overview
         </Link>
       }
@@ -663,27 +669,27 @@ export default function PlantQrPage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">Status: {cockpit.plant.status}</span>
-                <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">Grade: {cockpit.plant.grade || "Missing"}</span>
-                <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">
+                <Badge variant="secondary">Status: {cockpit.plant.status}</Badge>
+                <Badge variant="secondary">Grade: {cockpit.plant.grade || "Missing"}</Badge>
+                <Badge variant="secondary">
                   Tent: {cockpit.derived.location.tent?.code || cockpit.derived.location.tent?.name || "Unplaced"}
-                </span>
-                <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">Slot: {cockpit.derived.location.slot?.code || "Unplaced"}</span>
-                <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">
+                </Badge>
+                <Badge variant="secondary">Slot: {cockpit.derived.location.slot?.code || "Unplaced"}</Badge>
+                <Badge variant="secondary">
                   Tray:{" "}
                   {cockpit.derived.location.tray?.code ||
                     cockpit.derived.location.tray?.name ||
                     "Unplaced"}
                   {trayOccupancyLabel(cockpit)}
-                </span>
+                </Badge>
                 {cockpit.derived.assigned_recipe ? (
-                  <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">
+                  <Badge variant="secondary">
                     Recipe: {recipeLabel(cockpit.derived.assigned_recipe)}
-                  </span>
+                  </Badge>
                 ) : (
-                  <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"}>Recipe: Unassigned</span>
+                  <Badge variant="secondary">Recipe: Unassigned</Badge>
                 )}
-                {cockpit.derived.location.status !== "placed" ? <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">Unplaced</span> : null}
+                {cockpit.derived.location.status !== "placed" ? <Badge variant="secondary">Unplaced</Badge> : null}
               </div>
             </div>
           </SectionCard>
@@ -704,7 +710,7 @@ export default function PlantQrPage() {
                 ) : null}
                 {cockpit.derived.replaced_by_uuid ? (
                   <Link
-                    className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
+                    className={cn(buttonVariants({ variant: "default" }), "border border-border")}
                     href={replacementHref(cockpit.derived.replaced_by_uuid)}
                   >
                     Open Replacement
@@ -721,14 +727,14 @@ export default function PlantQrPage() {
               </p>
               <div className={"flex flex-wrap items-center gap-2"}>
                 <Link
-                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                  className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                   href={replacementHref(cockpit.derived.replaces_uuid)}
                 >
                   Open Previous Plant
                 </Link>
                 {cockpit.derived.replaced_by_uuid ? (
                   <Link
-                    className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                    className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                     href={replacementHref(cockpit.derived.replaced_by_uuid)}
                   >
                     Open Next Replacement
@@ -746,9 +752,9 @@ export default function PlantQrPage() {
               </div>
               <p className={"text-sm text-muted-foreground"}>{nowAction.detail}</p>
               {cockpit.plant.status === "active" && !cockpit.derived.assigned_recipe ? (
-                <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"}>
+                <Badge variant="secondary">
                   Needs placement / recipe assignment before feeding
-                </span>
+                </Badge>
               ) : null}
               {cockpit.plant.status !== "active" ? (
                 <p className={"text-sm text-muted-foreground"}>
@@ -756,11 +762,11 @@ export default function PlantQrPage() {
                 </p>
               ) : nowAction.href && nowAction.buttonLabel ? (
                 <div className={"flex flex-wrap items-center gap-2"}>
-                  <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={nowAction.href}>
+                  <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={nowAction.href}>
                     {nowAction.buttonLabel}
                   </Link>
                   {feedingHref ? (
-                    <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href={feedingHref}>
+                    <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href={feedingHref}>
                       Feed
                     </Link>
                   ) : null}
@@ -768,18 +774,18 @@ export default function PlantQrPage() {
               ) : (
                 <div className={"grid gap-3"}>
                   {feedingHref ? (
-                    <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={feedingHref}>
+                    <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={feedingHref}>
                       Feed
                     </Link>
                   ) : null}
                   <ul className={styles.comingSoonList}>
                     <li>
                       <span>Record weekly metrics</span>
-                      <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">Coming soon</span>
+                      <Badge variant="secondary">Coming soon</Badge>
                     </li>
                     <li>
                       <span>Take weekly photo</span>
-                      <span className="inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground">Coming soon</span>
+                      <Badge variant="secondary">Coming soon</Badge>
                     </li>
                   </ul>
                 </div>
@@ -793,7 +799,7 @@ export default function PlantQrPage() {
                 <div className={"flex flex-wrap items-center gap-2"}>
                   <Popover.Root>
                     <Popover.Trigger asChild>
-                      <button className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} type="button" disabled={recipeSaving}>
+                      <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" disabled={recipeSaving}>
                         <ChevronDown size={14} />
                         Change recipe
                       </button>
@@ -805,7 +811,7 @@ export default function PlantQrPage() {
                           <label className={"grid gap-2"}>
                             <span className={"text-sm text-muted-foreground"}>Recipe</span>
                             <select
-                              className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                              className={formStyles.nativeSelect}
                               value={recipeSelection}
                               onChange={(event) => setRecipeSelection(event.target.value)}
                               disabled={recipeSaving}
@@ -823,7 +829,7 @@ export default function PlantQrPage() {
                         )}
                         <div className={"flex flex-wrap items-center gap-2"}>
                           <button
-                            className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
+                            className={cn(buttonVariants({ variant: "default" }), "border border-border")}
                             type="button"
                             disabled={
                               recipeSaving ||
@@ -836,7 +842,7 @@ export default function PlantQrPage() {
                             {recipeSaving ? "Saving..." : "Save recipe"}
                           </button>
                           <button
-                            className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                            className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                             type="button"
                             disabled={recipeSaving || !cockpit.derived.assigned_recipe}
                             onClick={() => void handleRecipeChange(null)}
@@ -852,7 +858,7 @@ export default function PlantQrPage() {
                   Replace this plant if it was removed from trial or needs substitution.
                 </p>
                 <button
-                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90"}
+                  className={cn(buttonVariants({ variant: "destructive" }), "border border-border")}
                   type="button"
                   onClick={() => setShowReplaceModal(true)}
                 >
@@ -868,7 +874,7 @@ export default function PlantQrPage() {
               <div className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Photo tag</span>
                 <select
-                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                  className={formStyles.nativeSelect}
                   value={uploadTag}
                   onChange={(event) => setUploadTag(event.target.value as UploadTag)}
                   disabled={uploading}
@@ -892,7 +898,7 @@ export default function PlantQrPage() {
 
               <div className={"flex flex-wrap items-center gap-2"}>
                 <button
-                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                  className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                   type="button"
                   disabled={uploading}
                   onClick={() => fileInputRef.current?.click()}
@@ -901,7 +907,7 @@ export default function PlantQrPage() {
                   Choose photo
                 </button>
                 <button
-                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
+                  className={cn(buttonVariants({ variant: "default" }), "border border-border")}
                   type="button"
                   disabled={!photoFile || uploading}
                   onClick={handlePhotoUpload}
@@ -916,11 +922,11 @@ export default function PlantQrPage() {
               {notice ? <p className={"text-sm text-emerald-400"}>{notice}</p> : null}
 
               <div className={"flex flex-wrap items-center gap-2"}>
-                <button className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} type="button" disabled>
+                <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" disabled>
                   <ClipboardPlus size={16} />
                   Add note (Coming soon)
                 </button>
-                <button className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} type="button" disabled>
+                <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" disabled>
                   <ShieldAlert size={16} />
                   Report issue (Coming soon)
                 </button>
@@ -997,9 +1003,9 @@ export default function PlantQrPage() {
                       {item.title} ({formatScheduleSlot(item.date, item.timeframe, item.exact_time)})
                     </span>
                     {item.blocked_reasons.map((reason) => (
-                      <span className={"inline-flex items-center justify-center rounded-full border border-border bg-muted px-2 py-0.5 text-[0.72rem] leading-tight text-muted-foreground"} key={reason}>
+                      <Badge key={reason} variant="secondary">
                         {reason}
-                      </span>
+                      </Badge>
                     ))}
                   </div>
                 ))}
@@ -1007,7 +1013,7 @@ export default function PlantQrPage() {
             )}
             {scheduleHref ? (
               <div className={"flex flex-wrap items-center gap-2"}>
-                <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href={scheduleHref}>
+                <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href={scheduleHref}>
                   Open Schedule
                 </Link>
               </div>
@@ -1015,23 +1021,23 @@ export default function PlantQrPage() {
           </SectionCard>
 
           <StickyActionBar>
-            <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"} href={overviewHref}>
+            <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href={overviewHref}>
               ← Overview
             </Link>
             {cockpit.plant.status !== "active" && cockpit.derived.replaced_by_uuid ? (
               <Link
-                className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
+                className={cn(buttonVariants({ variant: "default" }), "border border-border")}
                 href={replacementHref(cockpit.derived.replaced_by_uuid)}
               >
                 Open Replacement
               </Link>
             ) : nowAction.href && nowAction.buttonLabel ? (
-              <Link className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"} href={nowAction.href}>
+              <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={nowAction.href}>
                 {nowAction.buttonLabel}
               </Link>
             ) : (
               <button
-                className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"}
+                className={cn(buttonVariants({ variant: "default" }), "border border-border")}
                 type="button"
                 disabled={uploading}
                 onClick={() => fileInputRef.current?.click()}
@@ -1054,16 +1060,14 @@ export default function PlantQrPage() {
               </p>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Removed reason (optional)</span>
-                <textarea
-                  className={"flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                <Textarea
                   value={removedReason}
                   onChange={(event) => setRemovedReason(event.target.value)}
                 />
               </label>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>New Plant ID (optional)</span>
-                <input
-                  className={"flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"}
+                <Input
                   placeholder="Leave blank for pending ID"
                   value={newPlantId}
                   onChange={(event) => setNewPlantId(event.target.value)}
@@ -1107,7 +1111,7 @@ export default function PlantQrPage() {
               </label>
               <div className={"flex flex-wrap items-center gap-2"}>
                 <button
-                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80"}
+                  className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
                   type="button"
                   disabled={replacing}
                   onClick={() => {
@@ -1118,7 +1122,7 @@ export default function PlantQrPage() {
                   Cancel
                 </button>
                 <button
-                  className={"inline-flex items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90"}
+                  className={cn(buttonVariants({ variant: "destructive" }), "border border-border")}
                   type="button"
                   disabled={!replaceConfirmed || replacing}
                   onClick={() => void handleReplacePlant()}
