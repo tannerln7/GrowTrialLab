@@ -91,6 +91,19 @@ Notes:
   - pyright
   - docker compose build
 
+## Backend tests (pytest)
+
+- Run all backend tests:
+  - `cd backend && uv run pytest`
+- Run a single file:
+  - `cd backend && uv run pytest tests/test_lifecycle.py`
+- Run a single test:
+  - `cd backend && uv run pytest tests/test_lifecycle.py::test_lifecycle_start_stop_roundtrip_for_ready_experiment`
+- Run with coverage:
+  - `cd backend && uv run pytest --cov=api --cov-report=term-missing`
+- Run in parallel (optional, xdist):
+  - `cd backend && uv run pytest -n auto`
+
 ## Reset Local Dev DB
 
 Use this only when you intentionally want a clean empty local database.
@@ -128,9 +141,13 @@ What it runs:
 
 ## Dev bypass (local only)
 
-- If `DJANGO_DEBUG=1` and either `CF_ACCESS_TEAM_DOMAIN` or `CF_ACCESS_AUD` is missing/placeholder, auth bypass is enabled.
+- Auth bypass only activates when all of the following are true:
+  - `NODE_ENV=development`
+  - `ENABLE_DEV_AUTH_BYPASS=true`
+  - `DJANGO_DEBUG=1`
+  - Cloudflare Access values are missing/placeholders (`CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD`)
 - In bypass mode, requests are treated as `DEV_EMAIL` (or `ADMIN_EMAIL` if `DEV_EMAIL` is unset).
-- If both Cloudflare values are set to real values, full JWT verification is enforced even in debug mode.
+- In all other modes, full Cloudflare JWT verification is enforced.
 
 ## Required env vars
 
@@ -140,6 +157,8 @@ What it runs:
 - `DATABASE_URL`
 - `DJANGO_SECRET_KEY`
 - `DJANGO_DEBUG`
+- `NODE_ENV`
+- `ENABLE_DEV_AUTH_BYPASS`
 - `DJANGO_ALLOWED_HOSTS`
 - `CORS_ALLOWED_ORIGINS`
 - `CF_ACCESS_TEAM_DOMAIN`
