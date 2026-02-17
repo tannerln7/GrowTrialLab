@@ -1,21 +1,27 @@
 "use client";
 
-import * as Popover from "@radix-ui/react-popover";
-import * as Select from "@radix-ui/react-select";
-import { Check, ChevronDown } from "lucide-react";
+import * as Tooltip from "@radix-ui/react-tooltip";
+import {
+  ArrowRight,
+  Check,
+  CheckSquare,
+  Layers,
+  MoveRight,
+  Trash2,
+  X,
+} from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
-import { suggestTrayName } from "@/lib/id-suggestions";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
 } from "@/lib/experiment-status";
+import { suggestTentCode, suggestTentName, suggestTrayName } from "@/lib/id-suggestions";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
-import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
 
@@ -23,7 +29,7 @@ import styles from "../../experiments.module.css";
 
 type Species = { id: string; name: string; category: string };
 
-type Slot = {
+type SlotSummary = {
   slot_id: string;
   code: string;
   label: string;
@@ -32,13 +38,17 @@ type Slot = {
   tray_count: number;
 };
 
-type Tent = {
+type TentSummary = {
   tent_id: string;
   name: string;
   code: string;
+  layout: {
+    schema_version: number;
+    shelves: Array<{ index: number; tray_count: number }>;
+  };
   allowed_species_count: number;
   allowed_species: Species[];
-  slots: Slot[];
+  slots: SlotSummary[];
 };
 
 type Location = {
@@ -52,10 +62,6 @@ type RecipeSummary = {
   id: string;
   code: string;
   name: string;
-};
-
-type Recipe = RecipeSummary & {
-  notes: string;
 };
 
 type TrayPlant = {
@@ -91,7 +97,7 @@ type UnplacedPlant = {
 };
 
 type PlacementSummary = {
-  tents: { count: number; results: Tent[]; meta: Record<string, unknown> };
+  tents: { count: number; results: TentSummary[]; meta: Record<string, unknown> };
   trays: { count: number; results: Tray[]; meta: Record<string, unknown> };
   unplaced_plants: {
     count: number;
@@ -119,87 +125,159 @@ type Diagnostics = {
   }>;
 };
 
+type PlantCell = {
+  uuid: string;
+  plant_id: string;
+  species_id: string;
+  species_name: string;
+  species_category: string;
+  grade: string | null;
+  status: string;
+  assigned_recipe: RecipeSummary | null;
+};
+
+type TrayCell = {
+  tray_id: string;
+  name: string;
+  capacity: number;
+  current_count: number;
+};
+
+type PersistedTrayPlantRow = {
+  trayId: string;
+  trayPlantId: string;
+};
+
+type TentDraft = {
+  name: string;
+  code: string;
+};
+
+type TrayDraft = {
+  name: string;
+  capacity: number;
+};
+
 const RUNNING_LOCK_MESSAGE =
   "Placement cannot be edited while the experiment is running. Stop the experiment to change placement.";
-const RECIPE_COLORS = ["#3f84e5", "#f27a54", "#17a37b", "#cc8d2b", "#8a6ae8", "#c1579a"];
 
-function locationLabel(location: Location): string {
-  if (location.status !== "placed" || !location.slot || !location.tent) {
-    return "Unplaced";
-  }
-  return `${location.tent.code || location.tent.name} / ${location.slot.code}`;
+const STEPS = [
+  { id: 1, title: "Tents + Slots" },
+  { id: 2, title: "Trays + Capacity" },
+  { id: 3, title: "Plants -> Trays" },
+  { id: 4, title: "Trays -> Slots" },
+] as const;
+
+function isActivePlant(status: string): boolean {
+  return status.toLowerCase() === "active";
 }
 
-function recipeLabel(recipe: RecipeSummary): string {
-  return recipe.name ? `${recipe.code} - ${recipe.name}` : recipe.code;
+function normalizePlant(plant: UnplacedPlant | TrayPlant): PlantCell {
+  return {
+    uuid: plant.uuid,
+    plant_id: plant.plant_id,
+    species_id: plant.species_id,
+    species_name: plant.species_name,
+    species_category: plant.species_category,
+    grade: plant.grade,
+    status: plant.status,
+    assigned_recipe: plant.assigned_recipe,
+  };
 }
 
-function recipeChipLabel(recipe: RecipeSummary | null): string {
-  if (!recipe) {
-    return "Recipe: Unassigned";
-  }
-  return `Recipe: ${recipeLabel(recipe)}`;
-}
-
-function recipeColor(seed: string): string {
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
-  }
-  return RECIPE_COLORS[hash % RECIPE_COLORS.length];
-}
-
-function summarizeTrayRecipes(tray: Tray): {
-  label: string;
-  tone: "mixed" | "assigned" | "unassigned";
-  assignedRecipes: RecipeSummary[];
-  hasUnassigned: boolean;
-} {
-  const assignedMap = new Map<string, RecipeSummary>();
-  let hasUnassigned = false;
-
-  for (const plant of tray.plants) {
-    if (plant.assigned_recipe) {
-      assignedMap.set(plant.assigned_recipe.id, plant.assigned_recipe);
-    } else {
-      hasUnassigned = true;
+function buildDefaultShelves(tent: TentSummary): number[] {
+  if (tent.layout?.schema_version === 1 && Array.isArray(tent.layout.shelves)) {
+    const counts = tent.layout.shelves.map((shelf) => Math.max(0, shelf.tray_count));
+    if (counts.length > 0) {
+      return counts;
     }
   }
+  return [4];
+}
 
-  const assignedRecipes = Array.from(assignedMap.values()).sort((left, right) =>
-    left.code.localeCompare(right.code),
+function parseStep(rawStep: string | null): number {
+  const parsed = Number.parseInt(rawStep || "1", 10);
+  if (!Number.isFinite(parsed)) {
+    return 1;
+  }
+  return Math.min(4, Math.max(1, parsed));
+}
+
+function formatTrayDisplay(rawValue: string | null | undefined, fallbackValue?: string): string {
+  const raw = (rawValue || "").trim() || (fallbackValue || "").trim();
+  if (!raw) {
+    return "";
+  }
+  const match = raw.match(/^(?:tray|tr|t)?[\s_-]*0*([0-9]+)$/i);
+  if (!match) {
+    return raw;
+  }
+  const trayNumber = Number.parseInt(match[1], 10);
+  if (!Number.isFinite(trayNumber)) {
+    return raw;
+  }
+  return `Tray ${trayNumber}`;
+}
+
+async function parseBackendErrorPayload(
+  response: Response,
+  fallback: string,
+): Promise<{ detail: string; diagnostics: Diagnostics | null }> {
+  try {
+    const payload = (await response.json()) as { detail?: string; diagnostics?: Diagnostics };
+    return {
+      detail: payload.detail || fallback,
+      diagnostics: payload.diagnostics || null,
+    };
+  } catch {
+    return { detail: fallback, diagnostics: null };
+  }
+}
+
+function ToolIconButton({
+  label,
+  icon,
+  onClick,
+  disabled,
+  danger,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <Tooltip.Provider delayDuration={150}>
+      <Tooltip.Root>
+        <Tooltip.Trigger asChild>
+          <button
+            className={danger ? styles.toolbarIconDanger : styles.toolbarIconButton}
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            aria-label={label}
+            title={label}
+          >
+            {icon}
+          </button>
+        </Tooltip.Trigger>
+        <Tooltip.Portal>
+          <Tooltip.Content className={styles.toolbarTooltip} sideOffset={6}>
+            {label}
+            <Tooltip.Arrow className={styles.toolbarTooltipArrow} />
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      </Tooltip.Root>
+    </Tooltip.Provider>
   );
-  const variantCount = assignedRecipes.length + (hasUnassigned ? 1 : 0);
-
-  if (variantCount > 1) {
-    return {
-      label: "Recipe mix: Mixed",
-      tone: "mixed",
-      assignedRecipes,
-      hasUnassigned,
-    };
-  }
-
-  if (assignedRecipes.length === 1) {
-    return {
-      label: `Recipe mix: ${recipeLabel(assignedRecipes[0])}`,
-      tone: "assigned",
-      assignedRecipes,
-      hasUnassigned,
-    };
-  }
-
-  return {
-    label: "Recipe mix: Unassigned",
-    tone: "unassigned",
-    assignedRecipes,
-    hasUnassigned,
-  };
 }
 
 export default function PlacementPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const experimentId = useMemo(() => {
     if (typeof params.id === "string") {
       return params.id;
@@ -210,110 +288,238 @@ export default function PlacementPage() {
     return "";
   }, [params]);
 
+  const [currentStep, setCurrentStep] = useState<number>(parseStep(searchParams.get("step")));
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notInvited, setNotInvited] = useState(false);
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
+
   const [summary, setSummary] = useState<PlacementSummary | null>(null);
   const [statusSummary, setStatusSummary] = useState<ExperimentStatusSummary | null>(null);
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [species, setSpecies] = useState<Species[]>([]);
+
+  const [newTentName, setNewTentName] = useState("");
+  const [newTentCode, setNewTentCode] = useState("");
+  const [shelfCountsByTent, setShelfCountsByTent] = useState<Record<string, number[]>>({});
+  const [tentDraftById, setTentDraftById] = useState<Record<string, TentDraft>>({});
+
   const [newTrayName, setNewTrayName] = useState("");
-  const [newTraySlotId, setNewTraySlotId] = useState("");
   const [newTrayCapacity, setNewTrayCapacity] = useState(1);
-  const [traySelectionByPlant, setTraySelectionByPlant] = useState<Record<string, string>>({});
-  const [slotSelectionByTray, setSlotSelectionByTray] = useState<Record<string, string>>({});
-  const [draftRecipeByPlantId, setDraftRecipeByPlantId] = useState<Record<string, string | null>>({});
-  const [overriddenPlantIds, setOverriddenPlantIds] = useState<Set<string>>(new Set());
-  const [recipeSelectionByTray, setRecipeSelectionByTray] = useState<Record<string, string>>({});
-  const [recipeSelectionByPlant, setRecipeSelectionByPlant] = useState<Record<string, string>>({});
-  const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
+  const [trayDraftById, setTrayDraftById] = useState<Record<string, TrayDraft>>({});
+
+  const [persistedPlantToTray, setPersistedPlantToTray] = useState<Record<string, string | null>>({});
+  const [draftPlantToTray, setDraftPlantToTray] = useState<Record<string, string | null>>({});
+  const [persistedTrayPlantRowByPlantId, setPersistedTrayPlantRowByPlantId] = useState<
+    Record<string, PersistedTrayPlantRow>
+  >({});
+
+  const [persistedTrayToSlot, setPersistedTrayToSlot] = useState<Record<string, string | null>>({});
+  const [draftTrayToSlot, setDraftTrayToSlot] = useState<Record<string, string | null>>({});
+
+  const [selectedPlantIds, setSelectedPlantIds] = useState<Set<string>>(new Set());
+  const [activePlantAnchorId, setActivePlantAnchorId] = useState<string | null>(null);
+  const [destinationTrayId, setDestinationTrayId] = useState("");
+
+  const [selectedTrayIds, setSelectedTrayIds] = useState<Set<string>>(new Set());
+  const [selectedTrayManagerIds, setSelectedTrayManagerIds] = useState<Set<string>>(new Set());
+  const [destinationSlotId, setDestinationSlotId] = useState("");
 
   const placementLocked = statusSummary?.lifecycle.state === "running";
 
-  const trayNameSuggestion = useMemo(
-    () => suggestTrayName((summary?.trays.results || []).map((tray) => tray.name)),
-    [summary?.trays.results],
-  );
+  const tents = useMemo(() => summary?.tents.results || [], [summary?.tents.results]);
+  const trays = useMemo(() => summary?.trays.results || [], [summary?.trays.results]);
+
+  const tentNameSuggestion = useMemo(() => suggestTentName(tents.map((tent) => tent.name)), [tents]);
+  const tentCodeSuggestion = useMemo(() => suggestTentCode(tents.map((tent) => tent.code)), [tents]);
+  const trayNameSuggestion = useMemo(() => suggestTrayName(trays.map((tray) => tray.name)), [trays]);
 
   useEffect(() => {
-    if (!newTrayName.trim() && trayNameSuggestion) {
+    setCurrentStep(parseStep(searchParams.get("step")));
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!newTentName.trim()) {
+      setNewTentName(tentNameSuggestion);
+    }
+  }, [newTentName, tentNameSuggestion]);
+
+  useEffect(() => {
+    if (!newTentCode.trim()) {
+      setNewTentCode(tentCodeSuggestion);
+    }
+  }, [newTentCode, tentCodeSuggestion]);
+
+  useEffect(() => {
+    if (!newTrayName.trim()) {
       setNewTrayName(trayNameSuggestion);
     }
   }, [newTrayName, trayNameSuggestion]);
 
-  const allSlots = useMemo(() => {
-    return (summary?.tents.results || []).flatMap((tent) =>
-      tent.slots.map((slot) => ({
-        id: slot.slot_id,
-        label: `${tent.code || tent.name} / ${slot.code}`,
-        tentId: tent.tent_id,
-        allowedSpeciesIds:
-          tent.allowed_species.length === 0 ? null : new Set(tent.allowed_species.map((species) => species.id)),
-      })),
-    );
-  }, [summary?.tents.results]);
-
-  const occupiedSlotByTray = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const tray of summary?.trays.results || []) {
-      if (tray.location.slot?.id) {
-        map.set(tray.location.slot.id, tray.tray_id);
-      }
+  const trayById = useMemo(() => {
+    const map = new Map<string, TrayCell>();
+    for (const tray of trays) {
+      map.set(tray.tray_id, {
+        tray_id: tray.tray_id,
+        name: tray.name,
+        capacity: tray.capacity,
+        current_count: tray.current_count,
+      });
     }
     return map;
-  }, [summary?.trays.results]);
+  }, [trays]);
 
-  const availableSlotsForNewTray = useMemo(
-    () => allSlots.filter((slot) => !occupiedSlotByTray.has(slot.id)),
-    [allSlots, occupiedSlotByTray],
-  );
-
-  const recipeById = useMemo(() => {
-    const map = new Map<string, RecipeSummary>();
-    for (const recipe of recipes) {
-      map.set(recipe.id, recipe);
-    }
-    return map;
-  }, [recipes]);
-
-  const persistedRecipeByPlantId = useMemo(() => {
-    const map: Record<string, string | null> = {};
+  const plantById = useMemo(() => {
+    const map = new Map<string, PlantCell>();
     for (const plant of summary?.unplaced_plants.results || []) {
-      map[plant.uuid] = plant.assigned_recipe?.id || null;
+      if (isActivePlant(plant.status)) {
+        map.set(plant.uuid, normalizePlant(plant));
+      }
     }
-    for (const tray of summary?.trays.results || []) {
+    for (const tray of trays) {
       for (const plant of tray.plants) {
-        map[plant.uuid] = plant.assigned_recipe?.id || null;
+        if (isActivePlant(plant.status)) {
+          map.set(plant.uuid, normalizePlant(plant));
+        }
       }
     }
     return map;
-  }, [summary?.trays.results, summary?.unplaced_plants.results]);
+  }, [summary?.unplaced_plants.results, trays]);
+
+  const sortedPlantIds = useMemo(() => {
+    return Array.from(plantById.values())
+      .sort((left, right) => {
+        const leftId = left.plant_id || "";
+        const rightId = right.plant_id || "";
+        if (leftId !== rightId) {
+          return leftId.localeCompare(rightId);
+        }
+        return left.uuid.localeCompare(right.uuid);
+      })
+      .map((plant) => plant.uuid);
+  }, [plantById]);
+
+  const sortedTrayIds = useMemo(() => {
+    return [...trays]
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((tray) => tray.tray_id);
+  }, [trays]);
+
+  const slotById = useMemo(() => {
+    const map = new Map<string, { slot: SlotSummary; tent: TentSummary }>();
+    for (const tent of tents) {
+      for (const slot of tent.slots) {
+        map.set(slot.slot_id, { slot, tent });
+      }
+    }
+    return map;
+  }, [tents]);
+
+  const sortedSlots = useMemo(() => {
+    return tents
+      .flatMap((tent) =>
+        [...tent.slots]
+          .sort((left, right) => {
+            if (left.shelf_index !== right.shelf_index) {
+              return left.shelf_index - right.shelf_index;
+            }
+            if (left.slot_index !== right.slot_index) {
+              return left.slot_index - right.slot_index;
+            }
+            return left.slot_id.localeCompare(right.slot_id);
+          })
+          .map((slot) => ({
+            slot_id: slot.slot_id,
+            label: `${tent.code || tent.name} / ${slot.code}`,
+            shelf_index: slot.shelf_index,
+            slot_index: slot.slot_index,
+            tent_id: tent.tent_id,
+          })),
+      )
+      .sort((left, right) => {
+        const leftTent = tents.find((tent) => tent.tent_id === left.tent_id);
+        const rightTent = tents.find((tent) => tent.tent_id === right.tent_id);
+        const leftTentLabel = leftTent ? leftTent.code || leftTent.name : "";
+        const rightTentLabel = rightTent ? rightTent.code || rightTent.name : "";
+        if (leftTentLabel !== rightTentLabel) {
+          return leftTentLabel.localeCompare(rightTentLabel);
+        }
+        if (left.shelf_index !== right.shelf_index) {
+          return left.shelf_index - right.shelf_index;
+        }
+        return left.slot_index - right.slot_index;
+      });
+  }, [tents]);
+
+  const tentAllowedSpeciesById = useMemo(() => {
+    const map = new Map<string, Set<string> | null>();
+    for (const tent of tents) {
+      map.set(
+        tent.tent_id,
+        tent.allowed_species.length > 0 ? new Set(tent.allowed_species.map((item) => item.id)) : null,
+      );
+    }
+    return map;
+  }, [tents]);
+
+  const step1Complete = useMemo(() => {
+    if (tents.length === 0) {
+      return false;
+    }
+    return tents.every((tent) => {
+      const hasLayout =
+        tent.layout?.schema_version === 1 && Array.isArray(tent.layout.shelves) && tent.layout.shelves.length > 0;
+      const hasSlots = tent.slots.length > 0;
+      return hasLayout && hasSlots;
+    });
+  }, [tents]);
+
+  const step2Complete = useMemo(() => {
+    if (trays.length === 0) {
+      return false;
+    }
+    return trays.every((tray) => tray.capacity >= 1);
+  }, [trays]);
+
+  const step3Complete = useMemo(() => {
+    if (sortedPlantIds.length === 0) {
+      return true;
+    }
+    return sortedPlantIds.every((plantId) => (draftPlantToTray[plantId] ?? null) !== null);
+  }, [draftPlantToTray, sortedPlantIds]);
+
+  const step4Complete = useMemo(() => {
+    if (sortedTrayIds.length === 0) {
+      return false;
+    }
+    return sortedTrayIds.every((trayId) => (draftTrayToSlot[trayId] ?? null) !== null);
+  }, [draftTrayToSlot, sortedTrayIds]);
+
+  const maxUnlockedStep = useMemo(() => {
+    if (!step1Complete) {
+      return 1;
+    }
+    if (!step2Complete) {
+      return 2;
+    }
+    if (!step3Complete) {
+      return 3;
+    }
+    return 4;
+  }, [step1Complete, step2Complete, step3Complete]);
 
   useEffect(() => {
-    setDraftRecipeByPlantId(persistedRecipeByPlantId);
-    setOverriddenPlantIds(new Set());
-    setRecipeSelectionByTray({});
-    setRecipeSelectionByPlant({});
-  }, [persistedRecipeByPlantId]);
-
-  const stagedChangeCount = useMemo(() => {
-    let count = 0;
-    for (const [plantId, persistedRecipeId] of Object.entries(persistedRecipeByPlantId)) {
-      const draftRecipeId = draftRecipeByPlantId[plantId] ?? persistedRecipeId ?? null;
-      if ((draftRecipeId || null) !== (persistedRecipeId || null)) {
-        count += 1;
-      }
-    }
-    return count;
-  }, [draftRecipeByPlantId, persistedRecipeByPlantId]);
+    setCurrentStep((current) => Math.min(Math.max(1, current), maxUnlockedStep));
+  }, [maxUnlockedStep]);
 
   const loadPage = useCallback(async () => {
-    const [summaryResponse, statusResponse, recipesResponse] = await Promise.all([
+    const [summaryResponse, statusResponse, speciesResponse] = await Promise.all([
       backendFetch(`/api/v1/experiments/${experimentId}/placement/summary`),
       fetchExperimentStatusSummary(experimentId),
-      backendFetch(`/api/v1/experiments/${experimentId}/recipes`),
+      backendFetch("/api/v1/species/"),
     ]);
 
     if (!summaryResponse.ok) {
@@ -322,15 +528,16 @@ export default function PlacementPage() {
     if (!statusResponse) {
       throw new Error("Unable to load status summary.");
     }
-    if (!recipesResponse.ok) {
-      throw new Error("Unable to load recipes.");
+    if (!speciesResponse.ok) {
+      throw new Error("Unable to load species.");
     }
 
     const summaryPayload = (await summaryResponse.json()) as PlacementSummary;
-    const recipesPayload = (await recipesResponse.json()) as unknown;
+    const speciesPayload = (await speciesResponse.json()) as unknown;
+
     setSummary(summaryPayload);
     setStatusSummary(statusResponse);
-    setRecipes(unwrapList<Recipe>(recipesPayload));
+    setSpecies(unwrapList<Species>(speciesPayload));
   }, [experimentId]);
 
   useEffect(() => {
@@ -338,15 +545,18 @@ export default function PlacementPage() {
       if (!experimentId) {
         return;
       }
+
       setLoading(true);
       setError("");
       setOffline(false);
+
       try {
         const meResponse = await backendFetch("/api/me");
         if (meResponse.status === 403) {
           setNotInvited(true);
           return;
         }
+
         const status = await fetchExperimentStatusSummary(experimentId);
         if (!status) {
           setError("Unable to load setup status.");
@@ -372,7 +582,357 @@ export default function PlacementPage() {
     void load();
   }, [experimentId, loadPage, router]);
 
-  async function createTray() {
+  useEffect(() => {
+    const nextPersistedPlantToTray: Record<string, string | null> = {};
+    const nextPersistedRows: Record<string, PersistedTrayPlantRow> = {};
+
+    for (const plant of summary?.unplaced_plants.results || []) {
+      if (isActivePlant(plant.status)) {
+        nextPersistedPlantToTray[plant.uuid] = null;
+      }
+    }
+
+    for (const tray of trays) {
+      for (const plant of tray.plants) {
+        if (!isActivePlant(plant.status)) {
+          continue;
+        }
+        nextPersistedPlantToTray[plant.uuid] = tray.tray_id;
+        nextPersistedRows[plant.uuid] = {
+          trayId: tray.tray_id,
+          trayPlantId: plant.tray_plant_id,
+        };
+      }
+    }
+
+    const nextPersistedTrayToSlot: Record<string, string | null> = {};
+    for (const tray of trays) {
+      nextPersistedTrayToSlot[tray.tray_id] = tray.location.slot?.id || null;
+    }
+
+    setPersistedPlantToTray(nextPersistedPlantToTray);
+    setDraftPlantToTray(nextPersistedPlantToTray);
+    setPersistedTrayPlantRowByPlantId(nextPersistedRows);
+
+    setPersistedTrayToSlot(nextPersistedTrayToSlot);
+    setDraftTrayToSlot(nextPersistedTrayToSlot);
+
+    setShelfCountsByTent((current) => {
+      const next = { ...current };
+      for (const tent of tents) {
+        if (!next[tent.tent_id] || next[tent.tent_id].length === 0) {
+          next[tent.tent_id] = buildDefaultShelves(tent);
+        }
+      }
+      return next;
+    });
+
+    setTentDraftById((current) => {
+      const next = { ...current };
+      for (const tent of tents) {
+        next[tent.tent_id] = {
+          name: tent.name,
+          code: tent.code,
+        };
+      }
+      return next;
+    });
+
+    setTrayDraftById((current) => {
+      const next = { ...current };
+      for (const tray of trays) {
+        next[tray.tray_id] = {
+          name: tray.name,
+          capacity: tray.capacity,
+        };
+      }
+      return next;
+    });
+
+    setDestinationTrayId((current) => (current && trayById.has(current) ? current : trays[0]?.tray_id || ""));
+    setDestinationSlotId((current) => (current && slotById.has(current) ? current : ""));
+    setSelectedPlantIds(new Set());
+    setSelectedTrayIds(new Set());
+    setSelectedTrayManagerIds(new Set());
+    setActivePlantAnchorId(null);
+  }, [slotById, summary?.unplaced_plants.results, tents, trayById, trays]);
+
+  useEffect(() => {
+    setSelectedTrayManagerIds((current) => {
+      const allowed = new Set(sortedTrayIds);
+      const next = new Set<string>();
+      for (const trayId of current) {
+        if (allowed.has(trayId)) {
+          next.add(trayId);
+        }
+      }
+      return next;
+    });
+  }, [sortedTrayIds]);
+
+  const draftPlantCountByTray = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const tray of trays) {
+      counts[tray.tray_id] = 0;
+    }
+    for (const trayId of Object.values(draftPlantToTray)) {
+      if (trayId && counts[trayId] !== undefined) {
+        counts[trayId] += 1;
+      }
+    }
+    return counts;
+  }, [draftPlantToTray, trays]);
+
+  const mainGridPlantIds = useMemo(
+    () => sortedPlantIds.filter((plantId) => (draftPlantToTray[plantId] ?? null) === null),
+    [draftPlantToTray, sortedPlantIds],
+  );
+
+  const trayPlantIdsByTray = useMemo(() => {
+    const grouped: Record<string, string[]> = {};
+    for (const tray of trays) {
+      grouped[tray.tray_id] = [];
+    }
+    for (const plantId of sortedPlantIds) {
+      const trayId = draftPlantToTray[plantId] ?? null;
+      if (trayId && grouped[trayId]) {
+        grouped[trayId].push(plantId);
+      }
+    }
+    return grouped;
+  }, [draftPlantToTray, sortedPlantIds, trays]);
+
+  const selectedInMainGrid = useMemo(
+    () => mainGridPlantIds.filter((plantId) => selectedPlantIds.has(plantId)),
+    [mainGridPlantIds, selectedPlantIds],
+  );
+
+  const selectedInTrayByTrayId = useMemo(() => {
+    const grouped: Record<string, string[]> = {};
+    for (const tray of trays) {
+      grouped[tray.tray_id] = (trayPlantIdsByTray[tray.tray_id] || []).filter((plantId) =>
+        selectedPlantIds.has(plantId),
+      );
+    }
+    return grouped;
+  }, [selectedPlantIds, trayPlantIdsByTray, trays]);
+
+  const draftSlotToTray = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const trayId of sortedTrayIds) {
+      const slotId = draftTrayToSlot[trayId] ?? null;
+      if (slotId) {
+        map.set(slotId, trayId);
+      }
+    }
+    return map;
+  }, [draftTrayToSlot, sortedTrayIds]);
+
+  const mainGridTrayIds = useMemo(
+    () => sortedTrayIds.filter((trayId) => (draftTrayToSlot[trayId] ?? null) === null),
+    [draftTrayToSlot, sortedTrayIds],
+  );
+
+  const selectedTraysByTentId = useMemo(() => {
+    const grouped: Record<string, string[]> = {};
+    for (const tent of tents) {
+      grouped[tent.tent_id] = [];
+    }
+    for (const trayId of selectedTrayIds) {
+      const slotId = draftTrayToSlot[trayId] ?? null;
+      if (!slotId) {
+        continue;
+      }
+      const slotRef = slotById.get(slotId);
+      if (slotRef) {
+        grouped[slotRef.tent.tent_id].push(trayId);
+      }
+    }
+    return grouped;
+  }, [draftTrayToSlot, selectedTrayIds, slotById, tents]);
+
+  const placementDraftChangeCount = useMemo(() => {
+    let count = 0;
+    for (const plantId of sortedPlantIds) {
+      const persistedTrayId = persistedPlantToTray[plantId] ?? null;
+      const draftTrayId = draftPlantToTray[plantId] ?? persistedTrayId;
+      if ((persistedTrayId || null) !== (draftTrayId || null)) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [draftPlantToTray, persistedPlantToTray, sortedPlantIds]);
+
+  const traySlotDraftChangeCount = useMemo(() => {
+    let count = 0;
+    for (const trayId of sortedTrayIds) {
+      const persistedSlotId = persistedTrayToSlot[trayId] ?? null;
+      const draftSlotId = draftTrayToSlot[trayId] ?? persistedSlotId;
+      if ((persistedSlotId || null) !== (draftSlotId || null)) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [draftTrayToSlot, persistedTrayToSlot, sortedTrayIds]);
+
+  function stepBlockedMessage(step: number): string {
+    if (step === 1 && !step1Complete) {
+      return "Add at least one tent and generate slots for each tent before continuing.";
+    }
+    if (step === 2 && !step2Complete) {
+      return "Add at least one tray with capacity before continuing.";
+    }
+    if (step === 3 && !step3Complete) {
+      return "Place all active plants into trays before continuing.";
+    }
+    if (step === 4 && !step4Complete) {
+      return "Place all trays into tent slots before continuing.";
+    }
+    return "";
+  }
+
+  function isStepComplete(step: number): boolean {
+    if (step === 1) {
+      return step1Complete;
+    }
+    if (step === 2) {
+      return step2Complete;
+    }
+    if (step === 3) {
+      return step3Complete;
+    }
+    return step4Complete;
+  }
+
+  function goToStep(step: number) {
+    const next = Math.min(Math.max(1, step), maxUnlockedStep);
+    setCurrentStep(next);
+  }
+
+  function goNextStep() {
+    if (!isStepComplete(currentStep)) {
+      setError(stepBlockedMessage(currentStep));
+      return;
+    }
+    if (currentStep === 4) {
+      router.push(`/experiments/${experimentId}/overview`);
+      return;
+    }
+    setCurrentStep((current) => Math.min(4, current + 1));
+    setError("");
+  }
+
+  function goPreviousStep() {
+    setCurrentStep((current) => Math.max(1, current - 1));
+    setError("");
+  }
+
+  async function createTent() {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
+
+    const name = newTentName.trim() || tentNameSuggestion;
+    const code = newTentCode.trim() || tentCodeSuggestion;
+
+    if (!name) {
+      setError("Tent name is required.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await backendFetch(`/api/v1/experiments/${experimentId}/tents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          code,
+          allowed_species: [],
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        detail?: string;
+        suggested_name?: string;
+        suggested_code?: string;
+      };
+
+      if (!response.ok) {
+        if (payload.suggested_name) {
+          setNewTentName(payload.suggested_name);
+        }
+        if (payload.suggested_code) {
+          setNewTentCode(payload.suggested_code);
+        }
+        setError(payload.detail || "Unable to create tent.");
+        return;
+      }
+
+      setNotice("Tent created.");
+      setNewTentName("");
+      setNewTentCode("");
+      await loadPage();
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to create tent.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveTentDetails(tent: TentSummary) {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
+
+    const draft = tentDraftById[tent.tent_id] || {
+      name: tent.name,
+      code: tent.code,
+    };
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await backendFetch(`/api/v1/tents/${tent.tent_id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: draft.name,
+          code: draft.code,
+        }),
+      });
+
+      const payload = (await response.json()) as { detail?: string };
+      if (!response.ok) {
+        setError(payload.detail || "Unable to update tent.");
+        return;
+      }
+
+      setNotice(`Saved tent details for ${draft.name}.`);
+      await loadPage();
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to update tent.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveTentRestrictions(tent: TentSummary, allowedSpeciesIds: string[]) {
     if (placementLocked) {
       setError(RUNNING_LOCK_MESSAGE);
       return;
@@ -381,16 +941,143 @@ export default function PlacementPage() {
     setSaving(true);
     setError("");
     setNotice("");
+
+    try {
+      const response = await backendFetch(`/api/v1/tents/${tent.tent_id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          allowed_species: allowedSpeciesIds,
+        }),
+      });
+
+      const payload = (await response.json()) as { detail?: string };
+      if (!response.ok) {
+        setError(payload.detail || "Unable to update tent restrictions.");
+        return;
+      }
+
+      setNotice(`Updated restrictions for ${tent.name}.`);
+      await loadPage();
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to update tent restrictions.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function updateShelfCount(tentId: string, shelfIndex: number, nextCount: number) {
+    setShelfCountsByTent((current) => {
+      const next = [...(current[tentId] || [4])];
+      next[shelfIndex] = Math.max(0, nextCount);
+      return { ...current, [tentId]: next };
+    });
+  }
+
+  function addShelf(tentId: string) {
+    setShelfCountsByTent((current) => {
+      const next = [...(current[tentId] || [4]), 0];
+      return { ...current, [tentId]: next };
+    });
+  }
+
+  function removeShelf(tentId: string) {
+    setShelfCountsByTent((current) => {
+      const values = [...(current[tentId] || [4])];
+      if (values.length <= 1) {
+        return current;
+      }
+      values.pop();
+      return { ...current, [tentId]: values };
+    });
+  }
+
+  async function generateSlots(tentId: string) {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
+
+    const shelfCounts = shelfCountsByTent[tentId] || [4];
+    const layout = {
+      schema_version: 1,
+      shelves: shelfCounts.map((trayCount, index) => ({
+        index: index + 1,
+        tray_count: Math.max(0, trayCount),
+      })),
+    };
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await backendFetch(`/api/v1/tents/${tentId}/slots/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ layout }),
+      });
+
+      const payload = (await response.json()) as {
+        detail?: string;
+        diagnostics?: {
+          would_orphan_trays?: Array<{ tray_code: string; slot_shelf_index: number; slot_index: number }>;
+        };
+      };
+
+      if (!response.ok) {
+        const orphanMessage = payload.diagnostics?.would_orphan_trays?.length
+          ? ` Would orphan: ${payload.diagnostics.would_orphan_trays
+              .map((item) => `${item.tray_code} @ S${item.slot_shelf_index}-${item.slot_index}`)
+              .join(", ")}.`
+          : "";
+        setError((payload.detail || "Unable to generate slots.") + orphanMessage);
+        return;
+      }
+
+      setNotice("Slots generated.");
+      await loadPage();
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to generate slots.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function createTray() {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
+
+    const name = newTrayName.trim() || trayNameSuggestion;
+    if (!name) {
+      setError("Tray code/name is required.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+
     try {
       const response = await backendFetch(`/api/v1/experiments/${experimentId}/trays`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: newTrayName.trim() || trayNameSuggestion,
-          slot_id: newTraySlotId || null,
+          name,
           capacity: newTrayCapacity,
         }),
       });
+
       const payload = (await response.json()) as { detail?: string; suggested_name?: string };
       if (!response.ok) {
         if (payload.suggested_name) {
@@ -399,9 +1086,9 @@ export default function PlacementPage() {
         setError(payload.detail || "Unable to create tray.");
         return;
       }
+
       setNotice("Tray created.");
       setNewTrayName("");
-      setNewTraySlotId("");
       setNewTrayCapacity(1);
       await loadPage();
     } catch (requestError) {
@@ -415,26 +1102,38 @@ export default function PlacementPage() {
     }
   }
 
-  async function updateTray(tray: Tray, updates: Record<string, unknown>) {
+  async function saveTrayDetails(tray: TrayCell) {
     if (placementLocked) {
       setError(RUNNING_LOCK_MESSAGE);
       return;
     }
+
+    const draft = trayDraftById[tray.tray_id] || {
+      name: tray.name,
+      capacity: tray.capacity,
+    };
+
     setSaving(true);
     setError("");
     setNotice("");
+
     try {
       const response = await backendFetch(`/api/v1/trays/${tray.tray_id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
+        body: JSON.stringify({
+          name: draft.name,
+          capacity: Math.max(1, Number(draft.capacity || 1)),
+        }),
       });
+
       const payload = (await response.json()) as { detail?: string };
       if (!response.ok) {
         setError(payload.detail || "Unable to update tray.");
         return;
       }
-      setNotice("Tray updated.");
+
+      setNotice(`Saved tray details for ${draft.name}.`);
       await loadPage();
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
@@ -447,256 +1146,679 @@ export default function PlacementPage() {
     }
   }
 
-  async function addPlantToTray(plantId: string, trayId: string) {
-    if (!trayId) {
+  function toggleTrayManagerSelection(trayId: string) {
+    if (!trayById.has(trayId)) {
       return;
     }
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/trays/${trayId}/plants`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plant_id: plantId }),
-      });
-      const payload = (await response.json()) as { detail?: string };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to place plant.");
-        return;
+    setSelectedTrayManagerIds((current) => {
+      const next = new Set(current);
+      if (next.has(trayId)) {
+        next.delete(trayId);
+      } else {
+        next.add(trayId);
       }
-      setNotice("Plant placed.");
-      await loadPage();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to place plant.");
-    } finally {
-      setSaving(false);
-    }
+      return next;
+    });
   }
 
-  async function removePlantFromTray(trayId: string, trayPlantId: string) {
+  function selectAllTrayManagerCells() {
+    setSelectedTrayManagerIds(new Set(sortedTrayIds));
+  }
+
+  function clearTrayManagerSelection() {
+    setSelectedTrayManagerIds(new Set());
+  }
+
+  async function bulkDeleteSelectedTrays() {
     if (placementLocked) {
       setError(RUNNING_LOCK_MESSAGE);
       return;
     }
+
+    const selected = sortedTrayIds.filter((trayId) => selectedTrayManagerIds.has(trayId));
+    if (selected.length === 0) {
+      return;
+    }
+
     setSaving(true);
     setError("");
     setNotice("");
+
     try {
-      const response = await backendFetch(`/api/v1/trays/${trayId}/plants/${trayPlantId}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) {
-        const payload = (await response.json()) as { detail?: string };
-        setError(payload.detail || "Unable to remove plant.");
-        return;
+      let deletedCount = 0;
+      for (const trayId of selected) {
+        const response = await backendFetch(`/api/v1/trays/${trayId}/`, {
+          method: "DELETE",
+        });
+        if (!response.ok) {
+          const parsed = await parseBackendErrorPayload(response, "Unable to delete selected trays.");
+          setError(parsed.detail);
+          setDiagnostics(parsed.diagnostics);
+          if (deletedCount > 0) {
+            await loadPage();
+          }
+          return;
+        }
+        deletedCount += 1;
       }
-      setNotice("Plant removed from tray.");
+
+      setSelectedTrayManagerIds(new Set());
+      setNotice(`Deleted ${deletedCount} tray(s).`);
       await loadPage();
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
       if (normalized.kind === "offline") {
         setOffline(true);
       }
-      setError("Unable to remove plant.");
+      setError("Unable to delete selected trays.");
     } finally {
       setSaving(false);
     }
   }
 
-  function applyStagedRecipeToTray(tray: Tray, recipeId: string) {
-    if (!recipeId) {
-      setError("Select a recipe before applying.");
+  function togglePlantSelection(plantId: string) {
+    if (!plantById.has(plantId)) {
       return;
     }
-    setError("");
-    setNotice("");
-    setDraftRecipeByPlantId((current) => {
-      const next = { ...current };
-      for (const plant of tray.plants) {
-        if (overriddenPlantIds.has(plant.uuid)) {
-          continue;
+
+    setSelectedPlantIds((current) => {
+      const next = new Set(current);
+      if (next.has(plantId)) {
+        next.delete(plantId);
+      } else {
+        next.add(plantId);
+      }
+      return next;
+    });
+    setActivePlantAnchorId(plantId);
+  }
+
+  function selectAllPlantsInMainGrid() {
+    setSelectedPlantIds((current) => {
+      const next = new Set(current);
+      for (const plantId of mainGridPlantIds) {
+        next.add(plantId);
+      }
+      return next;
+    });
+    setActivePlantAnchorId((current) => current || mainGridPlantIds[0] || null);
+  }
+
+  function selectSameSpeciesInMainGrid() {
+    if (!activePlantAnchorId) {
+      return;
+    }
+    const anchor = plantById.get(activePlantAnchorId);
+    if (!anchor) {
+      return;
+    }
+
+    const mainGridSet = new Set(mainGridPlantIds);
+    const matching = mainGridPlantIds.filter((plantId) => {
+      const plant = plantById.get(plantId);
+      return !!plant && plant.species_id === anchor.species_id;
+    });
+
+    setSelectedPlantIds((current) => {
+      const next = new Set<string>();
+      for (const plantId of current) {
+        if (!mainGridSet.has(plantId)) {
+          next.add(plantId);
         }
-        next[plant.uuid] = recipeId;
+      }
+      for (const plantId of matching) {
+        next.add(plantId);
       }
       return next;
     });
   }
 
-  function stagePlantRecipe(plantId: string, recipeId: string | null) {
-    setError("");
-    setNotice("");
-    setDraftRecipeByPlantId((current) => ({
-      ...current,
-      [plantId]: recipeId,
-    }));
-    setOverriddenPlantIds((current) => {
+  function clearPlantSelection() {
+    setSelectedPlantIds(new Set());
+    setActivePlantAnchorId(null);
+  }
+
+  function validatePlantMove(selectedPlantIdsToMove: string[], tray: TrayCell): { detail: string; diagnostics: Diagnostics } | null {
+    const currentCount = draftPlantCountByTray[tray.tray_id] || 0;
+    const remaining = tray.capacity - currentCount;
+    if (selectedPlantIdsToMove.length > remaining) {
+      return {
+        detail: `Tray is full (capacity ${tray.capacity}).`,
+        diagnostics: { reason_counts: { tray_full: 1 } },
+      };
+    }
+
+    const destinationSlotId = draftTrayToSlot[tray.tray_id] ?? null;
+    if (!destinationSlotId) {
+      return null;
+    }
+
+    const slotRef = slotById.get(destinationSlotId);
+    if (!slotRef) {
+      return null;
+    }
+
+    const allowedSpecies = tentAllowedSpeciesById.get(slotRef.tent.tent_id);
+    if (!allowedSpecies || allowedSpecies.size === 0) {
+      return null;
+    }
+
+    const conflicts: Diagnostics["unplaceable_plants"] = [];
+
+    for (const plantId of selectedPlantIdsToMove) {
+      const plant = plantById.get(plantId);
+      if (!plant) {
+        continue;
+      }
+      if (!allowedSpecies.has(plant.species_id)) {
+        conflicts.push({
+          plant_id: plant.plant_id,
+          species_name: plant.species_name,
+          reason: "restriction_conflict",
+        });
+      }
+    }
+
+    if (conflicts.length > 0) {
+      return {
+        detail: "One or more selected plants do not match destination tent restrictions.",
+        diagnostics: {
+          reason_counts: { restriction_conflict: conflicts.length },
+          unplaceable_plants: conflicts,
+        },
+      };
+    }
+
+    return null;
+  }
+
+  function stageMovePlantsToTray() {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
+    if (!destinationTrayId) {
+      setError("Select a destination tray first.");
+      return;
+    }
+
+    if (selectedInMainGrid.length === 0) {
+      setError("Select one or more plants from the unplaced grid first.");
+      return;
+    }
+
+    const destinationTray = trayById.get(destinationTrayId);
+    if (!destinationTray) {
+      setError("Destination tray not found.");
+      return;
+    }
+
+    const validation = validatePlantMove(selectedInMainGrid, destinationTray);
+    if (validation) {
+      setError(validation.detail);
+      setDiagnostics(validation.diagnostics);
+      return;
+    }
+
+    setDraftPlantToTray((current) => {
+      const next = { ...current };
+      for (const plantId of selectedInMainGrid) {
+        next[plantId] = destinationTrayId;
+      }
+      return next;
+    });
+
+    setSelectedPlantIds((current) => {
       const next = new Set(current);
-      next.add(plantId);
+      for (const plantId of selectedInMainGrid) {
+        next.delete(plantId);
+      }
+      return next;
+    });
+
+    setDiagnostics(null);
+    setError("");
+    setNotice(
+      `${selectedInMainGrid.length} plant(s) staged for ${formatTrayDisplay(destinationTray.name, destinationTray.tray_id)}.`,
+    );
+  }
+
+  function stageRemovePlantsFromTray(trayId: string) {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
+
+    const selectedInTray = selectedInTrayByTrayId[trayId] || [];
+    if (selectedInTray.length === 0) {
+      return;
+    }
+
+    setDraftPlantToTray((current) => {
+      const next = { ...current };
+      for (const plantId of selectedInTray) {
+        next[plantId] = null;
+      }
+      return next;
+    });
+
+    setSelectedPlantIds((current) => {
+      const next = new Set(current);
+      for (const plantId of selectedInTray) {
+        next.delete(plantId);
+      }
+      return next;
+    });
+
+    setDiagnostics(null);
+    setError("");
+    setNotice(`${selectedInTray.length} plant(s) staged back to unplaced.`);
+  }
+
+  function toggleTraySelection(trayId: string) {
+    if (!trayById.has(trayId)) {
+      return;
+    }
+
+    setSelectedTrayIds((current) => {
+      const next = new Set(current);
+      if (next.has(trayId)) {
+        next.delete(trayId);
+      } else {
+        next.add(trayId);
+      }
       return next;
     });
   }
 
-  function revertStagedRecipeChanges() {
-    setDraftRecipeByPlantId(persistedRecipeByPlantId);
-    setOverriddenPlantIds(new Set());
-    setRecipeSelectionByTray({});
-    setRecipeSelectionByPlant({});
-    setNotice("Staged recipe changes reverted.");
+  function clearTraySelection() {
+    setSelectedTrayIds(new Set());
   }
 
-  async function saveStagedRecipeChanges() {
-    const updates = Object.entries(persistedRecipeByPlantId)
-      .map(([plantId, persistedRecipeId]) => {
-        const draftRecipeId = draftRecipeByPlantId[plantId] ?? persistedRecipeId ?? null;
-        if ((draftRecipeId || null) === (persistedRecipeId || null)) {
+  function selectAllTraysInMainGrid() {
+    setSelectedTrayIds((current) => {
+      const next = new Set(current);
+      for (const trayId of mainGridTrayIds) {
+        next.add(trayId);
+      }
+      return next;
+    });
+  }
+
+  function stageMoveTraysToSlots() {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
+
+    if (!destinationSlotId) {
+      setError("Select a destination slot first.");
+      return;
+    }
+
+    const selected = sortedTrayIds.filter((trayId) => selectedTrayIds.has(trayId));
+    if (selected.length === 0) {
+      setError("Select one or more trays first.");
+      return;
+    }
+
+    const startIndex = sortedSlots.findIndex((slot) => slot.slot_id === destinationSlotId);
+    if (startIndex < 0) {
+      setError("Destination slot is not available.");
+      return;
+    }
+
+    const selectedSet = new Set(selected);
+    const availableSlots = sortedSlots
+      .slice(startIndex)
+      .filter((slot) => {
+        const occupant = draftSlotToTray.get(slot.slot_id) || null;
+        return !occupant || selectedSet.has(occupant);
+      })
+      .map((slot) => slot.slot_id);
+
+    if (availableSlots.length < selected.length) {
+      setError("Not enough empty slots from the selected destination onward.");
+      setDiagnostics({
+        reason_counts: {
+          insufficient_slots: 1,
+        },
+      });
+      return;
+    }
+
+    setDraftTrayToSlot((current) => {
+      const next = { ...current };
+      const orderedSelected = [...selected].sort((left, right) => {
+        const leftTray = trayById.get(left);
+        const rightTray = trayById.get(right);
+        return (leftTray?.name || left).localeCompare(rightTray?.name || right);
+      });
+
+      for (let index = 0; index < orderedSelected.length; index += 1) {
+        next[orderedSelected[index]] = availableSlots[index];
+      }
+      return next;
+    });
+
+    setSelectedTrayIds(new Set());
+    setDiagnostics(null);
+    setError("");
+    setNotice(`${selected.length} tray(s) staged into slots.`);
+  }
+
+  function stageRemoveTraysFromTent(tentId: string) {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
+
+    const selectedInTent = selectedTraysByTentId[tentId] || [];
+    if (selectedInTent.length === 0) {
+      return;
+    }
+
+    setDraftTrayToSlot((current) => {
+      const next = { ...current };
+      for (const trayId of selectedInTent) {
+        next[trayId] = null;
+      }
+      return next;
+    });
+
+    setSelectedTrayIds((current) => {
+      const next = new Set(current);
+      for (const trayId of selectedInTent) {
+        next.delete(trayId);
+      }
+      return next;
+    });
+
+    setError("");
+    setDiagnostics(null);
+    setNotice(`${selectedInTent.length} tray(s) staged back to unplaced.`);
+  }
+
+  function renderPlantCell(plantId: string) {
+    const plant = plantById.get(plantId);
+    if (!plant) {
+      return null;
+    }
+
+    const selected = selectedPlantIds.has(plantId);
+
+    return (
+      <article
+        key={plant.uuid}
+        className={[styles.plantCell, selected ? styles.plantCellSelected : ""].filter(Boolean).join(" ")}
+        onClick={() => togglePlantSelection(plant.uuid)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            togglePlantSelection(plant.uuid);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-pressed={selected}
+      >
+        {selected ? (
+          <span className={styles.plantCellCheck}>
+            <Check size={12} />
+          </span>
+        ) : null}
+        <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
+        <span className={styles.plantCellSpecies}>{plant.species_name}</span>
+        <div className={styles.plantCellMetaRow}>
+          <span className={styles.recipeLegendItem}>{plant.grade || "No grade"}</span>
+        </div>
+      </article>
+    );
+  }
+
+  function renderTrayCell(trayId: string, inSlot?: boolean) {
+    const tray = trayById.get(trayId);
+    if (!tray) {
+      return null;
+    }
+
+    const selected = selectedTrayIds.has(trayId);
+
+    return (
+      <article
+        key={trayId}
+        className={[styles.trayGridCell, selected ? styles.plantCellSelected : ""].filter(Boolean).join(" ")}
+        onClick={() => toggleTraySelection(trayId)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleTraySelection(trayId);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-pressed={selected}
+      >
+        {selected ? (
+          <span className={styles.plantCellCheck}>
+            <Check size={12} />
+          </span>
+        ) : null}
+        <strong className={styles.trayGridCellId}>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
+        <span className={styles.plantCellSpecies}>{tray.current_count}/{tray.capacity}</span>
+        {inSlot ? <span className={styles.recipeLegendItem}>Placed</span> : null}
+      </article>
+    );
+  }
+
+  async function applyPlantToTrayLayout() {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
+
+    const placementChanges = sortedPlantIds
+      .map((plantId) => {
+        const persistedTrayId = persistedPlantToTray[plantId] ?? null;
+        const stagedTrayId = draftPlantToTray[plantId] ?? persistedTrayId;
+        if ((persistedTrayId || null) === (stagedTrayId || null)) {
           return null;
         }
         return {
-          plant_id: plantId,
-          assigned_recipe_id: draftRecipeId,
+          plantId,
+          persistedTrayId,
+          stagedTrayId,
+          plantCode: plantById.get(plantId)?.plant_id || plantId,
         };
       })
-      .filter((item): item is { plant_id: string; assigned_recipe_id: string | null } => item !== null);
+      .filter(
+        (item): item is { plantId: string; persistedTrayId: string | null; stagedTrayId: string | null; plantCode: string } =>
+          item !== null,
+      )
+      .sort((left, right) => left.plantCode.localeCompare(right.plantCode));
 
-    if (updates.length === 0) {
-      setNotice("No staged recipe changes to save.");
+    if (placementChanges.length === 0) {
+      setNotice("No staged plant/tray changes to apply.");
       return;
     }
 
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/experiments/${experimentId}/plants/recipes`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates }),
-      });
-      const payload = (await response.json()) as { detail?: string; count?: number };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to save recipe assignments.");
-        return;
-      }
-      setNotice(`Saved recipe changes for ${payload.count || updates.length} plant(s).`);
-      await loadPage();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to save recipe assignments.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function runAutoPlace() {
-    if (placementLocked) {
-      setError(RUNNING_LOCK_MESSAGE);
-      return;
-    }
     setSaving(true);
     setError("");
     setNotice("");
     setDiagnostics(null);
+
     try {
-      const response = await backendFetch(`/api/v1/experiments/${experimentId}/placement/auto`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "bin_balance_v1", clear_existing: true }),
-      });
-      const payload = (await response.json()) as { detail?: string; diagnostics?: Diagnostics };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to auto-place.");
-        setDiagnostics(payload.diagnostics || null);
-        return;
+      const removals = placementChanges.filter((change) => change.persistedTrayId !== null);
+      const additions = placementChanges.filter((change) => change.stagedTrayId !== null);
+
+      for (const removal of removals) {
+        const row = persistedTrayPlantRowByPlantId[removal.plantId];
+        if (!row || !removal.persistedTrayId) {
+          setError("Unable to resolve persisted tray placement. Refresh and try again.");
+          return;
+        }
+
+        const response = await backendFetch(`/api/v1/trays/${removal.persistedTrayId}/plants/${row.trayPlantId}`, {
+          method: "DELETE",
+        });
+
+        if (!response.ok) {
+          const parsed = await parseBackendErrorPayload(response, "Unable to apply plant/tray layout changes.");
+          setError(parsed.detail);
+          setDiagnostics(parsed.diagnostics);
+          return;
+        }
       }
-      setNotice("Auto-place complete.");
+
+      for (const addition of additions) {
+        if (!addition.stagedTrayId) {
+          continue;
+        }
+
+        const response = await backendFetch(`/api/v1/trays/${addition.stagedTrayId}/plants`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plant_id: addition.plantId }),
+        });
+
+        if (!response.ok) {
+          const parsed = await parseBackendErrorPayload(response, "Unable to apply plant/tray layout changes.");
+          setError(parsed.detail);
+          setDiagnostics(parsed.diagnostics);
+          return;
+        }
+      }
+
+      setNotice(`Applied ${placementChanges.length} plant layout change(s).`);
       await loadPage();
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
       if (normalized.kind === "offline") {
         setOffline(true);
       }
-      setError("Unable to auto-place.");
+      setError("Unable to apply plant/tray layout changes.");
     } finally {
       setSaving(false);
     }
   }
 
-  const compatibleTraysByPlant = useMemo(() => {
-    const map = new Map<string, Tray[]>();
-
-    for (const plant of summary?.unplaced_plants.results || []) {
-      const compatible = (summary?.trays.results || []).filter((tray) => {
-        if (tray.current_count >= tray.capacity) {
-          return false;
-        }
-        if (tray.location.status !== "placed") {
-          return true;
-        }
-        const tent = (summary?.tents.results || []).find((item) => item.tent_id === tray.location.tent?.id);
-        if (!tent || tent.allowed_species.length === 0) {
-          return true;
-        }
-        return tent.allowed_species.some((species) => species.id === plant.species_id);
-      });
-      map.set(plant.uuid, compatible);
+  async function applyTrayToSlotLayout() {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
     }
 
-    return map;
-  }, [summary?.tents.results, summary?.trays.results, summary?.unplaced_plants.results]);
+    const slotChanges = sortedTrayIds
+      .map((trayId) => {
+        const persistedSlotId = persistedTrayToSlot[trayId] ?? null;
+        const draftSlotId = draftTrayToSlot[trayId] ?? persistedSlotId;
+        if ((persistedSlotId || null) === (draftSlotId || null)) {
+          return null;
+        }
+        return {
+          trayId,
+          persistedSlotId,
+          draftSlotId,
+        };
+      })
+      .filter(
+        (item): item is { trayId: string; persistedSlotId: string | null; draftSlotId: string | null } =>
+          item !== null,
+      );
 
-  function draftRecipeForPlant(plant: { uuid: string; assigned_recipe: RecipeSummary | null }): RecipeSummary | null {
-    const persistedRecipeId = plant.assigned_recipe?.id || null;
-    const draftRecipeId = draftRecipeByPlantId[plant.uuid] ?? persistedRecipeId;
-    if (!draftRecipeId) {
-      return null;
+    if (slotChanges.length === 0) {
+      setNotice("No staged tray/slot changes to apply.");
+      return;
     }
-    return recipeById.get(draftRecipeId) || null;
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+    setDiagnostics(null);
+
+    try {
+      const clearSlotFirst = slotChanges.filter(
+        (change) => change.persistedSlotId !== null && (change.persistedSlotId || null) !== (change.draftSlotId || null),
+      );
+
+      for (const change of clearSlotFirst) {
+        const response = await backendFetch(`/api/v1/trays/${change.trayId}/`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slot_id: null }),
+        });
+
+        if (!response.ok) {
+          const parsed = await parseBackendErrorPayload(response, "Unable to apply tray/slot layout changes.");
+          setError(parsed.detail);
+          setDiagnostics(parsed.diagnostics);
+          return;
+        }
+      }
+
+      for (const change of slotChanges) {
+        if (change.draftSlotId === null) {
+          continue;
+        }
+
+        const response = await backendFetch(`/api/v1/trays/${change.trayId}/`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slot_id: change.draftSlotId }),
+        });
+
+        if (!response.ok) {
+          const parsed = await parseBackendErrorPayload(response, "Unable to apply tray/slot layout changes.");
+          setError(parsed.detail);
+          setDiagnostics(parsed.diagnostics);
+          return;
+        }
+      }
+
+      setNotice(`Applied ${slotChanges.length} tray/slot layout change(s).`);
+      await loadPage();
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to apply tray/slot layout changes.");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function isPlantRecipeStaged(plant: { uuid: string; assigned_recipe: RecipeSummary | null }): boolean {
-    const persistedRecipeId = plant.assigned_recipe?.id || null;
-    const draftRecipeId = draftRecipeByPlantId[plant.uuid] ?? persistedRecipeId;
-    return (draftRecipeId || null) !== (persistedRecipeId || null);
+  function resetPlantDrafts() {
+    setDraftPlantToTray(persistedPlantToTray);
+    setSelectedPlantIds(new Set());
+    setActivePlantAnchorId(null);
+    setDiagnostics(null);
+    setError("");
+    setNotice("Plant/tray drafts discarded.");
   }
 
-  function renderRecipeSelect(
-    value: string | undefined,
-    onValueChange: (next: string) => void,
-    placeholder: string,
-  ) {
-    return (
-      <Select.Root value={value} onValueChange={onValueChange}>
-        <Select.Trigger className={styles.recipeSelectTrigger} aria-label={placeholder}>
-          <Select.Value placeholder={placeholder} />
-          <Select.Icon>
-            <ChevronDown size={14} />
-          </Select.Icon>
-        </Select.Trigger>
-        <Select.Portal>
-          <Select.Content className={styles.recipeSelectContent} position="popper" sideOffset={6}>
-            <Select.Viewport className={styles.recipeSelectViewport}>
-              {recipes.map((recipe) => (
-                <Select.Item key={recipe.id} value={recipe.id} className={styles.recipeSelectItem}>
-                  <Select.ItemText>{recipeLabel(recipe)}</Select.ItemText>
-                  <Select.ItemIndicator className={styles.recipeSelectIndicator}>
-                    <Check size={14} />
-                  </Select.ItemIndicator>
-                </Select.Item>
-              ))}
-            </Select.Viewport>
-          </Select.Content>
-        </Select.Portal>
-      </Select.Root>
-    );
+  function resetTraySlotDrafts() {
+    setDraftTrayToSlot(persistedTrayToSlot);
+    setSelectedTrayIds(new Set());
+    setDestinationSlotId("");
+    setDiagnostics(null);
+    setError("");
+    setNotice("Tray/slot drafts discarded.");
   }
+
+  const sameSpeciesDisabled = useMemo(() => {
+    if (!activePlantAnchorId) {
+      return true;
+    }
+    const anchorPlant = plantById.get(activePlantAnchorId);
+    if (!anchorPlant) {
+      return true;
+    }
+    return !mainGridPlantIds.some((plantId) => {
+      const plant = plantById.get(plantId);
+      return !!plant && plant.species_id === anchorPlant.species_id;
+    });
+  }, [activePlantAnchorId, mainGridPlantIds, plantById]);
 
   if (notInvited) {
     return (
@@ -711,7 +1833,7 @@ export default function PlacementPage() {
   return (
     <PageShell
       title="Placement"
-      subtitle="Assign trays to slots, place plants into trays, and set recipes per plant."
+      subtitle="Step through tent/slot setup, tray setup, then staged placement applies."
       actions={
         <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/overview`}>
           ← Overview
@@ -729,350 +1851,641 @@ export default function PlacementPage() {
         </SectionCard>
       ) : null}
 
-      <SectionCard title="Create Tray">
-        <div className={styles.formGrid}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Tray code/name</span>
-            <input className={styles.input} value={newTrayName} onChange={(event) => setNewTrayName(event.target.value)} />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Slot (optional)</span>
-            <select className={styles.select} value={newTraySlotId} onChange={(event) => setNewTraySlotId(event.target.value)}>
-              <option value="">Unplaced</option>
-              {availableSlotsForNewTray.map((slot) => (
-                <option key={slot.id} value={slot.id}>
-                  {slot.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Capacity</span>
-            <input
-              className={styles.input}
-              type="number"
-              min={1}
-              value={newTrayCapacity}
-              onChange={(event) => setNewTrayCapacity(Number.parseInt(event.target.value || "1", 10))}
-            />
-          </label>
-          <button className={styles.buttonPrimary} type="button" disabled={saving} onClick={() => void createTray()}>
-            {saving ? "Saving..." : "Create tray"}
-          </button>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Unplaced Plants">
-        <p className={styles.mutedText}>Remaining: {summary?.unplaced_plants.meta.remaining_count ?? 0}</p>
-        <ResponsiveList
-          items={summary?.unplaced_plants.results || []}
-          getKey={(plant) => plant.uuid}
-          columns={[
-            { key: "plant", label: "Plant", render: (plant) => plant.plant_id || "(pending)" },
-            { key: "species", label: "Species", render: (plant) => plant.species_name },
-            { key: "grade", label: "Grade", render: (plant) => plant.grade || "Missing" },
-            {
-              key: "recipe",
-              label: "Recipe",
-              render: (plant) => {
-                const draftRecipe = draftRecipeForPlant(plant);
-                const staged = isPlantRecipeStaged(plant);
-                return (
-                  <div className={styles.actions}>
-                    <span className={draftRecipe ? styles.recipeChipAssigned : styles.recipeChipUnassigned}>
-                      {recipeChipLabel(draftRecipe)}
-                    </span>
-                    {staged ? <span className={styles.recipeLegendItem}>Staged</span> : null}
-                  </div>
-                );
-              },
-            },
-            {
-              key: "tray",
-              label: "Add to tray",
-              render: (plant) => {
-                const options = compatibleTraysByPlant.get(plant.uuid) || [];
-                return (
-                  <div className={styles.actions}>
-                    <select
-                      className={styles.select}
-                      value={traySelectionByPlant[plant.uuid] || ""}
-                      onChange={(event) =>
-                        setTraySelectionByPlant((current) => ({ ...current, [plant.uuid]: event.target.value }))
-                      }
-                    >
-                      <option value="">Select tray</option>
-                      {options.map((tray) => (
-                        <option key={tray.tray_id} value={tray.tray_id}>
-                          {tray.name} ({tray.current_count}/{tray.capacity})
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      className={styles.buttonSecondary}
-                      type="button"
-                      disabled={!traySelectionByPlant[plant.uuid]}
-                      onClick={() => void addPlantToTray(plant.uuid, traySelectionByPlant[plant.uuid] || "")}
-                    >
-                      Add
-                    </button>
-                  </div>
-                );
-              },
-            },
-          ]}
-          renderMobileCard={(plant) => (
-            <div className={styles.cardKeyValue}>
-              <span>Plant</span>
-              <strong>{plant.plant_id || "(pending)"}</strong>
-              <span>Species</span>
-              <strong>{plant.species_name}</strong>
-              <span>Grade</span>
-              <strong>{plant.grade || "Missing"}</strong>
-              <span>Recipe</span>
-              <strong>
-                <span
-                  className={draftRecipeForPlant(plant) ? styles.recipeChipAssigned : styles.recipeChipUnassigned}
-                >
-                  {recipeChipLabel(draftRecipeForPlant(plant))}
-                </span>
-              </strong>
-              {isPlantRecipeStaged(plant) ? <span className={styles.recipeLegendItem}>Staged</span> : null}
-            </div>
-          )}
-        />
-      </SectionCard>
-
-      <SectionCard title="Trays">
-        <div className={styles.blocksList}>
-          {(summary?.trays.results || []).map((tray) => {
-            const location = locationLabel(tray.location);
-            const availableSlots = allSlots.filter((slot) => {
-              const occupiedBy = occupiedSlotByTray.get(slot.id);
-              return !occupiedBy || occupiedBy === tray.tray_id;
-            });
-            const draftTray = {
-              ...tray,
-              plants: tray.plants.map((plant) => ({
-                ...plant,
-                assigned_recipe: draftRecipeForPlant(plant),
-              })),
-            };
-            const trayRecipeState = summarizeTrayRecipes(draftTray);
-            const trayRecipeSelection =
-              recipeSelectionByTray[tray.tray_id] || trayRecipeState.assignedRecipes[0]?.id || "";
-
+      <SectionCard title="Placement Workflow">
+        <div className={styles.stepperRow}>
+          {STEPS.map((step) => {
+            const complete = isStepComplete(step.id);
+            const active = step.id === currentStep;
+            const disabled = step.id > maxUnlockedStep;
             return (
-              <article key={tray.tray_id} className={styles.blockRow}>
-                <div className={styles.actions}>
-                  <strong>{tray.name}</strong>
-                  <span
-                    className={
-                      trayRecipeState.tone === "assigned"
-                        ? styles.recipeChipAssigned
-                        : trayRecipeState.tone === "mixed"
-                          ? styles.recipeChipMixed
-                          : styles.recipeChipUnassigned
-                    }
-                  >
-                    {trayRecipeState.label}
-                  </span>
-                </div>
-                <p className={styles.mutedText}>Location: {location}</p>
-                <p className={styles.mutedText}>Occupancy: {tray.current_count}/{tray.capacity}</p>
-                {trayRecipeState.assignedRecipes.length > 0 || trayRecipeState.hasUnassigned ? (
-                  <div className={styles.recipeLegendRow}>
-                    {trayRecipeState.assignedRecipes.map((recipe) => (
-                      <span key={recipe.id} className={styles.recipeLegendItem}>
-                        <span className={styles.recipeDot} style={{ backgroundColor: recipeColor(recipe.id) }} />
-                        {recipe.code}
-                      </span>
-                    ))}
-                    {trayRecipeState.hasUnassigned ? (
-                      <span className={styles.recipeLegendItem}>Unassigned</span>
-                    ) : null}
-                  </div>
-                ) : null}
-                <div className={styles.actions}>
-                  <select
-                    className={styles.select}
-                    value={slotSelectionByTray[tray.tray_id] ?? (tray.location.slot?.id || "")}
-                    onChange={(event) =>
-                      setSlotSelectionByTray((current) => ({ ...current, [tray.tray_id]: event.target.value }))
-                    }
-                    disabled={placementLocked}
-                  >
-                    <option value="">Unplaced</option>
-                    {availableSlots.map((slot) => (
-                      <option key={slot.id} value={slot.id}>
-                        {slot.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    className={styles.buttonSecondary}
-                    type="button"
-                    disabled={placementLocked}
-                    onClick={() =>
-                      void updateTray(tray, {
-                        slot_id: slotSelectionByTray[tray.tray_id] || null,
-                      })
-                    }
-                  >
-                    Move tray
-                  </button>
-                  <Popover.Root>
-                    <Popover.Trigger asChild>
-                      <button className={styles.buttonSecondary} type="button" disabled={saving || recipes.length === 0}>
-                        Set recipe for all plants in this tray (staged)
-                      </button>
-                    </Popover.Trigger>
-                    <Popover.Portal>
-                      <Popover.Content className={styles.recipePopover} sideOffset={8} align="start">
-                        <p className={styles.fieldLabel}>Apply staged recipe to plants in this tray</p>
-                        {recipes.length > 0 ? (
-                          renderRecipeSelect(
-                            trayRecipeSelection || undefined,
-                            (next) =>
-                              setRecipeSelectionByTray((current) => ({
-                                ...current,
-                                [tray.tray_id]: next,
-                              })),
-                            "Select recipe",
-                          )
-                        ) : (
-                          <p className={styles.mutedText}>No recipes available yet.</p>
-                        )}
-                        <button
-                          className={styles.buttonPrimary}
-                          type="button"
-                          disabled={!trayRecipeSelection || saving || recipes.length === 0}
-                          onClick={() => applyStagedRecipeToTray(tray, trayRecipeSelection)}
-                        >
-                          Stage
-                        </button>
-                      </Popover.Content>
-                    </Popover.Portal>
-                  </Popover.Root>
-                </div>
-                {tray.plants.map((plant) => {
-                  const draftRecipe = draftRecipeForPlant(plant);
-                  const persistedRecipeId = plant.assigned_recipe?.id || "";
-                  const draftRecipeId = draftRecipe?.id || "";
-                  const selectedPlantRecipeId =
-                    recipeSelectionByPlant[plant.uuid] ?? draftRecipeId;
-                  const isStaged = draftRecipeId !== persistedRecipeId;
-                  const isOverridden = overriddenPlantIds.has(plant.uuid);
-                  return (
-                    <div key={plant.uuid} className={styles.trayPlantRow}>
-                      <Popover.Root>
-                        <Popover.Trigger asChild>
-                          <button className={styles.buttonSecondary} type="button">
-                            {plant.plant_id || "(pending)"} · {plant.species_name}
-                          </button>
-                        </Popover.Trigger>
-                        <Popover.Portal>
-                          <Popover.Content className={styles.recipePopover} sideOffset={8} align="start">
-                            <p className={styles.fieldLabel}>Set recipe for this plant</p>
-                            {recipes.length > 0 ? (
-                              renderRecipeSelect(
-                                selectedPlantRecipeId || undefined,
-                                (next) =>
-                                  setRecipeSelectionByPlant((current) => ({
-                                    ...current,
-                                    [plant.uuid]: next,
-                                  })),
-                                "Select recipe",
-                              )
-                            ) : (
-                              <p className={styles.mutedText}>No recipes available yet.</p>
-                            )}
-                            <div className={styles.actions}>
-                              <button
-                                className={styles.buttonPrimary}
-                                type="button"
-                                disabled={
-                                  recipes.length === 0 ||
-                                  !selectedPlantRecipeId ||
-                                  selectedPlantRecipeId === draftRecipeId
-                                }
-                                onClick={() =>
-                                  stagePlantRecipe(
-                                    plant.uuid,
-                                    selectedPlantRecipeId || null,
-                                  )
-                                }
-                              >
-                                Stage
-                              </button>
-                              <button
-                                className={styles.buttonSecondary}
-                                type="button"
-                                disabled={!draftRecipeId}
-                                onClick={() => stagePlantRecipe(plant.uuid, null)}
-                              >
-                                Stage clear
-                              </button>
-                            </div>
-                          </Popover.Content>
-                        </Popover.Portal>
-                      </Popover.Root>
-                      <span className={draftRecipe ? styles.recipeChipAssigned : styles.recipeChipUnassigned}>
-                        {recipeChipLabel(draftRecipe)}
-                      </span>
-                      {isStaged ? <span className={styles.recipeLegendItem}>Staged</span> : null}
-                      {isOverridden ? <span className={styles.recipeLegendItem}>Override</span> : null}
-                      <button
-                        className={styles.buttonSecondary}
-                        type="button"
-                        disabled={placementLocked}
-                        onClick={() => void removePlantFromTray(tray.tray_id, plant.tray_plant_id)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  );
-                })}
-              </article>
+              <button
+                key={step.id}
+                type="button"
+                className={[
+                  styles.stepperItem,
+                  active ? styles.stepperItemActive : "",
+                  complete ? styles.stepperItemDone : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                disabled={disabled}
+                onClick={() => goToStep(step.id)}
+              >
+                <span className={styles.stepperIndex}>{step.id}</span>
+                <span>{step.title}</span>
+              </button>
             );
           })}
         </div>
-      </SectionCard>
 
-      <SectionCard title="Auto-place">
-        <button className={styles.buttonPrimary} type="button" disabled={saving || placementLocked} onClick={() => void runAutoPlace()}>
-          {saving ? "Running..." : "Auto-place (balance by grade)"}
-        </button>
-        {diagnostics?.reason_counts ? (
-          <div className={styles.cardKeyValue}>
-            <span>Reasons</span>
-            <strong>{Object.entries(diagnostics.reason_counts).map(([key, value]) => `${key}: ${value}`).join(" · ")}</strong>
-            {diagnostics.unplaceable_plants?.slice(0, 10).map((plant) => (
-              <span key={`${plant.plant_id}-${plant.reason}`}>{`${plant.plant_id || "(pending)"} · ${plant.species_name} · ${plant.reason}`}</span>
-            ))}
+        {!isStepComplete(currentStep) ? (
+          <div className={styles.stepBlocker}>
+            <strong>Step blocker</strong>
+            <p className={styles.mutedText}>{stepBlockedMessage(currentStep)}</p>
           </div>
         ) : null}
-      </SectionCard>
 
-      <StickyActionBar>
-        <span className={styles.recipeLegendItem}>{stagedChangeCount} plants changed</span>
-        <button
-          className={styles.buttonPrimary}
-          type="button"
-          disabled={saving || stagedChangeCount === 0}
-          onClick={() => void saveStagedRecipeChanges()}
+        <div key={currentStep} className={styles.stepPanel}>
+          {currentStep === 1 ? (
+            <div className={styles.stack}>
+              <SectionCard title="Add Tent">
+                <div className={styles.formGrid}>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Tent name</span>
+                    <input className={styles.input} value={newTentName} onChange={(event) => setNewTentName(event.target.value)} />
+                  </label>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Tent code</span>
+                    <input className={styles.input} value={newTentCode} onChange={(event) => setNewTentCode(event.target.value)} />
+                  </label>
+                  <button className={styles.buttonPrimary} type="button" disabled={saving} onClick={() => void createTent()}>
+                    {saving ? "Saving..." : "Add tent"}
+                  </button>
+                </div>
+              </SectionCard>
+
+              {tents.map((tent) => {
+                const shelfCounts = shelfCountsByTent[tent.tent_id] || buildDefaultShelves(tent);
+                const totalSlots = shelfCounts.reduce((acc, value) => acc + Math.max(0, value), 0);
+                const selectedSpecies = new Set(tent.allowed_species.map((item) => item.id));
+                const tentDraft = tentDraftById[tent.tent_id] || { name: tent.name, code: tent.code };
+
+                return (
+                  <SectionCard key={tent.tent_id} title={`${tent.name}${tent.code ? ` (${tent.code})` : ""}`}>
+                    <div className={styles.formGrid}>
+                      <div className={styles.trayControlRow}>
+                        <input
+                          className={styles.input}
+                          value={tentDraft.name}
+                          onChange={(event) =>
+                            setTentDraftById((current) => ({
+                              ...current,
+                              [tent.tent_id]: {
+                                ...(current[tent.tent_id] || { name: tent.name, code: tent.code }),
+                                name: event.target.value,
+                              },
+                            }))
+                          }
+                          aria-label="Tent name"
+                        />
+                        <input
+                          className={styles.input}
+                          value={tentDraft.code}
+                          onChange={(event) =>
+                            setTentDraftById((current) => ({
+                              ...current,
+                              [tent.tent_id]: {
+                                ...(current[tent.tent_id] || { name: tent.name, code: tent.code }),
+                                code: event.target.value,
+                              },
+                            }))
+                          }
+                          aria-label="Tent code"
+                        />
+                        <button className={styles.buttonSecondary} type="button" disabled={saving} onClick={() => void saveTentDetails(tent)}>
+                          Save tent
+                        </button>
+                      </div>
+
+                      <div className={styles.field}>
+                        <span className={styles.fieldLabel}>Allowed species restrictions</span>
+                        <div className={styles.selectionGrid}>
+                          {species.map((item) => {
+                            const checked = selectedSpecies.has(item.id);
+                            return (
+                              <label key={item.id} className={styles.checkboxRow}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(event) => {
+                                    const next = new Set(selectedSpecies);
+                                    if (event.target.checked) {
+                                      next.add(item.id);
+                                    } else {
+                                      next.delete(item.id);
+                                    }
+                                    void saveTentRestrictions(tent, Array.from(next));
+                                  }}
+                                />
+                                <span>{item.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className={styles.field}>
+                        <span className={styles.fieldLabel}>Shelves layout</span>
+                        <div className={styles.actions}>
+                          <button className={styles.buttonSecondary} type="button" onClick={() => addShelf(tent.tent_id)}>
+                            Add shelf
+                          </button>
+                          <button className={styles.buttonSecondary} type="button" onClick={() => removeShelf(tent.tent_id)}>
+                            Remove shelf
+                          </button>
+                        </div>
+                        {shelfCounts.map((count, index) => (
+                          <label className={styles.field} key={`${tent.tent_id}-shelf-${index + 1}`}>
+                            <span className={styles.fieldLabel}>Shelf {index + 1} slot count</span>
+                            <input
+                              className={styles.input}
+                              type="number"
+                              min={0}
+                              value={count}
+                              onChange={(event) =>
+                                updateShelfCount(tent.tent_id, index, Number.parseInt(event.target.value || "0", 10))
+                              }
+                            />
+                          </label>
+                        ))}
+                      </div>
+
+                      <div className={styles.field}>
+                        <span className={styles.fieldLabel}>Live preview</span>
+                        <div className={styles.previewGrid}>
+                          {shelfCounts.map((count, index) => (
+                            <div className={styles.previewRow} key={`${tent.tent_id}-preview-${index + 1}`}>
+                              <strong className={styles.mutedText}>Shelf {index + 1}</strong>
+                              <div className={styles.previewCells}>
+                                {Array.from({ length: Math.max(0, count) }).map((_, slotIndex) => (
+                                  <span className={styles.previewCell} key={`${tent.tent_id}-${index + 1}-${slotIndex + 1}`}>
+                                    {`S${index + 1}-${slotIndex + 1}`}
+                                  </span>
+                                ))}
+                                {count === 0 ? <span className={styles.mutedText}>No slots</span> : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button className={styles.buttonPrimary} type="button" disabled={saving} onClick={() => void generateSlots(tent.tent_id)}>
+                        {saving ? "Generating..." : `Generate slots (${totalSlots})`}
+                      </button>
+
+                      <div className={styles.slotGridInline}>
+                        {[...tent.slots]
+                          .sort((left, right) => {
+                            if (left.shelf_index !== right.shelf_index) {
+                              return left.shelf_index - right.shelf_index;
+                            }
+                            if (left.slot_index !== right.slot_index) {
+                              return left.slot_index - right.slot_index;
+                            }
+                            return left.slot_id.localeCompare(right.slot_id);
+                          })
+                          .map((slot) => (
+                            <span key={slot.slot_id} className={styles.previewCell}>
+                              {slot.code}
+                            </span>
+                          ))}
+                        {tent.slots.length === 0 ? <span className={styles.mutedText}>No slots generated yet.</span> : null}
+                      </div>
+                    </div>
+                  </SectionCard>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {currentStep === 2 ? (
+            <div className={styles.stack}>
+              <SectionCard title="Add Tray">
+                <div className={styles.formGrid}>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Tray code/name</span>
+                    <input className={styles.input} value={newTrayName} onChange={(event) => setNewTrayName(event.target.value)} />
+                  </label>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Capacity</span>
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min={1}
+                      value={newTrayCapacity}
+                      onChange={(event) => setNewTrayCapacity(Number.parseInt(event.target.value || "1", 10))}
+                    />
+                  </label>
+                  <button className={styles.buttonPrimary} type="button" disabled={saving} onClick={() => void createTray()}>
+                    {saving ? "Saving..." : "Create tray"}
+                  </button>
+                </div>
+              </SectionCard>
+
+              <SectionCard title={`Tray Manager (${trays.length})`}>
+                <div className={styles.toolbarSummaryRow}>
+                  <span className={styles.mutedText}>Total trays: {sortedTrayIds.length}</span>
+                  <span className={styles.mutedText}>Selected: {selectedTrayManagerIds.size}</span>
+                  <div className={styles.toolbarActionsCompact}>
+                    <ToolIconButton
+                      label="Select all trays"
+                      icon={<CheckSquare size={16} />}
+                      onClick={selectAllTrayManagerCells}
+                      disabled={sortedTrayIds.length === 0}
+                    />
+                    <ToolIconButton
+                      label="Clear tray selection"
+                      icon={<X size={16} />}
+                      onClick={clearTrayManagerSelection}
+                      disabled={selectedTrayManagerIds.size === 0}
+                    />
+                    {selectedTrayManagerIds.size > 0 ? (
+                      <ToolIconButton
+                        label="Delete selected trays"
+                        icon={<Trash2 size={16} />}
+                        onClick={() => void bulkDeleteSelectedTrays()}
+                        danger
+                      />
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className={styles.trayManagerGrid}>
+                  {sortedTrayIds.map((trayId) => {
+                    const tray = trayById.get(trayId);
+                    if (!tray) {
+                      return null;
+                    }
+                    const draft = trayDraftById[trayId] || { name: tray.name, capacity: tray.capacity };
+                    const selected = selectedTrayManagerIds.has(trayId);
+                    return (
+                      <article
+                        key={trayId}
+                        className={[styles.trayEditorCell, selected ? styles.plantCellSelected : ""].filter(Boolean).join(" ")}
+                        onClick={() => toggleTrayManagerSelection(trayId)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            toggleTrayManagerSelection(trayId);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={selected}
+                      >
+                        {selected ? (
+                          <span className={styles.plantCellCheck}>
+                            <Check size={12} />
+                          </span>
+                        ) : null}
+                        <strong className={styles.trayGridCellId}>
+                          {formatTrayDisplay(draft.name || tray.name, tray.tray_id)}
+                        </strong>
+                        <span className={styles.mutedText}>Current occupancy: {tray.current_count}/{tray.capacity}</span>
+                        <div className={styles.trayEditorInputs}>
+                          <input
+                            className={styles.input}
+                            value={draft.name}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) =>
+                              setTrayDraftById((current) => ({
+                                ...current,
+                                [trayId]: {
+                                  ...(current[trayId] || { name: tray.name, capacity: tray.capacity }),
+                                  name: event.target.value,
+                                },
+                              }))
+                            }
+                            aria-label="Tray name"
+                          />
+                          <input
+                            className={styles.input}
+                            type="number"
+                            min={1}
+                            value={draft.capacity}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) =>
+                              setTrayDraftById((current) => ({
+                                ...current,
+                                [trayId]: {
+                                  ...(current[trayId] || { name: tray.name, capacity: tray.capacity }),
+                                  capacity: Number.parseInt(event.target.value || "1", 10),
+                                },
+                              }))
+                            }
+                            aria-label="Tray capacity"
+                          />
+                          <button
+                            className={styles.buttonSecondary}
+                            type="button"
+                            disabled={saving}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void saveTrayDetails(tray);
+                            }}
+                          >
+                            Save tray
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                  {trays.length === 0 ? <p className={styles.mutedText}>No trays yet.</p> : null}
+                </div>
+              </SectionCard>
+            </div>
+          ) : null}
+
+          {currentStep === 3 ? (
+            <div className={styles.stack}>
+              <SectionCard title="Plants -> Trays (Draft)">
+                <Tooltip.Provider delayDuration={150}>
+                  <div className={styles.placementToolbar}>
+                    <select
+                      className={styles.select}
+                      value={destinationTrayId}
+                      onChange={(event) => setDestinationTrayId(event.target.value)}
+                      aria-label="Destination tray"
+                    >
+                      <option value="">Select destination tray</option>
+                      {sortedTrayIds.map((trayId) => {
+                        const tray = trayById.get(trayId);
+                        if (!tray) {
+                          return null;
+                        }
+                        return (
+                          <option key={trayId} value={trayId}>
+                            {formatTrayDisplay(tray.name, tray.tray_id)} ({draftPlantCountByTray[trayId] || 0}/{tray.capacity})
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <div className={styles.toolbarActionsCompact}>
+                      <ToolIconButton
+                        label="Select all unplaced plants"
+                        icon={<CheckSquare size={16} />}
+                        onClick={selectAllPlantsInMainGrid}
+                        disabled={mainGridPlantIds.length === 0}
+                      />
+                      <ToolIconButton
+                        label="Select same species"
+                        icon={<Layers size={16} />}
+                        onClick={selectSameSpeciesInMainGrid}
+                        disabled={sameSpeciesDisabled}
+                      />
+                      <ToolIconButton
+                        label="Clear plant selection"
+                        icon={<X size={16} />}
+                        onClick={clearPlantSelection}
+                        disabled={selectedPlantIds.size === 0}
+                      />
+                      <button
+                        className={styles.buttonPrimary}
+                        type="button"
+                        disabled={placementLocked || !destinationTrayId || selectedInMainGrid.length === 0}
+                        onClick={stageMovePlantsToTray}
+                      >
+                        <MoveRight size={16} />
+                        Move selected
+                      </button>
+                    </div>
+                  </div>
+                </Tooltip.Provider>
+
+                <div className={styles.toolbarSummaryRow}>
+                  <span className={styles.mutedText}>Unplaced active plants: {mainGridPlantIds.length}</span>
+                  <span className={styles.mutedText}>Selected in main grid: {selectedInMainGrid.length}</span>
+                  {trays.length === 0 ? <span className={styles.badgeWarn}>Create at least one tray.</span> : null}
+                </div>
+
+                {diagnostics?.reason_counts ? (
+                  <div className={styles.cardKeyValue}>
+                    <span>Move diagnostics</span>
+                    <strong>{Object.entries(diagnostics.reason_counts).map(([key, value]) => `${key}: ${value}`).join(" · ")}</strong>
+                    {diagnostics.unplaceable_plants?.slice(0, 8).map((plant) => (
+                      <span key={`${plant.plant_id}-${plant.reason}`}>{`${plant.plant_id || "(pending)"} · ${plant.species_name} · ${plant.reason}`}</span>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className={styles.plantCellGrid}>{mainGridPlantIds.map((plantId) => renderPlantCell(plantId))}</div>
+              </SectionCard>
+
+              <SectionCard title="Tray Containers">
+                <div className={styles.trayManagerGrid}>
+                  {sortedTrayIds.map((trayId) => {
+                    const tray = trayById.get(trayId);
+                    if (!tray) {
+                      return null;
+                    }
+                    const trayPlantIds = trayPlantIdsByTray[trayId] || [];
+                    const selectedInTray = selectedInTrayByTrayId[trayId] || [];
+
+                    return (
+                      <article key={trayId} className={styles.trayEditorCell}>
+                        <div className={styles.trayHeaderRow}>
+                          <div className={styles.trayHeaderMeta}>
+                            <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
+                            <span className={styles.mutedText}>Occupancy: {draftPlantCountByTray[trayId] || 0}/{tray.capacity}</span>
+                          </div>
+                          <div className={styles.trayHeaderActions}>
+                            {selectedInTray.length > 0 ? (
+                              <ToolIconButton
+                                label="Return selected plants to unplaced"
+                                icon={<Trash2 size={16} />}
+                                onClick={() => stageRemovePlantsFromTray(trayId)}
+                                danger
+                              />
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className={styles.plantCellGridTray}>{trayPlantIds.map((plantId) => renderPlantCell(plantId))}</div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </SectionCard>
+
+              <StickyActionBar>
+                <span className={styles.recipeLegendItem}>{placementDraftChangeCount} plant layout change(s)</span>
+                <button
+                  className={styles.buttonPrimary}
+                  type="button"
+                  disabled={saving || placementDraftChangeCount === 0}
+                  onClick={() => void applyPlantToTrayLayout()}
+                >
+                  {saving ? "Applying..." : "Apply Plant -> Tray Layout"}
+                </button>
+                <button
+                  className={styles.buttonSecondary}
+                  type="button"
+                  disabled={saving || placementDraftChangeCount === 0}
+                  onClick={resetPlantDrafts}
+                >
+                  Discard drafts
+                </button>
+              </StickyActionBar>
+            </div>
+          ) : null}
+
+          {currentStep === 4 ? (
+            <div className={styles.stack}>
+              <SectionCard title="Trays -> Slots (Draft)">
+                <Tooltip.Provider delayDuration={150}>
+                  <div className={styles.placementToolbar}>
+                    <select
+                      className={styles.select}
+                      value={destinationSlotId}
+                      onChange={(event) => setDestinationSlotId(event.target.value)}
+                      aria-label="Destination slot"
+                    >
+                      <option value="">Select destination slot</option>
+                      {sortedSlots.map((slot) => {
+                        const occupant = draftSlotToTray.get(slot.slot_id) || null;
+                        const occupantName = occupant
+                          ? formatTrayDisplay(trayById.get(occupant)?.name, occupant)
+                          : "Empty";
+                        return (
+                          <option key={slot.slot_id} value={slot.slot_id}>
+                            {slot.label} ({occupantName})
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <div className={styles.toolbarActionsCompact}>
+                      <ToolIconButton
+                        label="Select all unplaced trays"
+                        icon={<CheckSquare size={16} />}
+                        onClick={selectAllTraysInMainGrid}
+                        disabled={mainGridTrayIds.length === 0}
+                      />
+                      <ToolIconButton
+                        label="Clear tray selection"
+                        icon={<X size={16} />}
+                        onClick={clearTraySelection}
+                        disabled={selectedTrayIds.size === 0}
+                      />
+                      <button
+                        className={styles.buttonPrimary}
+                        type="button"
+                        disabled={placementLocked || !destinationSlotId || selectedTrayIds.size === 0}
+                        onClick={stageMoveTraysToSlots}
+                      >
+                        <ArrowRight size={16} />
+                        Move selected
+                      </button>
+                    </div>
+                  </div>
+                </Tooltip.Provider>
+
+                <div className={styles.toolbarSummaryRow}>
+                  <span className={styles.mutedText}>Unplaced trays: {mainGridTrayIds.length}</span>
+                  <span className={styles.mutedText}>Selected trays: {selectedTrayIds.size}</span>
+                </div>
+
+                <div className={styles.trayMainGrid}>{mainGridTrayIds.map((trayId) => renderTrayCell(trayId))}</div>
+              </SectionCard>
+
+              <SectionCard title="Tent Slot Containers">
+                <div className={styles.tentBoardGrid}>
+                  {tents.map((tent) => {
+                    const selectedInTent = selectedTraysByTentId[tent.tent_id] || [];
+
+                    return (
+                      <article key={tent.tent_id} className={styles.tentBoardCard}>
+                        <div className={styles.trayHeaderRow}>
+                          <div className={styles.trayHeaderMeta}>
+                            <strong>{tent.name}</strong>
+                            <span className={styles.mutedText}>{tent.code || ""}</span>
+                          </div>
+                          <div className={styles.trayHeaderActions}>
+                            <span className={styles.recipeLegendItem}>{tent.slots.length} slot(s)</span>
+                            {selectedInTent.length > 0 ? (
+                              <ToolIconButton
+                                label="Return selected trays to unplaced"
+                                icon={<Trash2 size={16} />}
+                                onClick={() => stageRemoveTraysFromTent(tent.tent_id)}
+                                danger
+                              />
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className={styles.tentSlotGrid}>
+                          {[...tent.slots]
+                            .sort((left, right) => {
+                              if (left.shelf_index !== right.shelf_index) {
+                                return left.shelf_index - right.shelf_index;
+                              }
+                              if (left.slot_index !== right.slot_index) {
+                                return left.slot_index - right.slot_index;
+                              }
+                              return left.slot_id.localeCompare(right.slot_id);
+                            })
+                            .map((slot) => {
+                              const trayId = draftSlotToTray.get(slot.slot_id) || null;
+                              return (
+                                <div key={slot.slot_id} className={styles.slotCell}>
+                                  <span className={styles.slotCellLabel}>{slot.code}</span>
+                                  {trayId ? (
+                                    renderTrayCell(trayId, true)
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className={[
+                                        styles.slotCellEmpty,
+                                        destinationSlotId === slot.slot_id ? styles.slotCellEmptyActive : "",
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" ")}
+                                      onClick={() => setDestinationSlotId(slot.slot_id)}
+                                    >
+                                      Empty
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          {tent.slots.length === 0 ? <span className={styles.mutedText}>No slots generated.</span> : null}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </SectionCard>
+
+              <StickyActionBar>
+                <span className={styles.recipeLegendItem}>{traySlotDraftChangeCount} tray/slot change(s)</span>
+                <button
+                  className={styles.buttonPrimary}
+                  type="button"
+                  disabled={saving || traySlotDraftChangeCount === 0}
+                  onClick={() => void applyTrayToSlotLayout()}
+                >
+                  {saving ? "Applying..." : "Apply Tray -> Slot Layout"}
+                </button>
+                <button
+                  className={styles.buttonSecondary}
+                  type="button"
+                  disabled={saving || traySlotDraftChangeCount === 0}
+                  onClick={resetTraySlotDrafts}
+                >
+                  Discard drafts
+                </button>
+              </StickyActionBar>
+            </div>
+          ) : null}
+        </div>
+
+        <div
+          className={[styles.stepNavRow, currentStep === 1 ? styles.stepNavRowForwardOnly : ""].filter(Boolean).join(" ")}
         >
-          {saving ? "Saving..." : "Save recipe changes"}
-        </button>
-        <button
-          className={styles.buttonSecondary}
-          type="button"
-          disabled={saving || stagedChangeCount === 0}
-          onClick={revertStagedRecipeChanges}
-        >
-          Revert staged changes
-        </button>
-      </StickyActionBar>
+          {currentStep > 1 ? (
+            <button className={styles.buttonSecondary} type="button" onClick={goPreviousStep}>
+              Back
+            </button>
+          ) : null}
+          <button
+            className={styles.buttonPrimary}
+            type="button"
+            disabled={!isStepComplete(currentStep)}
+            onClick={goNextStep}
+          >
+            {currentStep === 4 ? "Go to Overview" : "Next"}
+          </button>
+        </div>
+      </SectionCard>
     </PageShell>
   );
 }

@@ -26,7 +26,7 @@
 .buttonPrimary:disabled,
 .buttonSecondary:disabled {
   opacity: 0.6;
-  cursor: wait;
+  cursor: default;
 }
 
 .mutedText {

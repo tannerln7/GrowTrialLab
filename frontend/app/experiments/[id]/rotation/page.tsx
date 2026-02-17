@@ -356,7 +356,7 @@ export default function RotationPage() {
                 {selectedTrayBlocked ? (
                   <p className={styles.inlineNote}>
                     No compatible destination slots for this tray. This tray contains plants not allowed in restricted tents.
-                    <Link href={`/experiments/${experimentId}/slots`}> Adjust tent restrictions</Link>.
+                    <Link href={`/experiments/${experimentId}/placement?step=1`}> Adjust tent restrictions</Link>.
                   </p>
                 ) : null}
               </label>

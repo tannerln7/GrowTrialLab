@@ -110,8 +110,8 @@ export default function ExperimentSetupPage() {
       id: "tents_blocks",
       title: "Tents + Slots",
       complete: !statusSummary?.setup.missing.tents && !statusSummary?.setup.missing.slots,
-      href: `/experiments/${experimentId}/slots`,
-      actionLabel: "Go to slots",
+      href: `/experiments/${experimentId}/placement?step=1`,
+      actionLabel: "Go to placement",
     },
     {
       id: "recipes",
@@ -125,7 +125,7 @@ export default function ExperimentSetupPage() {
   return (
     <PageShell
       title="Setup"
-      subtitle="Complete bootstrap setup: plants, slots, and recipes."
+      subtitle="Complete bootstrap setup: plants, tents + slots, and recipes."
       actions={
         <Link className={styles.buttonSecondary} href="/experiments">
           Back to experiments

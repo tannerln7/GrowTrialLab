@@ -1026,7 +1026,7 @@ export default function ExperimentSchedulePage() {
                 </label>
               ))}
               {(placementSummary ? unwrapList<PlacementSummary["tents"]["results"][number]>(placementSummary.tents).length : 0) === 0 ? (
-                <p className={styles.inlineNote}>No tents available yet. Add tents in Slots.</p>
+                <p className={styles.inlineNote}>No tents available yet. Add tents in Placement step 1.</p>
               ) : null}
             </div>
           ) : null}

@@ -8,22 +8,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ExperimentStatusSummary } from "@/lib/experiment-status";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import PageShell from "@/src/components/ui/PageShell";
-import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { api, isApiError } from "@/src/lib/api";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
 import styles from "../../experiments.module.css";
-
-type FilterId =
-  | "all"
-  | "needs_baseline"
-  | "needs_grade"
-  | "needs_placement"
-  | "needs_plant_recipe"
-  | "active"
-  | "removed";
 
 type LocationNode = {
   id: string;
@@ -69,15 +59,30 @@ type OverviewResponse = {
   };
 };
 
-const FILTERS: Array<{ id: FilterId; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "needs_baseline", label: "Needs Baseline" },
-  { id: "needs_grade", label: "Needs Grade" },
-  { id: "needs_placement", label: "Needs Placement" },
-  { id: "needs_plant_recipe", label: "Needs Plant Recipe" },
-  { id: "active", label: "Active" },
-  { id: "removed", label: "Removed" },
-];
+type PlacedTrayGroup = {
+  tray: NonNullable<OverviewPlant["location"]["tray"]>;
+  plants: OverviewPlant[];
+};
+
+type PlacedSlotGroup = {
+  slot: NonNullable<OverviewPlant["location"]["slot"]>;
+  shelfIndex: number;
+  slotIndex: number;
+  trays: PlacedTrayGroup[];
+};
+
+type PlacedShelfGroup = {
+  shelfIndex: number;
+  slots: PlacedSlotGroup[];
+};
+
+type PlacedTentGroup = {
+  tent: NonNullable<OverviewPlant["location"]["tent"]>;
+  shelves: PlacedShelfGroup[];
+  maxSlotCount: number;
+  trayCount: number;
+  plantCount: number;
+};
 
 const DIAGNOSTIC_LABELS: Record<string, string> = {
   needs_baseline: "needs baseline",
@@ -104,26 +109,6 @@ function formatScheduleSlot(
     ? slot.exact_time.slice(0, 5)
     : slot.timeframe?.toLowerCase() || "time";
   return `${day} · ${moment} (${slot.actions_count} action${slot.actions_count === 1 ? "" : "s"})`;
-}
-
-function locationSummary(plant: OverviewPlant): string {
-  if (plant.location.status !== "placed" || !plant.location.slot || !plant.location.tray) {
-    return "Unplaced";
-  }
-  const slotLabel = plant.location.slot.code || plant.location.slot.label || "Slot";
-  const trayLabel = plant.location.tray.code || plant.location.tray.name || "Tray";
-  const occupancy =
-    plant.location.tray.current_count != null && plant.location.tray.capacity != null
-      ? ` (${plant.location.tray.current_count}/${plant.location.tray.capacity})`
-      : "";
-  return `Slot ${slotLabel} > Tray ${trayLabel}${occupancy}`;
-}
-
-function recipeChipLabel(recipe: OverviewPlant["assigned_recipe"]): string {
-  if (!recipe) {
-    return "Recipe: Unassigned";
-  }
-  return recipe.name ? `Recipe: ${recipe.code} - ${recipe.name}` : `Recipe: ${recipe.code}`;
 }
 
 function formatActionError(error: unknown, fallback: string): string {
@@ -192,6 +177,38 @@ function isOfflineError(error: unknown): boolean {
   return typeof navigator !== "undefined" && navigator.onLine === false;
 }
 
+function normalizeGridIndex(value: number | null | undefined): number | null {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  const normalized = Math.trunc(value as number);
+  if (normalized < 1) {
+    return null;
+  }
+  return normalized;
+}
+
+function locationLabel(node: LocationNode | null, fallback: string): string {
+  return node?.code || node?.name || node?.label || fallback;
+}
+
+function formatTrayHeading(node: LocationNode | null): string {
+  const raw = (node?.code || node?.name || node?.label || "").trim();
+  if (!raw) {
+    return "Tray";
+  }
+  const strictMatch = raw.match(/^(?:tray|tr|t)?[\s_-]*0*([0-9]+)$/i);
+  const looseMatch = strictMatch || raw.match(/([0-9]+)/);
+  if (!looseMatch) {
+    return "Tray";
+  }
+  const trayNumber = Number.parseInt(looseMatch[1], 10);
+  if (!Number.isFinite(trayNumber)) {
+    return "Tray";
+  }
+  return `Tray ${trayNumber}`;
+}
+
 export default function ExperimentOverviewPage() {
   const params = useParams();
   const router = useRouter();
@@ -208,22 +225,6 @@ export default function ExperimentOverviewPage() {
     return "";
   }, [params]);
 
-  const activeFilter = useMemo<FilterId>(() => {
-    const value = searchParams.get("filter");
-    if (
-      value === "needs_baseline" ||
-      value === "needs_grade" ||
-      value === "needs_placement" ||
-      value === "needs_plant_recipe" ||
-      value === "active" ||
-      value === "removed"
-    ) {
-      return value;
-    }
-    return "all";
-  }, [searchParams]);
-
-  const queryValue = searchParams.get("q") ?? "";
   const refreshToken = searchParams.get("refresh");
 
   const [notice, setNotice] = useState("");
@@ -372,47 +373,35 @@ export default function ExperimentOverviewPage() {
     overviewPageState.errorKind === "offline" ||
     isOfflineError(startMutation.error) ||
     isOfflineError(stopMutation.error);
+  const startReady = Boolean(summary?.readiness.ready_to_start);
+  const baselineNeedsAttention = (data?.counts.needs_baseline ?? summary?.readiness.counts.needs_baseline ?? 0) > 0;
+  const placementNeedsAttention =
+    (data?.counts.needs_placement ?? summary?.readiness.counts.needs_placement ?? 0) > 0 ||
+    (summary?.readiness.counts.needs_tent_restriction ?? 0) > 0 ||
+    Boolean(summary?.setup.missing.tents || summary?.setup.missing.slots);
+  const recipesNeedsAttention =
+    (data?.counts.needs_plant_recipe ?? summary?.readiness.counts.needs_plant_recipe ?? 0) > 0 ||
+    Boolean(summary?.setup.missing.recipes);
+  const rotationNeedsAttention = (summary?.readiness.counts.needs_tent_restriction ?? 0) > 0;
+  const feedingNeedsAttention = (summary?.schedule.due_counts_today ?? 0) > 0;
+  const scheduleNeedsAttention =
+    (summary?.schedule.due_counts_today ?? 0) > 0 || summary?.schedule.next_scheduled_slot == null;
 
-  const filteredPlants = useMemo(() => {
-    const normalizedQuery = queryValue.trim().toLowerCase();
-    const allPlants = data?.plants.results ?? [];
-    return allPlants.filter((plant) => {
-      const needsBaseline = plant.status === "active" && (!plant.has_baseline || !plant.grade);
-      const needsGrade = plant.status === "active" && !plant.grade;
-      const needsPlacement = plant.status === "active" && plant.location.status !== "placed";
-      const needsPlantRecipe = plant.status === "active" && !plant.assigned_recipe;
+  function actionButtonClass(needsAttention: boolean): string {
+    return [needsAttention ? styles.buttonPrimary : styles.buttonSecondary, styles.overviewActionButton].join(" ");
+  }
 
-      let matchesFilter = true;
-      if (activeFilter === "needs_baseline") {
-        matchesFilter = needsBaseline;
-      } else if (activeFilter === "needs_grade") {
-        matchesFilter = needsGrade;
-      } else if (activeFilter === "needs_placement") {
-        matchesFilter = needsPlacement;
-      } else if (activeFilter === "needs_plant_recipe") {
-        matchesFilter = needsPlantRecipe;
-      } else if (activeFilter === "active") {
-        matchesFilter = plant.status === "active";
-      } else if (activeFilter === "removed") {
-        matchesFilter = plant.status !== "active";
-      }
+  const readinessItems = [
+    { key: "baseline", label: "Needs baseline", value: data?.counts.needs_baseline ?? 0 },
+    { key: "grade", label: "Needs grade", value: data?.counts.needs_grade ?? 0 },
+    { key: "placement", label: "Needs placement", value: data?.counts.needs_placement ?? 0 },
+    { key: "recipe", label: "Needs plant recipe", value: data?.counts.needs_plant_recipe ?? 0 },
+  ];
 
-      if (!matchesFilter) {
-        return false;
-      }
-      if (!normalizedQuery) {
-        return true;
-      }
-
-      return (
-        plant.plant_id.toLowerCase().includes(normalizedQuery) ||
-        plant.species_name.toLowerCase().includes(normalizedQuery)
-      );
-    });
-  }, [activeFilter, data?.plants.results, queryValue]);
+  const visiblePlants = useMemo(() => data?.plants.results ?? [], [data?.plants.results]);
 
   const sortedPlants = useMemo(() => {
-    return [...filteredPlants].sort((left, right) => {
+    return [...visiblePlants].sort((left, right) => {
       const leftPlaced = left.location.status === "placed" ? 0 : 1;
       const rightPlaced = right.location.status === "placed" ? 0 : 1;
       if (leftPlaced !== rightPlaced) {
@@ -435,49 +424,197 @@ export default function ExperimentOverviewPage() {
 
       return (left.plant_id || "").localeCompare(right.plant_id || "");
     });
-  }, [filteredPlants]);
+  }, [visiblePlants]);
 
-  const groupedPlants = useMemo(() => {
-    const groups = new Map<string, { title: string; plants: OverviewPlant[]; order: number }>();
+  const placementGroups = useMemo(() => {
+    type TentSlotAccumulator = {
+      slot: NonNullable<OverviewPlant["location"]["slot"]>;
+      rawShelfIndex: number | null;
+      rawSlotIndex: number | null;
+      trays: Map<string, PlacedTrayGroup>;
+    };
+
+    const tentMap = new Map<
+      string,
+      {
+        tent: NonNullable<OverviewPlant["location"]["tent"]>;
+        slots: Map<string, TentSlotAccumulator>;
+      }
+    >();
+    const unplaced: OverviewPlant[] = [];
 
     for (const plant of sortedPlants) {
-      const isUnplaced = plant.location.status !== "placed";
-      const key = isUnplaced ? "unplaced" : (plant.location.tent?.id || "unknown");
-      const title = isUnplaced
-        ? "Unplaced"
-        : `Tent ${plant.location.tent?.code || plant.location.tent?.name || "Unknown"}`;
-      const order = isUnplaced ? 1 : 0;
-
-      if (!groups.has(key)) {
-        groups.set(key, { title, plants: [], order });
+      const { location } = plant;
+      if (
+        location.status !== "placed" ||
+        !location.tent ||
+        !location.slot ||
+        !location.tray
+      ) {
+        unplaced.push(plant);
+        continue;
       }
-      groups.get(key)?.plants.push(plant);
+
+      const tentId = location.tent.id;
+      const slotId = location.slot.id;
+      const trayId = location.tray.id;
+      const rawShelfIndex = normalizeGridIndex(location.slot.shelf_index);
+      const rawSlotIndex = normalizeGridIndex(location.slot.slot_index);
+
+      if (!tentMap.has(tentId)) {
+        tentMap.set(tentId, { tent: location.tent, slots: new Map() });
+      }
+      const tentGroup = tentMap.get(tentId);
+      if (!tentGroup) {
+        continue;
+      }
+
+      if (!tentGroup.slots.has(slotId)) {
+        tentGroup.slots.set(slotId, {
+          slot: location.slot,
+          rawShelfIndex,
+          rawSlotIndex,
+          trays: new Map(),
+        });
+      }
+      const slotGroup = tentGroup.slots.get(slotId);
+      if (!slotGroup) {
+        continue;
+      }
+
+      if (!slotGroup.trays.has(trayId)) {
+        slotGroup.trays.set(trayId, { tray: location.tray, plants: [] });
+      }
+      slotGroup.trays.get(trayId)?.plants.push(plant);
     }
 
-    return Array.from(groups.entries())
-      .map(([key, value]) => ({ key, ...value }))
-      .sort((left, right) => left.order - right.order || left.title.localeCompare(right.title));
+    const tents: PlacedTentGroup[] = Array.from(tentMap.values())
+      .map((tentGroup) => {
+        const slotsByShelf = new Map<number, PlacedSlotGroup[]>();
+
+        Array.from(tentGroup.slots.values())
+          .map((slotGroup) => {
+            const trays = Array.from(slotGroup.trays.values())
+              .map((trayGroup) => ({
+                ...trayGroup,
+                plants: [...trayGroup.plants].sort((left, right) =>
+                  (left.plant_id || "").localeCompare(right.plant_id || ""),
+                ),
+              }))
+              .sort((left, right) => {
+                const leftLabel = (left.tray.code || left.tray.name || "").toLowerCase();
+                const rightLabel = (right.tray.code || right.tray.name || "").toLowerCase();
+                return leftLabel.localeCompare(rightLabel);
+              });
+
+            return {
+              slot: slotGroup.slot,
+              rawShelfIndex: slotGroup.rawShelfIndex,
+              rawSlotIndex: slotGroup.rawSlotIndex,
+              trays,
+            };
+          })
+          .sort((left, right) => {
+            const leftShelf = left.rawShelfIndex ?? Number.MAX_SAFE_INTEGER;
+            const rightShelf = right.rawShelfIndex ?? Number.MAX_SAFE_INTEGER;
+            if (leftShelf !== rightShelf) {
+              return leftShelf - rightShelf;
+            }
+            const leftIndex = left.rawSlotIndex ?? Number.MAX_SAFE_INTEGER;
+            const rightIndex = right.rawSlotIndex ?? Number.MAX_SAFE_INTEGER;
+            if (leftIndex !== rightIndex) {
+              return leftIndex - rightIndex;
+            }
+            const leftLabel = (left.slot.code || left.slot.label || "").toLowerCase();
+            const rightLabel = (right.slot.code || right.slot.label || "").toLowerCase();
+            return leftLabel.localeCompare(rightLabel);
+          })
+          .forEach((slotGroup) => {
+            const shelfIndex = slotGroup.rawShelfIndex ?? 1;
+            const existing = slotsByShelf.get(shelfIndex) || [];
+            existing.push({
+              slot: slotGroup.slot,
+              shelfIndex,
+              slotIndex: slotGroup.rawSlotIndex ?? 0,
+              trays: slotGroup.trays,
+            });
+            slotsByShelf.set(shelfIndex, existing);
+          });
+
+        const shelves: PlacedShelfGroup[] = Array.from(slotsByShelf.entries())
+          .sort((left, right) => left[0] - right[0])
+          .map(([shelfIndex, slots]) => {
+            const orderedSlots = [...slots].sort((left, right) => {
+              const leftIndex = left.slotIndex > 0 ? left.slotIndex : Number.MAX_SAFE_INTEGER;
+              const rightIndex = right.slotIndex > 0 ? right.slotIndex : Number.MAX_SAFE_INTEGER;
+              if (leftIndex !== rightIndex) {
+                return leftIndex - rightIndex;
+              }
+              return locationLabel(left.slot, "").toLowerCase().localeCompare(locationLabel(right.slot, "").toLowerCase());
+            });
+            const usedSlotIndexes = new Set<number>();
+            const normalizedSlots = orderedSlots.map((slotGroup) => {
+              let resolvedIndex = slotGroup.slotIndex > 0 ? slotGroup.slotIndex : 0;
+              if (resolvedIndex <= 0 || usedSlotIndexes.has(resolvedIndex)) {
+                resolvedIndex = 1;
+                while (usedSlotIndexes.has(resolvedIndex)) {
+                  resolvedIndex += 1;
+                }
+              }
+              usedSlotIndexes.add(resolvedIndex);
+              return {
+                ...slotGroup,
+                slotIndex: resolvedIndex,
+              };
+            });
+            return { shelfIndex, slots: normalizedSlots };
+          });
+
+        const maxSlotCount = Math.max(
+          1,
+          ...shelves.flatMap((shelf) => shelf.slots.map((slot) => slot.slotIndex)),
+        );
+        const trayCount = shelves.reduce(
+          (total, shelf) =>
+            total + shelf.slots.reduce((slotTotal, slot) => slotTotal + slot.trays.length, 0),
+          0,
+        );
+        const plantCount = shelves.reduce(
+          (total, shelf) =>
+            total +
+            shelf.slots.reduce(
+              (slotTotal, slot) =>
+                slotTotal +
+                slot.trays.reduce((trayTotal, tray) => trayTotal + tray.plants.length, 0),
+              0,
+            ),
+          0,
+        );
+
+        return {
+          tent: tentGroup.tent,
+          shelves,
+          maxSlotCount,
+          trayCount,
+          plantCount,
+        };
+      })
+      .sort((left, right) => {
+        const leftLabel = (left.tent.code || left.tent.name || "").toLowerCase();
+        const rightLabel = (right.tent.code || right.tent.name || "").toLowerCase();
+        return leftLabel.localeCompare(rightLabel);
+      });
+
+    return {
+      tents,
+      unplaced: [...unplaced].sort((left, right) =>
+        (left.plant_id || "").localeCompare(right.plant_id || ""),
+      ),
+    };
   }, [sortedPlants]);
 
-  function updateQuery(nextFilter: FilterId, nextQ: string) {
-    const next = new URLSearchParams(searchParams.toString());
-    next.delete("refresh");
-    if (nextFilter === "all") {
-      next.delete("filter");
-    } else {
-      next.set("filter", nextFilter);
-    }
-    if (nextQ.trim()) {
-      next.set("q", nextQ);
-    } else {
-      next.delete("q");
-    }
-    const query = next.toString();
-    router.replace(`/experiments/${experimentId}/overview${query ? `?${query}` : ""}`);
-  }
-
   function startExperiment() {
-    if (!summary?.readiness.ready_to_start) {
+    if (!startReady) {
       return;
     }
     startMutation.mutate();
@@ -490,6 +627,50 @@ export default function ExperimentOverviewPage() {
   function plantLink(plant: OverviewPlant): string {
     const from = encodeURIComponent(`/experiments/${experimentId}/overview?${searchParams.toString()}`);
     return `/p/${plant.uuid}?from=${from}`;
+  }
+
+  function renderPlantCell(plant: OverviewPlant) {
+    const speciesLine = plant.cultivar
+      ? `${plant.species_name} · ${plant.cultivar}`
+      : plant.species_name;
+    const statusLabel =
+      plant.status.length > 0
+        ? `${plant.status.charAt(0).toUpperCase()}${plant.status.slice(1)}`
+        : "Unknown";
+
+    return (
+      <Link
+        key={plant.uuid}
+        href={plantLink(plant)}
+        className={[styles.plantCell, styles.overviewPlantCellLink, styles.overviewPlantCell].join(" ")}
+      >
+        <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
+        <span className={[styles.plantCellSpecies, styles.overviewPlantSpecies].join(" ")}>{speciesLine}</span>
+        <div className={styles.overviewPlantStatusRow}>
+          <span
+            className={[
+              styles.overviewPlantChip,
+              plant.grade ? styles.overviewPlantChipReady : styles.overviewPlantChipMissing,
+            ].join(" ")}
+          >
+            {plant.grade ? `Grade ${plant.grade}` : "No grade"}
+          </span>
+          <span
+            className={[
+              styles.overviewPlantChip,
+              plant.assigned_recipe ? styles.overviewPlantChipReady : styles.overviewPlantChipMissing,
+            ].join(" ")}
+          >
+            {plant.assigned_recipe ? `Recipe ${plant.assigned_recipe.code}` : "No recipe"}
+          </span>
+          {plant.status !== "active" ? (
+            <span className={[styles.overviewPlantChip, styles.overviewPlantChipMissing].join(" ")}>
+              {statusLabel}
+            </span>
+          ) : null}
+        </div>
+      </Link>
+    );
   }
 
   if (notInvited) {
@@ -510,152 +691,181 @@ export default function ExperimentOverviewPage() {
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Experiment State">
-        <p className={styles.mutedText}>State: {summary?.lifecycle.state.toUpperCase() || "UNKNOWN"}</p>
-        {summary?.readiness.ready_to_start ? (
-          <button className={styles.buttonPrimary} type="button" disabled={busy} onClick={startExperiment}>
-            Start
-          </button>
-        ) : (
-          <p className={styles.inlineNote}>Start blocked until readiness is complete.</p>
-        )}
-        {summary?.lifecycle.state === "running" ? (
-          <button className={styles.buttonDanger} type="button" disabled={busy} onClick={stopExperiment}>
-            Stop
-          </button>
-        ) : null}
-      </SectionCard>
-
-      <SectionCard title="Readiness">
-        <p className={styles.mutedText}>
-          Needs baseline: {data?.counts.needs_baseline ?? 0} · Needs grade: {data?.counts.needs_grade ?? 0} · Needs placement: {data?.counts.needs_placement ?? 0} · Needs plant recipe: {data?.counts.needs_plant_recipe ?? 0}
-        </p>
-        <div className={styles.actions}>
-          <Link className={styles.buttonPrimary} href={`/experiments/${experimentId}/baseline`}>
-            Capture baselines
-          </Link>
-          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/placement`}>
-            Manage placement
-          </Link>
-          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/recipes`}>
-            Manage recipes
-          </Link>
-          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/rotation`}>
-            Rotation
-          </Link>
-          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/feeding`}>
-            Feeding
-          </Link>
-          <Link className={styles.buttonSecondary} href={`/experiments/${experimentId}/schedule`}>
-            Schedule
-          </Link>
-        </div>
-        <p className={styles.mutedText}>
-          Next schedule slot: {formatScheduleSlot(summary?.schedule.next_scheduled_slot || null)}
-        </p>
-      </SectionCard>
-
-      <SectionCard title="Filters">
-        <div className={styles.actions}>
-          {FILTERS.map((filter) => (
+        <div className={styles.overviewStateCard}>
+          <p className={styles.mutedText}>State: {summary?.lifecycle.state.toUpperCase() || "UNKNOWN"}</p>
+          <div className={styles.overviewReadinessRow}>
+            {readinessItems.map((item) => (
+              <span
+                key={item.key}
+                className={[
+                  styles.overviewReadinessChip,
+                  item.value === 0 ? styles.overviewReadinessChipReady : styles.overviewReadinessChipPending,
+                ].join(" ")}
+              >
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
+          <div className={styles.overviewStateActionRow}>
             <button
-              key={filter.id}
-              className={activeFilter === filter.id ? styles.buttonPrimary : styles.buttonSecondary}
+              className={[styles.buttonPrimary, styles.overviewActionButton].join(" ")}
               type="button"
-              onClick={() => updateQuery(filter.id, queryValue)}
+              disabled={busy || !startReady}
+              onClick={startExperiment}
             >
-              {filter.label}
+              Start
             </button>
-          ))}
+            {summary?.lifecycle.state === "running" ? (
+              <button
+                className={[styles.buttonDanger, styles.overviewActionButton].join(" ")}
+                type="button"
+                disabled={busy}
+                onClick={stopExperiment}
+              >
+                Stop
+              </button>
+            ) : null}
+            <Link className={actionButtonClass(baselineNeedsAttention)} href={`/experiments/${experimentId}/baseline`}>
+              Capture baselines
+            </Link>
+            <Link className={actionButtonClass(placementNeedsAttention)} href={`/experiments/${experimentId}/placement`}>
+              Manage placement
+            </Link>
+            <Link className={actionButtonClass(recipesNeedsAttention)} href={`/experiments/${experimentId}/recipes`}>
+              Manage recipes
+            </Link>
+            <Link className={actionButtonClass(rotationNeedsAttention)} href={`/experiments/${experimentId}/rotation`}>
+              Rotation
+            </Link>
+            <Link className={actionButtonClass(feedingNeedsAttention)} href={`/experiments/${experimentId}/feeding`}>
+              Feeding
+            </Link>
+          </div>
+          {!startReady ? (
+            <p className={styles.inlineNote}>Start blocked until readiness is complete.</p>
+          ) : null}
         </div>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>Search</span>
-          <input
-            className={styles.input}
-            value={queryValue}
-            onChange={(event) => updateQuery(activeFilter, event.target.value)}
-            placeholder="Plant ID or species"
-          />
-        </label>
       </SectionCard>
 
-      {groupedPlants.map((group) => (
-        <SectionCard key={group.key} title={group.title}>
-          <ResponsiveList
-            items={group.plants}
-            getKey={(plant) => plant.uuid}
-            columns={[
-              {
-                key: "plant",
-                label: "Plant",
-                render: (plant) => (
-                  <Link className={styles.inlineLink} href={plantLink(plant)}>
-                    {plant.plant_id || "(pending)"}
-                  </Link>
-                ),
-              },
-              {
-                key: "species",
-                label: "Species",
-                render: (plant) => `${plant.species_name}${plant.cultivar ? ` · ${plant.cultivar}` : ""}`,
-              },
-              {
-                key: "grade",
-                label: "Grade",
-                render: (plant) => plant.grade || "Missing",
-              },
-              {
-                key: "location",
-                label: "Location",
-                render: (plant) => locationSummary(plant),
-              },
-              {
-                key: "recipe",
-                label: "Recipe",
-                render: (plant) => (
-                  <span
-                    className={
-                      plant.assigned_recipe ? styles.recipeChipAssigned : styles.recipeChipUnassigned
-                    }
-                  >
-                    {recipeChipLabel(plant.assigned_recipe)}
-                  </span>
-                ),
-              },
-            ]}
-            renderMobileCard={(plant) => (
-              <div className={styles.cardKeyValue}>
-                <span>Plant</span>
-                <strong>
-                  <Link className={styles.inlineLink} href={plantLink(plant)}>
-                    {plant.plant_id || "(pending)"}
-                  </Link>
-                </strong>
-                <span>Species</span>
-                <strong>{plant.species_name}</strong>
-                <span>Grade</span>
-                <strong>{plant.grade || "Missing"}</strong>
-                <span>Location</span>
-                <strong>{locationSummary(plant)}</strong>
-                <span>Recipe</span>
-                <strong>
-                  <span
-                    className={
-                      plant.assigned_recipe ? styles.recipeChipAssigned : styles.recipeChipUnassigned
-                    }
-                  >
-                    {recipeChipLabel(plant.assigned_recipe)}
-                  </span>
-                </strong>
-              </div>
-            )}
-          />
-        </SectionCard>
-      ))}
+      <SectionCard title="Schedule">
+        <div className={styles.overviewScheduleCard}>
+          <p className={styles.mutedText}>
+            Next schedule slot: {formatScheduleSlot(summary?.schedule.next_scheduled_slot || null)}
+          </p>
+          <div className={styles.actions}>
+            <Link className={actionButtonClass(scheduleNeedsAttention)} href={`/experiments/${experimentId}/schedule`}>
+              Schedule
+            </Link>
+          </div>
+        </div>
+      </SectionCard>
 
-      {!loading && groupedPlants.length === 0 ? (
+      {placementGroups.tents.length > 0 ? (
+        <SectionCard title="Tent -> Slot -> Tray -> Plants">
+          <div className={styles.overviewTentBoardGrid}>
+            {placementGroups.tents.map((tentGroup) => {
+              return (
+                <article key={tentGroup.tent.id} className={[styles.tentBoardCard, styles.overviewTentBoardCard].join(" ")}>
+                  <div className={styles.trayHeaderRow}>
+                    <div className={styles.trayHeaderMeta}>
+                      <strong>{tentGroup.tent.name || tentGroup.tent.code || "Tent"}</strong>
+                    </div>
+                    <div className={styles.trayHeaderActions}>
+                      <span className={styles.recipeLegendItem}>{tentGroup.trayCount} tray(s)</span>
+                      <span className={styles.recipeLegendItem}>{tentGroup.plantCount} plant(s)</span>
+                    </div>
+                  </div>
+                  <div className={styles.overviewTentShelfStack}>
+                    {tentGroup.shelves.map((shelfGroup) => {
+                      const slotByIndex = new Map(
+                        shelfGroup.slots.map((slotGroup) => [slotGroup.slotIndex, slotGroup] as const),
+                      );
+                      return (
+                        <div key={`${tentGroup.tent.id}-shelf-${shelfGroup.shelfIndex}`} className={styles.overviewShelfGroup}>
+                        <span className={styles.overviewShelfLabel}>Shelf {shelfGroup.shelfIndex}</span>
+                        <div
+                          className={[styles.overviewTentSlotGrid, styles.overviewShelfSlotGrid].join(" ")}
+                          style={{
+                            gridTemplateColumns: `repeat(${tentGroup.maxSlotCount}, minmax(0, 1fr))`,
+                          }}
+                        >
+                          {Array.from({ length: tentGroup.maxSlotCount }, (_, index) => {
+                            const slotIndex = index + 1;
+                            const slotGroup = slotByIndex.get(slotIndex);
+                            if (!slotGroup) {
+                              return (
+                                <div
+                                  key={`${tentGroup.tent.id}-shelf-${shelfGroup.shelfIndex}-slot-${slotIndex}`}
+                                  className={[styles.slotCell, styles.overviewSlotCell, styles.overviewSlotCellEmpty].join(" ")}
+                                >
+                                  <span className={styles.slotCellLabel}>Slot {slotIndex}</span>
+                                  <div className={styles.overviewSlotEmptyState}>Empty</div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div
+                                key={slotGroup.slot.id}
+                                className={[styles.slotCell, styles.overviewSlotCell].join(" ")}
+                                style={{ gridColumnStart: slotIndex }}
+                              >
+                                <span className={styles.slotCellLabel}>Slot {slotIndex}</span>
+                                <div className={styles.overviewSlotTrayStack}>
+                                  {slotGroup.trays.map((trayGroup) => (
+                                    <article
+                                      key={trayGroup.tray.id}
+                                      className={styles.overviewTrayCell}
+                                    >
+                                    <div className={styles.overviewTrayMeta}>
+                                      <strong className={styles.trayGridCellId}>
+                                        {formatTrayHeading(trayGroup.tray)}
+                                      </strong>
+                                        {trayGroup.tray.current_count != null && trayGroup.tray.capacity != null ? (
+                                          <span className={styles.recipeLegendItem}>
+                                            {trayGroup.tray.current_count}/{trayGroup.tray.capacity}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                      <div className={styles.plantCellGridTray}>
+                                        {trayGroup.plants.map((plant) => renderPlantCell(plant))}
+                                      </div>
+                                    </article>
+                                  ))}
+                                  {slotGroup.trays.length === 0 ? (
+                                    <div className={styles.overviewSlotEmptyState}>Empty</div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        </div>
+                      );
+                    })}
+                    {tentGroup.shelves.length === 0 ? (
+                      <p className={styles.mutedText}>No mapped slots.</p>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </SectionCard>
+      ) : null}
+
+      {placementGroups.unplaced.length > 0 ? (
+        <SectionCard title="Unplaced Plants">
+          <div className={styles.plantCellGrid}>
+            {placementGroups.unplaced.map((plant) => renderPlantCell(plant))}
+          </div>
+        </SectionCard>
+      ) : null}
+
+      {!loading && sortedPlants.length === 0 ? (
         <SectionCard>
           <IllustrationPlaceholder inventoryId="ILL-201" kind="generic" />
-          <p className={styles.mutedText}>No plants match the current filters.</p>
+          <p className={styles.mutedText}>No plants available for this experiment.</p>
         </SectionCard>
       ) : null}
     </PageShell>
