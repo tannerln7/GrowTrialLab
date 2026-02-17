@@ -48,3 +48,4 @@ def test_status_summary_uses_current_schema_shape(api_client, experiment):
     assert "next_scheduled_slot" in payload["schedule"]
     assert "due_counts_today" in payload["schedule"]
     assert "needs_tent_restriction" in payload["readiness"]["counts"]
+    assert "needs_plant_recipe" in payload["readiness"]["counts"]
