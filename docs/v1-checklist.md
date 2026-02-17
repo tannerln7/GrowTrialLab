@@ -61,6 +61,10 @@ The largest remaining V1 work is lifecycle hardening (immutability/deletion poli
 - [x] Envelope-first API + Slot/Grade schema refactor (owner: Codex)
   - Routes: `POST /api/v1/tents/{id}/slots/generate`, `GET /api/v1/experiments/{id}/recipes`, `PATCH /api/v1/recipes/{id}`, `GET /api/v1/experiments/{id}/overview/plants`, `GET /api/v1/plants/{id}/cockpit`, `GET /api/v1/experiments/{id}/feeding/queue`, `GET /api/v1/experiments/{id}/rotation/summary`.
   - Notes: Legacy packet/groups contracts were removed; list responses now use `{count, results, meta}`, location payloads use nested `location`, blocked operations use structured `diagnostics`, slots use versioned tent `layout` with safe-reshape regeneration rules, and plant grading is canonical `grade`.
+- [x] Phase 0 UI/data-layer refactor foundations (owner: Codex)
+  - Refs: `02ecbdd7`, `58d6c60a`
+  - Files: `frontend/src/app/providers.tsx`, `frontend/app/layout.tsx`, `docs/phase0-ui-refactor-findings.md`.
+  - Notes: Added Radix/TanStack/RHF+Zod/AutoAnimate dependency baseline, stable App Router `QueryClientProvider` scaffold, dev-only React Query devtools gating, and a migration map report for Setup/Overview/Cockpit/Baseline/Placement/Rotation/Feeding/Schedule.
 - [x] Cloudflare Access auth middleware with invite-only provisioning and bootstrap admin (owner: Codex)
   - Refs: `262849c8`, `bba65cd9`, `f00306e5`
   - Routes: `GET /api/me`, middleware exemption `GET /healthz`.

@@ -24,6 +24,19 @@ This file records architecture/product decisions and why they were made.
 
 ## Decision Entries
 
+### 2026-02-17: Adopt Radix + TanStack Query/Table/Virtual + RHF+Zod + AutoAnimate as UI refactor stack
+- Decision: Standardize upcoming frontend refactors on:
+  - Radix UI primitives for accessible headless interactive controls
+  - TanStack Query for server-state orchestration
+  - TanStack Table/Virtual for complex tabular + high-volume list rendering
+  - React Hook Form + Zod (+ `@hookform/resolvers/zod`) for form state + schema validation
+  - AutoAnimate for lightweight list transition polish
+- Rationale: Existing pages duplicate fetching/loading/error/form logic heavily; this stack gives a consistent, incremental migration path without introducing a full styling framework rewrite.
+- Implementation notes:
+  - Query provider is mounted via client-only `frontend/src/app/providers.tsx`.
+  - Devtools are gated to development only and dynamically imported (`ssr: false`).
+  - Phase 0 keeps page behavior unchanged and does not alter APIs.
+
 ### 2026-02-16: Envelope-first API contracts + slot/grade canonical schema
 - Decision: Standardize API contracts around expandable envelopes and nested location objects:
   - list shape: `{ count, results, meta }`
