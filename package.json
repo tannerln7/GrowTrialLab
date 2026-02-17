@@ -2,7 +2,11 @@
   "name": "growtriallab",
   "private": true,
   "scripts": {
-    "pyright": "pyright"
+    "pyright": "pyright",
+    "frontend:lint": "pnpm --dir frontend run lint",
+    "frontend:typecheck": "pnpm --dir frontend run typecheck",
+    "backend:lint": "cd backend && uv run ruff check",
+    "backend:typecheck": "cd backend && uv run pyright"
   },
   "devDependencies": {
     "pyright": "^1.1.408"
