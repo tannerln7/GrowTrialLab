@@ -33,11 +33,12 @@ This file is the execution-focused feature map for product and engineering statu
   - Tent cards now use auto-fit sizing so two-up rendering occurs when space allows and stacks when constrained.
   - In two-up layout, shelf lanes target four visible slot/tray cells before horizontal scroll is needed.
   - Step 4 tent/shelf grid now renders directly on the step surface (outer section wrapper removed) to match Step 1 preview presentation.
+  - Empty slot destination selection now toggles on repeat click (click selected slot again to clear destination).
   - Filled slots render tray cards directly so trays take the full slot footprint; empty slots retain `Slot x` + `Empty`.
   - Relevant files:
     - `frontend/app/experiments/[id]/placement/page.tsx`
     - `frontend/src/components/ui/experiments-styles.ts`
-  - Refs: `c488672`, `7883f74`, `b89fb81`, `1cf39f5`
+  - Refs: `c488672`, `7883f74`, `b89fb81`, `1cf39f5`, `2dec785`
 
 ### 2026-02-18 (Overview Shelf Row Orientation)
 - `Completed` Overview shelf groups now render horizontally inside each tent card instead of vertical stacking.
