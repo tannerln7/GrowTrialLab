@@ -825,10 +825,13 @@ export default function ExperimentOverviewPage() {
                           {Array.from({ length: tentGroup.maxSlotCount }, (_, index) => {
                             const slotIndex = index + 1;
                             const slotGroup = slotByIndex.get(slotIndex);
-                            if (!slotGroup) {
+                            if (!slotGroup || slotGroup.trays.length === 0) {
                               return (
                                 <div
-                                  key={`${tentGroup.tent.id}-shelf-${shelfGroup.shelfIndex}-slot-${slotIndex}`}
+                                  key={
+                                    slotGroup?.slot.id ??
+                                    `${tentGroup.tent.id}-shelf-${shelfGroup.shelfIndex}-slot-${slotIndex}`
+                                  }
                                   className={[
                                     styles.slotCell,
                                     styles.overviewSlotCell,
@@ -846,14 +849,19 @@ export default function ExperimentOverviewPage() {
                             return (
                               <div
                                 key={slotGroup.slot.id}
-                                className={[styles.slotCell, styles.overviewSlotCell, styles.cellFrame, styles.cellSurfaceLevel3].join(" ")}
+                                className="h-full min-h-[118px] max-sm:min-h-[104px]"
                               >
-                                <span className={styles.slotCellLabel}>Slot {slotIndex}</span>
                                 <div className={styles.overviewSlotTrayStack}>
                                   {slotGroup.trays.map((trayGroup) => (
                                     <article
                                       key={trayGroup.tray.id}
-                                      className={[styles.overviewTrayCell, styles.cellSurfaceLevel2].join(" ")}
+                                      className={[
+                                        styles.overviewTrayCell,
+                                        styles.cellSurfaceLevel2,
+                                        slotGroup.trays.length === 1 ? "h-full" : "",
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" ")}
                                     >
                                     <div className={styles.overviewTrayMeta}>
                                       <strong className={[styles.trayGridCellId, "text-left"].join(" ")}>
@@ -870,9 +878,6 @@ export default function ExperimentOverviewPage() {
                                       </div>
                                     </article>
                                   ))}
-                                  {slotGroup.trays.length === 0 ? (
-                                    <div className={styles.overviewSlotEmptyState}>Empty</div>
-                                  ) : null}
                                 </div>
                               </div>
                             );
