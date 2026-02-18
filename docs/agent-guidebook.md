@@ -144,6 +144,14 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
   - Use `Notice` (`frontend/src/components/ui/notice.tsx`) for status/success messages instead of ad-hoc `text-emerald-*` text classes.
   - `buttonVariants` owns border styling for `default`/`secondary`/`destructive`; do not append `border border-border` at callsites.
   - Avoid inline style objects in route components for utility-friendly layout; prefer static utility class maps or bounded lookup classes.
+  - Mobile touch target baseline:
+    - `Button` default/min interactive height is `h-10` (40px) and large controls are `h-11` (44px).
+    - `IconButton` defaults to `h-11 w-11` (44px); compact icon actions should not go below `h-10 w-10` (40px).
+    - `Input` and `NativeSelect` controls use `h-10` for easier touch ergonomics.
+  - Focus + state baseline:
+    - Reuse `uiInteraction.focusRing` and cell-interactive focus classes for keyboard-visible focus.
+    - Selected cell states should pair border/surface changes with a ring (`ring-1 ring-ring/50`) instead of color-only changes.
+    - Success/status chips should use semantic success tokens (`border-success/*`, `bg-success/*`, `text-success-foreground`) for dark-theme contrast.
 - Variant naming conventions (core primitives):
   - `Button`: `default | secondary | outline | ghost | destructive`
   - `Badge` / `Chip`: `default | secondary | outline | success | warning | destructive`
@@ -170,6 +178,9 @@ Source of truth is `AGENTS.md`, but common commands are:
   - `cd frontend && pnpm run typecheck`
 - Full:
   - `infra/scripts/verify.sh`
+
+## UI Smoke Checklist
+- Manual keyboard/mobile smoke checks live in `docs/ui-tailwind-smoke.md`.
 
 ## Active risk register and “what’s next”
 Do not duplicate the risk register here. Use:

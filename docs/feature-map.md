@@ -82,6 +82,30 @@ This file is the execution-focused feature map for product and engineering statu
     - `docs/ui-tailwind-migration-audit.md`
   - Refs: `f45f670`
 
+### 2026-02-18 (Tailwind A11y + Mobile Interaction Polish)
+- `Completed` Shared UI primitives and state styles were tuned for keyboard visibility, touch ergonomics, and dark-theme contrast.
+  - Strengthened focus-visible behavior across selectable cell patterns and Radix menu/popover primitives.
+  - Standardized selected states with ring + surface treatment for cell/list interactions.
+  - Raised baseline touch target sizing for shared controls:
+    - `Button` (`h-10` default, `h-11` large)
+    - `IconButton` (`h-11 w-11` default, `h-10 w-10` compact minimum)
+    - `Input` + `NativeSelect` (`h-10`)
+  - Replaced low-contrast success chip styling in experiment style maps with semantic success tokens.
+  - Added manual smoke-check runbook for keyboard and mobile validation.
+  - Relevant files:
+    - `frontend/src/components/ui/ui-foundations.ts`
+    - `frontend/src/components/ui/button.tsx`
+    - `frontend/src/components/ui/icon-button.tsx`
+    - `frontend/src/components/ui/input.tsx`
+    - `frontend/src/components/ui/native-select.tsx`
+    - `frontend/src/components/ui/dropdown-menu.tsx`
+    - `frontend/src/components/ui/popover.tsx`
+    - `frontend/src/components/ui/tabs.tsx`
+    - `frontend/src/components/ui/experiments-styles.ts`
+    - `frontend/app/experiments/[id]/placement/page.tsx`
+    - `docs/ui-tailwind-smoke.md`
+  - Refs: `8662a1c`
+
 ### 2026-02-18 (Tailwind Primitive Backbone Stabilization)
 - `Completed` Shared Tailwind primitive foundation and variant conventions were consolidated to make route work token-first by default.
   - Added shared primitive foundations for interaction, controls, surfaces, and selectable states.
