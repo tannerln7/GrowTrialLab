@@ -1588,7 +1588,7 @@ export default function PlacementPage() {
           variant="secondary"
           className={[styles.recipeLegendItemCompact, inSlot ? "justify-self-center" : ""].filter(Boolean).join(" ")}
         >
-          {tray.current_count}/{tray.capacity}
+          {tray.current_count}/{tray.capacity} plants
         </Badge>
         {inSlot ? <span className={styles.slotPlacedChip}>Placed</span> : null}
       </article>
@@ -2181,6 +2181,7 @@ export default function PlacementPage() {
                           "rounded-lg border border-border",
                           styles.cellSurfaceLevel1,
                           styles.cellInteractive,
+                          "justify-items-center text-center",
                           selected ? styles.plantCellSelected : "",
                         ]
                           .filter(Boolean)
@@ -2204,12 +2205,9 @@ export default function PlacementPage() {
                         <strong className={styles.trayGridCellId}>
                           {formatTrayDisplay(tray.name, tray.tray_id)}
                         </strong>
-                        <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
-                          {tray.current_count}/{tray.capacity}
-                        </Badge>
-                        <div className={styles.trayEditorInputs}>
+                        <div className={[styles.trayEditorInputs, "justify-center"].join(" ")}>
                           <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
-                            {tray.capacity} {tray.capacity === 1 ? "slot" : "slots"}
+                            {tray.capacity} {tray.capacity === 1 ? "plant slot" : "plant slots"}
                           </Badge>
                         </div>
                       </article>
@@ -2461,16 +2459,12 @@ export default function PlacementPage() {
                               <div className={[styles.trayHeaderMeta, "py-0.5"].join(" ")}>
                                 <strong className={styles.trayGridCellId}>Shelf {shelfIndex}</strong>
                               </div>
-                              <div className={styles.trayHeaderActions}>
-                                <span className={styles.recipeLegendItem}>
-                                  {shelfSlots.length} {shelfSlots.length === 1 ? "slot" : "slots"}
-                                </span>
-                              </div>
                             </div>
 
                             <div className={styles.tentShelfSlotGrid}>
                               {shelfSlots.map((slot) => {
                                 const trayId = draftSlotToTray.get(slot.slot_id) || null;
+                                const slotSelected = destinationSlotId === slot.slot_id;
                                 if (trayId) {
                                   return (
                                     <div key={slot.slot_id} className={styles.slotTrayCellFill}>
@@ -2479,13 +2473,28 @@ export default function PlacementPage() {
                                   );
                                 }
                                 return (
-                                  <div key={slot.slot_id} className={[styles.slotCell, styles.slotContainerCellFrame, styles.cellSurfaceLevel1].join(" ")}>
+                                  <div
+                                    key={slot.slot_id}
+                                    className={[
+                                      styles.slotCell,
+                                      styles.slotContainerCellFrame,
+                                      styles.cellSurfaceLevel1,
+                                      slotSelected ? styles.plantCellSelected : "",
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" ")}
+                                  >
+                                    {slotSelected ? (
+                                      <span className={styles.plantCellCheck}>
+                                        <Check size={12} />
+                                      </span>
+                                    ) : null}
                                     <span className={styles.slotCellLabel}>{slot.code}</span>
                                     <button
                                       type="button"
                                       className={[
                                         styles.slotCellEmpty,
-                                        destinationSlotId === slot.slot_id ? styles.slotCellEmptyActive : "",
+                                        slotSelected ? styles.slotCellEmptyActive : "",
                                       ]
                                         .filter(Boolean)
                                         .join(" ")}

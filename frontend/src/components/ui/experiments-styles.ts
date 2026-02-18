@@ -97,9 +97,9 @@ export const experimentsStyles = {
     "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] [grid-template-rows:auto_1fr] items-stretch gap-1 rounded-md border border-border p-2",
   slotCellEmpty:
     "inline-flex h-full w-full items-center justify-center rounded-sm border border-transparent bg-transparent px-2 py-1 text-center text-[0.72rem] leading-tight text-muted-foreground",
-  slotCellEmptyActive: "border-ring bg-[color:var(--gt-cell-selected)] text-foreground ring-1 ring-ring/50",
+  slotCellEmptyActive: "text-foreground",
   slotPlacedChip:
-    "inline-flex items-center justify-center justify-self-center rounded-full border border-success/55 bg-success/20 px-2.5 py-1 text-xs leading-none text-success-foreground",
+    "inline-flex items-center justify-center justify-self-center rounded-full border border-success/55 bg-success/20 px-2 py-0.5 text-[0.72rem] leading-none text-success-foreground",
   slotCellLabel: "text-[0.72rem] text-muted-foreground",
   stepBlocker: "mt-3 grid gap-1 rounded-md border border-border bg-muted/50 p-2",
   stepNavRow: "mt-3 flex justify-between gap-2",
