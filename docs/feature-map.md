@@ -1,6 +1,6 @@
 # GrowTrialLab Feature Map
 
-Last updated: 2026-02-17  
+Last updated: 2026-02-18  
 Source set reviewed: `docs/unified-project-notes.md` + `docs/legacy/*` (decisions, checklist, watch-outs, findings, testing notes, illustration inventory)
 
 This file is the execution-focused feature map for product and engineering status.
@@ -26,6 +26,34 @@ This file is the execution-focused feature map for product and engineering statu
   - nested location object
 
 ## Timeline: Completed Features
+
+### 2026-02-18 (Tailwind Primitive Backbone Stabilization)
+- `Completed` Shared Tailwind primitive foundation and variant conventions were consolidated to make route work token-first by default.
+  - Added shared primitive foundations for interaction, controls, surfaces, and selectable states.
+  - Core primitive variant naming aligned across `button`, `badge/chip`, `notice`, `icon-button`, `panel-surface`, and `dense-selectable-cell`.
+  - Shared shells (`PageShell`, `SectionCard`, `StickyActionBar`) now consume the same surface variant system.
+  - `input`/`textarea`/`select` now share a single token-driven control base class.
+  - Unused `frontend/src/styles/theme.css` removed to keep token/theme authority in `tokens.css` + `tailwind-theme.css`.
+  - Relevant files:
+    - `frontend/src/components/ui/ui-foundations.ts`
+    - `frontend/src/components/ui/button.tsx`
+    - `frontend/src/components/ui/badge.tsx`
+    - `frontend/src/components/ui/notice.tsx`
+    - `frontend/src/components/ui/icon-button.tsx`
+    - `frontend/src/components/ui/panel-surface.tsx`
+    - `frontend/src/components/ui/dense-selectable-cell.tsx`
+    - `frontend/src/components/ui/toolbar-row.tsx`
+    - `frontend/src/components/ui/PageShell.tsx`
+    - `frontend/src/components/ui/SectionCard.tsx`
+    - `frontend/src/components/ui/StickyActionBar.tsx`
+    - `frontend/src/components/ui/input.tsx`
+    - `frontend/src/components/ui/textarea.tsx`
+    - `frontend/src/components/ui/select.tsx`
+    - `frontend/src/components/ui/card.tsx`
+    - `frontend/src/styles/tokens.css`
+    - `frontend/src/styles/tailwind-theme.css`
+    - `frontend/src/styles/theme.css` (removed)
+  - Refs: `5aa8f26`
 
 ### 2026-02-13 (Foundation)
 - `Completed` Backend stack foundation: Django + DRF + Postgres.

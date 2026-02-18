@@ -1,6 +1,6 @@
 # GrowTrialLab Agent Guidebook
 
-Last updated: 2026-02-17
+Last updated: 2026-02-18
 
 ## Purpose
 This guide helps coding agents (including Codex) work effectively in this repo by explaining **current** architecture, flows, conventions, and where to look for canonical truth. Repo-wide invariants/guardrails live in `AGENTS.md`; this guide is allowed to evolve as the product evolves.
@@ -106,10 +106,39 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 - Tailwind v4 + shadcn-style components are canonical.
 - Theme bridging:
   - `frontend/src/styles/tailwind-theme.css` (`@theme inline`) maps to existing token variables.
+- Token source of truth:
+  - `frontend/src/styles/tokens.css` is canonical for color/radius/spacing tokens.
+  - `frontend/src/styles/theme.css` is retired and should not be reintroduced.
+- Spacing ladder (canonical):
+  - Tailwind spacing utilities are bound to `--spacing: var(--gt-space-base-1)` (4px base).
+  - Use ladder steps before arbitrary values:
+    - `0` = 0px
+    - `0.5` = 2px
+    - `1` = 4px
+    - `2` = 8px
+    - `3` = 12px
+    - `4` = 16px
+    - `5` = 20px
+    - `6` = 24px
+    - `8` = 32px
+    - `10` = 40px
 - Shared UI primitives live in:
   - `frontend/src/components/ui/*`
 - Shared route style maps exist for complex geometry reuse:
   - `experiments-styles.ts`, `cockpit-styles.ts`
+- Shared primitive foundations:
+  - `frontend/src/components/ui/ui-foundations.ts` is the single source for:
+    - focus/disabled interaction classes (`uiInteraction`)
+    - shared control base class (`controlBaseClass`)
+    - surface variants (`surfaceVariants`, `panelSurfaceVariants`, `toolbarRowVariants`)
+    - selectable cell state variants (`selectableCellVariants`)
+- Variant naming conventions (core primitives):
+  - `Button`: `default | secondary | outline | ghost | destructive`
+  - `Badge` / `Chip`: `default | secondary | outline | success | warning | destructive`
+  - `Notice`: `default | success | warning | destructive` (legacy aliases `info`/`error` only for compatibility)
+  - `IconButton`: `default | secondary | ghost | destructive` (legacy alias `danger` only for compatibility)
+  - `PanelSurface` / `SectionCard` / shell surfaces: `variant` uses `default | muted | elevated`
+  - `DenseSelectableCell`: `tone` (`default | muted`) + `state` (`default | selected`) with shared interactive/dirty states
 - Avoid dynamic class generation; keep Tailwind scan-safe.
 
 ## Agent work pattern (practical)
