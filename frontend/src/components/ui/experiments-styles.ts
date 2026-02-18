@@ -80,10 +80,6 @@ export const experimentsStyles = {
   plantCellMetaRow: "flex flex-wrap items-center gap-1",
   plantCellSelected: "border-ring bg-[color:var(--gt-cell-selected)] ring-1 ring-ring/50",
   plantCellSpecies: "text-[0.72rem] leading-snug text-muted-foreground max-sm:text-[0.68rem]",
-  previewCell: "rounded-sm border border-border bg-card px-1 py-0.5 text-[0.76rem] leading-tight",
-  previewCells: "flex flex-wrap gap-1",
-  previewGrid: "grid gap-2",
-  previewRow: "grid gap-1",
   recipeBadge:
     "inline-flex items-center justify-center rounded-full border border-border bg-muted px-2.5 py-1 text-xs leading-none text-foreground",
   recipeBadgeEmpty:
@@ -96,7 +92,6 @@ export const experimentsStyles = {
     "inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-1 text-xs leading-none text-muted-foreground",
   recipeLegendItemCompact:
     "inline-flex w-fit justify-self-start items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[0.72rem] leading-none text-muted-foreground",
-  selectionGrid: "grid max-h-[200px] gap-1 overflow-auto rounded-md border border-border p-2",
   slotCell: "min-h-0 content-start gap-1 border-dashed p-2",
   slotContainerCellFrame:
     "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] [grid-template-rows:auto_1fr] items-stretch gap-1 rounded-md border border-border p-2",
@@ -106,7 +101,6 @@ export const experimentsStyles = {
   slotPlacedChip:
     "inline-flex items-center justify-center justify-self-center rounded-full border border-success/55 bg-success/20 px-2.5 py-1 text-xs leading-none text-success-foreground",
   slotCellLabel: "text-[0.72rem] text-muted-foreground",
-  slotGridInline: "flex flex-wrap gap-1",
   stepBlocker: "mt-3 grid gap-1 rounded-md border border-border bg-muted/50 p-2",
   stepNavRow: "mt-3 flex justify-between gap-2",
   stepNavRowForwardOnly: "justify-end",
