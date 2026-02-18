@@ -133,6 +133,7 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 - Shared route style maps exist for complex geometry reuse:
   - `experiments-styles.ts`, `cockpit-styles.ts`
   - Overview nested tray metadata rows should stay single-line with tray label left and occupancy chip right (use `overviewTrayMeta` pattern).
+  - Overview slot display convention: empty slot cells show `Slot x` + `Empty`; filled slots render tray content directly without repeating slot labels.
 - Shared primitive foundations:
   - `frontend/src/components/ui/ui-foundations.ts` is the single source for:
     - focus/disabled interaction classes (`uiInteraction`)

@@ -27,6 +27,16 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-18 (Overview Slot Label Simplification)
+- `Completed` Overview nested slot display now omits slot labels for filled slots while preserving labeled empty slot placeholders.
+  - Filled slots render tray content directly to use full cell space.
+  - Empty slots still show `Slot x` + `Empty` to preserve layout affordance.
+  - Relevant files:
+    - `frontend/app/experiments/[id]/overview/page.tsx`
+    - `docs/agent-guidebook.md`
+    - `docs/unified-project-notes.md`
+  - Refs: `372922c`
+
 ### 2026-02-18 (Tailwind Drift Guardrails)
 - `Completed` Lightweight repo guardrails were added to prevent migration regressions.
   - Added `infra/scripts/check-tailwind-drift.sh` plus root alias `pnpm frontend:tailwind-drift`.
