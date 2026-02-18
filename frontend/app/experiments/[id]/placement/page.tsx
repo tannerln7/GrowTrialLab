@@ -2240,9 +2240,16 @@ export default function PlacementPage() {
 
                       <div className={"grid gap-2"}>
                         <span className={"text-sm text-muted-foreground"}>Current slots</span>
-                        <div className="grid grid-flow-col auto-cols-[minmax(220px,1fr)] gap-2 overflow-x-auto pb-1">
+                        <div className={styles.step1ShelfPreviewLane}>
                           {previewShelfSlotGroups.map((group) => (
-                            <article key={`${tent.tent_id}-shelf-${group.shelfIndex}`} className={[styles.trayEditorCell, "min-w-[220px] rounded-lg border border-border", styles.cellSurfaceLevel2].join(" ")}>
+                            <article
+                              key={`${tent.tent_id}-shelf-${group.shelfIndex}`}
+                              className={[
+                                styles.trayEditorCell,
+                                styles.step1ShelfPreviewCard,
+                                styles.cellSurfaceLevel2,
+                              ].join(" ")}
+                            >
                               <div className={styles.trayHeaderRow}>
                                 <div className={styles.trayHeaderMeta}>
                                   <strong>{`Shelf ${group.shelfIndex}`}</strong>
@@ -2263,7 +2270,7 @@ export default function PlacementPage() {
                                 </div>
                               </div>
 
-                              <div className={[styles.plantCellGridTray, styles.cellGridResponsive].join(" ")} data-cell-size="sm">
+                              <div className={styles.step1ShelfPreviewSlotGrid}>
                                 {group.slots.map((slot) => (
                                   <article
                                     key={slot.slot_id}

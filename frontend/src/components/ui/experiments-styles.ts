@@ -101,6 +101,10 @@ export const experimentsStyles = {
   slotPlacedChip:
     "inline-flex items-center justify-center justify-self-center rounded-full border border-success/55 bg-success/20 px-2 py-0.5 text-[0.72rem] leading-none text-success-foreground",
   slotCellLabel: "text-[0.72rem] text-muted-foreground",
+  step1ShelfPreviewCard: "w-fit min-w-0 rounded-lg border border-border",
+  step1ShelfPreviewLane: "grid grid-flow-col auto-cols-max gap-2 overflow-x-auto pb-1",
+  step1ShelfPreviewSlotGrid:
+    "grid w-fit min-w-0 grid-flow-col auto-cols-[minmax(6.9rem,1fr)] gap-2 [--gt-cell-min-height:6.5rem] [--gt-cell-pad:var(--gt-space-md)]",
   stepPanel: "mt-3 animate-in fade-in slide-in-from-right-2 duration-200",
   stepperIndex: "inline-flex h-4 w-4 items-center justify-center rounded-full bg-muted text-[0.72rem]",
   stepperItem:

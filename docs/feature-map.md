@@ -37,6 +37,7 @@ This file is the execution-focused feature map for product and engineering statu
   - Step 1 tent name/ID + restriction drafts now save through bottom `Save & Next`; per-tent `Save tent` actions were removed.
   - Shared step navigation now uses a dedicated primitive for all steps (`StepNavBar`), and blocker hints were moved into the bottom back/save-next bar.
   - Step 1 next/save gating is now draft-aware for shelf layouts, so unsaved valid tent-slot drafts are not blocked before `Save & Next`.
+  - Step 1 shelf preview cards now auto-size to slot-cell rows (content-fit) rather than fixed minimum shelf widths.
   - Placement apply flow now uses shared bottom navigation save+advance behavior (`Save & Next`) when pending changes exist.
   - Draft-change chip now renders in the shared nav bar instead of per-step apply rows.
   - Relevant files:
