@@ -1398,6 +1398,13 @@ export default function PlacementPage() {
     });
   }
 
+  function toggleDestinationSlot(slotId: string) {
+    if (!slotById.has(slotId)) {
+      return;
+    }
+    setDestinationSlotId((current) => (current === slotId ? "" : slotId));
+  }
+
   function stageMoveTraysToSlots() {
     if (placementLocked) {
       setError(RUNNING_LOCK_MESSAGE);
@@ -2482,7 +2489,7 @@ export default function PlacementPage() {
                                       ]
                                         .filter(Boolean)
                                         .join(" ")}
-                                      onClick={() => setDestinationSlotId(slot.slot_id)}
+                                      onClick={() => toggleDestinationSlot(slot.slot_id)}
                                     >
                                       Empty
                                     </button>
