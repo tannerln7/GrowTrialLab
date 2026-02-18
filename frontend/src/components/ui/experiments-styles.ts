@@ -101,6 +101,9 @@ export const experimentsStyles = {
   slotPlacedChip:
     "inline-flex items-center justify-center justify-self-center rounded-full border border-success/55 bg-success/20 px-2 py-0.5 text-[0.72rem] leading-none text-success-foreground",
   slotCellLabel: "text-[0.72rem] text-muted-foreground",
+  draftChangedSurface: "ring-1 ring-ring/70",
+  draftChangedDot:
+    "absolute left-1 top-1 h-[0.42rem] w-[0.42rem] rounded-full bg-ring",
   step1ShelfPreviewCard: "w-fit max-w-full min-w-0 rounded-lg border border-border",
   step1ShelfPreviewLane: "flex flex-wrap items-start gap-2",
   step1ShelfPreviewSlotGrid:

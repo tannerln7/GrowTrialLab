@@ -7,6 +7,9 @@ type StepNavBarProps = {
   showBack: boolean;
   onBack: () => void;
   backDisabled?: boolean;
+  showReset?: boolean;
+  onReset?: () => void;
+  resetDisabled?: boolean;
   onNext: () => void;
   nextDisabled?: boolean;
   nextLabel: string;
@@ -19,6 +22,9 @@ function StepNavBar({
   showBack,
   onBack,
   backDisabled,
+  showReset = false,
+  onReset,
+  resetDisabled,
   onNext,
   nextDisabled,
   nextLabel,
@@ -45,6 +51,16 @@ function StepNavBar({
       </div>
       <div className="ml-auto flex items-center gap-2">
         {draftIndicator}
+        {showReset && onReset ? (
+          <Button
+            variant="secondary"
+            type="button"
+            disabled={resetDisabled}
+            onClick={onReset}
+          >
+            Reset
+          </Button>
+        ) : null}
         <Button type="button" disabled={nextDisabled} onClick={onNext}>
           {nextLabel}
         </Button>

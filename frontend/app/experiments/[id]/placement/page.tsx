@@ -23,6 +23,7 @@ import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { CountAdjustToolbar } from "@/src/components/ui/count-adjust-toolbar";
+import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
 import { Input } from "@/src/components/ui/input";
 import { NativeSelect } from "@/src/components/ui/native-select";
 import { Notice } from "@/src/components/ui/notice";
@@ -835,6 +836,36 @@ export default function PlacementPage() {
     return count;
   }, [tentAllowedSpeciesDraftById, tentDraftById, tents]);
 
+  const dirtyTentIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const tent of tents) {
+      const draft = tentDraftById[tent.tent_id] || {
+        name: tent.name,
+        code: tent.code,
+      };
+      const draftName = draft.name.trim();
+      const draftCode = draft.code.trim();
+      const persistedAllowedSpeciesIds = tent.allowed_species.map((item) => item.id);
+      const draftAllowedSpeciesIds =
+        tentAllowedSpeciesDraftById[tent.tent_id] || persistedAllowedSpeciesIds;
+      const hasNameOrCodeChange = draftName !== tent.name || draftCode !== tent.code;
+      const hasRestrictionChange = !areStringSetsEqual(
+        draftAllowedSpeciesIds,
+        persistedAllowedSpeciesIds,
+      );
+      const draftShelfCounts = (
+        shelfCountsByTent[tent.tent_id] || buildDefaultShelves(tent)
+      ).map((value) => Math.max(0, value));
+      const persistedShelfCounts = buildPersistedShelfCounts(tent);
+      const hasLayoutChange =
+        tent.slots.length === 0 || !areShelfCountsEqual(draftShelfCounts, persistedShelfCounts);
+      if (hasNameOrCodeChange || hasRestrictionChange || hasLayoutChange) {
+        ids.add(tent.tent_id);
+      }
+    }
+    return ids;
+  }, [shelfCountsByTent, tentAllowedSpeciesDraftById, tentDraftById, tents]);
+
   const step1DraftChangeCount =
     tentSlotDraftChangeCount + tentDetailsDraftChangeCount;
 
@@ -849,6 +880,17 @@ export default function PlacementPage() {
       }
     }
     return count;
+  }, [trayCapacityDraftById, trays]);
+
+  const dirtyTrayCapacityIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const tray of trays) {
+      const draftCapacity = trayCapacityDraftById[tray.tray_id] ?? tray.capacity;
+      if (draftCapacity !== tray.capacity) {
+        ids.add(tray.tray_id);
+      }
+    }
+    return ids;
   }, [trayCapacityDraftById, trays]);
 
   const step2DraftChangeCount = trayCountDraftChangeCount + trayCapacityDraftChangeCount;
@@ -965,6 +1007,54 @@ export default function PlacementPage() {
 
   function goPreviousStep() {
     setCurrentStep((current) => Math.max(1, current - 1));
+    setError("");
+  }
+
+  function resetCurrentStepDrafts() {
+    if (currentStep === 1) {
+      setShelfCountsByTent((current) => {
+        const next = { ...current };
+        for (const tent of tents) {
+          next[tent.tent_id] =
+            tent.slots.length > 0 ? buildPersistedShelfCounts(tent) : buildDefaultShelves(tent);
+        }
+        return next;
+      });
+      setTentDraftById((current) => {
+        const next = { ...current };
+        for (const tent of tents) {
+          next[tent.tent_id] = { name: tent.name, code: tent.code };
+        }
+        return next;
+      });
+      setTentAllowedSpeciesDraftById((current) => {
+        const next = { ...current };
+        for (const tent of tents) {
+          next[tent.tent_id] = tent.allowed_species.map((item) => item.id);
+        }
+        return next;
+      });
+      setNotice("Discarded step 1 draft changes.");
+    } else if (currentStep === 2) {
+      setDraftTrayCount(trays.length);
+      setTrayCapacityDraftById(
+        Object.fromEntries(trays.map((tray) => [tray.tray_id, Math.max(1, tray.capacity)])),
+      );
+      setNewTrayCapacities([]);
+      setNotice("Discarded step 2 draft changes.");
+    } else if (currentStep === 3) {
+      setDraftPlantToTray(persistedPlantToTray);
+      setSelectedPlantIds(new Set());
+      setActivePlantAnchorId(null);
+      setDiagnostics(null);
+      setNotice("Discarded step 3 draft changes.");
+    } else {
+      setDraftTrayToSlot(persistedTrayToSlot);
+      setSelectedTrayIds(new Set());
+      setDestinationSlotId("");
+      setDiagnostics(null);
+      setNotice("Discarded step 4 draft changes.");
+    }
     setError("");
   }
 
@@ -1717,6 +1807,9 @@ export default function PlacementPage() {
     }
 
     const selected = selectedPlantIds.has(plantId);
+    const persistedTrayId = persistedPlantToTray[plantId] ?? null;
+    const draftTrayId = draftPlantToTray[plantId] ?? persistedTrayId;
+    const dirty = (persistedTrayId || null) !== (draftTrayId || null);
     const gradeLabel = plant.grade ? `Grade ${plant.grade}` : "Grade -";
 
     return (
@@ -1728,6 +1821,7 @@ export default function PlacementPage() {
           styles.cellSurfaceLevel1,
           styles.cellInteractive,
           "justify-items-center text-center",
+          dirty ? styles.draftChangedSurface : "",
           selected ? styles.plantCellSelected : "",
         ]
           .filter(Boolean)
@@ -1748,6 +1842,7 @@ export default function PlacementPage() {
             <Check size={12} />
           </span>
         ) : null}
+        {dirty ? <span className={styles.draftChangedDot} /> : null}
         <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
         <span className={styles.plantCellSpecies}>{plant.species_name}</span>
         <div className={[styles.plantCellMetaRow, "justify-center"].join(" ")}>
@@ -1764,6 +1859,9 @@ export default function PlacementPage() {
     }
 
     const selected = selectedTrayIds.has(trayId);
+    const persistedSlotId = persistedTrayToSlot[trayId] ?? null;
+    const draftSlotId = draftTrayToSlot[trayId] ?? persistedSlotId;
+    const dirty = (persistedSlotId || null) !== (draftSlotId || null);
 
     return (
       <article
@@ -1774,6 +1872,7 @@ export default function PlacementPage() {
           styles.cellSurfaceLevel1,
           styles.cellInteractive,
           inSlot ? styles.slotTrayCellFill : "",
+          dirty ? styles.draftChangedSurface : "",
           selected ? styles.plantCellSelected : "",
         ]
           .filter(Boolean)
@@ -1794,6 +1893,7 @@ export default function PlacementPage() {
             <Check size={12} />
           </span>
         ) : null}
+        {dirty ? <span className={styles.draftChangedDot} /> : null}
         <strong
           className={[
             styles.trayGridCellId,
@@ -2071,7 +2171,14 @@ export default function PlacementPage() {
         <div key={currentStep} className={styles.stepPanel}>
           {currentStep === 1 ? (
             <div className={"grid gap-3"}>
-              <SectionCard title="Tent Manager">
+              <SectionCard
+                title="Tent Manager"
+                actions={
+                  step1DraftChangeCount > 0 ? (
+                    <DraftChangeChip label={draftChipLabelForStep(1)} />
+                  ) : null
+                }
+              >
                 <CountAdjustToolbar
                   count={tents.length}
                   countLabel="Total tents"
@@ -2145,7 +2252,12 @@ export default function PlacementPage() {
                 });
 
                 return (
-                  <SectionCard key={tent.tent_id} title={`${tent.name}${tent.code ? ` (${tent.code})` : ""}`}>
+                  <SectionCard
+                    key={tent.tent_id}
+                    title={`${tent.name}${tent.code ? ` (${tent.code})` : ""}`}
+                    className={dirtyTentIds.has(tent.tent_id) ? styles.draftChangedSurface : ""}
+                    actions={dirtyTentIds.has(tent.tent_id) ? <DraftChangeChip label="Draft changes" /> : null}
+                  >
                     <div className={"grid gap-3"}>
                       <div className={styles.trayControlRow}>
                         <label className="grid gap-1 sm:w-auto sm:min-w-[11rem] sm:flex-1">
@@ -2310,7 +2422,14 @@ export default function PlacementPage() {
 
           {currentStep === 2 ? (
             <div className={"grid gap-3"}>
-              <SectionCard title="Tray Manager">
+              <SectionCard
+                title="Tray Manager"
+                actions={
+                  step2DraftChangeCount > 0 ? (
+                    <DraftChangeChip label={draftChipLabelForStep(2)} />
+                  ) : null
+                }
+              >
                 <CountAdjustToolbar
                   count={draftTrayCount}
                   countLabel="Total trays"
@@ -2335,10 +2454,12 @@ export default function PlacementPage() {
                           "rounded-lg border border-border",
                           styles.cellSurfaceLevel1,
                           "justify-items-center text-center",
+                          dirtyTrayCapacityIds.has(trayId) ? styles.draftChangedSurface : "",
                         ]
                           .filter(Boolean)
                           .join(" ")}
                       >
+                        {dirtyTrayCapacityIds.has(trayId) ? <span className={styles.draftChangedDot} /> : null}
                         <strong className={styles.trayGridCellId}>
                           {formatTrayDisplay(tray.name, tray.tray_id)}
                         </strong>
@@ -2373,8 +2494,10 @@ export default function PlacementPage() {
                             "rounded-lg border border-dashed border-border",
                             styles.cellSurfaceLevel2,
                             "justify-items-center text-center",
+                            styles.draftChangedSurface,
                           ].join(" ")}
                         >
+                          <span className={styles.draftChangedDot} />
                           <strong className={styles.trayGridCellId}>New tray</strong>
                           <div className={styles.trayEditorBadgeRow}>
                             <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
@@ -2405,7 +2528,14 @@ export default function PlacementPage() {
 
           {currentStep === 3 ? (
             <div className={"grid gap-3"}>
-              <SectionCard title="Plants -> Trays (Draft)">
+              <SectionCard
+                title="Plants -> Trays (Draft)"
+                actions={
+                  placementDraftChangeCount > 0 ? (
+                    <DraftChangeChip label={draftChipLabelForStep(3)} />
+                  ) : null
+                }
+              >
                 <div className={styles.placementToolbar}>
                   <NativeSelect
                     className={styles.toolbarInlineSelect}
@@ -2522,7 +2652,14 @@ export default function PlacementPage() {
 
           {currentStep === 4 ? (
             <div className={"grid gap-3"}>
-              <SectionCard title="Trays -> Slots (Draft)">
+              <SectionCard
+                title="Trays -> Slots (Draft)"
+                actions={
+                  traySlotDraftChangeCount > 0 ? (
+                    <DraftChangeChip label={draftChipLabelForStep(4)} />
+                  ) : null
+                }
+              >
                 <div className={styles.placementToolbar}>
                   <NativeSelect
                     className={styles.toolbarInlineSelect}
@@ -2692,15 +2829,16 @@ export default function PlacementPage() {
           className="mt-3"
           showBack={currentStep > 1}
           onBack={goPreviousStep}
+          showReset={currentStepDraftChangeCount > 0}
+          onReset={resetCurrentStepDrafts}
+          resetDisabled={saving}
           onNext={() => void goNextStep()}
           nextDisabled={saving || !isStepReadyForNext(currentStep)}
           nextLabel={nextButtonLabel}
           blockerHint={currentStepBlockedMessage}
           draftIndicator={
             currentStepDraftChangeCount > 0 ? (
-              <span className={styles.recipeLegendItem}>
-                {draftChipLabelForStep(currentStep)}
-              </span>
+              <DraftChangeChip label={draftChipLabelForStep(currentStep)} />
             ) : null
           }
         />
