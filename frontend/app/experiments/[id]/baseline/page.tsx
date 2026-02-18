@@ -732,7 +732,7 @@ export default function BaselinePage() {
       title="Baseline"
       subtitle="Record week 0 baseline metrics and grade."
       actions={
-        <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
+        <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
@@ -750,7 +750,7 @@ export default function BaselinePage() {
         <div className={"flex flex-wrap items-center gap-2"}>
           {baselineLocked && !editingUnlocked ? (
             <button
-              className={cn(buttonVariants({ variant: "destructive" }), "border border-border")}
+              className={buttonVariants({ variant: "destructive" })}
               type="button"
               onClick={() => setEditingUnlocked(true)}
             >
@@ -759,7 +759,7 @@ export default function BaselinePage() {
           ) : null}
           {baselineLocked && editingUnlocked ? (
             <button
-              className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              className={buttonVariants({ variant: "secondary" })}
               type="button"
               onClick={() => setEditingUnlocked(false)}
             >
@@ -768,7 +768,7 @@ export default function BaselinePage() {
           ) : null}
           {!baselineLocked && allBaselinesCaptured ? (
             <button
-              className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              className={buttonVariants({ variant: "secondary" })}
               type="button"
               disabled={saving}
               onClick={() => void lockBaseline()}
@@ -777,7 +777,7 @@ export default function BaselinePage() {
             </button>
           ) : null}
           <button
-            className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+            className={buttonVariants({ variant: "default" })}
             type="button"
             disabled={primarySaveDisabled}
             onClick={() => void saveBaseline(primarySaveLabel === "Save & Next")}
@@ -873,7 +873,7 @@ export default function BaselinePage() {
                   return (
                     <button
                       key={grade}
-                      className={selected ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                      className={selected ? buttonVariants({ variant: "default" }) : buttonVariants({ variant: "secondary" })}
                       type="button"
                       disabled={saving || readOnly}
                       onClick={() => {

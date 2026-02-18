@@ -1793,7 +1793,7 @@ export default function PlacementPage() {
       title="Placement"
       subtitle="Step through tent/slot setup, tray setup, then staged placement applies."
       actions={
-        <Button asChild className={styles.buttonChrome}>
+        <Button asChild>
           <Link href={`/experiments/${experimentId}/overview`}>← Overview</Link>
         </Button>
       }
@@ -1857,7 +1857,7 @@ export default function PlacementPage() {
                     <Input value={newTentCode} onChange={(event) => setNewTentCode(event.target.value)} />
                   </label>
                   <div className={styles.entryFormActions}>
-                    <Button className={styles.buttonChrome} type="button" disabled={saving} onClick={() => void createTent()}>
+                    <Button type="button" disabled={saving} onClick={() => void createTent()}>
                       {saving ? "Saving..." : "Add tent"}
                     </Button>
                   </div>
@@ -1957,7 +1957,7 @@ export default function PlacementPage() {
                           }
                           aria-label="Tent code"
                         />
-                        <Button variant="secondary" className={styles.buttonChrome} type="button" disabled={saving} onClick={() => void saveTentDetails(tent)}>
+                        <Button variant="secondary" type="button" disabled={saving} onClick={() => void saveTentDetails(tent)}>
                           Save tent
                         </Button>
                       </div>
@@ -2009,10 +2009,10 @@ export default function PlacementPage() {
                       <div className={"grid gap-2"}>
                         <span className={"text-sm text-muted-foreground"}>Shelves layout</span>
                         <div className={"flex flex-wrap items-center gap-2"}>
-                          <Button variant="secondary" className={styles.buttonChrome} type="button" onClick={() => addShelf(tent.tent_id)}>
+                          <Button variant="secondary" type="button" onClick={() => addShelf(tent.tent_id)}>
                             Add shelf
                           </Button>
-                          <Button variant="secondary" className={styles.buttonChrome} type="button" onClick={() => removeShelf(tent.tent_id)}>
+                          <Button variant="secondary" type="button" onClick={() => removeShelf(tent.tent_id)}>
                             Remove shelf
                           </Button>
                         </div>
@@ -2034,7 +2034,7 @@ export default function PlacementPage() {
                                   <Button
                                     variant="secondary"
                                     size="sm"
-                                    className={styles.buttonChrome}
+                                   
                                     type="button"
                                     onClick={() => adjustShelfSlotCount(tent.tent_id, group.shelfIndex - 1, -1)}
                                     disabled={(shelfCounts[group.shelfIndex - 1] || 0) <= 0}
@@ -2044,7 +2044,7 @@ export default function PlacementPage() {
                                   <Button
                                     variant="secondary"
                                     size="sm"
-                                    className={styles.buttonChrome}
+                                   
                                     type="button"
                                     onClick={() => adjustShelfSlotCount(tent.tent_id, group.shelfIndex - 1, 1)}
                                   >
@@ -2093,7 +2093,7 @@ export default function PlacementPage() {
                 <span className={styles.recipeLegendItem}>{tentSlotDraftChangeCount} tent layout change(s)</span>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
-                    className={styles.buttonChrome}
+                   
                     type="button"
                     disabled={saving || placementLocked || tentSlotDraftChangeCount === 0}
                     onClick={() => void applyTentSlotLayouts()}
@@ -2123,7 +2123,7 @@ export default function PlacementPage() {
                     />
                   </label>
                   <div className={styles.entryFormActions}>
-                    <Button className={styles.buttonChrome} type="button" disabled={saving} onClick={() => void createTray()}>
+                    <Button type="button" disabled={saving} onClick={() => void createTray()}>
                       {saving ? "Saving..." : "Create tray"}
                     </Button>
                   </div>
@@ -2255,7 +2255,7 @@ export default function PlacementPage() {
                       disabled={selectedPlantIds.size === 0}
                     />
                     <Button
-                      className={styles.buttonChrome}
+                     
                       type="button"
                       disabled={placementLocked || !destinationTrayId || selectedInMainGrid.length === 0}
                       onClick={stageMovePlantsToTray}
@@ -2331,7 +2331,7 @@ export default function PlacementPage() {
                 <span className={styles.recipeLegendItem}>{placementDraftChangeCount} plant layout change(s)</span>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
-                    className={styles.buttonChrome}
+                   
                     type="button"
                     disabled={saving || placementDraftChangeCount === 0}
                     onClick={() => void applyPlantToTrayLayout()}
@@ -2380,7 +2380,7 @@ export default function PlacementPage() {
                       disabled={selectedTrayIds.size === 0}
                     />
                     <Button
-                      className={styles.buttonChrome}
+                     
                       type="button"
                       disabled={placementLocked || !destinationSlotId || selectedTrayIds.size === 0}
                       onClick={stageMoveTraysToSlots}
@@ -2474,7 +2474,7 @@ export default function PlacementPage() {
                 <span className={styles.recipeLegendItem}>{traySlotDraftChangeCount} tray/slot change(s)</span>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
-                    className={styles.buttonChrome}
+                   
                     type="button"
                     disabled={saving || traySlotDraftChangeCount === 0}
                     onClick={() => void applyTrayToSlotLayout()}
@@ -2491,12 +2491,12 @@ export default function PlacementPage() {
           className={[styles.stepNavRow, currentStep === 1 ? styles.stepNavRowForwardOnly : ""].filter(Boolean).join(" ")}
         >
           {currentStep > 1 ? (
-            <Button variant="secondary" className={styles.buttonChrome} type="button" onClick={goPreviousStep}>
+            <Button variant="secondary" type="button" onClick={goPreviousStep}>
               Back
             </Button>
           ) : null}
           <Button
-            className={styles.buttonChrome}
+           
             type="button"
             disabled={!isStepComplete(currentStep)}
             onClick={goNextStep}

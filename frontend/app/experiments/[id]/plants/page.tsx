@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
-import { cn } from "@/lib/utils";
 import { suggestPlantId } from "@/lib/id-suggestions";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
@@ -316,7 +315,7 @@ export default function ExperimentPlantsPage() {
       subtitle={`Experiment: ${experimentId}`}
       actions={
         <div className={"flex flex-wrap items-center gap-2"}>
-          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
+          <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/overview`}>
             ← Overview
           </Link>
         </div>
@@ -405,7 +404,7 @@ export default function ExperimentPlantsPage() {
             />
           </label>
           <button
-            className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+            className={buttonVariants({ variant: "secondary" })}
             type="button"
             disabled={saving || !manualSpeciesName.trim()}
             onClick={() => void addPlantsQuick()}
@@ -433,7 +432,7 @@ export default function ExperimentPlantsPage() {
             onChange={(event) => setCsvFile(event.target.files?.[0] ?? null)}
           />
           <button
-            className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+            className={buttonVariants({ variant: "secondary" })}
             type="button"
             disabled={saving || (!csvFile && !csvText.trim())}
             onClick={() => void importPlantsCsv()}
@@ -446,14 +445,14 @@ export default function ExperimentPlantsPage() {
       <SectionCard title="Tools">
         <div className={"flex flex-wrap items-center gap-2"}>
           <button
-            className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+            className={buttonVariants({ variant: "secondary" })}
             type="button"
             disabled={saving}
             onClick={() => void generateMissingIds()}
           >
             Generate IDs for pending plants
           </button>
-          <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" onClick={downloadLabels}>
+          <button className={buttonVariants({ variant: "secondary" })} type="button" onClick={downloadLabels}>
             Download labels PDF
           </button>
         </div>

@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
-import { cn } from "@/lib/utils";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
@@ -306,7 +305,7 @@ export default function RotationPage() {
       title="Rotation"
       subtitle="Log tray moves and review recent rotation history."
       actions={
-        <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
+        <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
@@ -327,7 +326,7 @@ export default function RotationPage() {
           <p className={"text-sm text-muted-foreground"}>
             Rotation logs are intended for running experiments. Start the experiment first.
           </p>
-          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
+          <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/overview`}>
             Start experiment from Overview
           </Link>
         </SectionCard>
@@ -370,7 +369,7 @@ export default function RotationPage() {
                 <Textarea value={note} onChange={(event) => setNote(event.target.value)} />
               </label>
               <button
-                className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+                className={buttonVariants({ variant: "default" })}
                 type="button"
                 disabled={saving || !selectedTrayId || selectedTrayBlocked}
                 onClick={() => void submitLogMove()}
@@ -398,7 +397,7 @@ export default function RotationPage() {
                   label: "Action",
                   render: (tray) => (
                     <button
-                      className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                      className={buttonVariants({ variant: "secondary" })}
                       type="button"
                       onClick={() => {
                         setSelectedTrayId(tray.tray_id);
@@ -419,7 +418,7 @@ export default function RotationPage() {
                   <span>Plants</span>
                   <strong>{tray.plant_count}</strong>
                   <button
-                    className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                    className={buttonVariants({ variant: "secondary" })}
                     type="button"
                     onClick={() => {
                       setSelectedTrayId(tray.tray_id);

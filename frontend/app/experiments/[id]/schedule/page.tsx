@@ -5,7 +5,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
-import { cn } from "@/lib/utils";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
@@ -695,7 +694,7 @@ export default function ExperimentSchedulePage() {
       title="Schedule"
       subtitle={plantFilter ? "Filtered for selected plant" : "Recurring actions plan"}
       actions={
-        <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
+        <Link className={buttonVariants({ variant: "secondary" })} href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
@@ -708,14 +707,14 @@ export default function ExperimentSchedulePage() {
       <SectionCard title="Upcoming plan">
         <div className={"flex flex-wrap items-center gap-2"}>
           <button
-            className={daysWindow === 7 ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+            className={daysWindow === 7 ? buttonVariants({ variant: "default" }) : buttonVariants({ variant: "secondary" })}
             type="button"
             onClick={() => setDaysWindow(7)}
           >
             7 days
           </button>
           <button
-            className={daysWindow === 14 ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+            className={daysWindow === 14 ? buttonVariants({ variant: "default" }) : buttonVariants({ variant: "secondary" })}
             type="button"
             onClick={() => setDaysWindow(14)}
           >
@@ -803,21 +802,21 @@ export default function ExperimentSchedulePage() {
 
           <div className={"flex flex-wrap items-center gap-2"}>
             <button
-              className={recurrenceMode === "weekly" ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              className={recurrenceMode === "weekly" ? buttonVariants({ variant: "default" }) : buttonVariants({ variant: "secondary" })}
               type="button"
               onClick={() => setRecurrenceMode("weekly")}
             >
               Weekly pattern
             </button>
             <button
-              className={recurrenceMode === "interval" ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              className={recurrenceMode === "interval" ? buttonVariants({ variant: "default" }) : buttonVariants({ variant: "secondary" })}
               type="button"
               onClick={() => setRecurrenceMode("interval")}
             >
               Every X days
             </button>
             <button
-              className={recurrenceMode === "daily" ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              className={recurrenceMode === "daily" ? buttonVariants({ variant: "default" }) : buttonVariants({ variant: "secondary" })}
               type="button"
               onClick={() => setRecurrenceMode("daily")}
             >
@@ -886,7 +885,7 @@ export default function ExperimentSchedulePage() {
                   <div className={"flex flex-wrap items-center gap-2"}>
                     {weeklyRules.length > 1 ? (
                       <button
-                        className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                        className={buttonVariants({ variant: "secondary" })}
                         type="button"
                         onClick={() =>
                           setWeeklyRules((current) => current.filter((_, itemIndex) => itemIndex !== index))
@@ -899,7 +898,7 @@ export default function ExperimentSchedulePage() {
                 </article>
               ))}
               <button
-                className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                className={buttonVariants({ variant: "secondary" })}
                 type="button"
                 onClick={() =>
                   setWeeklyRules((current) => [
@@ -976,7 +975,7 @@ export default function ExperimentSchedulePage() {
 
           <div className={"flex flex-wrap items-center gap-2"}>
             <button
-              className={scopeType === "TENT" ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              className={scopeType === "TENT" ? buttonVariants({ variant: "default" }) : buttonVariants({ variant: "secondary" })}
               type="button"
               onClick={() => {
                 setScopeType("TENT");
@@ -986,7 +985,7 @@ export default function ExperimentSchedulePage() {
               Tents
             </button>
             <button
-              className={scopeType === "TRAY" ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              className={scopeType === "TRAY" ? buttonVariants({ variant: "default" }) : buttonVariants({ variant: "secondary" })}
               type="button"
               onClick={() => {
                 setScopeType("TRAY");
@@ -996,7 +995,7 @@ export default function ExperimentSchedulePage() {
               Trays
             </button>
             <button
-              className={scopeType === "PLANT" ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              className={scopeType === "PLANT" ? buttonVariants({ variant: "default" }) : buttonVariants({ variant: "secondary" })}
               type="button"
               onClick={() => {
                 setScopeType("PLANT");
@@ -1093,7 +1092,7 @@ export default function ExperimentSchedulePage() {
 
           <div className={"flex flex-wrap items-center gap-2"}>
             <button
-              className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+              className={buttonVariants({ variant: "default" })}
               type="button"
               disabled={saving}
               onClick={() => void saveScheduleAction()}
@@ -1102,7 +1101,7 @@ export default function ExperimentSchedulePage() {
             </button>
             {editingId ? (
               <button
-                className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                className={buttonVariants({ variant: "secondary" })}
                 type="button"
                 disabled={saving}
                 onClick={resetForm}
@@ -1151,7 +1150,7 @@ export default function ExperimentSchedulePage() {
                     <span>Enabled</span>
                   </label>
                   <button
-                    className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                    className={buttonVariants({ variant: "secondary" })}
                     type="button"
                     disabled={saving}
                     onClick={() => startEdit(action)}
@@ -1159,7 +1158,7 @@ export default function ExperimentSchedulePage() {
                     Edit
                   </button>
                   <button
-                    className={cn(buttonVariants({ variant: "destructive" }), "border border-border")}
+                    className={buttonVariants({ variant: "destructive" })}
                     type="button"
                     disabled={saving}
                     onClick={() => void deleteScheduleAction(action.id)}

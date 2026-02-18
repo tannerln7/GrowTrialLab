@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError } from "@/lib/backend";
-import { cn } from "@/lib/utils";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
@@ -129,7 +128,7 @@ export default function ExperimentSetupPage() {
       title="Setup"
       subtitle="Complete bootstrap setup: plants, tents + slots, and recipes."
       actions={
-        <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href="/experiments">
+        <Link className={buttonVariants({ variant: "secondary" })} href="/experiments">
           Back to experiments
         </Link>
       }
@@ -148,7 +147,7 @@ export default function ExperimentSetupPage() {
                   {item.complete ? "Complete" : "Incomplete"}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={item.href}>
+                  <Link className={buttonVariants({ variant: "default" })} href={item.href}>
                     {item.actionLabel}
                   </Link>
                 </div>

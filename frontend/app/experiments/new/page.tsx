@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
 import { backendFetch, normalizeBackendError } from "@/lib/backend";
-import { cn } from "@/lib/utils";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -89,7 +88,7 @@ export default function NewExperimentPage() {
       title="New Experiment"
       subtitle="Create an experiment and finish bootstrap setup."
       actions={
-        <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href="/experiments">
+        <Link className={buttonVariants({ variant: "secondary" })} href="/experiments">
           Cancel
         </Link>
       }
@@ -108,13 +107,13 @@ export default function NewExperimentPage() {
 
           <div className={"flex flex-wrap items-center gap-2"}>
             <button
-              className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+              className={buttonVariants({ variant: "default" })}
               disabled={saving}
               type="submit"
             >
               {saving ? "Creating..." : "Create experiment"}
             </button>
-            <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href="/experiments">
+            <Link className={buttonVariants({ variant: "secondary" })} href="/experiments">
               Cancel
             </Link>
           </div>

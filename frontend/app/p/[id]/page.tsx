@@ -15,7 +15,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
-import { cn } from "@/lib/utils";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
@@ -589,7 +588,7 @@ export default function PlantQrPage() {
       <PageShell
         title="Plant Cockpit"
         actions={
-          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={overviewHref}>
+          <Link className={buttonVariants({ variant: "default" })} href={overviewHref}>
             ← Overview
           </Link>
         }
@@ -606,7 +605,7 @@ export default function PlantQrPage() {
       <PageShell
         title="Plant Cockpit"
         actions={
-          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={overviewHref}>
+          <Link className={buttonVariants({ variant: "default" })} href={overviewHref}>
             ← Overview
           </Link>
         }
@@ -629,7 +628,7 @@ export default function PlantQrPage() {
       subtitle={plantUuid || "Unknown plant"}
       stickyOffset
       actions={
-        <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={overviewHref}>
+        <Link className={buttonVariants({ variant: "default" })} href={overviewHref}>
           ← Overview
         </Link>
       }
@@ -711,7 +710,7 @@ export default function PlantQrPage() {
                 ) : null}
                 {cockpit.derived.replaced_by_uuid ? (
                   <Link
-                    className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+                    className={buttonVariants({ variant: "default" })}
                     href={replacementHref(cockpit.derived.replaced_by_uuid)}
                   >
                     Open Replacement
@@ -728,14 +727,14 @@ export default function PlantQrPage() {
               </p>
               <div className={"flex flex-wrap items-center gap-2"}>
                 <Link
-                  className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                  className={buttonVariants({ variant: "secondary" })}
                   href={replacementHref(cockpit.derived.replaces_uuid)}
                 >
                   Open Previous Plant
                 </Link>
                 {cockpit.derived.replaced_by_uuid ? (
                   <Link
-                    className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                    className={buttonVariants({ variant: "secondary" })}
                     href={replacementHref(cockpit.derived.replaced_by_uuid)}
                   >
                     Open Next Replacement
@@ -763,11 +762,11 @@ export default function PlantQrPage() {
                 </p>
               ) : nowAction.href && nowAction.buttonLabel ? (
                 <div className={"flex flex-wrap items-center gap-2"}>
-                  <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={nowAction.href}>
+                  <Link className={buttonVariants({ variant: "default" })} href={nowAction.href}>
                     {nowAction.buttonLabel}
                   </Link>
                   {feedingHref ? (
-                    <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href={feedingHref}>
+                    <Link className={buttonVariants({ variant: "secondary" })} href={feedingHref}>
                       Feed
                     </Link>
                   ) : null}
@@ -775,7 +774,7 @@ export default function PlantQrPage() {
               ) : (
                 <div className={"grid gap-3"}>
                   {feedingHref ? (
-                    <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={feedingHref}>
+                    <Link className={buttonVariants({ variant: "default" })} href={feedingHref}>
                       Feed
                     </Link>
                   ) : null}
@@ -800,7 +799,7 @@ export default function PlantQrPage() {
                 <div className={"flex flex-wrap items-center gap-2"}>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" disabled={recipeSaving}>
+                      <button className={buttonVariants({ variant: "secondary" })} type="button" disabled={recipeSaving}>
                         <ChevronDown size={14} />
                         Change recipe
                       </button>
@@ -828,7 +827,7 @@ export default function PlantQrPage() {
                       )}
                       <div className={"flex flex-wrap items-center gap-2"}>
                         <button
-                          className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+                          className={buttonVariants({ variant: "default" })}
                           type="button"
                           disabled={
                             recipeSaving ||
@@ -841,7 +840,7 @@ export default function PlantQrPage() {
                           {recipeSaving ? "Saving..." : "Save recipe"}
                         </button>
                         <button
-                          className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                          className={buttonVariants({ variant: "secondary" })}
                           type="button"
                           disabled={recipeSaving || !cockpit.derived.assigned_recipe}
                           onClick={() => void handleRecipeChange(null)}
@@ -856,7 +855,7 @@ export default function PlantQrPage() {
                   Replace this plant if it was removed from trial or needs substitution.
                 </p>
                 <button
-                  className={cn(buttonVariants({ variant: "destructive" }), "border border-border")}
+                  className={buttonVariants({ variant: "destructive" })}
                   type="button"
                   onClick={() => setShowReplaceModal(true)}
                 >
@@ -895,7 +894,7 @@ export default function PlantQrPage() {
 
               <div className={"flex flex-wrap items-center gap-2"}>
                 <button
-                  className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                  className={buttonVariants({ variant: "secondary" })}
                   type="button"
                   disabled={uploading}
                   onClick={() => fileInputRef.current?.click()}
@@ -904,7 +903,7 @@ export default function PlantQrPage() {
                   Choose photo
                 </button>
                 <button
-                  className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+                  className={buttonVariants({ variant: "default" })}
                   type="button"
                   disabled={!photoFile || uploading}
                   onClick={handlePhotoUpload}
@@ -919,11 +918,11 @@ export default function PlantQrPage() {
               {notice ? <Notice variant="success">{notice}</Notice> : null}
 
               <div className={"flex flex-wrap items-center gap-2"}>
-                <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" disabled>
+                <button className={buttonVariants({ variant: "secondary" })} type="button" disabled>
                   <ClipboardPlus size={16} />
                   Add note (Coming soon)
                 </button>
-                <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" disabled>
+                <button className={buttonVariants({ variant: "secondary" })} type="button" disabled>
                   <ShieldAlert size={16} />
                   Report issue (Coming soon)
                 </button>
@@ -1010,7 +1009,7 @@ export default function PlantQrPage() {
             )}
             {scheduleHref ? (
               <div className={"flex flex-wrap items-center gap-2"}>
-                <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href={scheduleHref}>
+                <Link className={buttonVariants({ variant: "secondary" })} href={scheduleHref}>
                   Open Schedule
                 </Link>
               </div>
@@ -1018,23 +1017,23 @@ export default function PlantQrPage() {
           </SectionCard>
 
           <StickyActionBar>
-            <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href={overviewHref}>
+            <Link className={buttonVariants({ variant: "secondary" })} href={overviewHref}>
               ← Overview
             </Link>
             {cockpit.plant.status !== "active" && cockpit.derived.replaced_by_uuid ? (
               <Link
-                className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+                className={buttonVariants({ variant: "default" })}
                 href={replacementHref(cockpit.derived.replaced_by_uuid)}
               >
                 Open Replacement
               </Link>
             ) : nowAction.href && nowAction.buttonLabel ? (
-              <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={nowAction.href}>
+              <Link className={buttonVariants({ variant: "default" })} href={nowAction.href}>
                 {nowAction.buttonLabel}
               </Link>
             ) : (
               <button
-                className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+                className={buttonVariants({ variant: "default" })}
                 type="button"
                 disabled={uploading}
                 onClick={() => fileInputRef.current?.click()}
@@ -1108,7 +1107,7 @@ export default function PlantQrPage() {
               </label>
               <div className={"flex flex-wrap items-center gap-2"}>
                 <button
-                  className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                  className={buttonVariants({ variant: "secondary" })}
                   type="button"
                   disabled={replacing}
                   onClick={() => {
@@ -1119,7 +1118,7 @@ export default function PlantQrPage() {
                   Cancel
                 </button>
                 <button
-                  className={cn(buttonVariants({ variant: "destructive" }), "border border-border")}
+                  className={buttonVariants({ variant: "destructive" })}
                   type="button"
                   disabled={!replaceConfirmed || replacing}
                   onClick={() => void handleReplacePlant()}

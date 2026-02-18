@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
-import { cn } from "@/lib/utils";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import PageShell from "@/src/components/ui/PageShell";
@@ -74,10 +73,10 @@ export default function ExperimentsPage() {
       subtitle="Create experiments and complete bootstrap setup."
       actions={
         <div className={"flex flex-wrap items-center gap-2"}>
-          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href="/experiments/new">
+          <Link className={buttonVariants({ variant: "default" })} href="/experiments/new">
             New experiment
           </Link>
-          <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href="/">
+          <Link className={buttonVariants({ variant: "secondary" })} href="/">
             Back home
           </Link>
         </div>
@@ -133,10 +132,10 @@ export default function ExperimentsPage() {
       </SectionCard>
       <SectionCard>
         <div className={"flex flex-wrap items-center gap-2"}>
-          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href="/experiments/new">
+          <Link className={buttonVariants({ variant: "default" })} href="/experiments/new">
             New experiment
           </Link>
-          <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href="/">
+          <Link className={buttonVariants({ variant: "secondary" })} href="/">
             Back home
           </Link>
         </div>

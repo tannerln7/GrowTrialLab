@@ -6,7 +6,6 @@ import { useParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
-import { cn } from "@/lib/utils";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -665,7 +664,7 @@ export default function RecipesPage() {
       title="Recipes"
       subtitle="Assign recipes to individual plants using tray-grouped selection and draft saves."
       actions={
-        <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
+        <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/overview`}>
           ← Overview
         </Link>
       }
@@ -695,7 +694,7 @@ export default function RecipesPage() {
             placeholder="Notes (optional)"
             aria-label="Recipe notes"
           />
-          <button className={cn(buttonVariants({ variant: "default" }), "border border-border")} type="submit" disabled={saving}>
+          <button className={buttonVariants({ variant: "default" })} type="submit" disabled={saving}>
             {saving ? "Saving..." : "Create recipe"}
           </button>
         </form>
@@ -803,7 +802,7 @@ export default function RecipesPage() {
               size="sm"
             />
             <button
-              className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+              className={buttonVariants({ variant: "default" })}
               type="button"
               disabled={selectedPlantIds.size === 0 || !selectedBulkRecipeId}
               onClick={stageApplyRecipeToSelection}
@@ -812,7 +811,7 @@ export default function RecipesPage() {
               Apply to selected
             </button>
             <button
-              className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              className={buttonVariants({ variant: "secondary" })}
               type="button"
               disabled={selectedPlantIds.size === 0}
               onClick={stageRemoveRecipeFromSelection}
@@ -899,7 +898,7 @@ export default function RecipesPage() {
       <StickyActionBar>
         <span className={styles.recipeLegendItem}>{draftChangeCount} recipe mapping change(s)</span>
         <button
-          className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+          className={buttonVariants({ variant: "default" })}
           type="button"
           disabled={saving || draftChangeCount === 0}
           onClick={() => void saveDrafts()}
@@ -907,7 +906,7 @@ export default function RecipesPage() {
           <Save size={16} />
           {saving ? "Saving..." : "Save Recipe Mapping"}
         </button>
-        <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" disabled={saving || draftChangeCount === 0} onClick={resetDrafts}>
+        <button className={buttonVariants({ variant: "secondary" })} type="button" disabled={saving || draftChangeCount === 0} onClick={resetDrafts}>
           Discard drafts
         </button>
       </StickyActionBar>

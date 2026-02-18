@@ -6,7 +6,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ExperimentStatusSummary } from "@/lib/experiment-status";
-import { cn } from "@/lib/utils";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Notice } from "@/src/components/ui/notice";
@@ -391,7 +390,7 @@ export default function ExperimentOverviewPage() {
     (summary?.schedule.due_counts_today ?? 0) > 0 || summary?.schedule.next_scheduled_slot == null;
 
   function actionButtonClass(needsAttention: boolean): string {
-    return [needsAttention ? cn(buttonVariants({ variant: "default" }), "border border-border") : cn(buttonVariants({ variant: "secondary" }), "border border-border"), styles.overviewActionButton].join(" ");
+    return [needsAttention ? buttonVariants({ variant: "default" }) : buttonVariants({ variant: "secondary" }), styles.overviewActionButton].join(" ");
   }
 
   const readinessItems = [
@@ -718,7 +717,7 @@ export default function ExperimentOverviewPage() {
           </div>
           <div className={styles.overviewStateActionRow}>
             <button
-              className={[cn(buttonVariants({ variant: "default" }), "border border-border"), styles.overviewActionButton].join(" ")}
+              className={[buttonVariants({ variant: "default" }), styles.overviewActionButton].join(" ")}
               type="button"
               disabled={busy || !startReady}
               onClick={startExperiment}
@@ -727,7 +726,7 @@ export default function ExperimentOverviewPage() {
             </button>
             {summary?.lifecycle.state === "running" ? (
               <button
-                className={[cn(buttonVariants({ variant: "destructive" }), "border border-border"), styles.overviewActionButton].join(" ")}
+                className={[buttonVariants({ variant: "destructive" }), styles.overviewActionButton].join(" ")}
                 type="button"
                 disabled={busy}
                 onClick={stopExperiment}

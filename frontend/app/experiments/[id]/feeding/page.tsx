@@ -5,7 +5,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
-import { cn } from "@/lib/utils";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
@@ -338,7 +337,7 @@ export default function FeedingPage() {
       title="Feeding"
       subtitle="Record feeding quickly for active plants."
       actions={
-        <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={overviewHref}>
+        <Link className={buttonVariants({ variant: "default" })} href={overviewHref}>
           ← Overview
         </Link>
       }
@@ -351,7 +350,7 @@ export default function FeedingPage() {
       {statusSummary && statusSummary.lifecycle.state !== "running" ? (
         <SectionCard title="Feeding Requires Running State">
           <p className={"text-sm text-muted-foreground"}>Feeding is available only while an experiment is running.</p>
-          <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
+          <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/overview`}>
             Start experiment from Overview
           </Link>
         </SectionCard>
@@ -368,7 +367,7 @@ export default function FeedingPage() {
               ) : null}
               {queue.remaining_count > 0 ? (
                 <button
-                  className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                  className={buttonVariants({ variant: "secondary" })}
                   type="button"
                   onClick={() => {
                     const next = pickNextNeedingFeed(queuePlants, selectedPlantId);
@@ -388,7 +387,7 @@ export default function FeedingPage() {
           {queue.remaining_count === 0 && !selectedPlant ? (
             <SectionCard title="All Feedings Complete">
               <p className={"text-sm text-muted-foreground"}>No active plants currently need feeding.</p>
-              <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/overview`}>
+              <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/overview`}>
                 Back to Overview
               </Link>
             </SectionCard>
@@ -433,7 +432,7 @@ export default function FeedingPage() {
                   placeholder="3 drops"
                 />
               </label>
-              <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" onClick={() => setShowNote((current) => !current)}>
+              <button className={buttonVariants({ variant: "secondary" })} type="button" onClick={() => setShowNote((current) => !current)}>
                 {showNote ? "Hide note" : "Add note"}
               </button>
               {showNote ? (
@@ -453,10 +452,10 @@ export default function FeedingPage() {
                   : "This plant needs a plant recipe before feeding."}
               </p>
               <div className={"flex flex-wrap items-center gap-2"}>
-                <Link className={cn(buttonVariants({ variant: "default" }), "border border-border")} href={`/experiments/${experimentId}/placement`}>
+                <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/placement`}>
                   Fix placement
                 </Link>
-                <Link className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} href={overviewHref}>
+                <Link className={buttonVariants({ variant: "secondary" })} href={overviewHref}>
                   Back to Overview
                 </Link>
               </div>
@@ -493,7 +492,7 @@ export default function FeedingPage() {
                     <strong>{plant.species_name}</strong>
                     <span>Last fed</span>
                     <strong>{formatLastFed(plant.last_fed_at)}</strong>
-                    <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" onClick={() => selectPlant(plant.uuid, true)}>
+                    <button className={buttonVariants({ variant: "secondary" })} type="button" onClick={() => selectPlant(plant.uuid, true)}>
                       Select
                     </button>
                   </div>
@@ -504,7 +503,7 @@ export default function FeedingPage() {
 
           <StickyActionBar>
             <button
-              className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+              className={buttonVariants({ variant: "default" })}
               type="button"
               disabled={!selectedPlantId || saving || saveBlocked}
               onClick={() => void saveFeeding(false)}
@@ -512,7 +511,7 @@ export default function FeedingPage() {
               {saving ? "Saving..." : "Save"}
             </button>
             <button
-              className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              className={buttonVariants({ variant: "secondary" })}
               type="button"
               disabled={!selectedPlantId || saving || !canSaveAndNext || saveBlocked}
               onClick={() => void saveFeeding(true)}
