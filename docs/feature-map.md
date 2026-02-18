@@ -27,6 +27,40 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-18 (Primitive Drift Consolidation)
+- `Completed` Duplicate route-level UI primitive patterns were consolidated behind shared components.
+  - Added shared `TooltipIconButton` and replaced route-local icon+tooltip wrappers in placement/recipes.
+  - Added shared `NativeSelect` and replaced route-local native select class usage in experiment and cockpit routes.
+  - Replaced route-level raw Radix popover composition with shared `popover` wrapper in cockpit.
+  - Removed unused `frontend/src/components/ui/select.tsx`.
+  - Relevant files:
+    - `frontend/src/components/ui/tooltip-icon-button.tsx`
+    - `frontend/src/components/ui/native-select.tsx`
+    - `frontend/src/components/ui/select.tsx` (removed)
+    - `frontend/app/experiments/[id]/recipes/page.tsx`
+    - `frontend/app/experiments/[id]/placement/page.tsx`
+    - `frontend/app/p/[id]/page.tsx`
+    - `frontend/src/components/ui/ResponsiveList.tsx`
+  - Refs: `acb0531`
+- `Completed` Route-level button class wrestling and styling overrides were removed.
+  - `buttonVariants` now owns border styling for `default`/`secondary`/`destructive`.
+  - Route-level `cn(buttonVariants(...), "border border-border")` usage was removed.
+  - Placement-specific `styles.buttonChrome` indirection was removed from style maps and callsites.
+  - Success/status text now uses shared `Notice` in core operator routes instead of ad-hoc `text-emerald-*` classes.
+  - Relevant files:
+    - `frontend/src/components/ui/button.tsx`
+    - `frontend/src/components/ui/experiments-styles.ts`
+    - `frontend/app/experiments/[id]/overview/page.tsx`
+    - `frontend/app/experiments/[id]/baseline/page.tsx`
+    - `frontend/app/experiments/[id]/feeding/page.tsx`
+    - `frontend/app/experiments/[id]/rotation/page.tsx`
+    - `frontend/app/experiments/[id]/schedule/page.tsx`
+    - `frontend/app/experiments/[id]/plants/page.tsx`
+    - `frontend/app/experiments/[id]/recipes/page.tsx`
+    - `frontend/app/experiments/[id]/placement/page.tsx`
+    - `frontend/app/p/[id]/page.tsx`
+  - Refs: `251b6fa`
+
 ### 2026-02-18 (Tailwind Primitive Backbone Stabilization)
 - `Completed` Shared Tailwind primitive foundation and variant conventions were consolidated to make route work token-first by default.
   - Added shared primitive foundations for interaction, controls, surfaces, and selectable states.

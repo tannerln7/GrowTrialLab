@@ -167,6 +167,13 @@ This document is the single consolidated source for current status, architecture
   - core primitive variants aligned for `button`, `badge/chip`, `notice`, `icon-button`, `panel-surface`, and `dense-selectable-cell`.
   - shared form controls (`input`, `textarea`, `select`) now reuse one token-driven control base class.
   - removed unused `frontend/src/styles/theme.css`; token/theming authority is now `frontend/src/styles/tokens.css` + `frontend/src/styles/tailwind-theme.css`.
+- [x] Primitive duplication and class-wrestling drift were reduced across route surfaces:
+  - route-local icon action wrappers were replaced with shared `TooltipIconButton`.
+  - route-local native select class strings were replaced with shared `NativeSelect`, and unused `frontend/src/components/ui/select.tsx` was removed.
+  - route-local raw Radix popover usage was replaced with shared `popover` wrapper.
+  - `ResponsiveList` now consumes shared `table-shell` primitives for desktop table rendering.
+  - status/success notices now use shared `Notice` instead of ad-hoc `text-emerald-*` text styling.
+  - `buttonVariants` now owns border styling for `default`/`secondary`/`destructive`; route-level `border border-border` add-ons and `styles.buttonChrome` were removed.
 - [x] Baseline v2 now uses species-aware 1-5 slider capture with unified `metrics.baseline_v1` keys (`vigor`, `feature_count`, `feature_quality`, `color_turgor`, `damage_pests`), auto/manual grade source handling, first-capture neutral default slider values (`3`), concise single-word descriptor labels displayed below each slider with small single-line metric titles (no per-slider helper lines), a top-row always-visible primary save action with dynamic `Save & Next`/`Save` labeling and dirty-state gating for already-captured baselines, and baseline photo upload per selected plant with inline thumbnail/`No media` empty-state behavior plus themed file-selector controls. Baseline queue and plant-baseline payloads now expose deterministic `baseline_photo` metadata so capture-page thumbnail recall does not depend on paginated global photo lists, and baseline saves persist `metrics.baseline_v1.captured_at` surfaced as `baseline_captured_at` for per-plant last-capture display shown below grade controls/chip row. Queue status chips now show baseline-only state (`No baseline`/`Captured`) with captured rendered green and anchored to the bottom of each queue tile, and queue cells retain a square minimum-height footprint for consistent alignment.
 - [x] Plant cockpit QR route (`/p/{id}`) is active with operational context and links.
 - [x] UI terminology aligns on `grade` and location context fields.

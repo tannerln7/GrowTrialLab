@@ -132,6 +132,11 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
     - shared control base class (`controlBaseClass`)
     - surface variants (`surfaceVariants`, `panelSurfaceVariants`, `toolbarRowVariants`)
     - selectable cell state variants (`selectableCellVariants`)
+- Shared primitive usage conventions:
+  - Use `TooltipIconButton` (`frontend/src/components/ui/tooltip-icon-button.tsx`) for icon-only actions that need tooltip labels.
+  - Use `NativeSelect` (`frontend/src/components/ui/native-select.tsx`) for native `<select>` controls instead of route-local select class strings.
+  - Use `Notice` (`frontend/src/components/ui/notice.tsx`) for status/success messages instead of ad-hoc `text-emerald-*` text classes.
+  - `buttonVariants` owns border styling for `default`/`secondary`/`destructive`; do not append `border border-border` at callsites.
 - Variant naming conventions (core primitives):
   - `Button`: `default | secondary | outline | ghost | destructive`
   - `Badge` / `Chip`: `default | secondary | outline | success | warning | destructive`
