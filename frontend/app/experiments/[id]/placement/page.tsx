@@ -307,8 +307,7 @@ export default function PlacementPage() {
   const [tentDraftById, setTentDraftById] = useState<Record<string, TentDraft>>({});
   const [tentAllowedSpeciesDraftById, setTentAllowedSpeciesDraftById] = useState<Record<string, string[]>>({});
 
-  const [newTrayName, setNewTrayName] = useState("");
-  const [newTrayCapacity, setNewTrayCapacity] = useState(1);
+  const [draftTrayCount, setDraftTrayCount] = useState(0);
 
   const [persistedPlantToTray, setPersistedPlantToTray] = useState<Record<string, string | null>>({});
   const [draftPlantToTray, setDraftPlantToTray] = useState<Record<string, string | null>>({});
@@ -324,7 +323,6 @@ export default function PlacementPage() {
   const [destinationTrayId, setDestinationTrayId] = useState("");
 
   const [selectedTrayIds, setSelectedTrayIds] = useState<Set<string>>(new Set());
-  const [selectedTrayManagerIds, setSelectedTrayManagerIds] = useState<Set<string>>(new Set());
   const [destinationSlotId, setDestinationSlotId] = useState("");
 
   const placementLocked = statusSummary?.lifecycle.state === "running";
@@ -334,7 +332,7 @@ export default function PlacementPage() {
 
   const tentNameSuggestion = useMemo(() => suggestTentName(tents.map((tent) => tent.name)), [tents]);
   const tentCodeSuggestion = useMemo(() => suggestTentCode(tents.map((tent) => tent.code)), [tents]);
-  const trayNameSuggestion = useMemo(() => suggestTrayName(trays.map((tray) => tray.name)), [trays]);
+  const defaultTrayCapacity = useMemo(() => trays[0]?.capacity ?? 4, [trays]);
 
   useEffect(() => {
     setCurrentStep(parseStep(searchParams.get("step")));
@@ -353,10 +351,8 @@ export default function PlacementPage() {
   }, [newTentCode, tentCodeSuggestion]);
 
   useEffect(() => {
-    if (!newTrayName.trim()) {
-      setNewTrayName(trayNameSuggestion);
-    }
-  }, [newTrayName, trayNameSuggestion]);
+    setDraftTrayCount(trays.length);
+  }, [trays.length]);
 
   const trayById = useMemo(() => {
     const map = new Map<string, TrayCell>();
@@ -648,22 +644,8 @@ export default function PlacementPage() {
     setDestinationSlotId((current) => (current && slotById.has(current) ? current : ""));
     setSelectedPlantIds(new Set());
     setSelectedTrayIds(new Set());
-    setSelectedTrayManagerIds(new Set());
     setActivePlantAnchorId(null);
   }, [slotById, summary?.unplaced_plants.results, tents, trayById, trays]);
-
-  useEffect(() => {
-    setSelectedTrayManagerIds((current) => {
-      const allowed = new Set(sortedTrayIds);
-      const next = new Set<string>();
-      for (const trayId of current) {
-        if (allowed.has(trayId)) {
-          next.add(trayId);
-        }
-      }
-      return next;
-    });
-  }, [sortedTrayIds]);
 
   const draftPlantCountByTray = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -785,6 +767,8 @@ export default function PlacementPage() {
     }
     return count;
   }, [shelfCountsByTent, tents]);
+
+  const trayCountDraftChangeCount = Math.abs(draftTrayCount - trays.length);
 
   function stepBlockedMessage(step: number): string {
     if (step === 1 && !step1Complete) {
@@ -1049,121 +1033,93 @@ export default function PlacementPage() {
     }
   }
 
-  async function createTray() {
+  function incrementDraftTrayCount() {
+    setDraftTrayCount((current) => current + 1);
+  }
+
+  function decrementDraftTrayCount() {
+    setDraftTrayCount((current) => Math.max(0, current - 1));
+  }
+
+  async function applyTrayCountDraft() {
     if (placementLocked) {
       setError(RUNNING_LOCK_MESSAGE);
       return;
     }
 
-    const name = newTrayName.trim() || trayNameSuggestion;
-    if (!name) {
-      setError("Tray code/name is required.");
+    const targetCount = Math.max(0, draftTrayCount);
+    const currentCount = trays.length;
+    const delta = targetCount - currentCount;
+    if (delta === 0) {
       return;
     }
 
     setSaving(true);
     setError("");
     setNotice("");
+    setDiagnostics(null);
 
     try {
-      const response = await backendFetch(`/api/v1/experiments/${experimentId}/trays`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          capacity: newTrayCapacity,
-        }),
-      });
-
-      const payload = (await response.json()) as { detail?: string; suggested_name?: string };
-      if (!response.ok) {
-        if (payload.suggested_name) {
-          setNewTrayName(payload.suggested_name);
-        }
-        setError(payload.detail || "Unable to create tray.");
-        return;
-      }
-
-      setNotice("Tray created.");
-      setNewTrayName("");
-      setNewTrayCapacity(1);
-      await loadPage();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to create tray.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function toggleTrayManagerSelection(trayId: string) {
-    if (!trayById.has(trayId)) {
-      return;
-    }
-    setSelectedTrayManagerIds((current) => {
-      const next = new Set(current);
-      if (next.has(trayId)) {
-        next.delete(trayId);
-      } else {
-        next.add(trayId);
-      }
-      return next;
-    });
-  }
-
-  function selectAllTrayManagerCells() {
-    setSelectedTrayManagerIds(new Set(sortedTrayIds));
-  }
-
-  function clearTrayManagerSelection() {
-    setSelectedTrayManagerIds(new Set());
-  }
-
-  async function bulkDeleteSelectedTrays() {
-    if (placementLocked) {
-      setError(RUNNING_LOCK_MESSAGE);
-      return;
-    }
-
-    const selected = sortedTrayIds.filter((trayId) => selectedTrayManagerIds.has(trayId));
-    if (selected.length === 0) {
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-    setNotice("");
-
-    try {
+      let createdCount = 0;
       let deletedCount = 0;
-      for (const trayId of selected) {
-        const response = await backendFetch(`/api/v1/trays/${trayId}/`, {
-          method: "DELETE",
-        });
-        if (!response.ok) {
-          const parsed = await parseBackendErrorPayload(response, "Unable to delete selected trays.");
-          setError(parsed.detail);
-          setDiagnostics(parsed.diagnostics);
-          if (deletedCount > 0) {
-            await loadPage();
+
+      if (delta > 0) {
+        const existingNames = new Set(trays.map((tray) => tray.name));
+        for (let index = 0; index < delta; index += 1) {
+          const suggestedName = suggestTrayName(Array.from(existingNames));
+          const response = await backendFetch(`/api/v1/experiments/${experimentId}/trays`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: suggestedName,
+              capacity: defaultTrayCapacity,
+            }),
+          });
+
+          const payload = (await response.json()) as { detail?: string; suggested_name?: string; name?: string };
+          if (!response.ok) {
+            setError(payload.detail || "Unable to add trays.");
+            return;
           }
-          return;
+
+          existingNames.add(payload.name || payload.suggested_name || suggestedName);
+          createdCount += 1;
         }
-        deletedCount += 1;
+      } else {
+        const removeCount = Math.abs(delta);
+        const traysToRemove = [...sortedTrayIds].slice(-removeCount);
+        for (const trayId of traysToRemove) {
+          const response = await backendFetch(`/api/v1/trays/${trayId}/`, {
+            method: "DELETE",
+          });
+          if (!response.ok) {
+            const parsed = await parseBackendErrorPayload(response, "Unable to remove trays.");
+            setError(parsed.detail);
+            setDiagnostics(parsed.diagnostics);
+            if (deletedCount > 0) {
+              await loadPage();
+            }
+            return;
+          }
+          deletedCount += 1;
+        }
       }
 
-      setSelectedTrayManagerIds(new Set());
-      setNotice(`Deleted ${deletedCount} tray(s).`);
+      const messages: string[] = [];
+      if (createdCount > 0) {
+        messages.push(`Added ${createdCount} tray(s).`);
+      }
+      if (deletedCount > 0) {
+        messages.push(`Removed ${deletedCount} tray(s).`);
+      }
+      setNotice(messages.join(" "));
       await loadPage();
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
       if (normalized.kind === "offline") {
         setOffline(true);
       }
-      setError("Unable to delete selected trays.");
+      setError("Unable to apply tray count changes.");
     } finally {
       setSaving(false);
     }
@@ -2115,55 +2071,34 @@ export default function PlacementPage() {
 
           {currentStep === 2 ? (
             <div className={"grid gap-3"}>
-              <SectionCard title="Add Tray">
-                <div className={styles.entryFormGrid}>
-                  <label className={"grid gap-2"}>
-                    <span className={"text-sm text-muted-foreground"}>Tray code/name</span>
-                    <Input value={newTrayName} onChange={(event) => setNewTrayName(event.target.value)} />
-                  </label>
-                  <label className={"grid gap-2"}>
-                    <span className={"text-sm text-muted-foreground"}>Capacity</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={newTrayCapacity}
-                      onChange={(event) => setNewTrayCapacity(Number.parseInt(event.target.value || "1", 10))}
-                    />
-                  </label>
-                  <div className={styles.entryFormActions}>
-                    <Button type="button" disabled={saving} onClick={() => void createTray()}>
-                      {saving ? "Saving..." : "Create tray"}
+              <SectionCard title={`Tray Manager (${draftTrayCount})`}>
+                <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={decrementDraftTrayCount}
+                      disabled={saving || placementLocked || draftTrayCount === 0}
+                    >
+                      -
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={incrementDraftTrayCount}
+                      disabled={saving || placementLocked}
+                    >
+                      +
                     </Button>
                   </div>
-                </div>
-              </SectionCard>
-
-              <SectionCard title={`Tray Manager (${trays.length})`}>
-                <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
-                  <span className="text-sm text-muted-foreground">Total trays: {sortedTrayIds.length}</span>
-                  <span className="text-sm text-muted-foreground">Selected: {selectedTrayManagerIds.size}</span>
-                  <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
-                    <TooltipIconButton
-                      label="Select all trays"
-                      icon={<CheckSquare size={16} />}
-                      onClick={selectAllTrayManagerCells}
-                      disabled={sortedTrayIds.length === 0}
-                    />
-                    <TooltipIconButton
-                      label="Clear tray selection"
-                      icon={<X size={16} />}
-                      onClick={clearTrayManagerSelection}
-                      disabled={selectedTrayManagerIds.size === 0}
-                    />
-                    {selectedTrayManagerIds.size > 0 ? (
-                      <TooltipIconButton
-                        label="Delete selected trays"
-                        icon={<Trash2 size={16} />}
-                        onClick={() => void bulkDeleteSelectedTrays()}
-                        variant="destructive"
-                      />
-                    ) : null}
-                  </div>
+                  <span className="text-sm text-muted-foreground">Total trays: {draftTrayCount}</span>
+                  {trayCountDraftChangeCount > 0 ? (
+                    <span className="text-sm text-muted-foreground">
+                      {draftTrayCount > trays.length
+                        ? `Pending add: ${trayCountDraftChangeCount}`
+                        : `Pending remove: ${trayCountDraftChangeCount}`}
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className={[styles.trayManagerGrid, styles.cellGridResponsive].join(" ")} data-cell-size="lg">
@@ -2172,7 +2107,6 @@ export default function PlacementPage() {
                     if (!tray) {
                       return null;
                     }
-                    const selected = selectedTrayManagerIds.has(trayId);
                     return (
                       <article
                         key={trayId}
@@ -2180,28 +2114,11 @@ export default function PlacementPage() {
                           styles.trayEditorCell,
                           "rounded-lg border border-border",
                           styles.cellSurfaceLevel1,
-                          styles.cellInteractive,
                           "justify-items-center text-center",
-                          selected ? styles.plantCellSelected : "",
                         ]
                           .filter(Boolean)
                           .join(" ")}
-                        onClick={() => toggleTrayManagerSelection(trayId)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            toggleTrayManagerSelection(trayId);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        aria-pressed={selected}
                       >
-                        {selected ? (
-                          <span className={styles.plantCellCheck}>
-                            <Check size={12} />
-                          </span>
-                        ) : null}
                         <strong className={styles.trayGridCellId}>
                           {formatTrayDisplay(tray.name, tray.tray_id)}
                         </strong>
@@ -2213,9 +2130,42 @@ export default function PlacementPage() {
                       </article>
                     );
                   })}
-                  {trays.length === 0 ? <p className="text-sm text-muted-foreground">No trays yet.</p> : null}
+                  {draftTrayCount > sortedTrayIds.length
+                    ? Array.from({ length: draftTrayCount - sortedTrayIds.length }, (_, index) => (
+                        <article
+                          key={`draft-tray-${index + 1}`}
+                          className={[
+                            styles.trayEditorCell,
+                            "rounded-lg border border-dashed border-border",
+                            styles.cellSurfaceLevel2,
+                            "justify-items-center text-center",
+                          ].join(" ")}
+                        >
+                          <strong className={styles.trayGridCellId}>New tray</strong>
+                          <div className={[styles.trayEditorInputs, "justify-center"].join(" ")}>
+                            <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
+                              {defaultTrayCapacity} {defaultTrayCapacity === 1 ? "plant slot" : "plant slots"}
+                            </Badge>
+                          </div>
+                        </article>
+                      ))
+                    : null}
+                  {draftTrayCount === 0 ? <p className="text-sm text-muted-foreground">No trays configured.</p> : null}
                 </div>
               </SectionCard>
+
+              <ToolbarRow className="mt-3">
+                <span className={styles.recipeLegendItem}>{trayCountDraftChangeCount} tray count change(s)</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    disabled={saving || placementLocked || trayCountDraftChangeCount === 0}
+                    onClick={() => void applyTrayCountDraft()}
+                  >
+                    {saving ? "Applying..." : "Apply Tray Count"}
+                  </Button>
+                </div>
+              </ToolbarRow>
             </div>
           ) : null}
 
