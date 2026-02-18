@@ -1,74 +1,100 @@
-# GrowTrialLab Agent Instructions
+# GrowTrialLab AGENTS.md (Project-Local Instructions)
 
-This file provides project-level instructions for Codex and other coding agents.
+These instructions are **in addition to** the global `~/.codex/AGENTS.md`. Follow **both** unless a rule here **explicitly overrides** or **directly contradicts** the global file (in which case this file wins).
 
-## Canonical Documentation
-Read these first before making changes:
-- `docs/unified-project-notes.md` (canonical architecture/status/risk summary)
-- `docs/feature-map.md` (timeline + completion map with commit refs)
-- `docs/agent-guidebook.md` (agent-specific workflow and documentation policy)
+## 1) Canonical docs (read before changes)
+- `docs/unified-project-notes.md` — canonical architecture/status/risk summary (source of truth)
+- `docs/feature-map.md` — timeline + completion map with commit refs
+- `docs/agent-guidebook.md` — working guide for flows, patterns, and “how it currently works”
+- Historical context only: `docs/legacy/*` (do not treat as canonical unless explicitly reconciling history)
 
-Historical context only:
-- `docs/legacy/*` (do not treat as current source of truth unless explicitly reconciling history)
+## 2) Scope boundary (what belongs where)
+- This `AGENTS.md` is for **durable repo-wide invariants**: security/auth guardrails, API contract invariants, required verification, commit hygiene, and documentation discipline.
+- Put evolving product behavior, UX conventions, and implementation patterns in:
+  - `docs/agent-guidebook.md` (agent workflow + UI/UX conventions)
+  - `docs/unified-project-notes.md` (canonical current state + risk register + open work)
 
-## Scope Boundary
-- Keep this file focused on durable, repo-wide policy: security guardrails, procedural requirements, and documentation discipline.
-- Keep evolving product behavior and implementation-level conventions in `docs/agent-guidebook.md`:
-  - Canonical product flow
-  - API contract conventions
-  - Frontend data-layer patterns
-
-## Auth and Safety Rules
+## 3) Non-negotiable invariants (do not break)
+### Auth & safety
 - Cloudflare Access auth is canonical.
-- Dev auth bypass is allowed only when `DJANGO_DEBUG`=`1` and `ENVIRONMENT`=`development` (or `APP_ENV`=`development`), never by `hostname`/`origin`.
-- Never broaden auth bypass behavior for production paths.
-- Keep production hardening assumptions strict (`DJANGO_DEBUG=0`, proper Cloudflare config, strict hosts/origins).
+- Dev auth bypass is allowed **only** when:
+  - `DJANGO_DEBUG=1` **and**
+  - `ENVIRONMENT=development` (or `APP_ENV=development`)
+- Never gate bypass by hostname/origin, and never broaden bypass for production paths.
+- Keep production hardening assumptions strict (`DJANGO_DEBUG=0`, strict hosts/origins, correct Cloudflare config).
 
-## Testing and Verification Requirements
-- Backend linting uses Ruff and backend static type checks use Pyright.
-- Backend tests use pytest.
-- Tests are required for relevant code changes: any task that adds or changes behavior must update existing tests or add new ones in the same task.
-- After any non-trivial change, run this backend command sequence:
+### API contract invariants
+- List responses must be an envelope: `{ count, results, meta }` and **`meta` must always be present** (even if empty).
+- Blocked operations must return: `{ detail, diagnostics }`.
+- `409` blocked operations must include at least `diagnostics.reason_counts`.
+- Location payloads must use nested `location` objects (do not reintroduce `tent_*`/`slot_*`/`tray_*` field sprawl).
+- Canonical terminology:
+  - use `grade` and `slot`
+  - do not reintroduce `bin` / `block` into active API/UI contracts
+
+### “No legacy resurrection” rule
+- Do not reintroduce removed/superseded flows/contracts as active behavior (see `docs/unified-project-notes.md` for what is canonical vs historical).
+- Preserve readiness blockers and diagnostics visibility in both UI and API.
+
+## 4) Frontend invariants (data layer + styling)
+### Data layer (React Query discipline)
+- Do not inline ad-hoc query keys; all React Query keys must come from `frontend/src/lib/queryKeys.ts`.
+- Prefer shared API helpers:
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/lib/usePageQueryState.ts`
+- Mutations must invalidate the narrowest affected keys plus relevant derived aggregates when applicable (status summary, overview roster, placement summary, feeding queue, schedule plan).
+
+### Styling system (Tailwind/shadcn canonical)
+- Tailwind v4 + shadcn-style primitives are the primary styling system for the frontend.
+- Tailwind theme bridging lives in `frontend/src/styles/tailwind-theme.css` (`@theme inline`) and should prefer referencing existing `--gt-*`/compat variables (avoid creating a second competing token system).
+- Keep Tailwind class strings **static** and scan-safe; do not dynamically generate utility class names.
+- Legacy `gt-*` classes and `frontend/src/styles/primitives.css` are retired; do not reintroduce them.
+- Prefer reusable primitives/patterns under `frontend/src/components/ui/*` and shared Tailwind class maps (e.g., experiments/cockpit style maps) over route-local CSS module forks.
+- Use CSS modules only when geometry truly requires it and cannot be expressed cleanly via utilities; avoid “just because” CSS modules.
+
+## 5) Testing + verification (required for non-trivial changes)
+- Backend lint/type checks:
   - `cd backend && uv run ruff check`
   - `cd backend && uv run pyright`
+- Backend tests:
   - `cd backend && uv run pytest`
   - `cd backend && uv run pytest -q`
   - `cd backend && uv run pytest --maxfail=1`
-- If changes touch frontend code, also run frontend checks:
+- Frontend checks (when frontend changes):
   - `cd frontend && pnpm run lint`
   - `cd frontend && pnpm run typecheck`
-- If changes are broad or cross-cutting, run:
+- If changes are broad or cross-cutting:
   - `infra/scripts/verify.sh`
-- Maintain, update, extend, or add tests when changing lifecycle, diagnostics, readiness, placement, feeding, schedule, response contracts, data models, serializers, middleware/auth, or frontend behavior with backend/API coupling.
-- Keep deterministic behavior and guard tests for ordering-sensitive flows.
+- Tests are mandatory for relevant changes: if a task changes behavior, update/add tests in the same task.
+- Keep tests deterministic; add guards for ordering-sensitive flows and contract shapes.
 
-## Documentation Update Policy (Required)
-When behavior changes, update docs in the same task:
-1. `docs/unified-project-notes.md` for canonical behavior/risk updates.
-2. `docs/feature-map.md` for status/timeline/commit-ref updates.
-3. `docs/agent-guidebook.md` when product guidance, implementation conventions, or agent workflow guidance changes.
-4. `docs/README.md` when canonical doc structure changes.
-5. Keep `docs/legacy/*` as historical archive (only update when recording historical context).
+## 6) Documentation update policy (required)
+- When behavior changes, update docs in the same task:
+  1. `docs/unified-project-notes.md` (canonical behavior/risk changes)
+  2. `docs/feature-map.md` (status/timeline/commit refs)
+  3. `docs/agent-guidebook.md` (agent workflow guidance / product conventions / implementation patterns)
+  4. `docs/README.md` (only when canonical doc structure changes)
+  5. `docs/legacy/*` remains historical archive (only append for traceability, never as canonical)
 
-## End-of-Task Docs Reconciliation (Required)
-1. Review docs relevant to the changed behavior, plus the canonical index docs (`unified-project-notes.md`, `feature-map.md`).
-2. Update outdated entries and ensure prior notes reflect new changes rather than conflicting with them.
-3. Add or update timestamps/status markers (`completed`, `in progress`, `not started`) where applicable.
-4. Ensure relevant commit references are captured in `docs/feature-map.md` for related features / milestones.
+## 7) End-of-task docs reconciliation (required)
+- Review docs relevant to the change plus `docs/unified-project-notes.md` and `docs/feature-map.md`.
+- Remove contradictions and update timestamps/status markers.
+- Ensure new/changed behavior is reflected and commit refs are captured in `docs/feature-map.md`.
 
-## Commit Hygiene and Practices (Required)
+## Commit hygiene and practices (required)
+- **If a task makes any repo changes (code/config/docs/migrations), it must end with at least one commit.**  
 - Keep commits small and single-purpose; don’t mix feature + refactor + formatting + dependency bumps.
-- Use Conventional Commits: `feat(frontend): ...`, `feat(backend): ...`, `fix(...)`, `refactor(...)`, `test(...)`, `docs: ...`, `chore: ...`.
-- Subject line: imperative, <72 chars, no trailing period; add a short body only when it clarifies why/invariants/migrations.
-- Prefer a clean sequence for multi-part work: scaffold/refactor → feat → test → docs (or docs adjacent to the change).
+- Use Conventional Commits:
+  - `feat(frontend): ...`, `feat(backend): ...`, `fix(...)`, `refactor(...)`, `test(...)`, `docs: ...`, `chore: ...`
+- Subject line: imperative, <72 chars, no trailing period; add a short body only when clarifying why/invariants/migrations.
+- Prefer a clean sequence for multi-part work: scaffold/refactor → feat → test → docs (docs may be adjacent to the change).
 - Keep diffs intentional: no drive-by reformatting or unrelated cleanup; formatting-only changes must be their own `chore(format): ...`.
-- Aim for green commits (lint/typecheck/tests passing); if an intermediate break is unavoidable, restore green immediately in the next commit.
-- Isolate schema work: migrations should be explicit and called out (especially if destructive/reset-based).
-- Before sharing/pushing, squash “oops” commits and reword vague messages; don’t rewrite history on shared branches.
+- Aim for green commits (lint/typecheck/tests passing). If an intermediate break is unavoidable, restore green immediately in the next commit.
+- Isolate schema work: migrations must be explicit and called out (especially destructive/reset-based changes).
 - Don’t claim verification unless it was actually run; if partial, state exactly what was run.
+- Before sharing/pushing, squash “oops” commits and reword vague messages; don’t rewrite history on shared branches.
 
-## Change Discipline
+## 9) Change discipline
 - Keep changes small, reviewable, and reversible.
 - Do not revert unrelated workspace changes.
-- Prefer targeted edits and explicit commit messages.
-- If an observed behavior conflicts with docs, fix code/docs mismatch and note it in canonical docs.
+- If observed behavior conflicts with docs, fix code/docs mismatch and record it in canonical docs.

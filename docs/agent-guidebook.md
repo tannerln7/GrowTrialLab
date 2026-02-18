@@ -3,227 +3,134 @@
 Last updated: 2026-02-17
 
 ## Purpose
-This guide is for coding agents (including Codex) working in this repository. It explains current architecture, canonical documentation, expected workflows, and update rules so work stays consistent across sessions.
+This guide helps coding agents (including Codex) work effectively in this repo by explaining **current** architecture, flows, conventions, and where to look for canonical truth. Repo-wide invariants/guardrails live in `AGENTS.md`; this guide is allowed to evolve as the product evolves.
 
-## Codex Instructions Location (Official)
-Per OpenAI Codex docs, project-level persistent instructions belong in `AGENTS.md` at the repository root, with optional nested overrides in subdirectories when needed.
+## Where instructions live (official split)
+- **Global defaults**: `~/.codex/AGENTS.md`
+- **Project invariants**: `AGENTS.md` (repo root)
+- **“How it works right now”**: this file (`docs/agent-guidebook.md`)
+- **Canonical current state + risk register + open work**: `docs/unified-project-notes.md`
+- **Timeline + commit refs**: `docs/feature-map.md`
+- **Historical context only**: `docs/legacy/*`
 
-Primary sources:
-- https://developers.openai.com/codex/guides/agents-md
-- https://developers.openai.com/codex/config-advanced
-- https://developers.openai.com/codex/cli/slash-commands
-
-## Repository Orientation
+## Repository orientation
 - Backend: `backend/` (Django + DRF)
 - Frontend: `frontend/` (Next.js App Router + TypeScript)
 - Infra scripts: `infra/scripts/`
 - Local runtime: `docker-compose.yml`
 - Canonical docs: `docs/`
 
-## Canonical Docs Map
-Use these first:
-- `docs/unified-project-notes.md`
-  - Consolidated architecture/status/risk source of truth.
-- `docs/feature-map.md`
-  - Timeline-accurate feature map with `Completed` / `In Progress` / `Not Started` and commit references.
-- `AGENTS.md`
-  - Stable policy guardrails (security, required verification, documentation reconciliation).
-
-Historical context only:
-- `docs/legacy/decisions.md`
-- `docs/legacy/v1-checklist.md`
-- `docs/legacy/watch-outs.md`
-- `docs/legacy/phase0-ui-refactor-findings.md`
-- `docs/legacy/testing-migration-notes.md`
-- `docs/legacy/ui-illustration-inventory.md`
-
-## Product Flow (Current Canonical)
+## Canonical product flow (current)
 - Entry route: `/experiments/{id}`
 - Redirect behavior:
-  - Bootstrap incomplete -> `/experiments/{id}/setup`
-  - Bootstrap complete -> `/experiments/{id}/overview`
-- Bootstrap scope:
+  - Bootstrap incomplete → `/experiments/{id}/setup`
+  - Bootstrap complete → `/experiments/{id}/overview`
+- Bootstrap scope (minimal):
   - Plants, Tents + Slots, Recipes
-- Readiness/ops pages:
-  - Baseline, Placement, Rotation, Feeding, Schedule, Recipes (recipe management)
-  - Placement is a single-route 4-step workflow:
-    - Step 1: Tents + Slots
-    - Step 2: Trays + Capacity
-    - Step 3: Plants -> Trays (draft then apply)
-    - Step 4: Trays -> Slots (draft then apply)
-- Recipe assignment model:
-  - `Plant.assigned_recipe` is canonical for operations/readiness/feeding.
-  - Trays are recipe-agnostic containers.
-- Plant cockpit:
+- Operations pages:
+  - Baseline: `/experiments/{id}/baseline`
+  - Placement: `/experiments/{id}/placement` (4-step wizard)
+  - Rotation: `/experiments/{id}/rotation`
+  - Feeding: `/experiments/{id}/feeding`
+  - Schedule: `/experiments/{id}/schedule`
+  - Recipes: `/experiments/{id}/recipes`
+- Plant cockpit (QR-first):
   - `/p/{uuid}`
-- Canonical status/gating contract:
+- Canonical gating contract:
   - `GET /api/v1/experiments/{id}/status/summary`
 
-## API Contract Rules
-- List responses use envelope shape: `{count, results, meta}`.
-- Blocked operations return `{detail, diagnostics}`.
-- Location payloads use nested location objects.
-- Endpoints that return entity location must use nested `location` payloads (avoid `tent_*`, `slot_*`, `tray_*` field sprawl).
-- Plant payloads that surface assignment should expose `assigned_recipe` as `{id, code, name} | null`.
-- Assignment API conventions:
-  - Staged per-plant batch save uses `PATCH /api/v1/experiments/{id}/plants/recipes` with `updates[]`.
-  - Per-plant assignment set/clear uses `PATCH /api/v1/plants/{id}` with `assigned_recipe_id`.
-  - Tray convenience bulk assignment uses `POST /api/v1/trays/{id}/plants/apply-recipe`.
-- List endpoints must always include `meta` (even when empty).
-- `409` blocked operations must include at least `diagnostics.reason_counts`.
-- Canonical terms:
-  - `grade` (not `bin`)
-  - `slot` (not `block`)
+## Domain model conventions (current behavior)
+### Physical hierarchy
+`Tent → Slot → Tray → Plant`
 
-## Frontend Data Layer Guidance (Current Conventions)
-- Keep App Router server/client boundaries clean.
-- Use shared query keys and API helpers:
+### Recipe assignment model
+- Canonical assignment lives on **plants**:
+  - `Plant.assigned_recipe` is the source of truth for readiness/feeding behaviors.
+- Trays are recipe-agnostic containers.
+- Recipes UI groups by tray for selection convenience, but writes per-plant mapping.
+
+## Placement workflow (single route, 4 steps)
+Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce standalone `/slots` navigation.
+
+### Step 1: Tents + Slots
+- Define tents, restrictions/parameters, and slot layout (shelves/slots).
+- Goal: stable physical map that mirrors IRL layout.
+
+### Step 2: Trays + Capacity
+- Define trays and per-tray capacity.
+- Goal: containers exist with constraints, but no placement yet.
+
+### Step 3: Plants → Trays (draft then apply)
+- Dense, mobile-first selection grid.
+- Selection is multi-select; bulk move into trays is staged in UI state.
+- Nothing persists until explicit save/confirm.
+
+### Step 4: Trays → Slots (draft then apply)
+- Trays are placed into tent slots using the same multi-select → bulk move model.
+- Slots render inside tents matching the predefined slot layout.
+
+### Placement staging state shape (convention)
+- Persisted mapping: `persistedTrayByPlantId`
+- Staged mapping: `stagedTrayByPlantId`
+- Apply order (deterministic):
+  1) remove stale memberships
+  2) add staged memberships
+
+## Recipes page UX (per-plant assignment with tray grouping)
+- Page purpose: per-plant recipe mapping, tray grouping as a selection aid.
+- Interactions:
+  - select/deselect plants
+  - tray-level toggle selects all plants in a tray
+  - species-based bulk select anchored to last clicked plant cell
+- Draft mapping persists only on explicit save.
+- CRUD UI remains compact (create + multi-select delete grid).
+
+## Baseline v2 capture (current)
+- Baseline capture uses five 1–5 sliders stored in unified metrics keys:
+  - `vigor`, `feature_count`, `feature_quality`, `color_turgor`, `damage_pests`
+- Stored under: `metrics.baseline_v1` on baseline-week metrics.
+- `captured_at` stored at: `metrics.baseline_v1.captured_at` and surfaced as `baseline_captured_at`.
+- Grade behavior:
+  - auto/manual grade sources supported; auto-grade is deterministic server-side
+  - UI allows override via grade control
+
+## Frontend engineering conventions (current)
+### Data layer
+- React Query provider scaffold exists and query key discipline is required.
+- Shared helpers:
   - `frontend/src/lib/queryKeys.ts`
   - `frontend/src/lib/api.ts`
   - `frontend/src/lib/usePageQueryState.ts`
-- Do not inline ad-hoc React Query keys; derive keys from `queryKeys.ts`.
-- Mutations should invalidate only the narrowest affected keys plus relevant derived aggregates:
-  - status summary
-  - overview roster
-  - placement summary
-  - feeding queue
-  - schedule plan
 
-## Frontend Styling Guidance (Current Conventions)
-- Tailwind v4 + shadcn-style patterns are now the primary styling system for core operator routes.
-- Tailwind infrastructure remains canonical (`frontend/postcss.config.mjs`, `frontend/tailwind.config.ts`, `frontend/src/styles/tailwind-theme.css`, and `@import "tailwindcss";` in `frontend/app/globals.css`).
-- Keep `frontend/tailwind.config.ts` minimal (content globs + empty `extend`/plugins) until migration needs explicit customizations.
-- Keep explicit style layering:
-  - `frontend/app/layout.tsx` imports `tokens.css`.
-  - `frontend/app/globals.css` imports `tailwind-theme.css` then `tailwindcss`, then app-global overrides.
-- Tailwind v4 theme bridging lives in `frontend/src/styles/tailwind-theme.css` (`@theme inline`) and should prefer referencing existing `--gt-*`/compat variables rather than introducing a second token system.
-- shadcn/ui-style component kit is active:
-  - `frontend/components.json`
-  - `frontend/src/lib/utils.ts` (`cn(...)`)
-  - `frontend/src/components/ui/*` baseline + migration primitives (`button`, `badge`, `card`, `dialog`, `input`, `textarea`, `select`, `tabs`, `tooltip`, `dropdown-menu`, `popover`, `separator`, `scroll-area`, `icon-button`, `table-shell`, `skeleton`, `empty-state`, `notice`, `panel-surface`, `toolbar-row`, `dense-selectable-cell`)
-- Route-agnostic shared layout wrappers should be Tailwind-first in JSX and avoid dedicated CSS modules unless geometry is truly non-utility-friendly (`PageShell`, `SectionCard`, `StickyActionBar`, `ResponsiveList` are canonical examples).
-- Token source of truth is `frontend/src/styles/tokens.css` (`--gt-*` variables); keep token names stable and minimal so they can map directly into future Tailwind theme config.
-- Keep density unitless (`--gt-density`) and apply it once through the spacing-token pipeline (base `--gt-space-base-*` -> scaled `--gt-space-*`); do not mix viewport length units directly into density math.
-- Legacy `gt-*` classes and `frontend/src/styles/primitives.css` are retired; do not add new `gt-*` usages.
-- Route CSS modules used for experiments/cockpit styling (`frontend/app/experiments/experiments.module.css`, `frontend/app/p/[id]/page.module.css`) are retired; prefer shared Tailwind maps/components instead.
-- For dense placement/recipe/baseline/overview cell layouts, use shared Tailwind-first patterns and `data-cell-size="sm|md|lg"` safe static class compositions.
-- Use the compact spacing ladder tokens (`--gt-space-*`) for all UI spacing declarations; if a fixed non-ladder value is truly required, document the exception inline at the declaration site.
+### Styling
+- Tailwind v4 + shadcn-style components are canonical.
+- Theme bridging:
+  - `frontend/src/styles/tailwind-theme.css` (`@theme inline`) maps to existing token variables.
+- Shared UI primitives live in:
+  - `frontend/src/components/ui/*`
+- Shared route style maps exist for complex geometry reuse:
+  - `experiments-styles.ts`, `cockpit-styles.ts`
+- Avoid dynamic class generation; keep Tailwind scan-safe.
 
-## Tailwind Migration Checklist (Codex Cloud Handoff)
-1. Keep core routes Tailwind-first; no regressions to state workflows, diagnostics rendering, or API shape handling.
-2. Prefer reusable UI primitives/patterns under `frontend/src/components/ui/` over route-local one-off class forks.
-3. Keep API/data contracts unchanged while iterating presentation.
-4. Keep class strings static/safe for Tailwind scanning; avoid dynamic utility name generation.
-5. If adding styles for complex geometry, prefer shared Tailwind class maps (for example, experiments/cockpit style maps) over reintroducing CSS modules.
+## Agent work pattern (practical)
+- Confirm current behavior in code first (routes, views, serializers, contracts).
+- Implement the smallest safe slice that preserves contracts and operator UX.
+- Keep changes staged/draft-only where UX requires explicit confirm.
+- Update canonical docs when behavior/contracts/workflows change (see `AGENTS.md`).
 
-## Overview Page UX Conventions
-- Keep overview roster visualization aligned with physical hierarchy: `Tent -> Slot -> Tray -> Plant`.
-- Prefer compact plant cells inside tray containers (instead of table-style rows) for dense, mobile-friendly scanning.
-- Render tent slot areas using real shelf/slot index geometry (rows by shelf, columns by slot index) instead of auto-fill-only slot wrapping.
-- Surface key per-plant status as compact centered chips in each plant cell (grade, recipe, and non-active status when applicable).
-- Keep tent cards top-aligned and content-sized (no equal-height stretch) so slot/tray stacks stay visually aligned without large vertical gaps.
-- Keep readiness counters and operational navigation controls in the `Experiment State` card, using dynamic status chips that render green when each counter is `0`; keep the `Schedule` navigation button with scheduling details in the `Schedule` card.
-- Keep overview action buttons stateful: nav buttons use primary styling when their corresponding workflow has pending work (baseline/placement/recipes/rotation/feeding/schedule) and secondary styling when clear.
-- Keep `Start` disabled until `readiness.ready_to_start` is true.
-- Keep overview slot/tray/plant grids mobile-safe: avoid hard minimum widths that cause horizontal overflow in portrait mode; cells must shrink responsively on narrow screens.
-
-## Placement Page UX Conventions
-- Keep tent/slot setup in Placement Step 1; do not reintroduce standalone `/slots` navigation links.
-- Keep Placement Step 3 focused on physical plant->tray membership only; do not embed recipe assignment controls in this step.
-- Keep step navigation intentional:
-  - do not render a Back button on Step 1
-  - final-step primary action routes to `/overview` only when Step 4 requirements are satisfied
-- Keep placement membership changes staged in page state until explicit save/confirm.
-- Canonical placement staging shape is plant-centric mapping:
-  - persisted: `persistedTrayByPlantId`
-  - staged: `stagedTrayByPlantId`
-- Enforce capacity and tent-restriction checks at staging time for fast operator feedback, then rely on backend as final source-of-truth on save.
-- Save placement membership changes in deterministic order:
-  - remove stale tray memberships first
-  - add staged tray memberships second
-- Keep multi-select behavior container-aware:
-  - main grid bulk move applies only to selected unplaced/main-grid plants
-  - tray trash removal applies only to selected plants in that tray
-
-## Recipes Page UX Conventions
-- Keep `/experiments/{id}/recipes` focused on per-plant recipe assignment with tray grouping as a selection aid only.
-- Use tray/unplaced plant container grids with Placement Step 3-style selection behavior:
-  - per-plant select/deselect
-  - tray-level select toggle for all plants in a tray
-  - species-based bulk select anchored to last clicked plant cell
-- Keep recipe assignment draft-only until explicit save:
-  - canonical state from placement summary + plant `assigned_recipe`
-  - draft mapping in page state
-  - save via `PATCH /api/v1/experiments/{id}/plants/recipes` diff updates
-- Keep recipe CRUD UI compact:
-  - compact create controls
-  - compact multi-select recipe cell grid with contextual delete action
-
-## Baseline Page UX Conventions
-- Keep baseline capture controls above the plant queue so selected-plant editing is always in view.
-- Use compact plant cell grids for queue navigation (no large row/table layout); clicking anywhere on a tile should select that plant as active for the capture panel.
-- Keep baseline queue tiles visually stable with a square footprint and minimum height so row alignment remains consistent after content changes.
-- Do not expose raw JSON editing in baseline capture UI.
-- Baseline v2 capture uses five unified sliders (1-5):
-  - `vigor`, `feature_count`, `feature_quality`, `color_turgor`, `damage_pests`
-  - persist under `metrics.baseline_v1` on baseline week metrics
-  - baseline capture timestamp persists as `metrics.baseline_v1.captured_at` and is exposed as `baseline_captured_at` in baseline API payloads
-- Baseline sliders default to `3` on first capture.
-- Baseline slider cards use small single-line metric titles (species-aware) and single-word value descriptors rendered below each slider; avoid long helper text blocks below each slider.
-- Slider labels are species/category-aware in UI only; backend schema remains unified across species.
-- Grade behavior:
-  - `grade_source=auto` computes deterministic grade server-side from slider values and stores `Plant.grade`
-  - `grade_source=manual` requires explicit grade override (`A|B|C`) and persists source in baseline metrics
-  - Auto-grade uses a stricter `A` threshold tuned around roughly 4/5 average slider performance.
-- Baseline save action is presented in the top Queue Status action row above capture fields (not sticky at page bottom), always visible with dynamic label behavior:
-  - show `Save & Next` while uncaptured plants remain
-  - show `Save` for already-captured selected plants
-  - keep disabled when no plant is selected, read-only is active, or an already-captured selection has no edits
-- Baseline photo capture/upload is per selected plant and should write with `tag=baseline` and `week_number=0`.
-- Baseline photo UI should use an inline thumbnail cell (always present) with `No media` empty-state text, positioned left of upload controls, instead of external-link navigation.
-- Baseline photo recall should be sourced from baseline endpoints (`baseline_photo` on queue rows and plant baseline payload), not from paginated global photo scans.
-- Baseline capture UI should display a small `Last baseline capture` timestamp for the selected plant, sourced from `baseline_captured_at`, directly below the grade controls/chip row.
-- Baseline queue status chips should show baseline capture state only (`No baseline`/`Captured`), with captured rendered as a green indicator and the chip anchored at the bottom of each queue tile.
-- Baseline file selector control should match the same monochrome button/input theme as the rest of the page.
-
-## Auth and Environment Rules
-- Auth middleware is Cloudflare Access-based.
-- Dev bypass must remain development-only and explicit.
-- Do not weaken production safety defaults.
-- Any auth changes must be reflected in:
-  - `backend/growtriallab/settings.py`
-  - `README.md`
-  - `docs/unified-project-notes.md` and `docs/feature-map.md` when behavior changes
-
-## Testing and Verification Rules
-- Backend lint/type checks:
+## Testing and verification (quick reference)
+Source of truth is `AGENTS.md`, but common commands are:
+- Backend:
   - `cd backend && uv run ruff check`
   - `cd backend && uv run pyright`
-- Backend tests use pytest:
   - `cd backend && uv run pytest`
-- Frontend lint/type checks:
+- Frontend:
   - `cd frontend && pnpm run lint`
   - `cd frontend && pnpm run typecheck`
-- Contract tests are split under `backend/tests/`.
-- Keep tests deterministic (ordering-sensitive logic covered).
-- Update, extend, or add tests for behavior changes (especially envelopes, diagnostics, lifecycle, placement/feeding gates).
-- Full verification script:
+- Full:
   - `infra/scripts/verify.sh`
 
-## Agent Doc Update Policy
-When behavior changes, update docs in the same change set:
-1. Update `docs/unified-project-notes.md` for canonical behavior/risk changes.
-2. Update `docs/feature-map.md` for status/timeline/commit-ref changes.
-3. If legacy-only context is relevant, append to `docs/legacy/*` only as historical notes (do not re-promote legacy docs as canonical).
-
-## Recommended Work Pattern for Agents
-1. Confirm current behavior in code (`backend/api/urls.py`, relevant views, frontend route pages).
-2. Implement smallest safe change.
-3. Run targeted tests, then broader verification as appropriate.
-4. Update canonical docs for any contract or workflow change.
-5. Keep commit messages scoped and explicit.
-
-## Scope Boundaries
-- Avoid reintroducing removed legacy flows (packet/setup-state/groups compatibility contracts) as active behavior.
-- Keep schedule semantics explicit: planning guidance, not auto-execution.
-- Preserve readiness blockers and diagnostics visibility in UI/API.
+## Active risk register and “what’s next”
+Do not duplicate the risk register here. Use:
+- `docs/unified-project-notes.md` (risk register + open work + status)
+- `docs/feature-map.md` (timeline + commit refs)
