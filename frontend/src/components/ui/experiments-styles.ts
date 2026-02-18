@@ -10,12 +10,13 @@ export const experimentsStyles = {
     "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] content-start gap-1 rounded-md border border-border p-[var(--gt-cell-pad,var(--gt-space-md))]",
   cellFrameCompact:
     "relative grid h-full min-h-0 content-start gap-1 rounded-md border border-border p-2",
-  cellInteractive: "cursor-pointer hover:border-ring/70",
+  cellInteractive:
+    "cursor-pointer hover:border-ring/70 active:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
   baselineGradeButtonRow: "flex flex-wrap gap-2",
   baselineGradePill:
     "inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-1 text-xs leading-none",
   baselineGradeRevertButton:
-    "inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-secondary text-foreground transition-colors hover:bg-secondary/80 disabled:opacity-60",
+    "inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-secondary text-foreground transition-colors hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-60",
   baselineGradeRow: "flex flex-wrap items-center gap-1",
   baselinePhotoControls: "grid min-w-[210px] flex-1 gap-2",
   baselinePhotoRow: "flex flex-wrap items-start gap-2",
@@ -28,7 +29,7 @@ export const experimentsStyles = {
   baselineStatusMissing:
     "inline-flex min-w-[5.5rem] items-center justify-center rounded-full border border-border bg-muted px-3 py-1 text-xs leading-none text-muted-foreground",
   baselineStatusReady:
-    "inline-flex min-w-[5.5rem] items-center justify-center rounded-full border border-emerald-500/50 bg-emerald-500/15 px-3 py-1 text-xs leading-none text-emerald-300",
+    "inline-flex min-w-[5.5rem] items-center justify-center rounded-full border border-success/55 bg-success/20 px-3 py-1 text-xs leading-none text-success-foreground",
   entryFormActions: "flex flex-wrap items-center gap-2 sm:col-span-2",
   entryFormGrid: "grid gap-3 sm:grid-cols-2 sm:items-end",
   metricSliderField: "grid gap-2 rounded-md border border-border bg-muted/40 px-2 py-2",
@@ -43,13 +44,13 @@ export const experimentsStyles = {
   overviewPlantChip:
     "inline-flex items-center justify-center rounded-full border border-border px-2 py-1 text-[0.72rem] leading-none whitespace-nowrap",
   overviewPlantChipMissing: "bg-muted text-muted-foreground",
-  overviewPlantChipReady: "border-emerald-500/50 bg-emerald-500/15 text-emerald-300",
+  overviewPlantChipReady: "border-success/55 bg-success/20 text-success-foreground",
   overviewPlantSpecies: "line-clamp-2",
   overviewPlantStatusRow: "flex min-h-[1.9rem] flex-wrap items-center justify-center gap-1",
   overviewReadinessChip:
     "inline-flex items-center justify-center rounded-full border border-border px-2.5 py-1 text-xs leading-none",
   overviewReadinessChipPending: "bg-muted text-muted-foreground",
-  overviewReadinessChipReady: "border-emerald-500/50 bg-emerald-500/15 text-emerald-300",
+  overviewReadinessChipReady: "border-success/55 bg-success/20 text-success-foreground",
   overviewReadinessRow: "flex flex-wrap items-center gap-2",
   overviewScheduleCard: "grid gap-2",
   overviewShelfGroup: "grid gap-1",
@@ -77,7 +78,7 @@ export const experimentsStyles = {
   plantCellGridTray: "rounded-md py-1 [--gt-grid-gap:0.45rem] [--gt-cell-min:110px]",
   plantCellId: "break-words text-[0.92rem] leading-tight max-sm:text-[0.86rem]",
   plantCellMetaRow: "flex flex-wrap items-center gap-1",
-  plantCellSelected: "border-ring bg-[color:var(--gt-cell-selected)]",
+  plantCellSelected: "border-ring bg-[color:var(--gt-cell-selected)] ring-1 ring-ring/50",
   plantCellSpecies: "text-[0.72rem] leading-snug text-muted-foreground max-sm:text-[0.68rem]",
   previewCell: "rounded-sm border border-border bg-card px-1 py-0.5 text-[0.76rem] leading-tight",
   previewCells: "flex flex-wrap gap-1",
@@ -101,9 +102,9 @@ export const experimentsStyles = {
     "relative grid min-h-[var(--gt-cell-min-height,5.25rem)] [grid-template-rows:auto_1fr] items-stretch gap-1 rounded-md border border-border p-2",
   slotCellEmpty:
     "inline-flex h-full w-full items-center justify-center rounded-sm border border-transparent bg-transparent px-2 py-1 text-center text-[0.72rem] leading-tight text-muted-foreground",
-  slotCellEmptyActive: "border-ring bg-[color:var(--gt-cell-selected)] text-foreground",
+  slotCellEmptyActive: "border-ring bg-[color:var(--gt-cell-selected)] text-foreground ring-1 ring-ring/50",
   slotPlacedChip:
-    "inline-flex items-center justify-center justify-self-center rounded-full border border-emerald-500/50 bg-emerald-500/15 px-2.5 py-1 text-xs leading-none text-emerald-300",
+    "inline-flex items-center justify-center justify-self-center rounded-full border border-success/55 bg-success/20 px-2.5 py-1 text-xs leading-none text-success-foreground",
   slotCellLabel: "text-[0.72rem] text-muted-foreground",
   slotGridInline: "flex flex-wrap gap-1",
   stepBlocker: "mt-3 grid gap-1 rounded-md border border-border bg-muted/50 p-2",
@@ -112,9 +113,9 @@ export const experimentsStyles = {
   stepPanel: "mt-3 animate-in fade-in slide-in-from-right-2 duration-200",
   stepperIndex: "inline-flex h-4 w-4 items-center justify-center rounded-full bg-muted text-[0.72rem]",
   stepperItem:
-    "flex items-center justify-start gap-1 rounded-md border border-border bg-card px-2 py-2 text-left text-foreground disabled:cursor-default disabled:opacity-60",
-  stepperItemActive: "border-ring bg-muted/50",
-  stepperItemDone: "border-emerald-500/50 bg-emerald-500/10",
+    "flex items-center justify-start gap-1 rounded-md border border-border bg-card px-2 py-2 text-left text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:cursor-default disabled:opacity-60",
+  stepperItemActive: "border-ring bg-[color:var(--gt-cell-selected)] ring-1 ring-ring/50",
+  stepperItemDone: "border-success/55 bg-success/20 text-success-foreground",
   stepperRow: "grid gap-2 [grid-template-columns:repeat(4,minmax(0,1fr))]",
   toolbarInlineSelect: "w-full sm:min-w-[16rem] sm:max-w-[26rem] sm:flex-1",
   tentBoardCard: "grid gap-2 p-2",
@@ -131,7 +132,7 @@ export const experimentsStyles = {
   trayHeaderMeta: "grid gap-1",
   trayHeaderRow: "flex flex-wrap justify-between gap-2",
   trayHeaderSelect:
-    "inline-flex items-center gap-1 rounded-sm border border-border bg-muted px-2 py-1 text-[0.76rem] text-foreground transition-colors hover:bg-muted/80",
+    "inline-flex min-h-10 items-center gap-1 rounded-sm border border-border bg-muted px-2 py-1 text-[0.76rem] text-foreground transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-60",
   trayMainGrid: "[--gt-grid-gap:0.5rem] [--gt-cell-min:140px]",
   trayManagerGrid: "[--gt-grid-gap:0.55rem] [--gt-cell-min:220px]",
 } as const;

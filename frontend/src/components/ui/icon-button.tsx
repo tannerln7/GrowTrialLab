@@ -7,6 +7,7 @@ import { uiInteraction } from "./ui-foundations";
 const iconButtonVariants = cva(
   [
     "inline-flex items-center justify-center rounded-md border border-border bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
     uiInteraction.transition,
     uiInteraction.focusRing,
     uiInteraction.disabled,
@@ -22,9 +23,9 @@ const iconButtonVariants = cva(
         danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
       },
       size: {
-        sm: "h-9 w-9",
-        default: "h-10 w-10",
-        lg: "h-11 w-11",
+        sm: "h-10 w-10",
+        default: "h-11 w-11",
+        lg: "h-12 w-12",
       },
     },
     defaultVariants: {

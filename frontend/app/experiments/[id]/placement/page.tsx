@@ -2172,6 +2172,7 @@ export default function PlacementPage() {
                           styles.trayEditorCell,
                           "rounded-lg border border-border",
                           styles.cellSurfaceLevel1,
+                          styles.cellInteractive,
                           selected ? styles.plantCellSelected : "",
                         ]
                           .filter(Boolean)

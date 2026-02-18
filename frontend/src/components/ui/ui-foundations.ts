@@ -82,10 +82,13 @@ export const selectableCellVariants = cva(
       },
       state: {
         default: "border-border",
-        selected: "border-ring bg-[color:var(--gt-cell-selected)]",
+        selected: "border-ring bg-[color:var(--gt-cell-selected)] ring-1 ring-ring/50",
       },
       interactive: {
-        true: "cursor-pointer hover:border-ring/70",
+        true: [
+          "cursor-pointer hover:border-ring/70 active:border-ring",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+        ].join(" "),
         false: "",
       },
       dirty: {
