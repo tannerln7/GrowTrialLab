@@ -67,6 +67,7 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 
 ### Step 4: Trays → Slots (draft then apply)
 - Trays are placed into tent slots using the same multi-select → bulk move model.
+- The tent/shelf nested grid renders directly on the step surface (no extra outer wrapper card), matching the Step 1 preview presentation.
 - Slot containers render with shelf grouping (`Tent → Shelf → Slot/Tray`) to match physical tent layout.
 - Within each tent, shelves render as stacked rows; each shelf row scrolls horizontally for its slot/tray cells.
 - Filled slots render tray cards directly (tray takes full slot footprint); empty slots keep `Slot x` + `Empty` affordances.
