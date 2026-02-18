@@ -68,7 +68,7 @@ export const experimentsStyles = {
   overviewTentSlotGrid: "items-start",
   overviewTrayCell:
     "relative grid min-h-0 gap-1 rounded-lg border border-border p-2",
-  overviewTrayMeta: "grid items-center justify-items-center gap-1",
+  overviewTrayMeta: "flex w-full items-center justify-between gap-2",
   placementToolbar: "flex flex-wrap items-center gap-2",
   plantCell: "min-h-[104px] transition-colors",
   plantCellCheck: "absolute right-1 top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground",

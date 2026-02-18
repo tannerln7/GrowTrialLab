@@ -856,11 +856,11 @@ export default function ExperimentOverviewPage() {
                                       className={[styles.overviewTrayCell, styles.cellSurfaceLevel2].join(" ")}
                                     >
                                     <div className={styles.overviewTrayMeta}>
-                                      <strong className={styles.trayGridCellId}>
+                                      <strong className={[styles.trayGridCellId, "text-left"].join(" ")}>
                                         {formatTrayHeading(trayGroup.tray)}
                                       </strong>
                                         {trayGroup.tray.current_count != null && trayGroup.tray.capacity != null ? (
-                                          <span className={styles.recipeLegendItem}>
+                                          <span className={[styles.recipeLegendItem, "shrink-0"].join(" ")}>
                                             {trayGroup.tray.current_count}/{trayGroup.tray.capacity}
                                           </span>
                                         ) : null}
