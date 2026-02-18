@@ -64,7 +64,7 @@ export const experimentsStyles = {
   overviewStateCard: "grid gap-3",
   overviewTentBoardCard: "h-fit content-start",
   overviewTentBoardGrid: "grid grid-cols-1 items-start gap-2 min-[920px]:grid-cols-2",
-  overviewTentShelfStack: "grid gap-2",
+  overviewTentShelfStack: "grid grid-flow-col auto-cols-[minmax(280px,1fr)] gap-2 overflow-x-auto pb-1",
   overviewTentSlotGrid: "items-start",
   overviewTrayCell:
     "relative grid min-h-0 gap-1 rounded-lg border border-border p-2",
