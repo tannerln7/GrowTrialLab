@@ -1,8 +1,12 @@
 import * as React from "react";
+import { type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
+import { selectableCellVariants } from "./ui-foundations";
 
 type DenseSelectableCellProps = React.ComponentProps<"article"> & {
+  tone?: VariantProps<typeof selectableCellVariants>["tone"];
+  state?: VariantProps<typeof selectableCellVariants>["state"];
   selected?: boolean;
   muted?: boolean;
   interactive?: boolean;
@@ -11,20 +15,26 @@ type DenseSelectableCellProps = React.ComponentProps<"article"> & {
 
 function DenseSelectableCell({
   className,
+  tone,
+  state,
   selected = false,
   muted = false,
   interactive = true,
   dirty = false,
   ...props
 }: DenseSelectableCellProps) {
+  const resolvedTone = tone ?? (muted ? "muted" : "default");
+  const resolvedState = state ?? (selected ? "selected" : "default");
+
   return (
     <article
       className={cn(
-        "relative grid min-h-[5.25rem] content-start gap-1 rounded-md border p-2",
-        muted ? "bg-[color:var(--gt-cell-surface-2)]" : "bg-[color:var(--gt-cell-surface-1)]",
-        selected ? "border-ring bg-[color:var(--gt-cell-selected)]" : "border-border",
-        interactive ? "cursor-pointer hover:border-ring/70" : "",
-        dirty ? "ring-1 ring-ring/50" : "",
+        selectableCellVariants({
+          tone: resolvedTone,
+          state: resolvedState,
+          interactive,
+          dirty,
+        }),
         className,
       )}
       {...props}

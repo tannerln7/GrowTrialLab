@@ -1,14 +1,21 @@
 import * as React from "react";
+import { type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
+import { toolbarRowVariants } from "./ui-foundations";
 
-function ToolbarRow({ className, ...props }: React.ComponentProps<"div">) {
+type ToolbarRowProps = React.ComponentProps<"div"> &
+  VariantProps<typeof toolbarRowVariants>;
+
+function ToolbarRow({
+  className,
+  variant,
+  density,
+  ...props
+}: ToolbarRowProps) {
   return (
     <div
-      className={cn(
-        "flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-card p-2",
-        className,
-      )}
+      className={cn(toolbarRowVariants({ variant, density }), className)}
       {...props}
     />
   );

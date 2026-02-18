@@ -10,6 +10,8 @@ const badgeVariants = cva(
         default: "border-transparent bg-primary text-primary-foreground",
         secondary: "border-border bg-muted text-muted-foreground",
         outline: "border-border text-foreground",
+        success: "border-success/50 bg-success/15 text-success-foreground",
+        warning: "border-warning/50 bg-warning/15 text-warning-foreground",
         destructive: "border-transparent bg-destructive text-destructive-foreground",
       },
     },
@@ -25,4 +27,8 @@ function Badge({ className, variant, ...props }: BadgeProps) {
   return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
 }
 
-export { Badge, badgeVariants };
+function Chip({ className, variant = "secondary", ...props }: BadgeProps) {
+  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
+}
+
+export { Badge, Chip, badgeVariants };

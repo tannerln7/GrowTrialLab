@@ -1,9 +1,24 @@
 import * as React from "react";
+import { type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
+import { panelSurfaceVariants } from "./ui-foundations";
 
-function PanelSurface({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("rounded-lg border border-border bg-card p-3 shadow-sm", className)} {...props} />;
+type PanelSurfaceProps = React.ComponentProps<"div"> &
+  VariantProps<typeof panelSurfaceVariants>;
+
+function PanelSurface({
+  className,
+  variant,
+  density,
+  ...props
+}: PanelSurfaceProps) {
+  return (
+    <div
+      className={cn(panelSurfaceVariants({ variant, density }), className)}
+      {...props}
+    />
+  );
 }
 
 export { PanelSurface };

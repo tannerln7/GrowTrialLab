@@ -1,18 +1,28 @@
 import { ReactNode } from "react";
+import { type VariantProps } from "class-variance-authority";
 
-import { cn } from "@/src/lib/utils";
+import { cn } from "@/lib/utils";
+import { surfaceVariants } from "./ui-foundations";
 
 type SectionCardProps = {
   className?: string;
+  variant?: VariantProps<typeof surfaceVariants>["variant"];
   title?: string;
   subtitle?: string;
   actions?: ReactNode;
   children: ReactNode;
 };
 
-export default function SectionCard({ className, title, subtitle, actions, children }: SectionCardProps) {
+export default function SectionCard({
+  className,
+  variant,
+  title,
+  subtitle,
+  actions,
+  children,
+}: SectionCardProps) {
   return (
-    <section className={cn("rounded-lg border border-border bg-card text-card-foreground shadow-sm", className)}>
+    <section className={cn(surfaceVariants({ variant }), className)}>
       {title || subtitle || actions ? (
         <header className="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-start md:justify-between">
           <div>

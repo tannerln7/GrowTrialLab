@@ -1,12 +1,17 @@
 import * as React from "react";
+import { type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
+import { surfaceVariants } from "./ui-foundations";
 
-const Card = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
-  ({ className, ...props }, ref) => (
+type CardProps = React.ComponentProps<"div"> &
+  VariantProps<typeof surfaceVariants>;
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  ({ className, variant, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn("rounded-xl border border-border bg-card text-card-foreground shadow-sm", className)}
+      className={cn(surfaceVariants({ variant }), "rounded-xl", className)}
       {...props}
     />
   ),

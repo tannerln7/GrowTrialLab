@@ -2,6 +2,7 @@
   /* Density + Tailwind-aligned spacing ladder (4px base). */
   --gt-density: 1;
 
+  /* Spacing ladder (4px base): 0, 2, 4, 8, 12, 16, 20, 24, 32, 40px. */
   /* Base ladder tokens remain static; scaled tokens apply density once. */
   --gt-space-base-0: 0;
   --gt-space-base-0-5: 0.125rem;
@@ -87,6 +88,9 @@
   --success: var(--gt-accent-2);
   --warning: var(--gt-warning);
   --focus: var(--gt-outline-focus);
+  --success-foreground: var(--gt-text);
+  --warning-foreground: var(--gt-text);
+  --gt-safe-bottom-offset: calc(env(safe-area-inset-bottom) + var(--gt-space-3));
 }
 
 @media (max-width: 30rem) {

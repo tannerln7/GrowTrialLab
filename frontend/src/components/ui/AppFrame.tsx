@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { cn } from "@/src/lib/utils";
+import { cn } from "@/lib/utils";
 
 type AppFrameProps = React.ComponentProps<"div"> & {
   as?: "div" | "main";

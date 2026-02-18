@@ -5,14 +5,17 @@ import { cn } from "@/lib/utils";
 const noticeVariants = cva("rounded-md border px-3 py-2 text-sm", {
   variants: {
     variant: {
-      info: "border-border bg-muted/50 text-muted-foreground",
-      success: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
-      warning: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+      default: "border-border bg-muted/50 text-foreground",
+      success: "border-success/50 bg-success/15 text-success-foreground",
+      warning: "border-warning/50 bg-warning/15 text-warning-foreground",
+      destructive: "border-destructive/50 bg-destructive/10 text-destructive",
+      // Backwards-compatible aliases.
+      info: "border-border bg-muted/50 text-foreground",
       error: "border-destructive/50 bg-destructive/10 text-destructive",
     },
   },
   defaultVariants: {
-    variant: "info",
+    variant: "default",
   },
 });
 

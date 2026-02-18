@@ -11,7 +11,7 @@ import { buttonVariants } from "@/src/components/ui/button";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { Textarea } from "@/src/components/ui/textarea";
-import { cn } from "@/src/lib/utils";
+import { cn } from "@/lib/utils";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
