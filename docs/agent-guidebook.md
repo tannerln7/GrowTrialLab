@@ -57,7 +57,8 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 - Goal: stable physical map that mirrors IRL layout.
 
 ### Step 2: Trays + Capacity
-- Define trays and per-tray capacity.
+- Define tray container count and default capacity.
+- Tray count is staged with `+/-` controls in `Tray Manager` and persisted via the bottom apply action.
 - Goal: containers exist with constraints, but no placement yet.
 
 ### Step 3: Plants → Trays (draft then apply)

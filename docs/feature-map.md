@@ -27,6 +27,17 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-18 (Placement Step 2 Mobile Tray Controls)
+- `Completed` Placement Step 2 tray setup now uses staged mobile-first count controls and bottom apply.
+  - Removed standalone `Add Tray` form and tray-delete icon flow from Step 2.
+  - Added `+/-` tray count controls in the `Tray Manager` summary row.
+  - Added bottom `Apply Tray Count` action to persist add/remove changes in one save step.
+  - Relevant files:
+    - `frontend/app/experiments/[id]/placement/page.tsx`
+    - `docs/agent-guidebook.md`
+    - `docs/unified-project-notes.md`
+  - Refs: `0e9d52a`
+
 ### 2026-02-18 (Placement Shelf Container Hierarchy)
 - `Completed` Placement Step 4 `Tent Slot Containers` now renders grouped shelf cells per tent (`Tent -> Shelf -> Slot/Tray`) instead of a single flat slot grid.
   - Shelf groups render as stacked rows per tent, and each shelf row presents slot/tray cells in a horizontal lane with overflow fallback.
