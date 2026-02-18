@@ -27,6 +27,25 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-18 (Tailwind Drift Guardrails)
+- `Completed` Lightweight repo guardrails were added to prevent migration regressions.
+  - Added `infra/scripts/check-tailwind-drift.sh` plus root alias `pnpm frontend:tailwind-drift`.
+  - Script checks:
+    - CSS module imports in high-traffic routes (`frontend/app/experiments`, `frontend/app/p`)
+    - `!important` usage
+    - dynamic class interpolation patterns (`className={\`...\`}`, `bg-${...}` style utility interpolation)
+    - legacy `gt-*` class token reintroduction
+    - non-token hex literal and arbitrary utility counts against configurable thresholds
+  - Removed unused styling keys from `experiments-styles` to reduce dead-style drift surface.
+  - Relevant files:
+    - `infra/scripts/check-tailwind-drift.sh`
+    - `package.json`
+    - `frontend/src/components/ui/experiments-styles.ts`
+    - `docs/agent-guidebook.md`
+    - `docs/unified-project-notes.md`
+    - `docs/ui-tailwind-migration-audit.md`
+  - Refs: `f32a672`
+
 ### 2026-02-18 (Primitive Drift Consolidation)
 - `Completed` Duplicate route-level UI primitive patterns were consolidated behind shared components.
   - Added shared `TooltipIconButton` and replaced route-local icon+tooltip wrappers in placement/recipes.

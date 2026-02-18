@@ -144,6 +144,11 @@ Scope: `frontend/app` + `frontend/src` styling system and UI primitives (audit-o
 - Repository-only analysis (no external web/docs sources).
 
 ## Completion RG Checks (2026-02-18)
+- `pnpm frontend:tailwind-drift`
+  - Runs `infra/scripts/check-tailwind-drift.sh` with repo guardrails.
+  - Optional thresholds:
+    - `MAX_NON_TOKEN_HEX` (default `1`)
+    - `MAX_ARBITRARY_UTILS` (default `120`)
 - `rg --files -g '*.css' -g '*.module.css' frontend`
   - Expected: `frontend/app/globals.css`, `frontend/src/styles/tokens.css`, `frontend/src/styles/tailwind-theme.css` only.
 - `rg -n "\\.module\\.css" frontend/app frontend/src --glob '*.{ts,tsx}'`

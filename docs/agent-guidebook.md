@@ -160,6 +160,14 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
   - `PanelSurface` / `SectionCard` / shell surfaces: `variant` uses `default | muted | elevated`
   - `DenseSelectableCell`: `tone` (`default | muted`) + `state` (`default | selected`) with shared interactive/dirty states
 - Avoid dynamic class generation; keep Tailwind scan-safe.
+- Tailwind-first workflow (regression guardrail):
+  - Prefer primitive/style-map updates over per-route CSS overrides.
+  - Keep high-traffic routes (`/experiments/*`, `/p/*`) free of CSS module imports.
+  - Run `pnpm frontend:tailwind-drift` before finalizing frontend styling work.
+  - Drift check thresholds can be tuned via env vars:
+    - `MAX_NON_TOKEN_HEX` (default `1`)
+    - `MAX_ARBITRARY_UTILS` (default `120`)
+  - Guardrail script path: `infra/scripts/check-tailwind-drift.sh`.
 
 ## Agent work pattern (practical)
 - Confirm current behavior in code first (routes, views, serializers, contracts).
@@ -176,6 +184,7 @@ Source of truth is `AGENTS.md`, but common commands are:
 - Frontend:
   - `cd frontend && pnpm run lint`
   - `cd frontend && pnpm run typecheck`
+  - `pnpm frontend:tailwind-drift`
 - Full:
   - `infra/scripts/verify.sh`
 

@@ -178,6 +178,10 @@ This document is the single consolidated source for current status, architecture
   - removed route/component CSS modules (`app/page.module.css`, `app/offline/page.module.css`, `AppMarkPlaceholder.module.css`, `IllustrationPlaceholder.module.css`, `OfflineBanner.module.css`) in favor of utility + primitive composition.
   - removed remaining route inline style objects from overview shelf/slot rendering and replaced with bounded static grid column utility lookup classes.
   - retained runtime CSS files only in `frontend/app/globals.css`, `frontend/src/styles/tokens.css`, and `frontend/src/styles/tailwind-theme.css`.
+- [x] Tailwind drift guardrails are now available as lightweight repo checks:
+  - added `infra/scripts/check-tailwind-drift.sh` and root script alias `pnpm frontend:tailwind-drift`.
+  - check covers: CSS module imports in high-traffic routes, `!important`, dynamic Tailwind interpolation, legacy `gt-*` class token reintroduction, non-token hex color count thresholds, and arbitrary utility count thresholds.
+  - removed dead/unused style-map keys from `frontend/src/components/ui/experiments-styles.ts` (`previewCell`, `previewCells`, `previewGrid`, `previewRow`, `selectionGrid`, `slotGridInline`).
 - [x] Accessibility and mobile ergonomics were hardened at primitive level:
   - standardized focus-visible ring behavior for selectable cells/list controls and Radix menu/popover surfaces.
   - aligned selected states to include both surface change and ring outline.
