@@ -67,7 +67,8 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 
 ### Step 4: Trays → Slots (draft then apply)
 - Trays are placed into tent slots using the same multi-select → bulk move model.
-- Slots render inside tents matching the predefined slot layout.
+- Slot containers render with shelf grouping (`Tent → Shelf → Slot/Tray`) to match physical tent layout.
+- Filled slots render tray cards directly (tray takes full slot footprint); empty slots keep `Slot x` + `Empty` affordances.
 
 ### Placement staging state shape (convention)
 - Persisted mapping: `persistedTrayByPlantId`
@@ -133,6 +134,7 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 - Shared route style maps exist for complex geometry reuse:
   - `experiments-styles.ts`, `cockpit-styles.ts`
   - Overview nested tray metadata rows should stay single-line with tray label left and occupancy chip right (use `overviewTrayMeta` pattern).
+  - Overview shelf groups should render as horizontal rows within each tent (scrollable on narrow widths), not vertical stacks.
   - Overview slot display convention: empty slot cells show `Slot x` + `Empty`; filled slots render tray content directly without repeating slot labels.
 - Shared primitive foundations:
   - `frontend/src/components/ui/ui-foundations.ts` is the single source for:

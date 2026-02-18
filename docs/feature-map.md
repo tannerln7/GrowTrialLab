@@ -27,6 +27,24 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-18 (Placement Shelf Container Hierarchy)
+- `Completed` Placement Step 4 `Tent Slot Containers` now renders grouped shelf cells per tent (`Tent -> Shelf -> Slot/Tray`) instead of a single flat slot grid.
+  - Shelf groups render in a horizontal row and preserve per-shelf slot ordering.
+  - Filled slots render tray cards directly so trays take the full slot footprint; empty slots retain `Slot x` + `Empty`.
+  - Relevant files:
+    - `frontend/app/experiments/[id]/placement/page.tsx`
+    - `frontend/src/components/ui/experiments-styles.ts`
+  - Refs: `c488672`
+
+### 2026-02-18 (Overview Shelf Row Orientation)
+- `Completed` Overview shelf groups now render horizontally inside each tent card instead of vertical stacking.
+  - Uses shared style-map layout (`overviewTentShelfStack`) with horizontal flow and narrow-screen overflow handling.
+  - Relevant files:
+    - `frontend/src/components/ui/experiments-styles.ts`
+    - `docs/agent-guidebook.md`
+    - `docs/unified-project-notes.md`
+  - Refs: `2fc4d95`
+
 ### 2026-02-18 (Overview Slot Label Simplification)
 - `Completed` Overview nested slot display now omits slot labels for filled slots while preserving labeled empty slot placeholders.
   - Filled slots render tray content directly to use full cell space.
