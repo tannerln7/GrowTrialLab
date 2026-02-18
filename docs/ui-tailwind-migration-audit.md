@@ -154,5 +154,5 @@ Scope: `frontend/app` + `frontend/src` styling system and UI primitives (audit-o
   - Expected: one match in `frontend/app/layout.tsx` for Next font vars; no Tailwind utility interpolation.
 - `rg -n "(bg|text|border|ring|p|m|w|h)-\\$\\{" frontend/app frontend/src --glob '*.{ts,tsx}'`
   - Expected: no matches.
-- `rg -n "\\bgt-[a-z0-9-]+" frontend/app frontend/src --glob '*.{ts,tsx,css}'`
-  - Expected: no matches (legacy `gt-*` class system removed).
+- `rg -n "\\bgt-[a-z0-9-]+" frontend/app frontend/src --glob '*.{ts,tsx,css}' | rg -v 'var\\(--gt-|--gt-'`
+  - Expected: no matches (legacy `gt-*` class tokens removed; CSS variable tokens remain in token/theme bridge).
