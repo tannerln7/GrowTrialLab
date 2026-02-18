@@ -2403,103 +2403,101 @@ export default function PlacementPage() {
                 </div>
               </SectionCard>
 
-              <SectionCard title="Tent Slot Containers">
-                <div className={styles.tentBoardGrid}>
-                  {tents.map((tent) => {
-                    const selectedInTent = selectedTraysByTentId[tent.tent_id] || [];
-                    const slotsByShelf = [...tent.slots]
-                      .sort((left, right) => {
-                        if (left.shelf_index !== right.shelf_index) {
-                          return left.shelf_index - right.shelf_index;
-                        }
-                        if (left.slot_index !== right.slot_index) {
-                          return left.slot_index - right.slot_index;
-                        }
-                        return left.slot_id.localeCompare(right.slot_id);
-                      })
-                      .reduce<Map<number, SlotSummary[]>>((map, slot) => {
-                        const shelfSlots = map.get(slot.shelf_index);
-                        if (shelfSlots) {
-                          shelfSlots.push(slot);
-                        } else {
-                          map.set(slot.shelf_index, [slot]);
-                        }
-                        return map;
-                      }, new Map<number, SlotSummary[]>());
+              <div className={styles.tentBoardGrid}>
+                {tents.map((tent) => {
+                  const selectedInTent = selectedTraysByTentId[tent.tent_id] || [];
+                  const slotsByShelf = [...tent.slots]
+                    .sort((left, right) => {
+                      if (left.shelf_index !== right.shelf_index) {
+                        return left.shelf_index - right.shelf_index;
+                      }
+                      if (left.slot_index !== right.slot_index) {
+                        return left.slot_index - right.slot_index;
+                      }
+                      return left.slot_id.localeCompare(right.slot_id);
+                    })
+                    .reduce<Map<number, SlotSummary[]>>((map, slot) => {
+                      const shelfSlots = map.get(slot.shelf_index);
+                      if (shelfSlots) {
+                        shelfSlots.push(slot);
+                      } else {
+                        map.set(slot.shelf_index, [slot]);
+                      }
+                      return map;
+                    }, new Map<number, SlotSummary[]>());
 
-                    return (
-                      <article key={tent.tent_id} className={[styles.tentBoardCard, "rounded-lg border border-border", styles.cellSurfaceLevel3].join(" ")}>
-                        <div className={[styles.trayHeaderRow, "items-center"].join(" ")}>
-                          <div className={[styles.trayHeaderMeta, "py-0.5"].join(" ")}>
-                            <strong className={styles.trayGridCellId}>{tent.name}</strong>
-                          </div>
-                          <div className={styles.trayHeaderActions}>
-                            <span className={styles.recipeLegendItem}>
-                              {tent.slots.length} {tent.slots.length === 1 ? "slot" : "slots"}
-                            </span>
-                            {selectedInTent.length > 0 ? (
-                              <TooltipIconButton
-                                label="Return selected trays to unplaced"
-                                icon={<Trash2 size={16} />}
-                                onClick={() => stageRemoveTraysFromTent(tent.tent_id)}
-                                variant="destructive"
-                              />
-                            ) : null}
-                          </div>
+                  return (
+                    <article key={tent.tent_id} className={[styles.tentBoardCard, "rounded-lg border border-border", styles.cellSurfaceLevel3].join(" ")}>
+                      <div className={[styles.trayHeaderRow, "items-center"].join(" ")}>
+                        <div className={[styles.trayHeaderMeta, "py-0.5"].join(" ")}>
+                          <strong className={styles.trayGridCellId}>{tent.name}</strong>
                         </div>
+                        <div className={styles.trayHeaderActions}>
+                          <span className={styles.recipeLegendItem}>
+                            {tent.slots.length} {tent.slots.length === 1 ? "slot" : "slots"}
+                          </span>
+                          {selectedInTent.length > 0 ? (
+                            <TooltipIconButton
+                              label="Return selected trays to unplaced"
+                              icon={<Trash2 size={16} />}
+                              onClick={() => stageRemoveTraysFromTent(tent.tent_id)}
+                              variant="destructive"
+                            />
+                          ) : null}
+                        </div>
+                      </div>
 
-                        <div className={styles.tentShelfRow}>
-                          {Array.from(slotsByShelf.entries()).map(([shelfIndex, shelfSlots]) => (
-                            <article key={`${tent.tent_id}-shelf-${shelfIndex}`} className={[styles.tentShelfCard, styles.cellSurfaceLevel2].join(" ")}>
-                              <div className={[styles.trayHeaderRow, "items-center"].join(" ")}>
-                                <div className={[styles.trayHeaderMeta, "py-0.5"].join(" ")}>
-                                  <strong className={styles.trayGridCellId}>Shelf {shelfIndex}</strong>
-                                </div>
-                                <div className={styles.trayHeaderActions}>
-                                  <span className={styles.recipeLegendItem}>
-                                    {shelfSlots.length} {shelfSlots.length === 1 ? "slot" : "slots"}
-                                  </span>
-                                </div>
+                      <div className={styles.tentShelfRow}>
+                        {Array.from(slotsByShelf.entries()).map(([shelfIndex, shelfSlots]) => (
+                          <article key={`${tent.tent_id}-shelf-${shelfIndex}`} className={[styles.tentShelfCard, styles.cellSurfaceLevel2].join(" ")}>
+                            <div className={[styles.trayHeaderRow, "items-center"].join(" ")}>
+                              <div className={[styles.trayHeaderMeta, "py-0.5"].join(" ")}>
+                                <strong className={styles.trayGridCellId}>Shelf {shelfIndex}</strong>
                               </div>
+                              <div className={styles.trayHeaderActions}>
+                                <span className={styles.recipeLegendItem}>
+                                  {shelfSlots.length} {shelfSlots.length === 1 ? "slot" : "slots"}
+                                </span>
+                              </div>
+                            </div>
 
-                              <div className={styles.tentShelfSlotGrid}>
-                                {shelfSlots.map((slot) => {
-                                  const trayId = draftSlotToTray.get(slot.slot_id) || null;
-                                  if (trayId) {
-                                    return (
-                                      <div key={slot.slot_id} className={styles.slotTrayCellFill}>
-                                        {renderTrayCell(trayId, true)}
-                                      </div>
-                                    );
-                                  }
+                            <div className={styles.tentShelfSlotGrid}>
+                              {shelfSlots.map((slot) => {
+                                const trayId = draftSlotToTray.get(slot.slot_id) || null;
+                                if (trayId) {
                                   return (
-                                    <div key={slot.slot_id} className={[styles.slotCell, styles.slotContainerCellFrame, styles.cellSurfaceLevel1].join(" ")}>
-                                      <span className={styles.slotCellLabel}>{slot.code}</span>
-                                      <button
-                                        type="button"
-                                        className={[
-                                          styles.slotCellEmpty,
-                                          destinationSlotId === slot.slot_id ? styles.slotCellEmptyActive : "",
-                                        ]
-                                          .filter(Boolean)
-                                          .join(" ")}
-                                        onClick={() => setDestinationSlotId(slot.slot_id)}
-                                      >
-                                        Empty
-                                      </button>
+                                    <div key={slot.slot_id} className={styles.slotTrayCellFill}>
+                                      {renderTrayCell(trayId, true)}
                                     </div>
                                   );
-                                })}
-                              </div>
-                            </article>
-                          ))}
-                          {tent.slots.length === 0 ? <span className="text-sm text-muted-foreground">No slots generated.</span> : null}
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </SectionCard>
+                                }
+                                return (
+                                  <div key={slot.slot_id} className={[styles.slotCell, styles.slotContainerCellFrame, styles.cellSurfaceLevel1].join(" ")}>
+                                    <span className={styles.slotCellLabel}>{slot.code}</span>
+                                    <button
+                                      type="button"
+                                      className={[
+                                        styles.slotCellEmpty,
+                                        destinationSlotId === slot.slot_id ? styles.slotCellEmptyActive : "",
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" ")}
+                                      onClick={() => setDestinationSlotId(slot.slot_id)}
+                                    >
+                                      Empty
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </article>
+                        ))}
+                        {tent.slots.length === 0 ? <span className="text-sm text-muted-foreground">No slots generated.</span> : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
 
               <ToolbarRow className="mt-3">
                 <span className={styles.recipeLegendItem}>{traySlotDraftChangeCount} tray/slot change(s)</span>
