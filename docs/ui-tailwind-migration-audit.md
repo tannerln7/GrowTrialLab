@@ -142,3 +142,17 @@ Scope: `frontend/app` + `frontend/src` styling system and UI primitives (audit-o
 
 ## Sources
 - Repository-only analysis (no external web/docs sources).
+
+## Completion RG Checks (2026-02-18)
+- `rg --files -g '*.css' -g '*.module.css' frontend`
+  - Expected: `frontend/app/globals.css`, `frontend/src/styles/tokens.css`, `frontend/src/styles/tailwind-theme.css` only.
+- `rg -n "\\.module\\.css" frontend/app frontend/src --glob '*.{ts,tsx}'`
+  - Expected: no matches.
+- `rg -n "style=\\{\\{" frontend/app frontend/src --glob '*.{ts,tsx}'`
+  - Expected: no matches.
+- `rg -n "className=\\{`" frontend/app frontend/src --glob '*.{ts,tsx}'`
+  - Expected: one match in `frontend/app/layout.tsx` for Next font vars; no Tailwind utility interpolation.
+- `rg -n "(bg|text|border|ring|p|m|w|h)-\\$\\{" frontend/app frontend/src --glob '*.{ts,tsx}'`
+  - Expected: no matches.
+- `rg -n "\\bgt-[a-z0-9-]+" frontend/app frontend/src --glob '*.{ts,tsx,css}'`
+  - Expected: no matches (legacy `gt-*` class system removed).

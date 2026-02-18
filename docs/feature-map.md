@@ -61,6 +61,27 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/app/p/[id]/page.tsx`
   - Refs: `251b6fa`
 
+### 2026-02-18 (Tailwind Migration Straggler Removal)
+- `Completed` Remaining frontend styling stragglers were removed to lock a Tailwind-first scan-safe baseline.
+  - Removed route/component CSS modules and migrated surfaces to shared primitives + utility classes.
+  - Removed remaining inline style objects in overview slot grid rendering by switching to static lookup classes.
+  - Runtime stylesheet scope now stays within `globals.css`, `tokens.css`, and `tailwind-theme.css`.
+  - Added explicit audit-time `rg` verification commands/results for legacy pattern checks.
+  - Relevant files:
+    - `frontend/app/page.tsx`
+    - `frontend/app/offline/page.tsx`
+    - `frontend/app/experiments/[id]/overview/page.tsx`
+    - `frontend/src/components/AppMarkPlaceholder.tsx`
+    - `frontend/src/components/IllustrationPlaceholder.tsx`
+    - `frontend/src/components/ui/OfflineBanner.tsx`
+    - `frontend/app/page.module.css` (removed)
+    - `frontend/app/offline/page.module.css` (removed)
+    - `frontend/src/components/AppMarkPlaceholder.module.css` (removed)
+    - `frontend/src/components/IllustrationPlaceholder.module.css` (removed)
+    - `frontend/src/components/ui/OfflineBanner.module.css` (removed)
+    - `docs/ui-tailwind-migration-audit.md`
+  - Refs: `f45f670`
+
 ### 2026-02-18 (Tailwind Primitive Backbone Stabilization)
 - `Completed` Shared Tailwind primitive foundation and variant conventions were consolidated to make route work token-first by default.
   - Added shared primitive foundations for interaction, controls, surfaces, and selectable states.

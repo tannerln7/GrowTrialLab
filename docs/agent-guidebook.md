@@ -109,6 +109,12 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 - Token source of truth:
   - `frontend/src/styles/tokens.css` is canonical for color/radius/spacing tokens.
   - `frontend/src/styles/theme.css` is retired and should not be reintroduced.
+- CSS file boundary (current target state):
+  - Runtime CSS should be limited to:
+    - `frontend/app/globals.css`
+    - `frontend/src/styles/tokens.css`
+    - `frontend/src/styles/tailwind-theme.css`
+  - Route/component `.module.css` files are retired; if reintroduced, they must be geometry-only and justified.
 - Spacing ladder (canonical):
   - Tailwind spacing utilities are bound to `--spacing: var(--gt-space-base-1)` (4px base).
   - Use ladder steps before arbitrary values:
@@ -137,6 +143,7 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
   - Use `NativeSelect` (`frontend/src/components/ui/native-select.tsx`) for native `<select>` controls instead of route-local select class strings.
   - Use `Notice` (`frontend/src/components/ui/notice.tsx`) for status/success messages instead of ad-hoc `text-emerald-*` text classes.
   - `buttonVariants` owns border styling for `default`/`secondary`/`destructive`; do not append `border border-border` at callsites.
+  - Avoid inline style objects in route components for utility-friendly layout; prefer static utility class maps or bounded lookup classes.
 - Variant naming conventions (core primitives):
   - `Button`: `default | secondary | outline | ghost | destructive`
   - `Badge` / `Chip`: `default | secondary | outline | success | warning | destructive`
