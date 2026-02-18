@@ -22,6 +22,7 @@ import { suggestTentCode, suggestTentName, suggestTrayName } from "@/lib/id-sugg
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
+import { CountAdjustToolbar } from "@/src/components/ui/count-adjust-toolbar";
 import { Input } from "@/src/components/ui/input";
 import { NativeSelect } from "@/src/components/ui/native-select";
 import { Notice } from "@/src/components/ui/notice";
@@ -1992,25 +1993,16 @@ export default function PlacementPage() {
         <div key={currentStep} className={styles.stepPanel}>
           {currentStep === 1 ? (
             <div className={"grid gap-3"}>
-              <SectionCard title={`Tent Manager (${tents.length})`}>
-                <div className={styles.placementToolbar}>
-                  <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
-                    <StepAdjustButton
-                      direction="decrement"
-                      onClick={() => void removeTent()}
-                      disabled={saving || placementLocked || tents.length === 0}
-                    />
-                    <StepAdjustButton
-                      direction="increment"
-                      onClick={() => void createTent()}
-                      disabled={saving || placementLocked}
-                    />
-                  </div>
-                </div>
-                <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
-                  <span className="text-sm text-muted-foreground">Total tents: {tents.length}</span>
-                  <span className="text-sm text-muted-foreground">Shelves and slots are configured per tent below.</span>
-                </div>
+              <SectionCard title="Tent Manager">
+                <CountAdjustToolbar
+                  count={tents.length}
+                  countLabel="Total tents"
+                  helperText="Shelves and slots are configured per tent below."
+                  onDecrement={() => void removeTent()}
+                  onIncrement={() => void createTent()}
+                  decrementDisabled={saving || placementLocked || tents.length === 0}
+                  incrementDisabled={saving || placementLocked}
+                />
               </SectionCard>
 
               {tents.map((tent) => {
@@ -2157,14 +2149,14 @@ export default function PlacementPage() {
 
                       <div className={"grid gap-2"}>
                         <span className={"text-sm text-muted-foreground"}>Shelves layout</span>
-                        <div className={"flex flex-wrap items-center gap-2"}>
-                          <Button variant="secondary" type="button" onClick={() => addShelf(tent.tent_id)}>
-                            Add shelf
-                          </Button>
-                          <Button variant="secondary" type="button" onClick={() => removeShelf(tent.tent_id)}>
-                            Remove shelf
-                          </Button>
-                        </div>
+                        <CountAdjustToolbar
+                          count={shelfCounts.length}
+                          countLabel="Total shelves"
+                          onDecrement={() => removeShelf(tent.tent_id)}
+                          onIncrement={() => addShelf(tent.tent_id)}
+                          decrementDisabled={saving || placementLocked || shelfCounts.length <= 1}
+                          incrementDisabled={saving || placementLocked}
+                        />
                       </div>
 
                       <div className={"grid gap-2"}>
@@ -2232,25 +2224,15 @@ export default function PlacementPage() {
 
           {currentStep === 2 ? (
             <div className={"grid gap-3"}>
-              <SectionCard title={`Tray Manager (${draftTrayCount})`}>
-                <div className={styles.placementToolbar}>
-                  <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
-                    <StepAdjustButton
-                      direction="decrement"
-                      onClick={decrementDraftTrayCount}
-                      disabled={saving || placementLocked || draftTrayCount === 0}
-                    />
-                    <StepAdjustButton
-                      direction="increment"
-                      onClick={incrementDraftTrayCount}
-                      disabled={saving || placementLocked}
-                    />
-                  </div>
-                </div>
-
-                <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
-                  <span className="text-sm text-muted-foreground">Total trays: {draftTrayCount}</span>
-                </div>
+              <SectionCard title="Tray Manager">
+                <CountAdjustToolbar
+                  count={draftTrayCount}
+                  countLabel="Total trays"
+                  onDecrement={decrementDraftTrayCount}
+                  onIncrement={incrementDraftTrayCount}
+                  decrementDisabled={saving || placementLocked || draftTrayCount === 0}
+                  incrementDisabled={saving || placementLocked}
+                />
 
                 <div className={[styles.trayManagerGrid, styles.cellGridResponsive].join(" ")} data-cell-size="lg">
                   {sortedTrayIds.map((trayId) => {

@@ -54,7 +54,8 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 
 ### Step 1: Tents + Slots
 - Define tents, restrictions/parameters, and slot layout (shelves/slots).
-- Tent count is managed with shared `+/-` controls in `Tent Manager` (above the tent shelf/slot layout cards), using the same `StepAdjustButton` pattern as later step count controls.
+- Tent count is managed with shared `+/-` controls in `Tent Manager` (above the tent shelf/slot layout cards).
+- Shelf count per tent is managed with the same shared `+/-` toolbar pattern in each tent's `Shelves layout` section.
 - Goal: stable physical map that mirrors IRL layout.
 
 ### Step 2: Trays + Capacity
@@ -155,6 +156,7 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
     - surface variants (`surfaceVariants`, `panelSurfaceVariants`, `toolbarRowVariants`)
     - selectable cell state variants (`selectableCellVariants`)
 - Shared primitive usage conventions:
+  - Use `CountAdjustToolbar` (`frontend/src/components/ui/count-adjust-toolbar.tsx`) for shared add/remove count toolbars (tent/shelf/tray manager rows).
   - Use `TooltipIconButton` (`frontend/src/components/ui/tooltip-icon-button.tsx`) for icon-only actions that need tooltip labels.
   - Use `StepAdjustButton` (`frontend/src/components/ui/step-adjust-button.tsx`) for shared `+/-` count controls instead of route-local button styling.
   - Use `NativeSelect` (`frontend/src/components/ui/native-select.tsx`) for native `<select>` controls instead of route-local select class strings.

@@ -33,10 +33,12 @@ This file is the execution-focused feature map for product and engineering statu
   - Added `+/-` tray count controls in the `Tray Manager` summary row.
   - Added in-card `+/-` controls for per-tray capacity drafting.
   - Placement Step 1 tent setup now uses shared `+/-` count controls in `Tent Manager` above tent shelf/slot layouts, replacing the standalone add-tent form flow.
+  - Step 1 shelf add/remove controls were refactored to the same shared `+/-` count-toolbar primitive used by tent/tray manager toolbars.
   - Placement apply flow now uses shared bottom navigation save+advance behavior (`Save & Next`) when pending changes exist.
   - Draft-change chip now renders in the shared nav bar instead of per-step apply rows.
   - Relevant files:
     - `frontend/app/experiments/[id]/placement/page.tsx`
+    - `frontend/src/components/ui/count-adjust-toolbar.tsx`
     - `frontend/src/components/ui/step-adjust-button.tsx`
     - `docs/agent-guidebook.md`
     - `docs/unified-project-notes.md`
