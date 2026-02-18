@@ -58,6 +58,7 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 - Shelf count per tent is managed with the same shared `+/-` toolbar pattern in each tent's `Shelves layout` section.
 - Tent name/ID and species restriction edits are staged per tent card and persisted by the shared bottom `Save & Next` action (no per-card save button).
 - Step 1 shelf preview cards auto-size to their slot cells (content-fit) instead of relying on fixed shelf-card minimum widths.
+- Step 1 shelf preview cards wrap onto new rows when horizontal space is constrained (instead of forcing shelf-to-shelf horizontal scroll).
 - Goal: stable physical map that mirrors IRL layout.
 
 ### Step 2: Trays + Capacity
