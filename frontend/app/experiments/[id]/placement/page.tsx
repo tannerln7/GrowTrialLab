@@ -235,6 +235,22 @@ function areShelfCountsEqual(left: number[], right: number[]): boolean {
   return true;
 }
 
+function areStringSetsEqual(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  const leftSet = new Set(left);
+  if (leftSet.size !== right.length) {
+    return false;
+  }
+  for (const value of right) {
+    if (!leftSet.has(value)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function parseStep(rawStep: string | null): number {
   const parsed = Number.parseInt(rawStep || "1", 10);
   if (!Number.isFinite(parsed)) {
@@ -776,6 +792,33 @@ export default function PlacementPage() {
     return count;
   }, [shelfCountsByTent, tents]);
 
+  const tentDetailsDraftChangeCount = useMemo(() => {
+    let count = 0;
+    for (const tent of tents) {
+      const draft = tentDraftById[tent.tent_id] || {
+        name: tent.name,
+        code: tent.code,
+      };
+      const draftName = draft.name.trim();
+      const draftCode = draft.code.trim();
+      const persistedAllowedSpeciesIds = tent.allowed_species.map((item) => item.id);
+      const draftAllowedSpeciesIds =
+        tentAllowedSpeciesDraftById[tent.tent_id] || persistedAllowedSpeciesIds;
+      const hasNameOrCodeChange = draftName !== tent.name || draftCode !== tent.code;
+      const hasRestrictionChange = !areStringSetsEqual(
+        draftAllowedSpeciesIds,
+        persistedAllowedSpeciesIds,
+      );
+      if (hasNameOrCodeChange || hasRestrictionChange) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [tentAllowedSpeciesDraftById, tentDraftById, tents]);
+
+  const step1DraftChangeCount =
+    tentSlotDraftChangeCount + tentDetailsDraftChangeCount;
+
   const trayCountDraftChangeCount = Math.abs(draftTrayCount - trays.length);
 
   const trayCapacityDraftChangeCount = useMemo(() => {
@@ -793,7 +836,7 @@ export default function PlacementPage() {
 
   function draftChangeCountForStep(step: number): number {
     if (step === 1) {
-      return tentSlotDraftChangeCount;
+      return step1DraftChangeCount;
     }
     if (step === 2) {
       return step2DraftChangeCount;
@@ -807,7 +850,7 @@ export default function PlacementPage() {
   function draftChipLabelForStep(step: number): string {
     const count = draftChangeCountForStep(step);
     if (step === 1) {
-      return formatDraftChipLabel(count, "tent layout change");
+      return formatDraftChipLabel(count, "step 1 change");
     }
     if (step === 2) {
       return formatDraftChipLabel(count, "tray change");
@@ -822,7 +865,7 @@ export default function PlacementPage() {
 
   function stepBlockedMessage(step: number): string {
     if (step === 1 && !step1Complete) {
-      return "Add at least one tent and generate slots for each tent before continuing.";
+      return "Add at least one tent and configure slot layouts before continuing. Step 1 updates save with Save & Next.";
     }
     if (step === 2 && !step2Complete) {
       return "Add at least one tray with capacity before continuing.";
@@ -981,52 +1024,6 @@ export default function PlacementPage() {
     }
   }
 
-  async function saveTentDetails(tent: TentSummary) {
-    if (placementLocked) {
-      setError(RUNNING_LOCK_MESSAGE);
-      return;
-    }
-
-    const draft = tentDraftById[tent.tent_id] || {
-      name: tent.name,
-      code: tent.code,
-    };
-    const allowedSpeciesIds = tentAllowedSpeciesDraftById[tent.tent_id] || tent.allowed_species.map((item) => item.id);
-
-    setSaving(true);
-    setError("");
-    setNotice("");
-
-    try {
-      const response = await backendFetch(`/api/v1/tents/${tent.tent_id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: draft.name,
-          code: draft.code,
-          allowed_species: allowedSpeciesIds,
-        }),
-      });
-
-      const payload = (await response.json()) as { detail?: string };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to update tent.");
-        return;
-      }
-
-      setNotice(`Saved tent details for ${draft.name}.`);
-      await loadPage();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to update tent.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   function adjustShelfSlotCount(tentId: string, shelfIndex: number, delta: number) {
     setShelfCountsByTent((current) => {
       const next = [...(current[tentId] || [4])];
@@ -1059,7 +1056,24 @@ export default function PlacementPage() {
       return false;
     }
 
-    const changedTents = tents.filter((tent) => {
+    const changedTentDetails = tents.filter((tent) => {
+      const draft = tentDraftById[tent.tent_id] || {
+        name: tent.name,
+        code: tent.code,
+      };
+      const draftName = draft.name.trim();
+      const draftCode = draft.code.trim();
+      const persistedAllowedSpeciesIds = tent.allowed_species.map((item) => item.id);
+      const draftAllowedSpeciesIds =
+        tentAllowedSpeciesDraftById[tent.tent_id] || persistedAllowedSpeciesIds;
+      return (
+        draftName !== tent.name ||
+        draftCode !== tent.code ||
+        !areStringSetsEqual(draftAllowedSpeciesIds, persistedAllowedSpeciesIds)
+      );
+    });
+
+    const changedTentLayouts = tents.filter((tent) => {
       const draftShelfCounts = (shelfCountsByTent[tent.tent_id] || buildDefaultShelves(tent)).map((count) =>
         Math.max(0, count),
       );
@@ -1067,8 +1081,8 @@ export default function PlacementPage() {
       return tent.slots.length === 0 || !areShelfCountsEqual(draftShelfCounts, persistedShelfCounts);
     });
 
-    if (changedTents.length === 0) {
-      setNotice("No tent slot layout changes to apply.");
+    if (changedTentDetails.length === 0 && changedTentLayouts.length === 0) {
+      setNotice("No step 1 changes to apply.");
       return true;
     }
 
@@ -1078,8 +1092,36 @@ export default function PlacementPage() {
     setDiagnostics(null);
 
     try {
-      let appliedCount = 0;
-      for (const tent of changedTents) {
+      let detailAppliedCount = 0;
+      let layoutAppliedCount = 0;
+
+      for (const tent of changedTentDetails) {
+        const draft = tentDraftById[tent.tent_id] || {
+          name: tent.name,
+          code: tent.code,
+        };
+        const allowedSpeciesIds =
+          tentAllowedSpeciesDraftById[tent.tent_id] ||
+          tent.allowed_species.map((item) => item.id);
+
+        const detailResponse = await backendFetch(`/api/v1/tents/${tent.tent_id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: draft.name.trim(),
+            code: draft.code.trim(),
+            allowed_species: allowedSpeciesIds,
+          }),
+        });
+        const detailPayload = (await detailResponse.json()) as { detail?: string };
+        if (!detailResponse.ok) {
+          setError(`${tent.name}: ${detailPayload.detail || "Unable to update tent details."}`);
+          return false;
+        }
+        detailAppliedCount += 1;
+      }
+
+      for (const tent of changedTentLayouts) {
         const shelfCounts = shelfCountsByTent[tent.tent_id] || [4];
         const layout = {
           schema_version: 1,
@@ -1109,16 +1151,23 @@ export default function PlacementPage() {
                 .join(", ")}.`
             : "";
           setError(`${tent.name}: ${(payload.detail || "Unable to generate slots.") + orphanMessage}`);
-          if (appliedCount > 0) {
+          if (detailAppliedCount > 0 || layoutAppliedCount > 0) {
             await loadPage();
           }
           return false;
         }
 
-        appliedCount += 1;
+        layoutAppliedCount += 1;
       }
 
-      setNotice(`Applied tent slot layout for ${appliedCount} tent(s).`);
+      const messages: string[] = [];
+      if (detailAppliedCount > 0) {
+        messages.push(`Saved tent details for ${detailAppliedCount} tent(s).`);
+      }
+      if (layoutAppliedCount > 0) {
+        messages.push(`Applied tent slot layout for ${layoutAppliedCount} tent(s).`);
+      }
+      setNotice(messages.join(" "));
       await loadPage();
       return true;
     } catch (requestError) {
@@ -2070,37 +2119,38 @@ export default function PlacementPage() {
                   <SectionCard key={tent.tent_id} title={`${tent.name}${tent.code ? ` (${tent.code})` : ""}`}>
                     <div className={"grid gap-3"}>
                       <div className={styles.trayControlRow}>
-                        <Input
-                          className="sm:w-auto sm:min-w-[11rem] sm:flex-1"
-                          value={tentDraft.name}
-                          onChange={(event) =>
-                            setTentDraftById((current) => ({
-                              ...current,
-                              [tent.tent_id]: {
-                                ...(current[tent.tent_id] || { name: tent.name, code: tent.code }),
-                                name: event.target.value,
-                              },
-                            }))
-                          }
-                          aria-label="Tent name"
-                        />
-                        <Input
-                          className="sm:w-auto sm:min-w-[11rem] sm:flex-1"
-                          value={tentDraft.code}
-                          onChange={(event) =>
-                            setTentDraftById((current) => ({
-                              ...current,
-                              [tent.tent_id]: {
-                                ...(current[tent.tent_id] || { name: tent.name, code: tent.code }),
-                                code: event.target.value,
-                              },
-                            }))
-                          }
-                          aria-label="Tent code"
-                        />
-                        <Button variant="secondary" type="button" disabled={saving} onClick={() => void saveTentDetails(tent)}>
-                          Save tent
-                        </Button>
+                        <label className="grid gap-1 sm:w-auto sm:min-w-[11rem] sm:flex-1">
+                          <span className="text-xs text-muted-foreground">Tent Name</span>
+                          <Input
+                            value={tentDraft.name}
+                            onChange={(event) =>
+                              setTentDraftById((current) => ({
+                                ...current,
+                                [tent.tent_id]: {
+                                  ...(current[tent.tent_id] || { name: tent.name, code: tent.code }),
+                                  name: event.target.value,
+                                },
+                              }))
+                            }
+                            aria-label="Tent name"
+                          />
+                        </label>
+                        <label className="grid gap-1 sm:w-auto sm:min-w-[11rem] sm:flex-1">
+                          <span className="text-xs text-muted-foreground">Tent ID</span>
+                          <Input
+                            value={tentDraft.code}
+                            onChange={(event) =>
+                              setTentDraftById((current) => ({
+                                ...current,
+                                [tent.tent_id]: {
+                                  ...(current[tent.tent_id] || { name: tent.name, code: tent.code }),
+                                  code: event.target.value,
+                                },
+                              }))
+                            }
+                            aria-label="Tent code"
+                          />
+                        </label>
                       </div>
 
                       <div className={"grid gap-2"}>
