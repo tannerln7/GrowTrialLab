@@ -101,8 +101,6 @@ export const experimentsStyles = {
   slotPlacedChip:
     "inline-flex items-center justify-center justify-self-center rounded-full border border-success/55 bg-success/20 px-2 py-0.5 text-[0.72rem] leading-none text-success-foreground",
   slotCellLabel: "text-[0.72rem] text-muted-foreground",
-  stepBlocker: "mt-3 grid gap-1 rounded-md border border-border bg-muted/50 p-2",
-  stepNavActions: "ml-auto flex items-center gap-2",
   stepPanel: "mt-3 animate-in fade-in slide-in-from-right-2 duration-200",
   stepperIndex: "inline-flex h-4 w-4 items-center justify-center rounded-full bg-muted text-[0.72rem]",
   stepperItem:

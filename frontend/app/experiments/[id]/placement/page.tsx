@@ -28,8 +28,8 @@ import { NativeSelect } from "@/src/components/ui/native-select";
 import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { StepNavBar } from "@/src/components/ui/step-nav-bar";
 import { StepAdjustButton } from "@/src/components/ui/step-adjust-button";
-import { ToolbarRow } from "@/src/components/ui/toolbar-row";
 import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
@@ -496,6 +496,25 @@ export default function PlacementPage() {
     });
   }, [tents]);
 
+  const step1ReadyForNext = useMemo(() => {
+    if (tents.length === 0) {
+      return false;
+    }
+    return tents.every((tent) => {
+      const draftShelfCounts = (
+        shelfCountsByTent[tent.tent_id] || buildDefaultShelves(tent)
+      ).map((value) => Math.max(0, value));
+      const persistedShelfCounts = buildPersistedShelfCounts(tent);
+      const layoutWillChange =
+        tent.slots.length === 0 ||
+        !areShelfCountsEqual(draftShelfCounts, persistedShelfCounts);
+      if (layoutWillChange) {
+        return draftShelfCounts.some((count) => count > 0);
+      }
+      return tent.slots.length > 0;
+    });
+  }, [shelfCountsByTent, tents]);
+
   const step2Complete = useMemo(() => {
     if (trays.length === 0) {
       return false;
@@ -862,10 +881,20 @@ export default function PlacementPage() {
   }
 
   const currentStepDraftChangeCount = draftChangeCountForStep(currentStep);
+  const currentStepBlockedMessage = !isStepReadyForNext(currentStep)
+    ? stepBlockedMessage(currentStep)
+    : "";
+  const nextButtonLabel = saving
+    ? "Saving..."
+    : currentStepDraftChangeCount > 0
+      ? "Save & Next"
+      : currentStep === 4
+        ? "Go to Overview"
+        : "Next";
 
   function stepBlockedMessage(step: number): string {
-    if (step === 1 && !step1Complete) {
-      return "Add at least one tent and configure slot layouts before continuing. Step 1 updates save with Save & Next.";
+    if (step === 1 && !step1ReadyForNext) {
+      return "Add at least one tent and ensure each tent has at least one slot before continuing.";
     }
     if (step === 2 && !step2Complete) {
       return "Add at least one tray with capacity before continuing.";
@@ -892,13 +921,20 @@ export default function PlacementPage() {
     return step4Complete;
   }
 
+  function isStepReadyForNext(step: number): boolean {
+    if (step === 1) {
+      return step1ReadyForNext;
+    }
+    return isStepComplete(step);
+  }
+
   function goToStep(step: number) {
     const next = Math.min(Math.max(1, step), maxUnlockedStep);
     setCurrentStep(next);
   }
 
   async function goNextStep() {
-    if (!isStepComplete(currentStep)) {
+    if (!isStepReadyForNext(currentStep)) {
       setError(stepBlockedMessage(currentStep));
       return;
     }
@@ -2032,13 +2068,6 @@ export default function PlacementPage() {
           })}
         </div>
 
-        {!isStepComplete(currentStep) ? (
-          <div className={[styles.stepBlocker, "rounded-lg border border-border bg-card"].join(" ")}>
-            <strong>Step blocker</strong>
-            <p className="text-sm text-muted-foreground">{stepBlockedMessage(currentStep)}</p>
-          </div>
-        ) : null}
-
         <div key={currentStep} className={styles.stepPanel}>
           {currentStep === 1 ? (
             <div className={"grid gap-3"}>
@@ -2652,32 +2681,22 @@ export default function PlacementPage() {
           ) : null}
         </div>
 
-        <ToolbarRow className="mt-3">
-          {currentStep > 1 ? (
-            <Button variant="secondary" type="button" onClick={goPreviousStep}>
-              Back
-            </Button>
-          ) : null}
-          <div className={styles.stepNavActions}>
-            {currentStepDraftChangeCount > 0 ? (
-              <span className={styles.recipeLegendItem}>{draftChipLabelForStep(currentStep)}</span>
-            ) : null}
-            <Button
-             
-              type="button"
-              disabled={saving || !isStepComplete(currentStep)}
-              onClick={() => void goNextStep()}
-            >
-              {saving
-                ? "Saving..."
-                : currentStepDraftChangeCount > 0
-                  ? "Save & Next"
-                  : currentStep === 4
-                    ? "Go to Overview"
-                    : "Next"}
-            </Button>
-          </div>
-        </ToolbarRow>
+        <StepNavBar
+          className="mt-3"
+          showBack={currentStep > 1}
+          onBack={goPreviousStep}
+          onNext={() => void goNextStep()}
+          nextDisabled={saving || !isStepReadyForNext(currentStep)}
+          nextLabel={nextButtonLabel}
+          blockerHint={currentStepBlockedMessage}
+          draftIndicator={
+            currentStepDraftChangeCount > 0 ? (
+              <span className={styles.recipeLegendItem}>
+                {draftChipLabelForStep(currentStep)}
+              </span>
+            ) : null
+          }
+        />
       </SectionCard>
     </PageShell>
   );

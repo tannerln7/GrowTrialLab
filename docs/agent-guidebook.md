@@ -68,6 +68,8 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 ### Step footer draft chips
 - Draft-change chips render in the shared back/next navigation bar and only when pending change count is greater than `0`.
 - Draft-change labels use singular/plural forms automatically (`1 ... change` vs `N ... changes`).
+- Step blocker hints render in that same bottom nav bar (instead of a separate top blocker card).
+- Step 1 blocker gating is draft-aware for shelf layouts, so valid unsaved Step 1 tent/slot drafts can be committed via `Save & Next`.
 
 ### Step 3: Plants → Trays (draft then apply)
 - Dense, mobile-first selection grid.
@@ -158,6 +160,7 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
     - selectable cell state variants (`selectableCellVariants`)
 - Shared primitive usage conventions:
   - Use `CountAdjustToolbar` (`frontend/src/components/ui/count-adjust-toolbar.tsx`) for shared add/remove count toolbars (tent/shelf/tray manager rows).
+  - Use `StepNavBar` (`frontend/src/components/ui/step-nav-bar.tsx`) for the placement-style back/save-next bar with blocker hints + draft indicators.
   - Use `TooltipIconButton` (`frontend/src/components/ui/tooltip-icon-button.tsx`) for icon-only actions that need tooltip labels.
   - Use `StepAdjustButton` (`frontend/src/components/ui/step-adjust-button.tsx`) for shared `+/-` count controls instead of route-local button styling.
   - Use `NativeSelect` (`frontend/src/components/ui/native-select.tsx`) for native `<select>` controls instead of route-local select class strings.
