@@ -5,9 +5,9 @@ import { useState } from "react";
 
 import { backendFetch, normalizeBackendError } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
+import { buttonVariants } from "@/src/components/ui/button";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
-import styles from "./page.module.css";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
@@ -69,17 +69,17 @@ export default function Home() {
       title="GrowTrialLab"
       subtitle="Django API + Next.js frontend local development."
       actions={
-        <div className={styles.actions}>
-          <Link className={styles.buttonSecondary} href="/experiments">
+        <div className="flex flex-wrap gap-2">
+          <Link className={buttonVariants({ variant: "secondary" })} href="/experiments">
             Experiments
           </Link>
         </div>
       }
     >
       <SectionCard title="System Checks">
-        <div className={styles.actions}>
+        <div className="flex flex-wrap gap-2">
           <button
-            className={styles.buttonPrimary}
+            className={buttonVariants({ variant: "default" })}
             onClick={checkBackendHealth}
             disabled={loading}
             type="button"
@@ -87,7 +87,7 @@ export default function Home() {
             {loading ? "Checking..." : "Check backend health"}
           </button>
           <button
-            className={styles.buttonSecondary}
+            className={buttonVariants({ variant: "secondary" })}
             onClick={loadMe}
             disabled={meLoading}
             type="button"
@@ -98,12 +98,14 @@ export default function Home() {
         {notInvited ? (
           <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
         ) : (
-          <p className={styles.mutedText}>{meResult}</p>
+          <p className="m-0 text-muted-foreground">{meResult}</p>
         )}
         {offline ? (
           <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" />
         ) : null}
-        <pre className={styles.output}>{result || "No result yet."}</pre>
+        <pre className="m-0 min-h-32 overflow-auto rounded-lg border border-border bg-card p-3 text-foreground">
+          {result || "No result yet."}
+        </pre>
       </SectionCard>
     </PageShell>
   );

@@ -15,7 +15,7 @@ export default function TailwindProbePage() {
               <Badge variant="secondary">Phase S</Badge>
             </div>
             <CardDescription>
-              Rendering foundational UI primitives without replacing existing gt-* usage.
+              Rendering foundational UI primitives and token-driven utilities.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">

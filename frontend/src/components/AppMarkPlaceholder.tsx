@@ -1,10 +1,8 @@
 import { FlaskConical } from "lucide-react";
 
-import styles from "./AppMarkPlaceholder.module.css";
-
 export default function AppMarkPlaceholder() {
   return (
-    <div className={styles.mark}>
+    <div className="inline-flex items-center gap-2 font-bold tracking-[0.01em] text-foreground">
       <FlaskConical size={18} />
       <span>GrowTrialLab</span>
     </div>

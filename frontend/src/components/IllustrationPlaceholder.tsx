@@ -9,8 +9,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import styles from "./IllustrationPlaceholder.module.css";
-
 type PlaceholderKind =
   | "notInvited"
   | "noExperiments"
@@ -78,14 +76,17 @@ export default function IllustrationPlaceholder({
   const Icon = config.icon;
 
   return (
-    <section className={styles.card} aria-label={inventoryId}>
-      <div className={styles.iconWrap}>
+    <section
+      className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-card p-4"
+      aria-label={inventoryId}
+    >
+      <div className="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-muted text-foreground">
         <Icon size={30} strokeWidth={1.8} />
       </div>
-      <div className={styles.text}>
+      <div className="grid gap-1">
         <strong>{title ?? config.title}</strong>
-        <p>{subtitle ?? config.subtitle}</p>
-        <small>{inventoryId}</small>
+        <p className="m-0 text-muted-foreground">{subtitle ?? config.subtitle}</p>
+        <small className="text-xs text-muted-foreground">{inventoryId}</small>
       </div>
     </section>
   );

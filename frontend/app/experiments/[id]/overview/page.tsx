@@ -93,6 +93,26 @@ const DIAGNOSTIC_LABELS: Record<string, string> = {
   needs_tent_restriction: "violates tent restrictions",
 };
 
+const OVERVIEW_SLOT_COLUMN_CLASSES = [
+  "grid-cols-1",
+  "grid-cols-2",
+  "grid-cols-3",
+  "grid-cols-4",
+  "grid-cols-5",
+  "grid-cols-6",
+  "grid-cols-7",
+  "grid-cols-8",
+  "grid-cols-9",
+  "grid-cols-10",
+  "grid-cols-11",
+  "grid-cols-12",
+] as const;
+
+function overviewSlotGridColumns(maxSlotCount: number): string {
+  const capped = Math.min(12, Math.max(1, Math.trunc(maxSlotCount || 1)));
+  return OVERVIEW_SLOT_COLUMN_CLASSES[capped - 1] || OVERVIEW_SLOT_COLUMN_CLASSES[0];
+}
+
 function formatScheduleSlot(
   slot: ExperimentStatusSummary["schedule"]["next_scheduled_slot"],
 ): string {
@@ -796,10 +816,11 @@ export default function ExperimentOverviewPage() {
                         <div key={`${tentGroup.tent.id}-shelf-${shelfGroup.shelfIndex}`} className={styles.overviewShelfGroup}>
                         <span className={styles.overviewShelfLabel}>Shelf {shelfGroup.shelfIndex}</span>
                         <div
-                          className={[styles.overviewTentSlotGrid, styles.overviewShelfSlotGrid].join(" ")}
-                          style={{
-                            gridTemplateColumns: `repeat(${tentGroup.maxSlotCount}, minmax(0, 1fr))`,
-                          }}
+                          className={[
+                            styles.overviewTentSlotGrid,
+                            styles.overviewShelfSlotGrid,
+                            overviewSlotGridColumns(tentGroup.maxSlotCount),
+                          ].join(" ")}
                         >
                           {Array.from({ length: tentGroup.maxSlotCount }, (_, index) => {
                             const slotIndex = index + 1;
@@ -826,7 +847,6 @@ export default function ExperimentOverviewPage() {
                               <div
                                 key={slotGroup.slot.id}
                                 className={[styles.slotCell, styles.overviewSlotCell, styles.cellFrame, styles.cellSurfaceLevel3].join(" ")}
-                                style={{ gridColumnStart: slotIndex }}
                               >
                                 <span className={styles.slotCellLabel}>Slot {slotIndex}</span>
                                 <div className={styles.overviewSlotTrayStack}>
