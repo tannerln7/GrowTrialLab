@@ -28,12 +28,16 @@ This file is the execution-focused feature map for product and engineering statu
 ## Timeline: Completed Features
 
 ### 2026-02-18 (Placement Step 2 Mobile Tray Controls)
-- `Completed` Placement Step 2 tray setup now uses staged mobile-first count controls and bottom apply.
+- `Completed` Placement Step 2 tray setup now uses staged mobile-first count/capacity controls.
   - Removed standalone `Add Tray` form and tray-delete icon flow from Step 2.
   - Added `+/-` tray count controls in the `Tray Manager` summary row.
-  - Added bottom `Apply Tray Count` action to persist add/remove changes in one save step.
+  - Added in-card `+/-` controls for per-tray capacity drafting.
+  - Placement Step 1 tent setup now uses shared `+/-` count controls in `Tent Manager` above tent shelf/slot layouts, replacing the standalone add-tent form flow.
+  - Placement apply flow now uses shared bottom navigation save+advance behavior (`Save & Next`) when pending changes exist.
+  - Draft-change chip now renders in the shared nav bar instead of per-step apply rows.
   - Relevant files:
     - `frontend/app/experiments/[id]/placement/page.tsx`
+    - `frontend/src/components/ui/step-adjust-button.tsx`
     - `docs/agent-guidebook.md`
     - `docs/unified-project-notes.md`
   - Refs: `0e9d52a`

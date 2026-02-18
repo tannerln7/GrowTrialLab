@@ -27,6 +27,7 @@ import { NativeSelect } from "@/src/components/ui/native-select";
 import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { StepAdjustButton } from "@/src/components/ui/step-adjust-button";
 import { ToolbarRow } from "@/src/components/ui/toolbar-row";
 import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
 
@@ -257,6 +258,10 @@ function formatTrayDisplay(rawValue: string | null | undefined, fallbackValue?: 
   return `Tray ${trayNumber}`;
 }
 
+function formatDraftChipLabel(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? "" : "s"}`;
+}
+
 async function parseBackendErrorPayload(
   response: Response,
   fallback: string,
@@ -301,13 +306,13 @@ export default function PlacementPage() {
   const [statusSummary, setStatusSummary] = useState<ExperimentStatusSummary | null>(null);
   const [species, setSpecies] = useState<Species[]>([]);
 
-  const [newTentName, setNewTentName] = useState("");
-  const [newTentCode, setNewTentCode] = useState("");
   const [shelfCountsByTent, setShelfCountsByTent] = useState<Record<string, number[]>>({});
   const [tentDraftById, setTentDraftById] = useState<Record<string, TentDraft>>({});
   const [tentAllowedSpeciesDraftById, setTentAllowedSpeciesDraftById] = useState<Record<string, string[]>>({});
 
   const [draftTrayCount, setDraftTrayCount] = useState(0);
+  const [trayCapacityDraftById, setTrayCapacityDraftById] = useState<Record<string, number>>({});
+  const [newTrayCapacities, setNewTrayCapacities] = useState<number[]>([]);
 
   const [persistedPlantToTray, setPersistedPlantToTray] = useState<Record<string, string | null>>({});
   const [draftPlantToTray, setDraftPlantToTray] = useState<Record<string, string | null>>({});
@@ -339,20 +344,22 @@ export default function PlacementPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!newTentName.trim()) {
-      setNewTentName(tentNameSuggestion);
-    }
-  }, [newTentName, tentNameSuggestion]);
-
-  useEffect(() => {
-    if (!newTentCode.trim()) {
-      setNewTentCode(tentCodeSuggestion);
-    }
-  }, [newTentCode, tentCodeSuggestion]);
-
-  useEffect(() => {
     setDraftTrayCount(trays.length);
-  }, [trays.length]);
+    setTrayCapacityDraftById(
+      Object.fromEntries(trays.map((tray) => [tray.tray_id, Math.max(1, tray.capacity)])),
+    );
+  }, [trays]);
+
+  useEffect(() => {
+    setNewTrayCapacities((current) => {
+      const required = Math.max(0, draftTrayCount - trays.length);
+      const next = current.slice(0, required);
+      while (next.length < required) {
+        next.push(defaultTrayCapacity);
+      }
+      return next;
+    });
+  }, [defaultTrayCapacity, draftTrayCount, trays.length]);
 
   const trayById = useMemo(() => {
     const map = new Map<string, TrayCell>();
@@ -770,6 +777,48 @@ export default function PlacementPage() {
 
   const trayCountDraftChangeCount = Math.abs(draftTrayCount - trays.length);
 
+  const trayCapacityDraftChangeCount = useMemo(() => {
+    let count = 0;
+    for (const tray of trays) {
+      const draftCapacity = trayCapacityDraftById[tray.tray_id] ?? tray.capacity;
+      if (draftCapacity !== tray.capacity) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [trayCapacityDraftById, trays]);
+
+  const step2DraftChangeCount = trayCountDraftChangeCount + trayCapacityDraftChangeCount;
+
+  function draftChangeCountForStep(step: number): number {
+    if (step === 1) {
+      return tentSlotDraftChangeCount;
+    }
+    if (step === 2) {
+      return step2DraftChangeCount;
+    }
+    if (step === 3) {
+      return placementDraftChangeCount;
+    }
+    return traySlotDraftChangeCount;
+  }
+
+  function draftChipLabelForStep(step: number): string {
+    const count = draftChangeCountForStep(step);
+    if (step === 1) {
+      return formatDraftChipLabel(count, "tent layout change");
+    }
+    if (step === 2) {
+      return formatDraftChipLabel(count, "tray change");
+    }
+    if (step === 3) {
+      return formatDraftChipLabel(count, "plant layout change");
+    }
+    return formatDraftChipLabel(count, "tray/slot change");
+  }
+
+  const currentStepDraftChangeCount = draftChangeCountForStep(currentStep);
+
   function stepBlockedMessage(step: number): string {
     if (step === 1 && !step1Complete) {
       return "Add at least one tent and generate slots for each tent before continuing.";
@@ -804,17 +853,34 @@ export default function PlacementPage() {
     setCurrentStep(next);
   }
 
-  function goNextStep() {
+  async function goNextStep() {
     if (!isStepComplete(currentStep)) {
       setError(stepBlockedMessage(currentStep));
       return;
     }
+    setError("");
+
+    if (currentStepDraftChangeCount > 0) {
+      let saved = true;
+      if (currentStep === 1) {
+        saved = await applyTentSlotLayouts();
+      } else if (currentStep === 2) {
+        saved = await applyTrayCountDraft();
+      } else if (currentStep === 3) {
+        saved = await applyPlantToTrayLayout();
+      } else {
+        saved = await applyTrayToSlotLayout();
+      }
+      if (!saved) {
+        return;
+      }
+    }
+
     if (currentStep === 4) {
       router.push(`/experiments/${experimentId}/overview`);
       return;
     }
     setCurrentStep((current) => Math.min(4, current + 1));
-    setError("");
   }
 
   function goPreviousStep() {
@@ -828,8 +894,8 @@ export default function PlacementPage() {
       return;
     }
 
-    const name = newTentName.trim() || tentNameSuggestion;
-    const code = newTentCode.trim() || tentCodeSuggestion;
+    const name = tentNameSuggestion;
+    const code = tentCodeSuggestion;
 
     if (!name) {
       setError("Tent name is required.");
@@ -853,24 +919,14 @@ export default function PlacementPage() {
 
       const payload = (await response.json()) as {
         detail?: string;
-        suggested_name?: string;
-        suggested_code?: string;
       };
 
       if (!response.ok) {
-        if (payload.suggested_name) {
-          setNewTentName(payload.suggested_name);
-        }
-        if (payload.suggested_code) {
-          setNewTentCode(payload.suggested_code);
-        }
         setError(payload.detail || "Unable to create tent.");
         return;
       }
 
       setNotice("Tent created.");
-      setNewTentName("");
-      setNewTentCode("");
       await loadPage();
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
@@ -878,6 +934,47 @@ export default function PlacementPage() {
         setOffline(true);
       }
       setError("Unable to create tent.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeTent() {
+    if (placementLocked) {
+      setError(RUNNING_LOCK_MESSAGE);
+      return;
+    }
+    if (tents.length === 0) {
+      return;
+    }
+
+    const removableTent =
+      [...tents].reverse().find((tent) => tent.slots.length === 0) || tents[tents.length - 1];
+    if (!removableTent) {
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await backendFetch(`/api/v1/tents/${removableTent.tent_id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const payload = await parseBackendErrorPayload(response, "Unable to remove tent.");
+        setError(payload.detail);
+        return;
+      }
+      setNotice(`Removed ${removableTent.name}.`);
+      await loadPage();
+    } catch (requestError) {
+      const normalized = normalizeBackendError(requestError);
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to remove tent.");
     } finally {
       setSaving(false);
     }
@@ -955,10 +1052,10 @@ export default function PlacementPage() {
     });
   }
 
-  async function applyTentSlotLayouts() {
+  async function applyTentSlotLayouts(): Promise<boolean> {
     if (placementLocked) {
       setError(RUNNING_LOCK_MESSAGE);
-      return;
+      return false;
     }
 
     const changedTents = tents.filter((tent) => {
@@ -971,7 +1068,7 @@ export default function PlacementPage() {
 
     if (changedTents.length === 0) {
       setNotice("No tent slot layout changes to apply.");
-      return;
+      return true;
     }
 
     setSaving(true);
@@ -1014,7 +1111,7 @@ export default function PlacementPage() {
           if (appliedCount > 0) {
             await loadPage();
           }
-          return;
+          return false;
         }
 
         appliedCount += 1;
@@ -1022,12 +1119,14 @@ export default function PlacementPage() {
 
       setNotice(`Applied tent slot layout for ${appliedCount} tent(s).`);
       await loadPage();
+      return true;
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
       if (normalized.kind === "offline") {
         setOffline(true);
       }
       setError("Unable to apply tent slot layout changes.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1041,17 +1140,42 @@ export default function PlacementPage() {
     setDraftTrayCount((current) => Math.max(0, current - 1));
   }
 
-  async function applyTrayCountDraft() {
+  function adjustTrayCapacity(trayId: string, delta: number) {
+    const tray = trayById.get(trayId);
+    if (!tray) {
+      return;
+    }
+    setTrayCapacityDraftById((current) => {
+      const currentValue = current[trayId] ?? tray.capacity;
+      return {
+        ...current,
+        [trayId]: Math.max(1, currentValue + delta),
+      };
+    });
+  }
+
+  function adjustPendingTrayCapacity(index: number, delta: number) {
+    setNewTrayCapacities((current) => {
+      if (index < 0 || index >= current.length) {
+        return current;
+      }
+      const next = [...current];
+      next[index] = Math.max(1, next[index] + delta);
+      return next;
+    });
+  }
+
+  async function applyTrayCountDraft(): Promise<boolean> {
     if (placementLocked) {
       setError(RUNNING_LOCK_MESSAGE);
-      return;
+      return false;
     }
 
     const targetCount = Math.max(0, draftTrayCount);
     const currentCount = trays.length;
     const delta = targetCount - currentCount;
-    if (delta === 0) {
-      return;
+    if (delta === 0 && trayCapacityDraftChangeCount === 0) {
+      return true;
     }
 
     setSaving(true);
@@ -1062,28 +1186,35 @@ export default function PlacementPage() {
     try {
       let createdCount = 0;
       let deletedCount = 0;
+      let capacityUpdatedCount = 0;
+      let mutationCount = 0;
 
       if (delta > 0) {
         const existingNames = new Set(trays.map((tray) => tray.name));
         for (let index = 0; index < delta; index += 1) {
           const suggestedName = suggestTrayName(Array.from(existingNames));
+          const draftCapacity = Math.max(1, newTrayCapacities[index] ?? defaultTrayCapacity);
           const response = await backendFetch(`/api/v1/experiments/${experimentId}/trays`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               name: suggestedName,
-              capacity: defaultTrayCapacity,
+              capacity: draftCapacity,
             }),
           });
 
           const payload = (await response.json()) as { detail?: string; suggested_name?: string; name?: string };
           if (!response.ok) {
+            if (mutationCount > 0) {
+              await loadPage();
+            }
             setError(payload.detail || "Unable to add trays.");
-            return;
+            return false;
           }
 
           existingNames.add(payload.name || payload.suggested_name || suggestedName);
           createdCount += 1;
+          mutationCount += 1;
         }
       } else {
         const removeCount = Math.abs(delta);
@@ -1096,13 +1227,46 @@ export default function PlacementPage() {
             const parsed = await parseBackendErrorPayload(response, "Unable to remove trays.");
             setError(parsed.detail);
             setDiagnostics(parsed.diagnostics);
-            if (deletedCount > 0) {
+            if (mutationCount > 0) {
               await loadPage();
             }
-            return;
+            return false;
           }
           deletedCount += 1;
+          mutationCount += 1;
         }
+      }
+
+      const removeCount = delta < 0 ? Math.abs(delta) : 0;
+      const remainingTrayIds = removeCount > 0 ? [...sortedTrayIds].slice(0, sortedTrayIds.length - removeCount) : sortedTrayIds;
+
+      for (const trayId of remainingTrayIds) {
+        const tray = trayById.get(trayId);
+        if (!tray) {
+          continue;
+        }
+        const draftCapacity = Math.max(1, trayCapacityDraftById[trayId] ?? tray.capacity);
+        if (draftCapacity === tray.capacity) {
+          continue;
+        }
+        const response = await backendFetch(`/api/v1/trays/${trayId}/`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            capacity: draftCapacity,
+          }),
+        });
+        if (!response.ok) {
+          const parsed = await parseBackendErrorPayload(response, "Unable to update tray capacity.");
+          setError(parsed.detail);
+          setDiagnostics(parsed.diagnostics);
+          if (mutationCount > 0) {
+            await loadPage();
+          }
+          return false;
+        }
+        capacityUpdatedCount += 1;
+        mutationCount += 1;
       }
 
       const messages: string[] = [];
@@ -1112,14 +1276,19 @@ export default function PlacementPage() {
       if (deletedCount > 0) {
         messages.push(`Removed ${deletedCount} tray(s).`);
       }
+      if (capacityUpdatedCount > 0) {
+        messages.push(`Updated ${capacityUpdatedCount} tray capacity setting(s).`);
+      }
       setNotice(messages.join(" "));
       await loadPage();
+      return true;
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
       if (normalized.kind === "offline") {
         setOffline(true);
       }
       setError("Unable to apply tray count changes.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1539,7 +1708,16 @@ export default function PlacementPage() {
             <Check size={12} />
           </span>
         ) : null}
-        <strong className={[styles.trayGridCellId, inSlot ? "truncate" : ""].filter(Boolean).join(" ")}>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
+        <strong
+          className={[
+            styles.trayGridCellId,
+            inSlot ? styles.trayGridCellIdInSlot : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {formatTrayDisplay(tray.name, tray.tray_id)}
+        </strong>
         <Badge
           variant="secondary"
           className={[styles.recipeLegendItemCompact, inSlot ? "justify-self-center" : ""].filter(Boolean).join(" ")}
@@ -1551,10 +1729,10 @@ export default function PlacementPage() {
     );
   }
 
-  async function applyPlantToTrayLayout() {
+  async function applyPlantToTrayLayout(): Promise<boolean> {
     if (placementLocked) {
       setError(RUNNING_LOCK_MESSAGE);
-      return;
+      return false;
     }
 
     const placementChanges = sortedPlantIds
@@ -1579,7 +1757,7 @@ export default function PlacementPage() {
 
     if (placementChanges.length === 0) {
       setNotice("No staged plant/tray changes to apply.");
-      return;
+      return true;
     }
 
     setSaving(true);
@@ -1595,7 +1773,7 @@ export default function PlacementPage() {
         const row = persistedTrayPlantRowByPlantId[removal.plantId];
         if (!row || !removal.persistedTrayId) {
           setError("Unable to resolve persisted tray placement. Refresh and try again.");
-          return;
+          return false;
         }
 
         const response = await backendFetch(`/api/v1/trays/${removal.persistedTrayId}/plants/${row.trayPlantId}`, {
@@ -1606,7 +1784,7 @@ export default function PlacementPage() {
           const parsed = await parseBackendErrorPayload(response, "Unable to apply plant/tray layout changes.");
           setError(parsed.detail);
           setDiagnostics(parsed.diagnostics);
-          return;
+          return false;
         }
       }
 
@@ -1625,27 +1803,29 @@ export default function PlacementPage() {
           const parsed = await parseBackendErrorPayload(response, "Unable to apply plant/tray layout changes.");
           setError(parsed.detail);
           setDiagnostics(parsed.diagnostics);
-          return;
+          return false;
         }
       }
 
       setNotice(`Applied ${placementChanges.length} plant layout change(s).`);
       await loadPage();
+      return true;
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
       if (normalized.kind === "offline") {
         setOffline(true);
       }
       setError("Unable to apply plant/tray layout changes.");
+      return false;
     } finally {
       setSaving(false);
     }
   }
 
-  async function applyTrayToSlotLayout() {
+  async function applyTrayToSlotLayout(): Promise<boolean> {
     if (placementLocked) {
       setError(RUNNING_LOCK_MESSAGE);
-      return;
+      return false;
     }
 
     const slotChanges = sortedTrayIds
@@ -1668,7 +1848,7 @@ export default function PlacementPage() {
 
     if (slotChanges.length === 0) {
       setNotice("No staged tray/slot changes to apply.");
-      return;
+      return true;
     }
 
     setSaving(true);
@@ -1692,7 +1872,7 @@ export default function PlacementPage() {
           const parsed = await parseBackendErrorPayload(response, "Unable to apply tray/slot layout changes.");
           setError(parsed.detail);
           setDiagnostics(parsed.diagnostics);
-          return;
+          return false;
         }
       }
 
@@ -1711,18 +1891,20 @@ export default function PlacementPage() {
           const parsed = await parseBackendErrorPayload(response, "Unable to apply tray/slot layout changes.");
           setError(parsed.detail);
           setDiagnostics(parsed.diagnostics);
-          return;
+          return false;
         }
       }
 
       setNotice(`Applied ${slotChanges.length} tray/slot layout change(s).`);
       await loadPage();
+      return true;
     } catch (requestError) {
       const normalized = normalizeBackendError(requestError);
       if (normalized.kind === "offline") {
         setOffline(true);
       }
       setError("Unable to apply tray/slot layout changes.");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1810,21 +1992,24 @@ export default function PlacementPage() {
         <div key={currentStep} className={styles.stepPanel}>
           {currentStep === 1 ? (
             <div className={"grid gap-3"}>
-              <SectionCard title="Add Tent">
-                <div className={styles.entryFormGrid}>
-                  <label className={"grid gap-2"}>
-                    <span className={"text-sm text-muted-foreground"}>Tent name</span>
-                    <Input value={newTentName} onChange={(event) => setNewTentName(event.target.value)} />
-                  </label>
-                  <label className={"grid gap-2"}>
-                    <span className={"text-sm text-muted-foreground"}>Tent code</span>
-                    <Input value={newTentCode} onChange={(event) => setNewTentCode(event.target.value)} />
-                  </label>
-                  <div className={styles.entryFormActions}>
-                    <Button type="button" disabled={saving} onClick={() => void createTent()}>
-                      {saving ? "Saving..." : "Add tent"}
-                    </Button>
+              <SectionCard title={`Tent Manager (${tents.length})`}>
+                <div className={styles.placementToolbar}>
+                  <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
+                    <StepAdjustButton
+                      direction="decrement"
+                      onClick={() => void removeTent()}
+                      disabled={saving || placementLocked || tents.length === 0}
+                    />
+                    <StepAdjustButton
+                      direction="increment"
+                      onClick={() => void createTent()}
+                      disabled={saving || placementLocked}
+                    />
                   </div>
+                </div>
+                <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
+                  <span className="text-sm text-muted-foreground">Total tents: {tents.length}</span>
+                  <span className="text-sm text-muted-foreground">Shelves and slots are configured per tent below.</span>
                 </div>
               </SectionCard>
 
@@ -1995,25 +2180,15 @@ export default function PlacementPage() {
                                   <span className={styles.recipeLegendItem}>
                                     {group.slots.length} {group.slots.length === 1 ? "slot" : "slots"}
                                   </span>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                   
-                                    type="button"
+                                  <StepAdjustButton
+                                    direction="decrement"
                                     onClick={() => adjustShelfSlotCount(tent.tent_id, group.shelfIndex - 1, -1)}
                                     disabled={(shelfCounts[group.shelfIndex - 1] || 0) <= 0}
-                                  >
-                                    -
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                   
-                                    type="button"
+                                  />
+                                  <StepAdjustButton
+                                    direction="increment"
                                     onClick={() => adjustShelfSlotCount(tent.tent_id, group.shelfIndex - 1, 1)}
-                                  >
-                                    +
-                                  </Button>
+                                  />
                                 </div>
                               </div>
 
@@ -2052,53 +2227,29 @@ export default function PlacementPage() {
                   </SectionCard>
                 );
               })}
-
-              <ToolbarRow className="mt-3">
-                <span className={styles.recipeLegendItem}>{tentSlotDraftChangeCount} tent layout change(s)</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                   
-                    type="button"
-                    disabled={saving || placementLocked || tentSlotDraftChangeCount === 0}
-                    onClick={() => void applyTentSlotLayouts()}
-                  >
-                    {saving ? "Applying..." : "Apply Tent -> Slot Layout"}
-                  </Button>
-                </div>
-              </ToolbarRow>
             </div>
           ) : null}
 
           {currentStep === 2 ? (
             <div className={"grid gap-3"}>
               <SectionCard title={`Tray Manager (${draftTrayCount})`}>
-                <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="secondary"
-                      type="button"
+                <div className={styles.placementToolbar}>
+                  <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
+                    <StepAdjustButton
+                      direction="decrement"
                       onClick={decrementDraftTrayCount}
                       disabled={saving || placementLocked || draftTrayCount === 0}
-                    >
-                      -
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      type="button"
+                    />
+                    <StepAdjustButton
+                      direction="increment"
                       onClick={incrementDraftTrayCount}
                       disabled={saving || placementLocked}
-                    >
-                      +
-                    </Button>
+                    />
                   </div>
+                </div>
+
+                <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
                   <span className="text-sm text-muted-foreground">Total trays: {draftTrayCount}</span>
-                  {trayCountDraftChangeCount > 0 ? (
-                    <span className="text-sm text-muted-foreground">
-                      {draftTrayCount > trays.length
-                        ? `Pending add: ${trayCountDraftChangeCount}`
-                        : `Pending remove: ${trayCountDraftChangeCount}`}
-                    </span>
-                  ) : null}
                 </div>
 
                 <div className={[styles.trayManagerGrid, styles.cellGridResponsive].join(" ")} data-cell-size="lg">
@@ -2107,6 +2258,7 @@ export default function PlacementPage() {
                     if (!tray) {
                       return null;
                     }
+                    const draftCapacity = Math.max(1, trayCapacityDraftById[trayId] ?? tray.capacity);
                     return (
                       <article
                         key={trayId}
@@ -2122,16 +2274,30 @@ export default function PlacementPage() {
                         <strong className={styles.trayGridCellId}>
                           {formatTrayDisplay(tray.name, tray.tray_id)}
                         </strong>
-                        <div className={[styles.trayEditorInputs, "justify-center"].join(" ")}>
+                        <div className={styles.trayEditorBadgeRow}>
                           <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
-                            {tray.capacity} {tray.capacity === 1 ? "plant slot" : "plant slots"}
+                            {draftCapacity} {draftCapacity === 1 ? "plant" : "plants"}
                           </Badge>
+                        </div>
+                        <div className={styles.trayEditorAdjustRow}>
+                          <StepAdjustButton
+                            direction="decrement"
+                            onClick={() => adjustTrayCapacity(trayId, -1)}
+                            disabled={saving || placementLocked || draftCapacity <= 1}
+                          />
+                          <StepAdjustButton
+                            direction="increment"
+                            onClick={() => adjustTrayCapacity(trayId, 1)}
+                            disabled={saving || placementLocked}
+                          />
                         </div>
                       </article>
                     );
                   })}
                   {draftTrayCount > sortedTrayIds.length
-                    ? Array.from({ length: draftTrayCount - sortedTrayIds.length }, (_, index) => (
+                    ? Array.from({ length: draftTrayCount - sortedTrayIds.length }, (_, index) => {
+                        const draftCapacity = Math.max(1, newTrayCapacities[index] ?? defaultTrayCapacity);
+                        return (
                         <article
                           key={`draft-tray-${index + 1}`}
                           className={[
@@ -2142,30 +2308,30 @@ export default function PlacementPage() {
                           ].join(" ")}
                         >
                           <strong className={styles.trayGridCellId}>New tray</strong>
-                          <div className={[styles.trayEditorInputs, "justify-center"].join(" ")}>
+                          <div className={styles.trayEditorBadgeRow}>
                             <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
-                              {defaultTrayCapacity} {defaultTrayCapacity === 1 ? "plant slot" : "plant slots"}
+                              {draftCapacity} {draftCapacity === 1 ? "plant" : "plants"}
                             </Badge>
                           </div>
+                          <div className={styles.trayEditorAdjustRow}>
+                            <StepAdjustButton
+                              direction="decrement"
+                              onClick={() => adjustPendingTrayCapacity(index, -1)}
+                              disabled={saving || placementLocked || draftCapacity <= 1}
+                            />
+                            <StepAdjustButton
+                              direction="increment"
+                              onClick={() => adjustPendingTrayCapacity(index, 1)}
+                              disabled={saving || placementLocked}
+                            />
+                          </div>
                         </article>
-                      ))
+                        );
+                      })
                     : null}
                   {draftTrayCount === 0 ? <p className="text-sm text-muted-foreground">No trays configured.</p> : null}
                 </div>
               </SectionCard>
-
-              <ToolbarRow className="mt-3">
-                <span className={styles.recipeLegendItem}>{trayCountDraftChangeCount} tray count change(s)</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    disabled={saving || placementLocked || trayCountDraftChangeCount === 0}
-                    onClick={() => void applyTrayCountDraft()}
-                  >
-                    {saving ? "Applying..." : "Apply Tray Count"}
-                  </Button>
-                </div>
-              </ToolbarRow>
             </div>
           ) : null}
 
@@ -2283,20 +2449,6 @@ export default function PlacementPage() {
                   })}
                 </div>
               </SectionCard>
-
-              <ToolbarRow className="mt-3">
-                <span className={styles.recipeLegendItem}>{placementDraftChangeCount} plant layout change(s)</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                   
-                    type="button"
-                    disabled={saving || placementDraftChangeCount === 0}
-                    onClick={() => void applyPlantToTrayLayout()}
-                  >
-                    {saving ? "Applying..." : "Apply Plant -> Tray Layout"}
-                  </Button>
-                </div>
-              </ToolbarRow>
             </div>
           ) : null}
 
@@ -2464,41 +2616,36 @@ export default function PlacementPage() {
                   );
                 })}
               </div>
-
-              <ToolbarRow className="mt-3">
-                <span className={styles.recipeLegendItem}>{traySlotDraftChangeCount} tray/slot change(s)</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                   
-                    type="button"
-                    disabled={saving || traySlotDraftChangeCount === 0}
-                    onClick={() => void applyTrayToSlotLayout()}
-                  >
-                    {saving ? "Applying..." : "Apply Tray -> Slot Layout"}
-                  </Button>
-                </div>
-              </ToolbarRow>
             </div>
           ) : null}
         </div>
 
-        <div
-          className={[styles.stepNavRow, currentStep === 1 ? styles.stepNavRowForwardOnly : ""].filter(Boolean).join(" ")}
-        >
+        <ToolbarRow className="mt-3">
           {currentStep > 1 ? (
             <Button variant="secondary" type="button" onClick={goPreviousStep}>
               Back
             </Button>
           ) : null}
-          <Button
-           
-            type="button"
-            disabled={!isStepComplete(currentStep)}
-            onClick={goNextStep}
-          >
-            {currentStep === 4 ? "Go to Overview" : "Next"}
-          </Button>
-        </div>
+          <div className={styles.stepNavActions}>
+            {currentStepDraftChangeCount > 0 ? (
+              <span className={styles.recipeLegendItem}>{draftChipLabelForStep(currentStep)}</span>
+            ) : null}
+            <Button
+             
+              type="button"
+              disabled={saving || !isStepComplete(currentStep)}
+              onClick={() => void goNextStep()}
+            >
+              {saving
+                ? "Saving..."
+                : currentStepDraftChangeCount > 0
+                  ? "Save & Next"
+                  : currentStep === 4
+                    ? "Go to Overview"
+                    : "Next"}
+            </Button>
+          </div>
+        </ToolbarRow>
       </SectionCard>
     </PageShell>
   );

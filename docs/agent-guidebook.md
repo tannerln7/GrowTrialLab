@@ -54,12 +54,18 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 
 ### Step 1: Tents + Slots
 - Define tents, restrictions/parameters, and slot layout (shelves/slots).
+- Tent count is managed with shared `+/-` controls in `Tent Manager` (above the tent shelf/slot layout cards), using the same `StepAdjustButton` pattern as later step count controls.
 - Goal: stable physical map that mirrors IRL layout.
 
 ### Step 2: Trays + Capacity
 - Define tray container count and default capacity.
-- Tray count is staged with `+/-` controls in `Tray Manager` and persisted via the bottom apply action.
+- Tray count is staged with `+/-` controls in `Tray Manager`, and each tray cell has in-card `+/-` controls for per-tray capacity.
+- The bottom navigation action persists pending changes for the current step, then advances.
 - Goal: containers exist with constraints, but no placement yet.
+
+### Step footer draft chips
+- Draft-change chips render in the shared back/next navigation bar and only when pending change count is greater than `0`.
+- Draft-change labels use singular/plural forms automatically (`1 ... change` vs `N ... changes`).
 
 ### Step 3: Plants → Trays (draft then apply)
 - Dense, mobile-first selection grid.
@@ -150,6 +156,7 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
     - selectable cell state variants (`selectableCellVariants`)
 - Shared primitive usage conventions:
   - Use `TooltipIconButton` (`frontend/src/components/ui/tooltip-icon-button.tsx`) for icon-only actions that need tooltip labels.
+  - Use `StepAdjustButton` (`frontend/src/components/ui/step-adjust-button.tsx`) for shared `+/-` count controls instead of route-local button styling.
   - Use `NativeSelect` (`frontend/src/components/ui/native-select.tsx`) for native `<select>` controls instead of route-local select class strings.
   - Use `Notice` (`frontend/src/components/ui/notice.tsx`) for status/success messages instead of ad-hoc `text-emerald-*` text classes.
   - `buttonVariants` owns border styling for `default`/`secondary`/`destructive`; do not append `border border-border` at callsites.
