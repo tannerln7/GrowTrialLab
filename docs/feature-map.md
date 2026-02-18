@@ -29,13 +29,15 @@ This file is the execution-focused feature map for product and engineering statu
 
 ### 2026-02-18 (Placement Shelf Container Hierarchy)
 - `Completed` Placement Step 4 `Tent Slot Containers` now renders grouped shelf cells per tent (`Tent -> Shelf -> Slot/Tray`) instead of a single flat slot grid.
-  - Shelf groups render as stacked rows per tent, and each shelf row presents slot/tray cells in a horizontal lane.
+  - Shelf groups render as stacked rows per tent, and each shelf row presents slot/tray cells in a horizontal lane with overflow fallback.
+  - Tent cards now use auto-fit sizing so two-up rendering occurs when space allows and stacks when constrained.
+  - In two-up layout, shelf lanes target four visible slot/tray cells before horizontal scroll is needed.
   - Step 4 tent/shelf grid now renders directly on the step surface (outer section wrapper removed) to match Step 1 preview presentation.
   - Filled slots render tray cards directly so trays take the full slot footprint; empty slots retain `Slot x` + `Empty`.
   - Relevant files:
     - `frontend/app/experiments/[id]/placement/page.tsx`
     - `frontend/src/components/ui/experiments-styles.ts`
-  - Refs: `c488672`, `7883f74`, `b89fb81`
+  - Refs: `c488672`, `7883f74`, `b89fb81`, `1cf39f5`
 
 ### 2026-02-18 (Overview Shelf Row Orientation)
 - `Completed` Overview shelf groups now render horizontally inside each tent card instead of vertical stacking.

@@ -69,7 +69,8 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 - Trays are placed into tent slots using the same multi-select → bulk move model.
 - The tent/shelf nested grid renders directly on the step surface (no extra outer wrapper card), matching the Step 1 preview presentation.
 - Slot containers render with shelf grouping (`Tent → Shelf → Slot/Tray`) to match physical tent layout.
-- Within each tent, shelves render as stacked rows; each shelf row scrolls horizontally for its slot/tray cells.
+- Tent cards auto-fit in two columns when viewport width allows and stack when constrained.
+- Within each tent, shelves render as stacked rows; each shelf row stays horizontal with scroll fallback when slot count exceeds available width (target: up to 4 slot/tray cells visible in two-up tent layout).
 - Filled slots render tray cards directly (tray takes full slot footprint); empty slots keep `Slot x` + `Empty` affordances.
 
 ### Placement staging state shape (convention)
