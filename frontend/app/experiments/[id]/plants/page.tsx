@@ -10,10 +10,11 @@ import { suggestPlantId } from "@/lib/id-suggestions";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
+import { NativeSelect } from "@/src/components/ui/native-select";
+import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
-import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import { Textarea } from "@/src/components/ui/textarea";
 
 
@@ -323,15 +324,14 @@ export default function ExperimentPlantsPage() {
     >
       {loading ? <p className={"text-sm text-muted-foreground"}>Loading plants...</p> : null}
       {error ? <p className={"text-sm text-destructive"}>{error}</p> : null}
-      {notice ? <p className={"text-sm text-emerald-400"}>{notice}</p> : null}
+      {notice ? <Notice variant="success">{notice}</Notice> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Add Plants (Manual)">
         <div className={"grid gap-3"}>
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Plant preset</span>
-            <select
-              className={styles.nativeSelect}
+            <NativeSelect
               value={selectedPresetId}
               onChange={(event) => {
                 const nextPresetId = event.target.value;
@@ -355,7 +355,7 @@ export default function ExperimentPlantsPage() {
                   {preset.cultivar ? ` — ${preset.cultivar}` : ""}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Species name</span>

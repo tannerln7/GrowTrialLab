@@ -38,8 +38,6 @@ export const experimentsStyles = {
   metricSliderLabelRow: "flex items-center gap-1 text-[0.8rem] text-muted-foreground",
   metricSliderTitle: "truncate text-[0.72rem] leading-tight text-foreground",
   metricSliderValueRow: "text-[0.82rem] leading-tight text-muted-foreground",
-  nativeSelect:
-    "flex h-9 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
   overviewActionButton: "min-w-[9rem] justify-center",
   overviewPlantCell: "min-h-[122px] justify-items-center text-center [grid-template-rows:auto_minmax(2.2rem,auto)_auto]",
   overviewPlantCellLink: "text-inherit no-underline",

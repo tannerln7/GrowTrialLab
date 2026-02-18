@@ -9,6 +9,7 @@ import type { ExperimentStatusSummary } from "@/lib/experiment-status";
 import { cn } from "@/lib/utils";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
+import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { api, isApiError } from "@/src/lib/api";
@@ -696,7 +697,7 @@ export default function ExperimentOverviewPage() {
     <PageShell title="Overview" subtitle={experimentName || experimentId}>
       {loading ? <p className="text-sm text-muted-foreground">Loading overview...</p> : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {notice ? <p className="text-sm text-emerald-400">{notice}</p> : null}
+      {notice ? <Notice variant="success">{notice}</Notice> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Experiment State">

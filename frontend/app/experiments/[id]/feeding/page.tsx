@@ -14,11 +14,12 @@ import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
+import { NativeSelect } from "@/src/components/ui/native-select";
+import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
-import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import { Textarea } from "@/src/components/ui/textarea";
 
 
@@ -344,7 +345,7 @@ export default function FeedingPage() {
     >
       {loading ? <p className={"text-sm text-muted-foreground"}>Loading feeding queue...</p> : null}
       {error ? <p className={"text-sm text-destructive"}>{error}</p> : null}
-      {notice ? <p className={"text-sm text-emerald-400"}>{notice}</p> : null}
+      {notice ? <Notice variant="success">{notice}</Notice> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       {statusSummary && statusSummary.lifecycle.state !== "running" ? (
@@ -379,7 +380,7 @@ export default function FeedingPage() {
                   Next needing feeding
                 </button>
               ) : (
-                <p className={"text-sm text-emerald-400"}>All plants are up to date.</p>
+                <Notice variant="success">All plants are up to date.</Notice>
               )}
             </div>
           </SectionCard>
@@ -397,8 +398,7 @@ export default function FeedingPage() {
             <div className={"grid gap-3"}>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Plant</span>
-                <select
-                  className={styles.nativeSelect}
+                <NativeSelect
                   value={selectedPlantId ?? ""}
                   onChange={(event) => selectPlant(event.target.value || null, true)}
                 >
@@ -408,7 +408,7 @@ export default function FeedingPage() {
                       {plant.plant_id || "(pending)"} - {plant.species_name}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </label>
               {selectedPlant ? (
                 <div className={"grid gap-3"}>

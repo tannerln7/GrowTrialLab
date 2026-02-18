@@ -14,6 +14,8 @@ import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
+import { NativeSelect } from "@/src/components/ui/native-select";
+import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
@@ -700,7 +702,7 @@ export default function ExperimentSchedulePage() {
     >
       {loading ? <p className={"text-sm text-muted-foreground"}>Loading schedules...</p> : null}
       {error ? <p className={"text-sm text-destructive"}>{error}</p> : null}
-      {notice ? <p className={"text-sm text-emerald-400"}>{notice}</p> : null}
+      {notice ? <Notice variant="success">{notice}</Notice> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Upcoming plan">
@@ -754,8 +756,7 @@ export default function ExperimentSchedulePage() {
         <div className={"grid gap-3"}>
           <label className={"grid gap-2"}>
             <span className={"text-sm text-muted-foreground"}>Action type</span>
-            <select
-              className={styles.nativeSelect}
+            <NativeSelect
               value={actionType}
               onChange={(event) => setActionType(event.target.value as ActionType)}
               disabled={saving}
@@ -765,7 +766,7 @@ export default function ExperimentSchedulePage() {
                   {option.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
 
           <label className={"grid gap-2"}>
@@ -830,8 +831,7 @@ export default function ExperimentSchedulePage() {
                 <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={`${rule.weekday}-${index}`}>
                   <label className={"grid gap-2"}>
                     <span className={"text-sm text-muted-foreground"}>Weekday</span>
-                    <select
-                      className={styles.nativeSelect}
+                    <NativeSelect
                       value={rule.weekday}
                       onChange={(event) =>
                         setWeeklyRules((current) =>
@@ -846,12 +846,11 @@ export default function ExperimentSchedulePage() {
                           {weekday.label}
                         </option>
                       ))}
-                    </select>
+                    </NativeSelect>
                   </label>
                   <label className={"grid gap-2"}>
                     <span className={"text-sm text-muted-foreground"}>Timeframe</span>
-                    <select
-                      className={styles.nativeSelect}
+                    <NativeSelect
                       value={rule.timeframe}
                       onChange={(event) =>
                         setWeeklyRules((current) =>
@@ -868,7 +867,7 @@ export default function ExperimentSchedulePage() {
                           {timeframe.label}
                         </option>
                       ))}
-                    </select>
+                    </NativeSelect>
                   </label>
                   <label className={"grid gap-2"}>
                     <span className={"text-sm text-muted-foreground"}>Exact time (optional)</span>
@@ -927,8 +926,7 @@ export default function ExperimentSchedulePage() {
               </label>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Timeframe</span>
-                <select
-                  className={styles.nativeSelect}
+                <NativeSelect
                   value={intervalTimeframe}
                   onChange={(event) => setIntervalTimeframe(event.target.value as Timeframe)}
                 >
@@ -937,7 +935,7 @@ export default function ExperimentSchedulePage() {
                       {timeframe.label}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </label>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Exact time (optional)</span>
@@ -954,8 +952,7 @@ export default function ExperimentSchedulePage() {
             <div className={"grid gap-3"}>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Timeframe</span>
-                <select
-                  className={styles.nativeSelect}
+                <NativeSelect
                   value={dailyTimeframe}
                   onChange={(event) => setDailyTimeframe(event.target.value as Timeframe)}
                 >
@@ -964,7 +961,7 @@ export default function ExperimentSchedulePage() {
                       {timeframe.label}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </label>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Exact time (optional)</span>

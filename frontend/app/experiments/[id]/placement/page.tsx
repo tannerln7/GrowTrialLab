@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
 import {
@@ -22,17 +22,13 @@ import { suggestTentCode, suggestTentName, suggestTrayName } from "@/lib/id-sugg
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { IconButton } from "@/src/components/ui/icon-button";
 import { Input } from "@/src/components/ui/input";
+import { NativeSelect } from "@/src/components/ui/native-select";
+import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { ToolbarRow } from "@/src/components/ui/toolbar-row";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/src/components/ui/tooltip";
+import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -274,40 +270,6 @@ async function parseBackendErrorPayload(
   } catch {
     return { detail: fallback, diagnostics: null };
   }
-}
-
-function ToolIconButton({
-  label,
-  icon,
-  onClick,
-  disabled,
-  danger,
-}: {
-  label: string;
-  icon: ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-}) {
-  return (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <IconButton
-            type="button"
-            variant={danger ? "danger" : "default"}
-            onClick={onClick}
-            disabled={disabled}
-            aria-label={label}
-            title={label}
-          >
-            {icon}
-          </IconButton>
-        </TooltipTrigger>
-        <TooltipContent className="px-2 py-1">{label}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
 }
 
 export default function PlacementPage() {
@@ -1838,7 +1800,7 @@ export default function PlacementPage() {
     >
       {loading ? <p className="text-sm text-muted-foreground">Loading placement...</p> : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {notice ? <p className="text-sm text-emerald-400">{notice}</p> : null}
+      {notice ? <Notice variant="success">{notice}</Notice> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       {placementLocked ? (
@@ -2173,24 +2135,24 @@ export default function PlacementPage() {
                   <span className="text-sm text-muted-foreground">Total trays: {sortedTrayIds.length}</span>
                   <span className="text-sm text-muted-foreground">Selected: {selectedTrayManagerIds.size}</span>
                   <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
-                    <ToolIconButton
+                    <TooltipIconButton
                       label="Select all trays"
                       icon={<CheckSquare size={16} />}
                       onClick={selectAllTrayManagerCells}
                       disabled={sortedTrayIds.length === 0}
                     />
-                    <ToolIconButton
+                    <TooltipIconButton
                       label="Clear tray selection"
                       icon={<X size={16} />}
                       onClick={clearTrayManagerSelection}
                       disabled={selectedTrayManagerIds.size === 0}
                     />
                     {selectedTrayManagerIds.size > 0 ? (
-                      <ToolIconButton
+                      <TooltipIconButton
                         label="Delete selected trays"
                         icon={<Trash2 size={16} />}
                         onClick={() => void bulkDeleteSelectedTrays()}
-                        danger
+                        variant="destructive"
                       />
                     ) : null}
                   </div>
@@ -2254,8 +2216,8 @@ export default function PlacementPage() {
             <div className={"grid gap-3"}>
               <SectionCard title="Plants -> Trays (Draft)">
                 <div className={styles.placementToolbar}>
-                  <select
-                    className={[styles.nativeSelect, styles.toolbarInlineSelect].join(" ")}
+                  <NativeSelect
+                    className={styles.toolbarInlineSelect}
                     value={destinationTrayId}
                     onChange={(event) => setDestinationTrayId(event.target.value)}
                     aria-label="Destination tray"
@@ -2272,21 +2234,21 @@ export default function PlacementPage() {
                         </option>
                       );
                     })}
-                  </select>
+                  </NativeSelect>
                   <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
-                    <ToolIconButton
+                    <TooltipIconButton
                       label="Select all unplaced plants"
                       icon={<CheckSquare size={16} />}
                       onClick={selectAllPlantsInMainGrid}
                       disabled={mainGridPlantIds.length === 0}
                     />
-                    <ToolIconButton
+                    <TooltipIconButton
                       label="Select same species"
                       icon={<Layers size={16} />}
                       onClick={selectSameSpeciesInMainGrid}
                       disabled={sameSpeciesDisabled}
                     />
-                    <ToolIconButton
+                    <TooltipIconButton
                       label="Clear plant selection"
                       icon={<X size={16} />}
                       onClick={clearPlantSelection}
@@ -2346,11 +2308,11 @@ export default function PlacementPage() {
                           </div>
                           <div className={styles.trayHeaderActions}>
                             {selectedInTray.length > 0 ? (
-                              <ToolIconButton
+                              <TooltipIconButton
                                 label="Return selected plants to unplaced"
                                 icon={<Trash2 size={16} />}
                                 onClick={() => stageRemovePlantsFromTray(trayId)}
-                                danger
+                                variant="destructive"
                               />
                             ) : null}
                           </div>
@@ -2385,8 +2347,8 @@ export default function PlacementPage() {
             <div className={"grid gap-3"}>
               <SectionCard title="Trays -> Slots (Draft)">
                 <div className={styles.placementToolbar}>
-                  <select
-                    className={[styles.nativeSelect, styles.toolbarInlineSelect].join(" ")}
+                  <NativeSelect
+                    className={styles.toolbarInlineSelect}
                     value={destinationSlotId}
                     onChange={(event) => setDestinationSlotId(event.target.value)}
                     aria-label="Destination slot"
@@ -2403,15 +2365,15 @@ export default function PlacementPage() {
                         </option>
                       );
                     })}
-                  </select>
+                  </NativeSelect>
                   <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
-                    <ToolIconButton
+                    <TooltipIconButton
                       label="Select all unplaced trays"
                       icon={<CheckSquare size={16} />}
                       onClick={selectAllTraysInMainGrid}
                       disabled={mainGridTrayIds.length === 0}
                     />
-                    <ToolIconButton
+                    <TooltipIconButton
                       label="Clear tray selection"
                       icon={<X size={16} />}
                       onClick={clearTraySelection}
@@ -2455,11 +2417,11 @@ export default function PlacementPage() {
                               {tent.slots.length} {tent.slots.length === 1 ? "slot" : "slots"}
                             </span>
                             {selectedInTent.length > 0 ? (
-                              <ToolIconButton
+                              <TooltipIconButton
                                 label="Return selected trays to unplaced"
                                 icon={<Trash2 size={16} />}
                                 onClick={() => stageRemoveTraysFromTent(tent.tent_id)}
-                                danger
+                                variant="destructive"
                               />
                             ) : null}
                           </div>

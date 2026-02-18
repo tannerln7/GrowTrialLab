@@ -8,6 +8,8 @@ import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
+import { NativeSelect } from "@/src/components/ui/native-select";
+import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { Textarea } from "@/src/components/ui/textarea";
@@ -737,7 +739,7 @@ export default function BaselinePage() {
     >
       {loading ? <p className="text-sm text-muted-foreground">Loading baseline queue...</p> : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {notice ? <p className="text-sm text-emerald-400">{notice}</p> : null}
+      {notice ? <Notice variant="success">{notice}</Notice> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Queue Status">
@@ -790,8 +792,7 @@ export default function BaselinePage() {
           <div className={"grid gap-3"}>
             <label className={"grid gap-2"}>
               <span className={"text-sm text-muted-foreground"}>Plant</span>
-              <select
-                className={styles.nativeSelect}
+              <NativeSelect
                 value={selectedPlantId}
                 onChange={(event) => jumpToPlant(event.target.value)}
                 disabled={saving}
@@ -801,7 +802,7 @@ export default function BaselinePage() {
                     {plant.plant_id || "(pending)"} · {plant.species_name}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
 
             <div className={"grid gap-2"}>

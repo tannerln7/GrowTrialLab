@@ -1,19 +1,21 @@
 "use client";
 
-import * as Tooltip from "@radix-ui/react-tooltip";
 import { ArrowRight, Check, CheckSquare, Layers, Save, Trash2, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
+import { NativeSelect } from "@/src/components/ui/native-select";
+import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
+import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -113,43 +115,6 @@ async function parseBackendErrorPayload(
   } catch {
     return { detail: fallback, diagnostics: null };
   }
-}
-
-function ToolIconButton({
-  label,
-  icon,
-  onClick,
-  disabled,
-  danger,
-}: {
-  label: string;
-  icon: ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-}) {
-  return (
-    <Tooltip.Root>
-      <Tooltip.Trigger asChild>
-        <button
-          className={danger ? "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-secondary text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90" : "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-secondary text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:pointer-events-none disabled:opacity-50"}
-          type="button"
-          onClick={onClick}
-          disabled={disabled}
-          aria-label={label}
-          title={label}
-        >
-          {icon}
-        </button>
-      </Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content className="z-50 rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md" sideOffset={6}>
-          {label}
-          <Tooltip.Arrow className="fill-popover" />
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
-  );
 }
 
 function TrayHeaderToggle({
@@ -707,7 +672,7 @@ export default function RecipesPage() {
     >
       {loading ? <p className="text-sm text-muted-foreground">Loading recipes...</p> : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {notice ? <p className="text-sm text-emerald-400">{notice}</p> : null}
+      {notice ? <Notice variant="success">{notice}</Notice> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       <SectionCard title="Recipe Tools">
@@ -735,29 +700,29 @@ export default function RecipesPage() {
           </button>
         </form>
 
-        <Tooltip.Provider delayDuration={150}>
-          <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
-            <span className="text-sm text-muted-foreground">Recipes: {recipes.length}</span>
-            <span className="text-sm text-muted-foreground">Selected: {selectedRecipeIds.size}</span>
-            <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
-              <ToolIconButton
-                label="Clear recipe selection"
-                icon={<X size={16} />}
-                onClick={clearRecipeSelection}
-                disabled={selectedRecipeIds.size === 0}
+        <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
+          <span className="text-sm text-muted-foreground">Recipes: {recipes.length}</span>
+          <span className="text-sm text-muted-foreground">Selected: {selectedRecipeIds.size}</span>
+          <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
+            <TooltipIconButton
+              label="Clear recipe selection"
+              icon={<X size={16} />}
+              onClick={clearRecipeSelection}
+              disabled={selectedRecipeIds.size === 0}
+              size="sm"
+            />
+            {selectedRecipeIds.size > 0 ? (
+              <TooltipIconButton
+                label="Delete selected recipes"
+                icon={<Trash2 size={16} />}
+                onClick={() => void deleteSelectedRecipes()}
+                variant="destructive"
+                disabled={saving}
+                size="sm"
               />
-              {selectedRecipeIds.size > 0 ? (
-                <ToolIconButton
-                  label="Delete selected recipes"
-                  icon={<Trash2 size={16} />}
-                  onClick={() => void deleteSelectedRecipes()}
-                  danger
-                  disabled={saving}
-                />
-              ) : null}
-            </div>
+            ) : null}
           </div>
-        </Tooltip.Provider>
+        </div>
 
         <div className={[styles.trayMainGrid, styles.cellGridResponsive].join(" ")} data-cell-size="md">
           {recipes.map((recipe) => {
@@ -801,61 +766,62 @@ export default function RecipesPage() {
       </SectionCard>
 
       <SectionCard title="Plants by Tray (Draft)">
-        <Tooltip.Provider delayDuration={150}>
-          <div className={styles.placementToolbar}>
-            <select
-              className={[styles.nativeSelect, styles.toolbarInlineSelect].join(" ")}
-              value={selectedBulkRecipeId}
-              onChange={(event) => setSelectedBulkRecipeId(event.target.value)}
-              aria-label="Recipe for selected plants"
+        <div className={styles.placementToolbar}>
+          <NativeSelect
+            className={styles.toolbarInlineSelect}
+            value={selectedBulkRecipeId}
+            onChange={(event) => setSelectedBulkRecipeId(event.target.value)}
+            aria-label="Recipe for selected plants"
+          >
+            <option value="">Select recipe</option>
+            {recipes.map((recipe) => (
+              <option key={recipe.id} value={recipe.id}>
+                {recipeLabel(recipe)}
+              </option>
+            ))}
+          </NativeSelect>
+          <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
+            <TooltipIconButton
+              label="Select all plants"
+              icon={<CheckSquare size={16} />}
+              onClick={selectAllPlants}
+              disabled={allPlantIds.length === 0}
+              size="sm"
+            />
+            <TooltipIconButton
+              label="Select same species"
+              icon={<Layers size={16} />}
+              onClick={selectSameSpecies}
+              disabled={sameSpeciesDisabled}
+              size="sm"
+            />
+            <TooltipIconButton
+              label="Clear plant selection"
+              icon={<X size={16} />}
+              onClick={clearPlantSelection}
+              disabled={selectedPlantIds.size === 0}
+              size="sm"
+            />
+            <button
+              className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+              type="button"
+              disabled={selectedPlantIds.size === 0 || !selectedBulkRecipeId}
+              onClick={stageApplyRecipeToSelection}
             >
-              <option value="">Select recipe</option>
-              {recipes.map((recipe) => (
-                <option key={recipe.id} value={recipe.id}>
-                  {recipeLabel(recipe)}
-                </option>
-              ))}
-            </select>
-            <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
-              <ToolIconButton
-                label="Select all plants"
-                icon={<CheckSquare size={16} />}
-                onClick={selectAllPlants}
-                disabled={allPlantIds.length === 0}
-              />
-              <ToolIconButton
-                label="Select same species"
-                icon={<Layers size={16} />}
-                onClick={selectSameSpecies}
-                disabled={sameSpeciesDisabled}
-              />
-              <ToolIconButton
-                label="Clear plant selection"
-                icon={<X size={16} />}
-                onClick={clearPlantSelection}
-                disabled={selectedPlantIds.size === 0}
-              />
-              <button
-                className={cn(buttonVariants({ variant: "default" }), "border border-border")}
-                type="button"
-                disabled={selectedPlantIds.size === 0 || !selectedBulkRecipeId}
-                onClick={stageApplyRecipeToSelection}
-              >
-                <ArrowRight size={16} />
-                Apply to selected
-              </button>
-              <button
-                className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
-                type="button"
-                disabled={selectedPlantIds.size === 0}
-                onClick={stageRemoveRecipeFromSelection}
-              >
-                <X size={16} />
-                Remove recipe
-              </button>
-            </div>
+              <ArrowRight size={16} />
+              Apply to selected
+            </button>
+            <button
+              className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+              type="button"
+              disabled={selectedPlantIds.size === 0}
+              onClick={stageRemoveRecipeFromSelection}
+            >
+              <X size={16} />
+              Remove recipe
+            </button>
           </div>
-        </Tooltip.Provider>
+        </div>
 
         <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
           <span className="text-sm text-muted-foreground">Plants in view: {allPlantIds.length}</span>

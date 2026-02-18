@@ -13,7 +13,8 @@ import {
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
-import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import { NativeSelect } from "@/src/components/ui/native-select";
+import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
@@ -312,7 +313,7 @@ export default function RotationPage() {
     >
       {loading ? <p className={"text-sm text-muted-foreground"}>Loading rotation...</p> : null}
       {error ? <p className={"text-sm text-destructive"}>{error}</p> : null}
-      {notice ? <p className={"text-sm text-emerald-400"}>{notice}</p> : null}
+      {notice ? <Notice variant="success">{notice}</Notice> : null}
       {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
 
       {statusSummary ? (
@@ -338,25 +339,25 @@ export default function RotationPage() {
             <div className={"grid gap-3"}>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Tray</span>
-                <select className={styles.nativeSelect} value={selectedTrayId} onChange={(event) => setSelectedTrayId(event.target.value)}>
+                <NativeSelect value={selectedTrayId} onChange={(event) => setSelectedTrayId(event.target.value)}>
                   <option value="">Select tray</option>
                   {trays.map((tray) => (
                     <option key={tray.tray_id} value={tray.tray_id}>
                       {tray.tray_name}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </label>
               <label className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Destination slot</span>
-                <select className={styles.nativeSelect} value={selectedToSlotId} onChange={(event) => setSelectedToSlotId(event.target.value)}>
+                <NativeSelect value={selectedToSlotId} onChange={(event) => setSelectedToSlotId(event.target.value)}>
                   <option value="">None / Unassigned</option>
                   {compatibleSlotsForSelectedTray.map((slot) => (
                     <option key={slot.id} value={slot.id}>
                       {slot.label}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
                 {selectedTrayBlocked ? (
                   <p className={"text-sm text-muted-foreground"}>
                     No compatible destination slots for this tray. This tray contains plants not allowed in restricted tents.

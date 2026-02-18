@@ -10,7 +10,6 @@ import {
   ShieldAlert,
   Tag,
 } from "lucide-react";
-import * as Popover from "@radix-ui/react-popover";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -20,9 +19,11 @@ import { cn } from "@/lib/utils";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
-import { experimentsStyles as formStyles } from "@/src/components/ui/experiments-styles";
 import { Input } from "@/src/components/ui/input";
+import { NativeSelect } from "@/src/components/ui/native-select";
+import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
+import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
@@ -797,62 +798,59 @@ export default function PlantQrPage() {
             <SectionCard title="Manage">
               <div className={"grid gap-3"}>
                 <div className={"flex flex-wrap items-center gap-2"}>
-                  <Popover.Root>
-                    <Popover.Trigger asChild>
+                  <Popover>
+                    <PopoverTrigger asChild>
                       <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" disabled={recipeSaving}>
                         <ChevronDown size={14} />
                         Change recipe
                       </button>
-                    </Popover.Trigger>
-                    <Popover.Portal>
-                      <Popover.Content className="z-50 w-[min(280px,calc(100vw-2rem))] rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg" sideOffset={8} align="start">
-                        <p className={"text-sm text-muted-foreground"}>Set recipe assignment</p>
-                        {recipes.length > 0 ? (
-                          <label className={"grid gap-2"}>
-                            <span className={"text-sm text-muted-foreground"}>Recipe</span>
-                            <select
-                              className={formStyles.nativeSelect}
-                              value={recipeSelection}
-                              onChange={(event) => setRecipeSelection(event.target.value)}
-                              disabled={recipeSaving}
-                            >
-                              <option value="">Select recipe</option>
-                              {recipes.map((recipe) => (
-                                <option key={recipe.id} value={recipe.id}>
-                                  {recipeLabel(recipe)}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        ) : (
-                          <p className={"text-sm text-muted-foreground"}>No recipes available yet.</p>
-                        )}
-                        <div className={"flex flex-wrap items-center gap-2"}>
-                          <button
-                            className={cn(buttonVariants({ variant: "default" }), "border border-border")}
-                            type="button"
-                            disabled={
-                              recipeSaving ||
-                              recipes.length === 0 ||
-                              !recipeSelection ||
-                              recipeSelection === cockpit.derived.assigned_recipe?.id
-                            }
-                            onClick={() => void handleRecipeChange(recipeSelection)}
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[min(280px,calc(100vw-2rem))] p-3" sideOffset={8} align="start">
+                      <p className={"text-sm text-muted-foreground"}>Set recipe assignment</p>
+                      {recipes.length > 0 ? (
+                        <label className={"grid gap-2"}>
+                          <span className={"text-sm text-muted-foreground"}>Recipe</span>
+                          <NativeSelect
+                            value={recipeSelection}
+                            onChange={(event) => setRecipeSelection(event.target.value)}
+                            disabled={recipeSaving}
                           >
-                            {recipeSaving ? "Saving..." : "Save recipe"}
-                          </button>
-                          <button
-                            className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
-                            type="button"
-                            disabled={recipeSaving || !cockpit.derived.assigned_recipe}
-                            onClick={() => void handleRecipeChange(null)}
-                          >
-                            Clear recipe
-                          </button>
-                        </div>
-                      </Popover.Content>
-                    </Popover.Portal>
-                  </Popover.Root>
+                            <option value="">Select recipe</option>
+                            {recipes.map((recipe) => (
+                              <option key={recipe.id} value={recipe.id}>
+                                {recipeLabel(recipe)}
+                              </option>
+                            ))}
+                          </NativeSelect>
+                        </label>
+                      ) : (
+                        <p className={"text-sm text-muted-foreground"}>No recipes available yet.</p>
+                      )}
+                      <div className={"flex flex-wrap items-center gap-2"}>
+                        <button
+                          className={cn(buttonVariants({ variant: "default" }), "border border-border")}
+                          type="button"
+                          disabled={
+                            recipeSaving ||
+                            recipes.length === 0 ||
+                            !recipeSelection ||
+                            recipeSelection === cockpit.derived.assigned_recipe?.id
+                          }
+                          onClick={() => void handleRecipeChange(recipeSelection)}
+                        >
+                          {recipeSaving ? "Saving..." : "Save recipe"}
+                        </button>
+                        <button
+                          className={cn(buttonVariants({ variant: "secondary" }), "border border-border")}
+                          type="button"
+                          disabled={recipeSaving || !cockpit.derived.assigned_recipe}
+                          onClick={() => void handleRecipeChange(null)}
+                        >
+                          Clear recipe
+                        </button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <p className={"text-sm text-muted-foreground"}>
                   Replace this plant if it was removed from trial or needs substitution.
@@ -873,8 +871,7 @@ export default function PlantQrPage() {
             <div className={"grid gap-3"}>
               <div className={"grid gap-2"}>
                 <span className={"text-sm text-muted-foreground"}>Photo tag</span>
-                <select
-                  className={formStyles.nativeSelect}
+                <NativeSelect
                   value={uploadTag}
                   onChange={(event) => setUploadTag(event.target.value as UploadTag)}
                   disabled={uploading}
@@ -884,7 +881,7 @@ export default function PlantQrPage() {
                       {option.label}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </div>
 
               <input
@@ -919,7 +916,7 @@ export default function PlantQrPage() {
               {photoFile ? (
                 <p className={"text-sm text-muted-foreground"}>Selected: {photoFile.name}</p>
               ) : null}
-              {notice ? <p className={"text-sm text-emerald-400"}>{notice}</p> : null}
+              {notice ? <Notice variant="success">{notice}</Notice> : null}
 
               <div className={"flex flex-wrap items-center gap-2"}>
                 <button className={cn(buttonVariants({ variant: "secondary" }), "border border-border")} type="button" disabled>

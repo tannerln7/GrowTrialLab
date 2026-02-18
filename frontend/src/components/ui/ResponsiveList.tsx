@@ -1,6 +1,13 @@
 import { ReactNode } from "react";
 
 import SectionCard from "./SectionCard";
+import {
+  TableBodyRow,
+  TableCell,
+  TableHeadCell,
+  TableHeaderRow,
+  TableShell,
+} from "./table-shell";
 
 type Column<T> = {
   key: string;
@@ -28,30 +35,30 @@ export default function ResponsiveList<T>({ items, getKey, columns, renderMobile
           <SectionCard key={getKey(item)}>{renderMobileCard(item)}</SectionCard>
         ))}
       </div>
-      <div className="hidden overflow-hidden rounded-lg border border-border md:block">
+      <TableShell className="hidden md:block">
         <table className="w-full border-collapse bg-card text-sm">
-          <thead className="bg-muted/60 text-muted-foreground">
-            <tr>
+          <thead>
+            <TableHeaderRow>
               {columns.map((column) => (
-                <th key={column.key} className="px-3 py-2 text-left font-medium">
+                <TableHeadCell key={column.key}>
                   {column.label}
-                </th>
+                </TableHeadCell>
               ))}
-            </tr>
+            </TableHeaderRow>
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={getKey(item)} className="border-t border-border align-top">
+              <TableBodyRow key={getKey(item)}>
                 {columns.map((column) => (
-                  <td key={column.key} className="px-3 py-2">
+                  <TableCell key={column.key}>
                     {column.render(item)}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableBodyRow>
             ))}
           </tbody>
         </table>
-      </div>
+      </TableShell>
     </>
   );
 }
