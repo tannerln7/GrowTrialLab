@@ -114,7 +114,9 @@ export const experimentsStyles = {
   toolbarInlineSelect: "w-full sm:min-w-[16rem] sm:max-w-[26rem] sm:flex-1",
   tentBoardCard: "grid gap-2 p-2",
   tentBoardGrid: "grid grid-cols-1 gap-2 min-[920px]:grid-cols-2",
-  tentSlotGrid: "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(126px,1fr))]",
+  tentShelfRow: "grid grid-flow-col auto-cols-[minmax(220px,1fr)] gap-2 overflow-x-auto pb-1",
+  tentShelfCard: "grid min-w-[220px] gap-2 rounded-lg border border-border p-2",
+  tentShelfSlotGrid: "grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(126px,1fr))]",
   toolbarActionsCompact: "gap-2",
   toolbarSummaryRow: "gap-2",
   trayControlRow: "flex flex-wrap items-center gap-2",
@@ -129,4 +131,5 @@ export const experimentsStyles = {
     "inline-flex min-h-10 items-center gap-1 rounded-sm border border-border bg-muted px-2 py-1 text-[0.76rem] text-foreground transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-60",
   trayMainGrid: "[--gt-grid-gap:0.5rem] [--gt-cell-min:140px]",
   trayManagerGrid: "[--gt-grid-gap:0.55rem] [--gt-cell-min:220px]",
+  slotTrayCellFill: "h-full w-full",
 } as const;
