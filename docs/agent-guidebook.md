@@ -225,6 +225,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
   - Use `PositionStrip` (`frontend/src/lib/gridkit/components/PositionStrip.tsx`) for shelf position paging:
     - one canonical native scroll-snap implementation (`snap-x`), no carousel libraries.
     - fixed page size is `4` positions (`POSITION_STRIP_PRESET.maxVisible`).
+    - shelf strips should use fixed non-scroll column geometry (`columnsMode="fixed"`, `fixedColumns=4`) so 1-3 item shelves preserve the same 4-up density as 4-item shelves.
     - desktop arrow controls page by one viewport-width strip.
     - hide scrollbars with `.hide-scrollbar`; preserve touch momentum.
   - For shelf-position rendering, use renderer registry wiring instead of direct position lambdas:

@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { StepAdjustButton } from "@/src/components/ui/step-adjust-button";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import { POSITION_STRIP_PRESET } from "@/src/lib/gridkit/presets";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import type { TentSpec } from "@/src/lib/gridkit/spec";
 import { createPositionRendererMap, PositionStripWithRenderers, type PositionRendererMap } from "@/src/lib/gridkit/renderers";
@@ -116,6 +117,8 @@ export function PlacementShelfPreview({
             {slotCount > 0 ? (
               <PositionStripWithRenderers
                 positions={shelf.positions}
+                columnsMode="fixed"
+                fixedColumns={POSITION_STRIP_PRESET.maxVisible}
                 className="[--gt-cell-min-height:6.5rem] [--gt-cell-pad:var(--gt-space-md)]"
                 ariaLabel={`${shelf.label} preview positions`}
                 renderers={previewRenderers}

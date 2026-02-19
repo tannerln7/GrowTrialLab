@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import { POSITION_STRIP_PRESET } from "@/src/lib/gridkit/presets";
 import type { PlantOccupantSpec, PositionSpec, TentLayoutSpec, TrayOccupantSpec } from "@/src/lib/gridkit/spec";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import {
@@ -182,6 +183,8 @@ export function OverviewTentLayout({
                     >
                       <PositionStripWithRenderers
                         positions={shelf.positions}
+                        columnsMode="fixed"
+                        fixedColumns={POSITION_STRIP_PRESET.maxVisible}
                         pageGridClassName="max-sm:gap-1"
                         ariaLabel={`${tent.label} shelf ${shelfIndex} positions`}
                         renderers={overviewRenderers}

@@ -14,6 +14,8 @@ type PositionStripProps = {
   positions: PositionSpec[];
   renderPosition: (position: PositionSpec) => ReactNode;
   pageSize?: number;
+  columnsMode?: "fit" | "fixed";
+  fixedColumns?: number;
   className?: string;
   pageGridClassName?: string;
   positionClassName?: string;
@@ -40,12 +42,16 @@ export function PositionStrip({
   positions,
   renderPosition,
   pageSize = 4,
+  columnsMode = "fit",
+  fixedColumns,
   className,
   pageGridClassName,
   positionClassName,
   ariaLabel,
 }: PositionStripProps) {
   const safePageSize = Math.max(1, Math.trunc(pageSize));
+  const safeFixedColumns = Math.max(1, Math.trunc(fixedColumns ?? safePageSize));
+  const nonScrollColumns = columnsMode === "fixed" ? safeFixedColumns : Math.max(1, positions.length);
   const pages = useMemo(() => chunkArray(positions, safePageSize), [positions, safePageSize]);
   const pagedGridColsClass = PAGE_COL_CLASS_MAP[safePageSize] || PAGE_COL_CLASS_MAP[4];
 
@@ -137,7 +143,7 @@ export function PositionStrip({
       <div className={cn("relative", className)}>
         <div
           className={cn("grid items-stretch gap-2", pageGridClassName)}
-          style={{ gridTemplateColumns: `repeat(${Math.max(1, positions.length)}, minmax(0, 1fr))` }}
+          style={{ gridTemplateColumns: `repeat(${nonScrollColumns}, minmax(0, 1fr))` }}
           aria-label={ariaLabel || "Shelf positions"}
         >
           {positions.map(renderPositionItem)}

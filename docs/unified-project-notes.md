@@ -173,6 +173,7 @@ This document is the single consolidated source for current status, architecture
 - [x] GridKit shelf paging is now standardized with `PositionStrip` (`frontend/src/lib/gridkit/components/PositionStrip.tsx`) across legacy tent/shelf adapters:
   - native CSS scroll-snap (`snap-x snap-mandatory`) and touch momentum (`-webkit-overflow-scrolling: touch`)
   - fixed page size of 4 positions (`POSITION_STRIP_PRESET.maxVisible`)
+  - shelf strips now use fixed non-scroll column geometry for `<=4` positions (`columnsMode="fixed"`, `fixedColumns=4`) so low-slot shelves do not upsize leaf cells.
   - desktop arrow paging (one full page per click) with reduced-motion fallback
   - stable DnD seam `data-*` attributes (`data-pos-id`, `data-draggable-id`, `data-droppable-id`, etc.) applied on position wrappers without enabling DnD behavior.
 - [x] GridKit canonical leaf cells + renderer registry are now active for slot/tray/plant rendering paths:

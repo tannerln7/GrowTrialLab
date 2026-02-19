@@ -5,6 +5,7 @@ import { useMemo, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { GridControlButton } from "@/src/components/ui/grid-control-button";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import { POSITION_STRIP_PRESET } from "@/src/lib/gridkit/presets";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import type { TentLayoutSpec, TentSpec } from "@/src/lib/gridkit/spec";
 import { createPositionRendererMap, PositionStripWithRenderers, type PositionRendererMap } from "@/src/lib/gridkit/renderers";
@@ -158,6 +159,8 @@ export function PlacementTentLayout({
                 >
                   <PositionStripWithRenderers
                     positions={shelf.positions}
+                    columnsMode="fixed"
+                    fixedColumns={POSITION_STRIP_PRESET.maxVisible}
                     ariaLabel={`${tent.label} ${shelf.label} positions`}
                     renderers={placementRenderers}
                   />

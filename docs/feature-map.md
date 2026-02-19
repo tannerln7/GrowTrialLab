@@ -27,6 +27,18 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (GridKit Fixed Shelf Column Geometry + Paging Recovery)
+- `Completed` Shelf strips now preserve 4-up leaf sizing density for low slot counts and keep desktop paging behavior for multi-page shelves.
+  - Added fixed-column support to strip primitives:
+    - `frontend/src/lib/gridkit/components/PositionStrip.tsx` (`columnsMode`, `fixedColumns`)
+    - `frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx`
+  - Wired shelf-layout callsites to fixed mode (`fixedColumns=4`):
+    - `frontend/src/lib/gridkit/components/layouts/OverviewTentLayout.tsx`
+    - `frontend/src/lib/gridkit/components/layouts/PlacementTentLayout.tsx`
+    - `frontend/src/lib/gridkit/components/layouts/PlacementShelfPreview.tsx`
+  - Result:
+    - shelves with 1-3 positions no longer inflate cell size/height; shelves keep the same 4-column density baseline while preserving scroll-snap paging when `positions.length > 4`.
+
 ### 2026-02-19 (GridKit PositionStrip Leaf Sizing Regression Fix)
 - `Completed` Restored shelf-strip 4-column/page geometry by removing desktop-constraining leaf min widths while preserving square cell sizing.
   - Updated canonical leaf sizing contract:

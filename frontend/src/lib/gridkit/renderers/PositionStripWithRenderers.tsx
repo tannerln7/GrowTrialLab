@@ -11,6 +11,8 @@ type PositionStripWithRenderersProps = {
   renderers?: PositionRendererMap;
   ctx?: GridRenderContext;
   pageSize?: number;
+  columnsMode?: "fit" | "fixed";
+  fixedColumns?: number;
   className?: string;
   pageGridClassName?: string;
   positionClassName?: string;
@@ -24,6 +26,8 @@ export function PositionStripWithRenderers({
   renderers,
   ctx,
   pageSize = POSITION_STRIP_PRESET.maxVisible,
+  columnsMode = "fit",
+  fixedColumns,
   className,
   pageGridClassName,
   positionClassName,
@@ -52,6 +56,8 @@ export function PositionStripWithRenderers({
     <PositionStrip
       positions={positions}
       pageSize={pageSize}
+      columnsMode={columnsMode}
+      fixedColumns={fixedColumns}
       className={className}
       pageGridClassName={pageGridClassName}
       positionClassName={positionClassName}
