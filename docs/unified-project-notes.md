@@ -166,6 +166,10 @@ This document is the single consolidated source for current status, architecture
   - canonical chip overlays: `frontend/src/lib/gridkit/components/CellChips.tsx`
   - canonical text helpers: `frontend/src/lib/gridkit/components/CellText.tsx`
   - inventory/guardrail scripts now report `CellChrome` adoption and remaining bespoke shell/chip hotspots in report-only mode.
+- [x] GridKit structural containers are now active for tent/shelf scaffolding:
+  - canonical containers: `TentGrid`, `TentCard`, `ShelfStack`, `ShelfCard` under `frontend/src/lib/gridkit/components/containers/`
+  - legacy tent/shelf adapters now render through these containers while preserving existing leaf content behavior
+  - Step 1 tent wrappers now use `TentGrid`/`TentCard`, and inventory/guardrail scripts now report container adoption plus remaining bespoke tent/shelf wrapper heuristics.
 - [x] Tailwind-first migration is now active across the primary operator routes (`overview`, `recipes`, `placement`, `baseline`, `feeding`, `rotation`, `schedule`, `setup` + supporting setup routes, and cockpit `/p/{id}`): legacy `gt-*` class usage was removed from these flows and styling is now driven by Tailwind utility composition plus shadcn-style components/primitives.
 - [x] Route CSS modules for experiments/cockpit styling were retired in favor of shared Tailwind style maps and reusable UI primitives:
   - removed: `frontend/app/experiments/experiments.module.css`

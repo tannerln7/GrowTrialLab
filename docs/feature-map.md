@@ -27,6 +27,32 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (GridKit Phase 3 Structural Container Standardization)
+- `Completed` GridKit tent/shelf structural scaffolding was standardized with shared containers and adopted across legacy adapters and direct tent-wrapper callsites.
+  - Added canonical structural container components:
+    - `frontend/src/lib/gridkit/components/containers/TentGrid.tsx`
+    - `frontend/src/lib/gridkit/components/containers/TentCard.tsx`
+    - `frontend/src/lib/gridkit/components/containers/ShelfStack.tsx`
+    - `frontend/src/lib/gridkit/components/containers/ShelfCard.tsx`
+    - `frontend/src/lib/gridkit/components/containers/HeaderChips.tsx`
+  - Adopted container primitives in GridKit adapters and Step 1 tent wrappers while preserving existing shelf-body content:
+    - `LegacyOverviewTentLayoutAdapter`
+    - `LegacyPlacementTentLayoutAdapter`
+    - `LegacyPlacementShelfPreviewAdapter`
+    - `Step1Tents`
+  - GridKit inventory/guardrail reporting now includes:
+    - `gridkit_container_callsites`
+    - `remaining_bespoke_tent_shelf_wrappers`
+  - Relevant files:
+    - `frontend/src/lib/gridkit/components/index.ts`
+    - `frontend/src/lib/gridkit/components/adapters/LegacyOverviewTentLayoutAdapter.tsx`
+    - `frontend/src/lib/gridkit/components/adapters/LegacyPlacementTentLayoutAdapter.tsx`
+    - `frontend/src/lib/gridkit/components/adapters/LegacyPlacementShelfPreviewAdapter.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step1Tents.tsx`
+    - `infra/scripts/gridkit-inventory.sh`
+    - `infra/scripts/check-gridkit-legacy.sh`
+  - Refs: `1433ec6`
+
 ### 2026-02-19 (GridKit Phase 2 CellChrome Standardization)
 - `Completed` GridKit cell chrome primitives were introduced and adopted across dense slot/tray/plant surfaces while preserving existing behavior.
   - Added canonical GridKit cell primitives:
