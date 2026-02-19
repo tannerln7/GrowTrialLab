@@ -356,6 +356,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     await queryClient.fetchQuery({
       queryKey: placementDataQueryKey,
       queryFn: fetchPlacementPageData,
+      staleTime: 0,
     });
   }, [fetchPlacementPageData, placementDataQueryKey, queryClient]);
 

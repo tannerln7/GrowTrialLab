@@ -155,6 +155,7 @@ This document is the single consolidated source for current status, architecture
 - [x] Placement Step 1 tent metadata and restriction edits now stage in-card and persist through the shared bottom `Save & Next` action (per-tent `Save tent` buttons removed); Step 1 blocker/help text reflects this single save path.
 - [x] Placement Step 1 `+` tent creation now guards against pre-load clicks and retries duplicate-name/code conflicts with incremented suggestions, preventing bootstrap-time `Tent name already exists` loops when adding multiple tents.
 - [x] Placement wizard action dispatch now updates latest handlers in a layout-effect ref bridge, preventing stale one-render-behind callbacks right after data refresh (for example Step 1 tent add/remove using stale tent lists).
+- [x] Placement wizard mutation reload now forces network refresh (`staleTime: 0`) when reloading placement query data, avoiding 30s cache-fresh reads that previously delayed Step 1 tent counter/grid updates after add/remove actions.
 - [x] Placement Step 2 `Tray Manager` now uses add + selection-delete staging:
   - toolbar keeps a single `+` add control and a contextual trash action for selected trays (no top-level `-` count control)
   - tray cards are multi-selectable; selected persisted trays are staged for deletion and removed from the draft grid immediately, while selected draft-added trays are dropped from draft state

@@ -27,6 +27,13 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Placement Mutation Reload Cache-Fresh Fix)
+- `Completed` Placement wizard reload path now forces a network fetch after mutations.
+  - `reloadPlacementData` sets `staleTime: 0` on `fetchQuery`, bypassing global 30s freshness for post-mutation reads.
+  - Fixes Step 1 tent add/remove UI lag where first add could report success without immediately updating tent count/grid.
+  - updated file:
+    - `frontend/src/features/placement/wizard/usePlacementWizard.ts`
+
 ### 2026-02-19 (Dev Seed Script: 4 Plants Per Species)
 - `Completed` Added infra seed script to create plant demo data through API against running containers.
   - New script: `infra/scripts/seed-plants-by-species.sh`
