@@ -27,6 +27,27 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (GridKit Phase 8 Cleanup + Guardrail Enforcement + Docs Finalization)
+- `Completed` GridKit legacy cleanup and enforcement finished; legacy adapter paths were removed and checks now fail on regressions.
+  - Removed legacy adapter path and naming:
+    - deleted `frontend/src/lib/gridkit/components/adapters/*`
+    - added canonical layout wrappers:
+      - `frontend/src/lib/gridkit/components/layouts/OverviewTentLayout.tsx`
+      - `frontend/src/lib/gridkit/components/layouts/PlacementTentLayout.tsx`
+      - `frontend/src/lib/gridkit/components/layouts/PlacementShelfPreview.tsx`
+  - Removed unused placement shim:
+    - `frontend/src/features/placement/components/tent-slot-board.tsx`
+  - Enforced GridKit guardrails:
+    - `infra/scripts/check-gridkit-legacy.sh` now enforces by default (`--enforce`)
+    - `package.json` now includes `pnpm guardrails`
+    - `frontend:guardrails` now runs GridKit enforcement in addition to existing frontend checks
+  - Inventory updates:
+    - `infra/scripts/gridkit-inventory.sh` now reports `gridkit_layout_usages` and `remaining_legacy_adapter_refs`
+    - tray overlay heuristic refined to targeted tray-overlay state patterns
+  - Final GridKit guide:
+    - `frontend/docs/gridkit.md`
+  - Refs: `d30edd0`
+
 ### 2026-02-19 (GridKit Phase 7 Virtualization + Targeted Performance Pass)
 - `Completed` GridKit performance baseline now includes reusable virtualization primitives plus thresholded tray-overlay plant-grid virtualization without DnD/behavior changes.
   - Added canonical virtual primitives:

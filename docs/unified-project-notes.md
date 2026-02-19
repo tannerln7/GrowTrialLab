@@ -178,7 +178,7 @@ This document is the single consolidated source for current status, architecture
 - [x] GridKit canonical leaf cells + renderer registry are now active for slot/tray/plant rendering paths:
   - canonical leaf cells: `frontend/src/lib/gridkit/components/cells/SlotCell.tsx`, `frontend/src/lib/gridkit/components/cells/TrayCell.tsx`, `frontend/src/lib/gridkit/components/cells/PlantCell.tsx`
   - canonical renderer registry + wrapper: `frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx`, `frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx`
-  - all GridKit shelf adapters now render through renderer maps (`LegacyOverviewTentLayoutAdapter`, `LegacyPlacementTentLayoutAdapter`, `LegacyPlacementShelfPreviewAdapter`) instead of direct `renderPosition` lambdas
+  - all GridKit tent/shelf layout wrappers now render through renderer maps (`OverviewTentLayout`, `PlacementTentLayout`, `PlacementShelfPreview`) instead of direct `renderPosition` lambdas
   - DnD seam metadata helpers now live in `frontend/src/lib/dnd/attributes.ts` and `frontend/src/lib/dnd/shells.tsx`, with canonical leaf cells emitting consistent `data-cell-kind`, `data-tent-id`, `data-shelf-id`, `data-position-index`, `data-draggable-id`, and `data-droppable-id` attributes without enabling active DnD behavior.
 - [x] GridKit tray folder overlay behavior is now standardized for tent-layout tray expansion using Radix Popover + Framer Motion:
   - canonical folder overlay primitives:
@@ -195,11 +195,20 @@ This document is the single consolidated source for current status, architecture
     - `frontend/src/lib/gridkit/components/virtual/VirtualList.tsx`
     - `frontend/src/lib/gridkit/components/virtual/VirtualGrid.tsx`
   - tray folder plant grids now use thresholded virtualization in `TrayPlantGrid` (`<=24` static render; `>24` virtualized rows), while preserving ordering/click semantics.
-  - GridKit adapter renderer/context objects are memoized in the hottest tent/shelf render paths (`LegacyOverviewTentLayoutAdapter`, `LegacyPlacementTentLayoutAdapter`, `LegacyPlacementShelfPreviewAdapter`, `PositionStripWithRenderers`) to reduce avoidable rerender churn.
+  - GridKit layout wrapper renderer/context objects are memoized in the hottest tent/shelf render paths (`OverviewTentLayout`, `PlacementTentLayout`, `PlacementShelfPreview`, `PositionStripWithRenderers`) to reduce avoidable rerender churn.
   - safe `content-visibility` hints are now available via `.perf-content-auto` and applied to GridKit tent/shelf card bodies (not to scroll-snap strip containers).
   - inventory/guardrail scripts now report:
     - `virtual_list_grid_usages`
     - `remaining_large_map_loops_in_scroll_containers`
+- [x] GridKit Phase 8 finalization is active:
+  - legacy adapter naming/path was retired (`components/adapters/*` removed) and replaced by canonical layout wrappers under `frontend/src/lib/gridkit/components/layouts/*`.
+  - enforced guardrails now block regressions for:
+    - legacy adapter references
+    - legacy shelf-strip scroll logic outside `PositionStrip`
+    - bespoke tray-overlay state patterns
+    - large `.map()` loops in scroll containers without GridKit virtualization
+  - root guardrail command is now `pnpm guardrails` (runs frontend guardrails including enforced GridKit checks).
+  - durable GridKit usage guide is finalized at `frontend/docs/gridkit.md`.
 - [x] Tailwind-first migration is now active across the primary operator routes (`overview`, `recipes`, `placement`, `baseline`, `feeding`, `rotation`, `schedule`, `setup` + supporting setup routes, and cockpit `/p/{id}`): legacy `gt-*` class usage was removed from these flows and styling is now driven by Tailwind utility composition plus shadcn-style components/primitives.
 - [x] Route CSS modules for experiments/cockpit styling were retired in favor of shared Tailwind style maps and reusable UI primitives:
   - removed: `frontend/app/experiments/experiments.module.css`
@@ -266,7 +275,7 @@ This document is the single consolidated source for current status, architecture
   - frontend guardrail script `infra/scripts/check-no-backendfetch.sh` + `pnpm frontend:no-backendfetch` now blocks reintroduction of `backendFetch(...)` usage in `frontend/src`.
 - [x] Phase 6 performance and cache hardening is active for high-churn frontend surfaces:
   - controller return groups (`ui/data/actions/mutations`) are memoized on core entry/checklist hooks to avoid avoidable rerenders.
-  - placement dense-cell surfaces now use memoized components (`PlantSelectableCell`, `TraySelectableCell`, `TentSlotBoard`, and heavy step modules) with stable controller model/action contracts.
+  - placement dense-cell surfaces now use memoized components (`PlantSelectableCell`, `TraySelectableCell`, and heavy step modules) with stable controller model/action contracts.
   - overview start/stop lifecycle mutations now update status cache via `queryClient.setQueryData(...)` and only invalidate the overview plant query instead of broad status+overview invalidation.
   - frontend guardrails now also include `infra/scripts/check-no-inline-querykeys.sh` + `pnpm frontend:no-inline-querykeys` to prevent ad-hoc inline `queryKey: [...]` arrays in `frontend/src`.
 - [x] Phase 7 consistency lock-in and final cleanup is active:

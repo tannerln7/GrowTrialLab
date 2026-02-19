@@ -230,6 +230,10 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
     - default map: `frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx`
     - wrapper: `frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx`
     - adapters/pages can override only specific occupant kinds while inheriting defaults.
+  - Use GridKit layout wrappers instead of route-local tent/shelf mapping layers:
+    - `OverviewTentLayout`: `frontend/src/lib/gridkit/components/layouts/OverviewTentLayout.tsx`
+    - `PlacementTentLayout`: `frontend/src/lib/gridkit/components/layouts/PlacementTentLayout.tsx`
+    - `PlacementShelfPreview`: `frontend/src/lib/gridkit/components/layouts/PlacementShelfPreview.tsx`
   - For tray folder expansion behavior, use GridKit overlay primitives (not ad-hoc route-local popovers/dialogs):
     - `TrayFolderOverlay`: `frontend/src/lib/gridkit/components/overlays/TrayFolderOverlay.tsx` (Radix Popover, non-modal, portal, Framer Motion animation).
     - `TrayCellExpandable`: `frontend/src/lib/gridkit/components/cells/TrayCellExpandable.tsx` (canonical tray trigger + folder overlay wiring).
@@ -243,6 +247,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
     - inventory scripts expose virtualization adoption and remaining scroll-container map hotspots:
       - `pnpm frontend:gridkit:inventory`
       - `pnpm frontend:gridkit:guardrail`
+      - `pnpm guardrails` (full enforced frontend guardrail suite)
   - DnD seam metadata is helper-driven and passive in this phase:
     - helpers: `frontend/src/lib/dnd/attributes.ts`, `frontend/src/lib/dnd/shells.tsx`
     - no `DndContext`/sensors/hooks are active yet; only stable `data-*` attributes are emitted.

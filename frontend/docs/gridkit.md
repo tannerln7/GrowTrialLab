@@ -1,28 +1,114 @@
-# GridKit Program Stub (Phase 0-1)
+# GridKit Guide
 
-GridKit is the shared frontend system for rendering and interacting with the canonical physical hierarchy (`Tent -> Shelf -> Position -> Tray/Plant`) with consistent structure and flexible leaf-cell content by page. Phase 0 established dependencies/seams/tooling; Phase 1 establishes typed spec contracts, presets, and pure builders/adapters so callsites can move to spec-driven data without visual changes.
+GridKit is the canonical frontend framework for rendering physical grow layouts as `Tent -> Shelf -> Position -> Occupant` while keeping page behavior (actions, selection workflows, mutations) page-owned. Use GridKit for any tent/shelf/slot/tray/plant surface instead of building one-off board markup.
 
-## Locked library decisions
-- Shelf paging: native CSS scroll-snap (single implementation, no carousel library).
-- Tray folder overlay: Radix Popover (shadcn wrapper) + portal.
-- Overlay animations: Framer Motion.
-- Heavy grid virtualization: `@tanstack/react-virtual`.
-- Container measurement: internal `useResizeObserver` hook.
-- Drag-and-drop prep: `@dnd-kit/*` metadata/ID seams only in early phases (no `DndContext` wiring yet).
+## When to use GridKit
+- Use GridKit when a view renders tent/shelf structures, slot/tray occupancy, or tray plant folders.
+- Use GridKit for new placement/overview-like workflows before writing any custom layout wrappers.
+- Do not introduce route-local shelf strip implementations, tray overlay systems, or slot/tray/plant cell shells.
 
-## Phase 0-1 scaffolding paths
-- GridKit contracts/presets/builders/components: `frontend/src/lib/gridkit/*`
-- Legacy bridge adapters: `frontend/src/lib/gridkit/components/adapters/*`
-- DnD seams: `frontend/src/lib/dnd/*`
-- Resize observer hook: `frontend/src/lib/hooks/useResizeObserver.ts`
-- Scrollbar utility: `.hide-scrollbar` in `frontend/app/globals.css`
+## Data spine
+### Specs
+- Source of truth: `frontend/src/lib/gridkit/spec.ts`
+- Root: `TentLayoutSpec`
+- Structure:
+  - `TentSpec[]`
+  - each tent has `ShelfSpec[]`
+  - each shelf has ordered `PositionSpec[]`
+  - each position has an `occupant.kind` (`tray`, `trayStack`, `emptySlot`, `slotDef`, `plant`)
+- Specs are plain serializable objects only (no JSX/functions/refs).
 
-## Inventory and guardrail scripts
-- Inventory report:
-  - `pnpm frontend:gridkit:inventory`
-- Legacy-grid guardrail (report-only):
-  - `pnpm frontend:gridkit:guardrail`
-- Optional future enforcement mode:
-  - `pnpm frontend:gridkit:guardrail:enforce`
+### Builders
+- Source: `frontend/src/lib/gridkit/builders/*`
+- Build one spec per backend shape:
+  - `buildTentLayoutSpecFromOverviewPlants(...)`
+  - `buildTentLayoutSpecFromPlacementStep1(...)`
+  - `buildTentLayoutSpecFromPlacementStep4(...)`
+- Builder rules:
+  - preserve API ordering
+  - preserve slot visibility rules
+  - emit stable IDs for tent/shelf/position
 
-The guardrail script currently reports totals and file lists without failing CI, and supports an allowlist at `infra/scripts/gridkit-legacy-allowlist.txt` for progressive tightening.
+### Presets
+- Source: `frontend/src/lib/gridkit/presets.ts`
+- Key invariant: `POSITION_STRIP_PRESET.maxVisible = 4`
+
+## Rendering model
+### Structural containers
+- `TentGrid`, `TentCard`, `ShelfStack`, `ShelfCard`
+- Source: `frontend/src/lib/gridkit/components/containers/*`
+- Responsive invariant: tents render as 1 column on small screens, 2 columns on `md+`.
+
+### Position paging
+- `PositionStrip`: `frontend/src/lib/gridkit/components/PositionStrip.tsx`
+- Rules:
+  - native CSS scroll-snap
+  - one page visible at a time
+  - page size fixed to 4 positions
+  - desktop arrows page by one full viewport width
+
+### Renderer registry
+- Source:
+  - `frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx`
+  - `frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx`
+- Default occupant mapping:
+  - `tray` -> `TrayCell` / `TrayCellExpandable` (context-controlled)
+  - `emptySlot` -> `SlotCell` (empty)
+  - `slotDef` -> `SlotCell` (define)
+  - `plant` -> `PlantCell`
+- For page-specific behavior, start from `createPositionRendererMap(...)` and override only needed kinds.
+
+### Canonical layout wrappers
+- `OverviewTentLayout`, `PlacementTentLayout`, `PlacementShelfPreview`
+- Source: `frontend/src/lib/gridkit/components/layouts/*`
+- These are GridKit-backed layout wrappers (not legacy adapters).
+
+## Tray folder overlay
+### Use `TrayCellExpandable` when expansion is required
+- Sources:
+  - `frontend/src/lib/gridkit/components/cells/TrayCellExpandable.tsx`
+  - `frontend/src/lib/gridkit/components/overlays/TrayFolderOverlay.tsx`
+  - `frontend/src/lib/gridkit/state/trayFolderManager.tsx`
+- Behavior:
+  - Radix Popover (non-modal) + portal
+  - Framer Motion animation
+  - single-open coordination via `TrayFolderProvider`
+
+### Use `TrayCell` when expansion is not required
+- Keep static tray behavior for views that never had tray-folder UX.
+
+## Virtualization
+### Components
+- `VirtualList`: `frontend/src/lib/gridkit/components/virtual/VirtualList.tsx`
+- `VirtualGrid`: `frontend/src/lib/gridkit/components/virtual/VirtualGrid.tsx`
+
+### Current thresholds
+- `TrayPlantGrid` (`frontend/src/lib/gridkit/components/grids/TrayPlantGrid.tsx`):
+  - `plants.length <= 24`: static grid
+  - `plants.length > 24`: `VirtualGrid`
+- Keep small sets static to avoid unnecessary virtualization overhead.
+
+## DnD readiness (no active DnD yet)
+### Stable IDs
+- Source: `frontend/src/lib/dnd/ids.ts`
+- Convention: `kind:part:part...`
+  - examples: `slot:{experimentId}:{tentId}:{shelfId}:{slotId}`, `tray:{experimentId}:{trayId}`
+
+### Required data attributes
+- `data-cell-kind`
+- `data-pos-id`
+- `data-tent-id`
+- `data-shelf-id`
+- `data-position-index`
+- optional when present in spec:
+  - `data-draggable-id`
+  - `data-droppable-id`
+
+### Future activation seam
+- Do not add `DndContext`/sensors/hooks yet.
+- Use existing metadata helpers (`frontend/src/lib/dnd/attributes.ts`, `frontend/src/lib/dnd/shells.tsx`) so dnd-kit hooks can be attached later with minimal churn.
+
+## Guardrails
+- Inventory report: `pnpm frontend:gridkit:inventory`
+- Enforced GridKit guardrails: `pnpm frontend:gridkit:guardrail`
+- Full frontend guardrails: `pnpm guardrails`
