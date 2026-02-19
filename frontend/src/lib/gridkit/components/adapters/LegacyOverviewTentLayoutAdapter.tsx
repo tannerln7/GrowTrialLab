@@ -1,9 +1,11 @@
 import { cn } from "@/lib/utils";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import type { PlantOccupantSpec, TentLayoutSpec, TrayOccupantSpec } from "@/src/lib/gridkit/spec";
+import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import type { ReactNode } from "react";
 import { CellChrome } from "../CellChrome";
 import { CellTitle } from "../CellText";
+import { ShelfCard, ShelfStack, TentCard, TentGrid } from "../containers";
 
 const OVERVIEW_SLOT_COLUMN_CLASSES = [
   "grid-cols-1",
@@ -40,39 +42,43 @@ export function LegacyOverviewTentLayoutAdapter({
   renderPlantCell,
 }: LegacyOverviewTentLayoutAdapterProps) {
   return (
-    <div className={styles.overviewTentBoardGrid}>
+    <TentGrid>
       {spec.tents.map((tent) => {
         const trayCount = readTrayCount((tent.meta as { trayCount?: unknown } | undefined)?.trayCount);
         const plantCount = readTrayCount((tent.meta as { plantCount?: unknown } | undefined)?.plantCount);
+        const tentChips: ChipSpec[] = [
+          {
+            id: `${tent.tentId}-trays`,
+            label: `${trayCount} tray(s)`,
+            tone: "muted",
+            placement: "top",
+          },
+          {
+            id: `${tent.tentId}-plants`,
+            label: `${plantCount} plant(s)`,
+            tone: "muted",
+            placement: "top",
+          },
+        ];
 
         return (
-          <article
+          <TentCard
             key={tent.tentId}
-            className={cn(
-              styles.tentBoardCard,
-              styles.overviewTentBoardCard,
-              "rounded-lg border border-border",
-              styles.cellSurfaceLevel4,
-            )}
+            title={tent.label}
+            chips={tentChips}
+            className={styles.cellSurfaceLevel4}
           >
-            <div className={styles.trayHeaderRow}>
-              <div className={styles.trayHeaderMeta}>
-                <strong>{tent.label}</strong>
-              </div>
-              <div className={styles.trayHeaderActions}>
-                <span className={styles.recipeLegendItem}>{trayCount} tray(s)</span>
-                <span className={styles.recipeLegendItem}>{plantCount} plant(s)</span>
-              </div>
-            </div>
-            <div className={styles.overviewTentShelfStack}>
+            <ShelfStack>
               {tent.shelves.map((shelf, shelfPosition) => {
                 const shelfIndexRaw = (shelf.meta as { shelfIndex?: unknown } | undefined)?.shelfIndex;
                 const shelfIndex = typeof shelfIndexRaw === "number" ? shelfIndexRaw : shelfPosition + 1;
                 const maxSlotCount = shelf.positions.length;
 
                 return (
-                  <div key={shelf.shelfId} className={styles.overviewShelfGroup}>
-                    <span className={styles.overviewShelfLabel}>{`Shelf ${shelfIndex}`}</span>
+                  <ShelfCard
+                    key={shelf.shelfId}
+                    title={<span className={styles.overviewShelfLabel}>{`Shelf ${shelfIndex}`}</span>}
+                  >
                     <div
                       className={cn(
                         styles.overviewTentSlotGrid,
@@ -151,16 +157,16 @@ export function LegacyOverviewTentLayoutAdapter({
                         );
                       })}
                     </div>
-                  </div>
+                  </ShelfCard>
                 );
               })}
               {tent.shelves.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No mapped slots.</p>
               ) : null}
-            </div>
-          </article>
+            </ShelfStack>
+          </TentCard>
         );
       })}
-    </div>
+    </TentGrid>
   );
 }

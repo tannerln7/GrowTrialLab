@@ -8,6 +8,7 @@ import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import type { TentLayoutSpec, TentSpec } from "@/src/lib/gridkit/spec";
 import { CellChrome } from "../CellChrome";
 import { CellTitle } from "../CellText";
+import { ShelfCard, ShelfStack, TentCard, TentGrid } from "../containers";
 
 type LegacyPlacementTentLayoutAdapterProps = {
   spec: TentLayoutSpec;
@@ -35,42 +36,41 @@ export function LegacyPlacementTentLayoutAdapter({
   renderTrayCell,
 }: LegacyPlacementTentLayoutAdapterProps) {
   return (
-    <div className={styles.tentBoardGrid}>
+    <TentGrid>
       {spec.tents.map((tent) => {
         const { selectedTrayIds, slotCount } = readTentMeta(tent);
+        const tentChips: ChipSpec[] = [
+          {
+            id: `${tent.tentId}-slot-count`,
+            label: `${slotCount} ${slotCount === 1 ? "slot" : "slots"}`,
+            tone: "muted",
+            placement: "top",
+          },
+        ];
         return (
-          <article
+          <TentCard
             key={tent.tentId}
-            className={cn(styles.tentBoardCard, "rounded-lg border border-border", styles.cellSurfaceLevel3)}
+            title={<span className={styles.trayGridCellId}>{tent.label}</span>}
+            chips={tentChips}
+            className={styles.cellSurfaceLevel3}
+            actions={
+              selectedTrayIds.length > 0 ? (
+                <TooltipIconButton
+                  label="Return selected trays to unplaced"
+                  icon={<Trash2 size={16} />}
+                  onClick={() => onReturnSelectedFromTent(tent.tentId)}
+                  variant="destructive"
+                />
+              ) : null
+            }
           >
-            <div className={cn(styles.trayHeaderRow, "items-center")}>
-              <div className={cn(styles.trayHeaderMeta, "py-0.5")}>
-                <strong className={styles.trayGridCellId}>{tent.label}</strong>
-              </div>
-              <div className={styles.trayHeaderActions}>
-                <span className={styles.recipeLegendItem}>
-                  {slotCount} {slotCount === 1 ? "slot" : "slots"}
-                </span>
-                {selectedTrayIds.length > 0 ? (
-                  <TooltipIconButton
-                    label="Return selected trays to unplaced"
-                    icon={<Trash2 size={16} />}
-                    onClick={() => onReturnSelectedFromTent(tent.tentId)}
-                    variant="destructive"
-                  />
-                ) : null}
-              </div>
-            </div>
-
-            <div className={styles.tentShelfRow}>
+            <ShelfStack>
               {tent.shelves.map((shelf) => (
-                <article key={shelf.shelfId} className={cn(styles.tentShelfCard, styles.cellSurfaceLevel2)}>
-                  <div className={cn(styles.trayHeaderRow, "items-center")}>
-                    <div className={cn(styles.trayHeaderMeta, "py-0.5")}>
-                      <strong className={styles.trayGridCellId}>{shelf.label}</strong>
-                    </div>
-                  </div>
-
+                <ShelfCard
+                  key={shelf.shelfId}
+                  title={<span className={styles.trayGridCellId}>{shelf.label}</span>}
+                  className={styles.cellSurfaceLevel2}
+                >
                   <div className={styles.tentShelfSlotGrid}>
                     {shelf.positions.map((position) => {
                       if (position.occupant.kind === "tray") {
@@ -137,13 +137,13 @@ export function LegacyPlacementTentLayoutAdapter({
                       );
                     })}
                   </div>
-                </article>
+                </ShelfCard>
               ))}
               {slotCount === 0 ? <span className="text-sm text-muted-foreground">No slots generated.</span> : null}
-            </div>
-          </article>
+            </ShelfStack>
+          </TentCard>
         );
       })}
-    </div>
+    </TentGrid>
   );
 }

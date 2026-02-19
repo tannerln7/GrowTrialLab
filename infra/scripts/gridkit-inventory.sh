@@ -34,7 +34,7 @@ report_bucket() {
     echo "[$label] matches=$match_count files=$file_count"
     if [[ -s "$work_file" ]]; then
       echo "[$label] top_files:"
-      cut -d: -f1 "$work_file" | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /'
+      cut -d: -f1 "$work_file" | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
     fi
   else
     echo "[$label] matches=0 files=0"
@@ -53,9 +53,14 @@ report_bucket "adhoc_scroll_paging" "overflow-x|scroll-snap|scrollTo\\(|scrollLe
 report_bucket "spec_builder_callsites" "buildTentLayoutSpecFrom[A-Za-z0-9_]*\\("
 report_bucket "cellchrome_usages" "<CellChrome\\b"
 report_bucket "cellchips_usages" "<CellChips\\b"
+report_bucket "gridkit_container_callsites" "<TentGrid\\b|<TentCard\\b|<ShelfStack\\b|<ShelfCard\\b"
 report_bucket \
   "remaining_bespoke_mapping_heuristics" \
   "groupSlotsByShelf|buildStep1ShelfPreviewGroups|slotsByShelf\\s*=\\s*new Map|slotByIndex\\s*=\\s*new Map|tentMap\\s*=\\s*new Map"
+report_bucket \
+  "remaining_bespoke_tent_shelf_wrappers" \
+  "styles\\.overviewTentBoardGrid|styles\\.overviewTentBoardCard|styles\\.overviewTentShelfStack|styles\\.overviewShelfGroup|styles\\.tentBoardGrid|styles\\.tentBoardCard|styles\\.tentShelfRow|styles\\.tentShelfCard|styles\\.step1ShelfPreviewLane|styles\\.step1ShelfPreviewCard|\\[grid-template-columns:repeat\\(auto-fit,minmax\\(min\\(100%,28rem\\),1fr\\)\\)\\]" \
+  "frontend/src/components/ui/experiments-styles.ts"
 report_bucket \
   "remaining_bespoke_chip_overlays" \
   "DraftChangeMarker|plantCellCheck|plantCellDirtyDot|slotPlacedChip|absolute[^\\n]*(top|bottom|left|right).*text-xs" \

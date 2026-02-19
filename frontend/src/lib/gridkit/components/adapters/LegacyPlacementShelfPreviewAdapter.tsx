@@ -5,6 +5,7 @@ import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import type { TentSpec } from "@/src/lib/gridkit/spec";
 import { CellChrome } from "../CellChrome";
 import { CellTitle } from "../CellText";
+import { ShelfCard, ShelfStack } from "../containers";
 
 type LegacyPlacementShelfPreviewAdapterProps = {
   tentSpec: TentSpec;
@@ -17,7 +18,7 @@ export function LegacyPlacementShelfPreviewAdapter({
   onAdjustShelfSlotCount,
 }: LegacyPlacementShelfPreviewAdapterProps) {
   return (
-    <div className={styles.step1ShelfPreviewLane}>
+    <ShelfStack>
       {tentSpec.shelves.map((shelf, shelfPosition) => {
         const shelfIndexRaw = (shelf.meta as { shelfIndex?: unknown } | undefined)?.shelfIndex;
         const shelfIndex = typeof shelfIndexRaw === "number" ? shelfIndexRaw : shelfPosition + 1;
@@ -29,23 +30,19 @@ export function LegacyPlacementShelfPreviewAdapter({
         const slotCount = shelf.positions.length;
 
         return (
-          <article
+          <ShelfCard
             key={shelf.shelfId}
-            className={cn(
-              styles.trayEditorCell,
-              styles.step1ShelfPreviewCard,
-              styles.cellSurfaceLevel2,
-              shelfDirty && styles.draftChangedSurface,
-            )}
-          >
-            <div className={styles.trayHeaderRow}>
-              <div className={styles.trayHeaderMeta}>
-                <strong>{shelf.label}</strong>
-              </div>
-              <div className={styles.trayHeaderActions}>
-                <span className={styles.recipeLegendItem}>
-                  {slotCount} {slotCount === 1 ? "slot" : "slots"}
-                </span>
+            title={shelf.label}
+            chips={[
+              {
+                id: `${shelf.shelfId}-slot-count`,
+                label: `${slotCount} ${slotCount === 1 ? "slot" : "slots"}`,
+                tone: "muted",
+                placement: "top",
+              },
+            ]}
+            actions={
+              <>
                 <StepAdjustButton
                   direction="decrement"
                   onClick={() => onAdjustShelfSlotCount(tentSpec.tentId, shelfIndex - 1, -1)}
@@ -55,9 +52,13 @@ export function LegacyPlacementShelfPreviewAdapter({
                   direction="increment"
                   onClick={() => onAdjustShelfSlotCount(tentSpec.tentId, shelfIndex - 1, 1)}
                 />
-              </div>
-            </div>
-
+              </>
+            }
+            className={cn(
+              styles.cellSurfaceLevel2,
+              shelfDirty && styles.draftChangedSurface,
+            )}
+          >
             <div className={styles.step1ShelfPreviewSlotGrid}>
               {shelf.positions.map((position) => {
                 if (position.occupant.kind !== "slotDef") {
@@ -106,12 +107,12 @@ export function LegacyPlacementShelfPreviewAdapter({
               })}
               {slotCount === 0 ? <span className="text-sm text-muted-foreground">No slots.</span> : null}
             </div>
-          </article>
+          </ShelfCard>
         );
       })}
       {tentSpec.shelves.length === 0 ? (
         <span className="text-sm text-muted-foreground">No shelves configured yet.</span>
       ) : null}
-    </div>
+    </ShelfStack>
   );
 }
