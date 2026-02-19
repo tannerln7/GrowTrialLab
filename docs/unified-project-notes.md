@@ -222,7 +222,7 @@ This document is the single consolidated source for current status, architecture
   - page clients now focus on orchestration + controller state wiring while preserving existing labels/gating/lock semantics.
 - [x] Phase 5 utility consolidation and legacy guardrails are active across frontend shared code:
   - canonical shared helpers were added for set-selection mutations (`frontend/src/lib/collections/sets.ts`) and draft-vs-persisted comparisons (`frontend/src/lib/state/drafts.ts`), with placement + recipes callsites migrated.
-  - canonical error helpers now live under `frontend/src/lib/errors/*` with compatibility re-exports retained for old import paths.
+  - canonical error helpers now live under `frontend/src/lib/errors/*`; compatibility shim modules were removed after adoption.
   - duplicate label/format helpers were consolidated in `frontend/src/lib/format/labels.ts` and reused by placement/recipes/cockpit.
   - frontend guardrail script `infra/scripts/check-no-backendfetch.sh` + `pnpm frontend:no-backendfetch` now blocks reintroduction of `backendFetch(...)` usage in `frontend/src`.
 - [x] Phase 6 performance and cache hardening is active for high-churn frontend surfaces:
@@ -230,6 +230,14 @@ This document is the single consolidated source for current status, architecture
   - placement dense-cell surfaces now use memoized components (`PlantSelectableCell`, `TraySelectableCell`, `TentSlotBoard`, and heavy step modules) with stable controller model/action contracts.
   - overview start/stop lifecycle mutations now update status cache via `queryClient.setQueryData(...)` and only invalidate the overview plant query instead of broad status+overview invalidation.
   - frontend guardrails now also include `infra/scripts/check-no-inline-querykeys.sh` + `pnpm frontend:no-inline-querykeys` to prevent ad-hoc inline `queryKey: [...]` arrays in `frontend/src`.
+- [x] Phase 7 consistency lock-in and final cleanup is active:
+  - removed unused legacy frontend fetch export (`backendFetch`) from `frontend/lib/backend.ts`.
+  - removed unused compatibility shim modules (`frontend/src/lib/backend-errors.ts`, `frontend/src/lib/error-normalization.ts`).
+  - added className guardrail script `infra/scripts/check-no-filter-join-classnames.sh` + `pnpm frontend:no-filter-join-classnames`.
+  - added aggregate guardrail command `pnpm frontend:guardrails` and integrated it into `infra/scripts/verify.sh`.
+  - added concise frontend architecture guide + smoke checklist:
+    - `frontend/docs/page-patterns.md`
+    - `frontend/docs/smoke-checks.md`
 - [x] Phase 1.5 mechanical frontend helper rollout is complete for route/page conventions:
   - route/page param parsing now standardizes on `useRouteParamString("id")` / `getParamString(...)` across experiment and cockpit pages.
   - standard top-of-page alert slabs now use shared `PageAlerts` in core experiment routes.

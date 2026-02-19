@@ -140,8 +140,10 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
   - `frontend/src/lib/api.ts`
   - `frontend/src/lib/usePageQueryState.ts`
 - Regression guardrails:
+  - `pnpm frontend:guardrails`
   - `pnpm frontend:no-backendfetch`
   - `pnpm frontend:no-inline-querykeys`
+  - `pnpm frontend:no-filter-join-classnames`
 
 ### Shared page helpers
 - Route params:
@@ -162,7 +164,6 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
   - Canonical error paths are:
     - `frontend/src/lib/errors/normalizeError.ts`
     - `frontend/src/lib/errors/backendErrors.ts`
-  - Legacy shim imports (`frontend/src/lib/error-normalization.ts`, `frontend/src/lib/backend-errors.ts`) are compatibility-only.
 - Shared formatting:
   - Use `frontend/src/lib/format/labels.ts` for `formatRecipeLabel` and `formatTrayDisplay` to avoid per-feature duplicates.
 
@@ -247,6 +248,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 - Implement the smallest safe slice that preserves contracts and operator UX.
 - Keep changes staged/draft-only where UX requires explicit confirm.
 - Update canonical docs when behavior/contracts/workflows change (see `AGENTS.md`).
+- For frontend page/controller conventions, use `frontend/docs/page-patterns.md`.
 
 ## Testing and verification (quick reference)
 Source of truth is `AGENTS.md`, but common commands are:

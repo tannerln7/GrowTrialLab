@@ -27,6 +27,35 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Frontend Phase 7 Consistency Lock-In + Final Cleanup)
+- `Completed` Final consistency enforcement landed with legacy cleanup, guardrail expansion, and durable frontend architecture docs.
+  - Legacy/dead code cleanup:
+    - removed unused `backendFetch` export from `frontend/lib/backend.ts`
+    - removed unused shim modules:
+      - `frontend/src/lib/backend-errors.ts`
+      - `frontend/src/lib/error-normalization.ts`
+  - Guardrails expanded and aggregated:
+    - `infra/scripts/check-no-filter-join-classnames.sh`
+    - `pnpm frontend:no-filter-join-classnames`
+    - `pnpm frontend:guardrails` (runs no-backendfetch + no-inline-querykeys + no-filter-join-classnames)
+    - `infra/scripts/verify.sh` now runs `pnpm frontend:guardrails`
+  - Final architecture docs added for future feature work:
+    - `frontend/docs/page-patterns.md`
+    - `frontend/docs/smoke-checks.md`
+  - Shared UI class composition cleanup:
+    - `ui-foundations`, `button`, and `icon-button` class assembly now uses `cn(...)`.
+  - Relevant files:
+    - `frontend/lib/backend.ts`
+    - `frontend/src/components/ui/ui-foundations.ts`
+    - `frontend/src/components/ui/button.tsx`
+    - `frontend/src/components/ui/icon-button.tsx`
+    - `infra/scripts/check-no-filter-join-classnames.sh`
+    - `infra/scripts/verify.sh`
+    - `frontend/docs/page-patterns.md`
+    - `frontend/docs/smoke-checks.md`
+    - `package.json`
+  - Refs: `c1b3fb8`
+
 ### 2026-02-19 (Frontend Phase 6 Performance, Cache Tuning, and Guardrails)
 - `Completed` Frontend controller outputs and high-churn render paths were stabilized, with targeted cache refresh behavior and an added query-key guardrail.
   - Stabilized controller return groups via `useMemo`/`useCallback` on core entry/checklist hooks:
@@ -74,7 +103,7 @@ This file is the execution-focused feature map for product and engineering statu
     - placement wizard selection + draft-change comparisons now use shared set/draft helpers
     - recipes selection + draft changesets now use shared set/draft helpers
     - placement/recipes/cockpit now share canonical recipe/tray label formatting
-  - Canonical error imports now target `frontend/src/lib/errors/*`; legacy paths remain as compatibility shims.
+  - Canonical error imports now target `frontend/src/lib/errors/*` (shim modules were removed in Phase 7 after migration).
   - Added guardrail script and package entry to prevent `backendFetch` usage from returning in UI code:
     - `infra/scripts/check-no-backendfetch.sh`
     - `pnpm frontend:no-backendfetch`
@@ -153,7 +182,7 @@ This file is the execution-focused feature map for product and engineering statu
 
 ### 2026-02-19 (Frontend Phase 2 Data Layer Migration)
 - `Completed` Frontend server-state reads/writes were migrated from `backendFetch + useEffect` loading patterns to shared `api + @tanstack/react-query` usage across active experiment/cockpit routes.
-  - Removed route-level `backendFetch(...)` callsites from `frontend/app/*` and `frontend/src/features/*`; `backendFetch` now remains only as a legacy helper in `frontend/lib/backend.ts`.
+  - Removed route-level `backendFetch(...)` callsites from `frontend/app/*` and `frontend/src/features/*`; the legacy helper was later removed in Phase 7.
   - Standardized query keys through `frontend/src/lib/queryKeys.ts` (including new `queryKeys.plant.cockpit(...)`) and removed ad-hoc inline query key arrays.
   - Migrated high-traffic pages to query/mutation flows with existing UX preserved:
     - experiment index/new/landing/setup
@@ -207,7 +236,7 @@ This file is the execution-focused feature map for product and engineering statu
   - Added `frontend/src/features/placement/wizard/*` with `PlacementWizardPageClient`, `usePlacementWizard`, and step modules (`Step1Tents`, `Step2Trays`, `Step3PlantsToTrays`, `Step4TraysToSlots`).
   - Added shared generic workflow helpers:
     - `frontend/src/lib/async/useSavingAction.ts` (`ensureUnlocked`, `useSavingAction`)
-    - `frontend/src/lib/backend-errors.ts` (`parseBackendErrorPayload`)
+    - `frontend/src/lib/errors/backendErrors.ts` (`parseBackendErrorPayload`)
   - Removed duplicate placement initial-load status fetch by reusing the first status payload.
   - Moved placement className join/filter patterns to `cn(...)` in extracted step modules and placement shared components.
   - Reused shared backend-error parsing on `recipes` as a bounded non-wizard adoption.
@@ -222,7 +251,7 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/src/features/placement/components/placement-cells.tsx`
     - `frontend/src/features/placement/components/tent-slot-board.tsx`
     - `frontend/src/lib/async/useSavingAction.ts`
-    - `frontend/src/lib/backend-errors.ts`
+    - `frontend/src/lib/errors/backendErrors.ts`
     - `frontend/app/experiments/[id]/recipes/page.tsx`
     - `docs/agent-guidebook.md`
   - Refs: `e274b4e`, `92c3a55`, `cb1e288`
