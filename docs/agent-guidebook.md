@@ -219,7 +219,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 - For interactive grid cards that contain nested button controls (for example Step 2 tray cards with in-card `+/-` buttons), use `interactiveElement="div"` on `CellChrome`/`TrayCell` to avoid invalid nested `<button>` markup while keeping keyboard activation behavior.
 - Shared route style maps exist for complex geometry reuse:
   - `experiments-styles.ts`, `cockpit-styles.ts`
-  - Overview tray triggers should show one centered bottom occupancy chip (`x/x Plants`), with tray titles centered.
+  - Overview tray triggers should show one centered bottom occupancy chip (`x/x Plants`) only (no duplicate inline count text), with tray titles centered.
   - Overview shelf groups should render as horizontal rows within each tent (scrollable on narrow widths), not vertical stacks.
   - Overview slot display convention: empty slot cells show `Slot x` + `Empty`; filled slots render tray content directly without repeating slot labels.
   - Overview slot topology should be built from placement summary spine (`tent.layout.shelves[*].tray_count` plus tray location metadata) so shelves render configured slot capacity even when a slot has zero plants.

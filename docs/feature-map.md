@@ -30,6 +30,7 @@ This file is the execution-focused feature map for product and engineering statu
 ### 2026-02-19 (Overview Tray Trigger De-Dupe + Center Alignment)
 - `Completed` Overview tray trigger cards now avoid repeated occupancy text and use centered trigger alignment.
   - Tray triggers now suppress `summaryLines` and render one centered bottom chip: `x/x Plants`.
+  - Tray triggers also suppress `TrayCell` fallback inline count rendering (`currentCount/capacity`) so the occupancy appears once.
   - Tray titles are centered.
   - Empty-slot title/status alignment updated (`Slot x` centered; `Empty` centered vertically/horizontally).
   - updated file:

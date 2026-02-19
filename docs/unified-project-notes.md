@@ -239,6 +239,7 @@ This document is the single consolidated source for current status, architecture
   - tray body children render in a shrinkable content region (`min-h-0 flex-1`) to prevent clipping while preserving selection and staged move/remove semantics.
 - [x] Overview tray/slot trigger alignment was simplified:
   - tray trigger suppresses redundant summary lines and renders a single centered bottom chip: `x/x Plants`
+  - overview tray trigger now also suppresses `TrayCell` fallback inline count text (`currentCount/capacity`) so only the bottom occupancy chip is shown.
   - tray title is centered horizontally
   - empty-slot `Slot x` title is centered horizontally and `Empty` status is centered both vertically/horizontally.
 - [x] GridKit shelf strip page geometry was corrected after leaf sizing regression:
