@@ -1,5 +1,4 @@
 import type {
-  Diagnostics,
   PlantCell,
   PersistedTrayPlantRow,
   SlotSummary,
@@ -164,21 +163,6 @@ export function formatTrayDisplay(rawValue: string | null | undefined, fallbackV
 
 export function formatDraftChipLabel(count: number, singular: string): string {
   return `${count} ${singular}${count === 1 ? "" : "s"}`;
-}
-
-export async function parseBackendErrorPayload(
-  response: Response,
-  fallback: string,
-): Promise<{ detail: string; diagnostics: Diagnostics | null }> {
-  try {
-    const payload = (await response.json()) as { detail?: string; diagnostics?: Diagnostics };
-    return {
-      detail: payload.detail || fallback,
-      diagnostics: payload.diagnostics || null,
-    };
-  } catch {
-    return { detail: fallback, diagnostics: null };
-  }
 }
 
 export function getTentDraftMeta(

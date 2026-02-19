@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { parseBackendErrorPayload } from "@/src/lib/backend-errors";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -99,21 +100,6 @@ function formatTrayDisplay(rawValue: string | null | undefined, fallbackValue?: 
     return raw;
   }
   return `Tray ${trayNumber}`;
-}
-
-async function parseBackendErrorPayload(
-  response: Response,
-  fallback: string,
-): Promise<{ detail: string; diagnostics: Diagnostics | null }> {
-  try {
-    const payload = (await response.json()) as { detail?: string; diagnostics?: Diagnostics };
-    return {
-      detail: payload.detail || fallback,
-      diagnostics: payload.diagnostics || null,
-    };
-  } catch {
-    return { detail: fallback, diagnostics: null };
-  }
 }
 
 function TrayHeaderToggle({
@@ -476,7 +462,7 @@ export default function RecipesPage() {
       });
 
       if (!response.ok) {
-        const parsed = await parseBackendErrorPayload(response, "Unable to save recipe assignments.");
+        const parsed = await parseBackendErrorPayload<Diagnostics>(response, "Unable to save recipe assignments.");
         setError(parsed.detail);
         setDiagnostics(parsed.diagnostics);
         return;
@@ -570,7 +556,7 @@ export default function RecipesPage() {
       for (const recipe of selected) {
         const response = await backendFetch(`/api/v1/recipes/${recipe.id}`, { method: "DELETE" });
         if (!response.ok) {
-          const parsed = await parseBackendErrorPayload(response, "Unable to delete selected recipes.");
+          const parsed = await parseBackendErrorPayload<Diagnostics>(response, "Unable to delete selected recipes.");
           setError(parsed.detail);
           setDiagnostics(parsed.diagnostics);
           if (deletedCount > 0) {
