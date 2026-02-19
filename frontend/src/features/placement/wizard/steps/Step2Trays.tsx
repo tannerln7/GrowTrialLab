@@ -1,9 +1,11 @@
 import { Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { draftChipLabelForStep, formatTrayDisplay } from "@/src/features/placement/utils";
 import type { Step2Actions, Step2Model } from "@/src/features/placement/wizard/types";
 import { Badge } from "@/src/components/ui/badge";
+import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
 import { GridControlButton } from "@/src/components/ui/grid-control-button";
 import SectionCard from "@/src/components/ui/SectionCard";
@@ -19,8 +21,35 @@ type Step2TraysProps = {
 };
 
 export function Step2Trays({ model, actions }: Step2TraysProps) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const visiblePersistedTrayIds = model.sortedTrayIds.filter((trayId) => !model.draftRemovedTrayIds.has(trayId));
   const selectedTrayCount = model.selectedTrayDraftKeys.size;
+  const selectedPersistedTrayIds = useMemo(
+    () =>
+      Array.from(model.selectedTrayDraftKeys)
+        .filter((trayKey) => trayKey.startsWith("persisted:"))
+        .map((trayKey) => trayKey.slice("persisted:".length)),
+    [model.selectedTrayDraftKeys],
+  );
+  const selectedTraysWithPlants = useMemo(
+    () =>
+      selectedPersistedTrayIds
+        .map((trayId) => model.trayById.get(trayId))
+        .filter((tray): tray is NonNullable<typeof tray> => !!tray && tray.current_count > 0),
+    [model.trayById, selectedPersistedTrayIds],
+  );
+  const plantsInDeletedTrays = selectedTraysWithPlants.reduce((total, tray) => total + tray.current_count, 0);
+
+  function handleRemoveSelectedTrays() {
+    if (selectedTrayCount === 0) {
+      return;
+    }
+    if (selectedTraysWithPlants.length > 0) {
+      setConfirmOpen(true);
+      return;
+    }
+    actions.removeSelectedTrays();
+  }
 
   return (
     <div className="grid gap-3">
@@ -48,7 +77,7 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
             aria-label="Remove selected trays"
             title="Remove selected trays"
             variant="destructive"
-            onClick={actions.removeSelectedTrays}
+            onClick={handleRemoveSelectedTrays}
             disabled={model.saving || model.locked || selectedTrayCount === 0}
             className={cn(selectedTrayCount === 0 && "invisible")}
           >
@@ -189,6 +218,28 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
           {model.totalDraftTrayCount === 0 ? <p className="text-sm text-muted-foreground">No trays configured.</p> : null}
         </div>
       </SectionCard>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete selected trays?"
+        description={`Deleting selected trays will unassign ${plantsInDeletedTrays} plant mapping(s) from those trays. Plants are not deleted.`}
+        confirmLabel="Delete trays"
+        onConfirm={actions.removeSelectedTrays}
+        details={
+          selectedTraysWithPlants.length > 0 ? (
+            <>
+              <span className="font-medium text-foreground">Affected trays</span>
+              <ul className="list-disc pl-5">
+                {selectedTraysWithPlants.map((tray) => (
+                  <li key={tray.tray_id}>
+                    {formatTrayDisplay(tray.name, tray.tray_id)}: {tray.current_count} mapped plant(s)
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null
+        }
+      />
     </div>
   );
 }

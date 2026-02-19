@@ -39,6 +39,7 @@ export type PlacementWizardNavState = {
 export type Step1Model = {
   step1DraftChangeCount: number;
   tents: TentSummary[];
+  totalDraftTentCount: number;
   species: Species[];
   saving: boolean;
   locked: boolean;
@@ -47,11 +48,16 @@ export type Step1Model = {
   tentAllowedSpeciesDraftById: Record<string, string[]>;
   tentDraftMetaById: Map<string, TentDraftMeta>;
   dirtyTentIds: Set<string>;
+  selectedTentIds: Set<string>;
+  draftRemovedTentIds: Set<string>;
+  trayCountByTentId: Record<string, number>;
 };
 
 export type Step1Actions = {
   createTent: () => Promise<void>;
-  removeTent: () => Promise<void>;
+  toggleTentSelection: (tentId: string) => void;
+  removeSelectedTents: () => void;
+  clearTentSelection: () => void;
   addShelf: (tentId: string) => void;
   removeShelf: (tentId: string) => void;
   adjustShelfSlotCount: (tentId: string, shelfIndex: number, delta: number) => void;

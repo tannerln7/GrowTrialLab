@@ -27,6 +27,22 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Placement Step 1 Tent Selection-Delete Draft Flow + Shared Confirm Dialog)
+- `Completed` Placement Step 1 tent removal now uses selection-delete staging instead of immediate decrement deletion.
+  - Tent Manager toolbar now keeps add (`+`) and contextual remove-selected trash controls.
+  - Tent cards are selectable; selected tents are staged for deletion and hidden from draft grid immediately.
+  - Step 1 apply now unassigns mapped trays from deleted tents, regenerates empty slot layout, then deletes tents.
+- `Completed` Added shared confirmation popup primitive and applied it to filled-container deletion flows.
+  - New shared UI primitive:
+    - `frontend/src/components/ui/confirm-dialog.tsx`
+  - Step 1 uses confirm dialog when selected tents contain mapped trays.
+  - Step 2 uses confirm dialog when selected trays contain mapped plants.
+  - updated files:
+    - `frontend/src/features/placement/wizard/steps/Step1Tents.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step2Trays.tsx`
+    - `frontend/src/features/placement/wizard/usePlacementWizard.ts`
+    - `frontend/src/features/placement/wizard/types.ts`
+
 ### 2026-02-19 (Placement Mutation Reload Cache-Fresh Fix)
 - `Completed` Placement wizard reload path now forces a network fetch after mutations.
   - `reloadPlacementData` sets `staleTime: 0` on `fetchQuery`, bypassing global 30s freshness for post-mutation reads.

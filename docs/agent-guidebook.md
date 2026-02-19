@@ -61,7 +61,10 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 
 ### Step 1: Tents + Slots
 - Define tents, restrictions/parameters, and slot layout (shelves/slots).
-- Tent count is managed with shared `+/-` controls in `Tent Manager` (above the tent shelf/slot layout cards).
+- Tent manager uses add + selection-delete staging:
+  - toolbar keeps `+` add and contextual remove-selected trash action
+  - tent cards are selectable for draft deletion; selected tents are removed from the draft grid immediately
+  - if selected tents contain mapped trays, deletion requires confirmation and save/apply unassigns trays before tent deletion
 - Shelf count per tent is managed with the same shared `+/-` toolbar pattern in each tent's `Shelves layout` section.
 - Tent creation uses incremented name/code suggestions with duplicate-collision retry, so repeated `+` actions during bootstrap continue creating tents instead of failing on duplicate defaults.
 - Tent name/ID and species restriction edits are staged per tent card and persisted by the shared bottom `Save & Next` action (no per-card save button).
@@ -73,6 +76,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 - Define tray container count and default capacity.
 - Tray manager uses an add-only `+` toolbar control, multi-select tray cells, and a contextual toolbar trash action to stage removals.
 - Selected persisted trays are staged for deletion and removed from the draft grid immediately; selected draft-added trays are removed from draft state.
+- Deleting selected trays that currently contain plants requires confirmation before staging removal.
 - Each tray cell keeps in-card `+/-` controls for per-tray capacity.
 - The bottom navigation action persists pending changes for the current step, then advances.
 - Step 2 `Save & Next` readiness is draft-aware: at least one effective draft tray (persisted minus staged removals plus additions) with capacity `>= 1` is sufficient to proceed.
@@ -205,6 +209,9 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
     - `10` = 40px
 - Shared UI primitives live in:
   - `frontend/src/components/ui/*`
+- Destructive draft actions for filled containers should use shared confirmation popup:
+  - `frontend/src/components/ui/confirm-dialog.tsx`
+  - includes warning text/details and confirm/cancel footer actions.
 - Shared route style maps exist for complex geometry reuse:
   - `experiments-styles.ts`, `cockpit-styles.ts`
   - Overview nested tray metadata rows should stay single-line with tray label left and occupancy chip right (use `overviewTrayMeta` pattern).

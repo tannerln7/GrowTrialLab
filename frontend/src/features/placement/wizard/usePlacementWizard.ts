@@ -71,6 +71,8 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
   const [shelfCountsByTent, setShelfCountsByTent] = useState<Record<string, number[]>>({});
   const [tentDraftById, setTentDraftById] = useState<Record<string, TentDraft>>({});
   const [tentAllowedSpeciesDraftById, setTentAllowedSpeciesDraftById] = useState<Record<string, string[]>>({});
+  const [draftRemovedTentIds, setDraftRemovedTentIds] = useState<Set<string>>(new Set());
+  const [step1SelectedTentIds, setStep1SelectedTentIds] = useState<Set<string>>(new Set());
 
   const [trayCapacityDraftById, setTrayCapacityDraftById] = useState<Record<string, number>>({});
   const [draftRemovedTrayIds, setDraftRemovedTrayIds] = useState<Set<string>>(new Set());
@@ -106,8 +108,26 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
 
   const tents = useMemo(() => summary?.tents.results || [], [summary?.tents.results]);
   const trays = useMemo(() => summary?.trays.results || [], [summary?.trays.results]);
+  const retainedTents = useMemo(
+    () => tents.filter((tent) => !draftRemovedTentIds.has(tent.tent_id)),
+    [draftRemovedTentIds, tents],
+  );
 
   const defaultTrayCapacity = useMemo(() => trays[0]?.capacity ?? 4, [trays]);
+
+  const trayCountByTentId = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const tent of tents) {
+      counts[tent.tent_id] = 0;
+    }
+    for (const tray of trays) {
+      const tentId = tray.location.tent?.id;
+      if (tentId && counts[tentId] !== undefined) {
+        counts[tentId] += 1;
+      }
+    }
+    return counts;
+  }, [tents, trays]);
 
   useEffect(() => {
     setTrayCapacityDraftById(
@@ -117,6 +137,36 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     setStep2SelectedTrayKeys(setWithAll<string>([]));
     setDraftNewTrays([]);
   }, [trays]);
+
+  useEffect(() => {
+    const existingTentIds = new Set(tents.map((tent) => tent.tent_id));
+
+    setDraftRemovedTentIds((current) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const tentId of current) {
+        if (existingTentIds.has(tentId)) {
+          next.add(tentId);
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+
+    setStep1SelectedTentIds((current) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const tentId of current) {
+        if (existingTentIds.has(tentId)) {
+          next.add(tentId);
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [tents]);
 
   const trayById = useMemo(() => {
     const map = new Map<string, TrayCell>();
@@ -191,22 +241,22 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
   }, [tents]);
 
   const step1Complete = useMemo(() => {
-    if (tents.length === 0) {
+    if (retainedTents.length === 0) {
       return false;
     }
-    return tents.every((tent) => {
+    return retainedTents.every((tent) => {
       const hasLayout =
         tent.layout?.schema_version === 1 && Array.isArray(tent.layout.shelves) && tent.layout.shelves.length > 0;
       const hasSlots = tent.slots.length > 0;
       return hasLayout && hasSlots;
     });
-  }, [tents]);
+  }, [retainedTents]);
 
   const step1ReadyForNext = useMemo(() => {
-    if (tents.length === 0) {
+    if (retainedTents.length === 0) {
       return false;
     }
-    return tents.every((tent) => {
+    return retainedTents.every((tent) => {
       const draftShelfCounts = (
         shelfCountsByTent[tent.tent_id] || buildDefaultShelves(tent)
       ).map((value) => Math.max(0, value));
@@ -219,7 +269,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       }
       return tent.slots.length > 0;
     });
-  }, [shelfCountsByTent, tents]);
+  }, [retainedTents, shelfCountsByTent]);
 
   const step2Complete = useMemo(() => {
     if (trays.length === 0) {
@@ -401,6 +451,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
 
     setDestinationTrayId((current) => (current && trayById.has(current) ? current : trays[0]?.tray_id || ""));
     setDestinationSlotId((current) => (current && slotById.has(current) ? current : ""));
+    setStep1SelectedTentIds(setWithAll<string>([]));
     setSelectedPlantIds(setWithAll<string>([]));
     setSelectedTrayIds(setWithAll<string>([]));
     setActivePlantAnchorId(null);
@@ -514,10 +565,11 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
   const step1DraftStats = useMemo(() => {
     let tentSlotDraftChangeCount = 0;
     let tentDetailsDraftChangeCount = 0;
+    const tentDeletionDraftChangeCount = draftRemovedTentIds.size;
     const dirtyTentIds = new Set<string>();
     const tentDraftMetaById = new Map<string, ReturnType<typeof getTentDraftMeta>>();
 
-    for (const tent of tents) {
+    for (const tent of retainedTents) {
       const tentDraftMeta = getTentDraftMeta(
         tent,
         shelfCountsByTent,
@@ -535,25 +587,31 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
         dirtyTentIds.add(tent.tent_id);
       }
     }
+    for (const tentId of draftRemovedTentIds) {
+      dirtyTentIds.add(tentId);
+    }
 
     return {
       tentSlotDraftChangeCount,
       tentDetailsDraftChangeCount,
+      tentDeletionDraftChangeCount,
       dirtyTentIds,
       tentDraftMetaById,
     };
   }, [
+    draftRemovedTentIds,
+    retainedTents,
     shelfCountsByTent,
     tentAllowedSpeciesDraftById,
     tentDraftById,
-    tents,
   ]);
   const tentSlotDraftChangeCount = step1DraftStats.tentSlotDraftChangeCount;
   const tentDetailsDraftChangeCount = step1DraftStats.tentDetailsDraftChangeCount;
+  const tentDeletionDraftChangeCount = step1DraftStats.tentDeletionDraftChangeCount;
   const dirtyTentIds = step1DraftStats.dirtyTentIds;
   const tentDraftMetaById = step1DraftStats.tentDraftMetaById;
 
-  const step1DraftChangeCount = tentSlotDraftChangeCount + tentDetailsDraftChangeCount;
+  const step1DraftChangeCount = tentSlotDraftChangeCount + tentDetailsDraftChangeCount + tentDeletionDraftChangeCount;
 
   const retainedPersistedTrays = useMemo(
     () => trays.filter((tray) => !draftRemovedTrayIds.has(tray.tray_id)),
@@ -673,6 +731,8 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
         }
         return next;
       });
+      setDraftRemovedTentIds(setWithAll<string>([]));
+      setStep1SelectedTentIds(setWithAll<string>([]));
       setNotice("Discarded step 1 draft changes.");
     } else if (currentStep === 2) {
       setTrayCapacityDraftById(
@@ -757,39 +817,38 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     });
   }
 
-  async function removeTent() {
+  function toggleStep1TentSelection(tentId: string) {
     if (!ensureUnlocked({ locked: placementLocked, message: RUNNING_LOCK_MESSAGE, setError })) {
       return;
     }
-    if (tents.length === 0) {
+    setStep1SelectedTentIds((current) => toggleSet(current, tentId));
+    setError("");
+    setDiagnostics(null);
+  }
+
+  function clearStep1TentSelection() {
+    setStep1SelectedTentIds(setWithAll<string>([]));
+  }
+
+  function removeSelectedStep1Tents() {
+    if (!ensureUnlocked({ locked: placementLocked, message: RUNNING_LOCK_MESSAGE, setError })) {
+      return;
+    }
+    if (step1SelectedTentIds.size === 0) {
       return;
     }
 
-    const removableTent =
-      [...tents].reverse().find((tent) => tent.slots.length === 0) || tents[tents.length - 1];
-    if (!removableTent) {
-      return;
-    }
-
-    await runSavingAction({
-      locked: placementLocked,
-      lockMessage: RUNNING_LOCK_MESSAGE,
-      fallbackError: "Unable to remove tent.",
-      clearDiagnostics: false,
-      action: async () => {
-        try {
-          await api.delete(`/api/v1/tents/${removableTent.tent_id}`);
-        } catch (requestError) {
-          const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to remove tent.");
-          setError(payload.detail);
-          setDiagnostics(payload.diagnostics);
-          return false;
-        }
-        setNotice(`Removed ${removableTent.name}.`);
-        await reloadPlacementData();
-        return true;
-      },
+    setDraftRemovedTentIds((current) => {
+      const next = new Set(current);
+      for (const tentId of step1SelectedTentIds) {
+        next.add(tentId);
+      }
+      return next;
     });
+    setStep1SelectedTentIds(setWithAll<string>([]));
+    setError("");
+    setDiagnostics(null);
+    setNotice(`${step1SelectedTentIds.size} tent(s) staged for deletion.`);
   }
 
   function adjustShelfSlotCount(tentId: string, shelfIndex: number, delta: number) {
@@ -823,15 +882,20 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       return false;
     }
 
-    const changedTentDetails = tents.filter(
+    const changedTentDetails = retainedTents.filter(
       (tent) => tentDraftMetaById.get(tent.tent_id)?.detailDirty,
     );
 
-    const changedTentLayouts = tents.filter(
+    const changedTentLayouts = retainedTents.filter(
       (tent) => tentDraftMetaById.get(tent.tent_id)?.layoutDirty,
     );
 
-    if (changedTentDetails.length === 0 && changedTentLayouts.length === 0) {
+    const tentById = new Map(tents.map((tent) => [tent.tent_id, tent] as const));
+    const deletedTents = Array.from(draftRemovedTentIds)
+      .map((tentId) => tentById.get(tentId))
+      .filter((tent): tent is TentSummary => Boolean(tent));
+
+    if (changedTentDetails.length === 0 && changedTentLayouts.length === 0 && deletedTents.length === 0) {
       setNotice("No step 1 changes to apply.");
       return true;
     }
@@ -843,6 +907,8 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       action: async () => {
         let detailAppliedCount = 0;
         let layoutAppliedCount = 0;
+        let deletedTentCount = 0;
+        let unassignedTrayCount = 0;
 
         for (const tent of changedTentDetails) {
           const tentDraftMeta = tentDraftMetaById.get(tent.tent_id);
@@ -904,6 +970,52 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
           layoutAppliedCount += 1;
         }
 
+        for (const tent of deletedTents) {
+          const tentSlotIds = new Set(tent.slots.map((slot) => slot.slot_id));
+          const mappedTrays = trays.filter((tray) => {
+            const slotId = tray.location.slot?.id;
+            return !!slotId && tentSlotIds.has(slotId);
+          });
+
+          for (const tray of mappedTrays) {
+            try {
+              await api.patch(`/api/v1/trays/${tray.tray_id}/`, { slot_id: null });
+            } catch (requestError) {
+              const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to unassign tray from tent slots.");
+              setError(`${tent.name}: ${payload.detail}`);
+              setDiagnostics(payload.diagnostics);
+              return false;
+            }
+            unassignedTrayCount += 1;
+          }
+
+          if (tent.slots.length > 0) {
+            try {
+              await api.post(`/api/v1/tents/${tent.tent_id}/slots/generate`, {
+                layout: {
+                  schema_version: 1,
+                  shelves: [],
+                },
+              });
+            } catch (requestError) {
+              const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to clear tent slots before deletion.");
+              setError(`${tent.name}: ${payload.detail}`);
+              setDiagnostics(payload.diagnostics);
+              return false;
+            }
+          }
+
+          try {
+            await api.delete(`/api/v1/tents/${tent.tent_id}`);
+          } catch (requestError) {
+            const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to delete tent.");
+            setError(`${tent.name}: ${payload.detail}`);
+            setDiagnostics(payload.diagnostics);
+            return false;
+          }
+          deletedTentCount += 1;
+        }
+
         const messages: string[] = [];
         if (detailAppliedCount > 0) {
           messages.push(`Saved tent details for ${detailAppliedCount} tent(s).`);
@@ -911,6 +1023,14 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
         if (layoutAppliedCount > 0) {
           messages.push(`Applied tent slot layout for ${layoutAppliedCount} tent(s).`);
         }
+        if (deletedTentCount > 0) {
+          const unassignedNote = unassignedTrayCount > 0
+            ? ` and unassigned ${unassignedTrayCount} tray(s)`
+            : "";
+          messages.push(`Deleted ${deletedTentCount} tent(s)${unassignedNote}.`);
+        }
+        setDraftRemovedTentIds(setWithAll<string>([]));
+        setStep1SelectedTentIds(setWithAll<string>([]));
         setNotice(messages.join(" "));
         await reloadPlacementData();
         return true;
@@ -1584,7 +1704,8 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     () => ({
       step1: {
         step1DraftChangeCount,
-        tents,
+        tents: retainedTents,
+        totalDraftTentCount: retainedTents.length,
         species,
         saving,
         locked: placementLocked,
@@ -1593,6 +1714,9 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
         tentAllowedSpeciesDraftById,
         tentDraftMetaById,
         dirtyTentIds,
+        selectedTentIds: step1SelectedTentIds,
+        draftRemovedTentIds,
+        trayCountByTentId,
       },
       step2: {
         step2DraftChangeCount,
@@ -1675,13 +1799,17 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       sortedSlots,
       sortedTrayIds,
       species,
+      step1SelectedTentIds,
       step1DraftChangeCount,
       step2DraftChangeCount,
       tentAllowedSpeciesDraftById,
       tentDraftById,
       tentDraftMetaById,
       tents,
+      retainedTents,
+      draftRemovedTentIds,
       totalDraftTrayCount,
+      trayCountByTentId,
       trayById,
       trayCapacityDraftById,
       trayPlantIdsByTray,
@@ -1710,7 +1838,9 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     goPreviousStep: () => void;
     resetCurrentStepDrafts: () => void;
     createTent: () => Promise<void>;
-    removeTent: () => Promise<void>;
+    toggleStep1TentSelection: (tentId: string) => void;
+    removeSelectedStep1Tents: () => void;
+    clearStep1TentSelection: () => void;
     addShelf: (tentId: string) => void;
     removeShelf: (tentId: string) => void;
     adjustShelfSlotCount: (tentId: string, shelfIndex: number, delta: number) => void;
@@ -1748,7 +1878,9 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       goPreviousStep,
       resetCurrentStepDrafts,
       createTent,
-      removeTent,
+      toggleStep1TentSelection,
+      removeSelectedStep1Tents,
+      clearStep1TentSelection,
       addShelf,
       removeShelf,
       adjustShelfSlotCount,
@@ -1795,9 +1927,9 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
         createTent: async () => {
           await actionRefs.current?.createTent();
         },
-        removeTent: async () => {
-          await actionRefs.current?.removeTent();
-        },
+        toggleTentSelection: (tentId: string) => actionRefs.current?.toggleStep1TentSelection(tentId),
+        removeSelectedTents: () => actionRefs.current?.removeSelectedStep1Tents(),
+        clearTentSelection: () => actionRefs.current?.clearStep1TentSelection(),
         addShelf: (tentId: string) => actionRefs.current?.addShelf(tentId),
         removeShelf: (tentId: string) => actionRefs.current?.removeShelf(tentId),
         adjustShelfSlotCount: (tentId: string, shelfIndex: number, delta: number) =>

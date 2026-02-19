@@ -149,7 +149,11 @@ This document is the single consolidated source for current status, architecture
 - [x] Dedicated pages for baseline/placement/rotation/feeding/schedule/recipes are active.
 - [x] Standalone `/slots` navigation was merged into Placement Step 1 (single-route wizard flow).
 - [x] Placement page now uses step-gated wizard UX and dense multi-select grid workflows for both plants->trays and trays->slots with explicit draft apply/discard controls.
-- [x] Placement Step 1 now uses mobile-first `+/-` count toolbars for both tent count (`Tent Manager`) and per-tent shelf count (`Shelves layout`), replacing older add/remove text-button flows and keeping step controls consistent with shared primitives.
+- [x] Placement Step 1 `Tent Manager` now uses add + selection-delete staging:
+  - toolbar keeps a single `+` add control and a contextual trash action for selected tents
+  - tent cards are selectable; selected tents are staged for deletion and removed from the draft grid immediately
+  - save/apply unassigns trays from selected tents, clears slots, then deletes tents
+  - per-tent shelf layout still uses in-card `+/-` controls
 - [x] Placement Step 1 shelf preview cards now content-fit to slot-cell rows (auto-sized shelf width) instead of fixed shelf-card minimums, reducing empty horizontal slack and keeping shelf geometry tied to slot count.
 - [x] Placement Step 1 shelf preview lane now wraps shelf cards to new rows when screen width is constrained; individual shelf slot rows can still scroll within a shelf card when a single shelf exceeds available width.
 - [x] Placement Step 1 tent metadata and restriction edits now stage in-card and persist through the shared bottom `Save & Next` action (per-tent `Save tent` buttons removed); Step 1 blocker/help text reflects this single save path.
@@ -162,6 +166,9 @@ This document is the single consolidated source for current status, architecture
   - per-tray capacity still uses in-card `+/-` controls
 - [x] Placement Step 2 blocker/`Save & Next` readiness now evaluates effective draft trays (persisted minus staged deletions plus draft additions) and requires at least one tray with capacity `>= 1`.
 - [x] Placement Step 2 apply path now clears tray-plant memberships before deleting staged trays, so deleting non-empty trays succeeds in one `Save & Next` flow.
+- [x] Container-destructive actions now use a shared confirmation popup primitive (`frontend/src/components/ui/confirm-dialog.tsx`) with warning text/details + confirm/cancel actions:
+  - Step 1 tent deletion prompts only when selected tents currently contain mapped trays
+  - Step 2 tray deletion prompts when selected trays currently contain mapped plants
 - [x] Placement Step 4 `Tent Slot Containers` now renders `Tent -> Shelf -> Slot/Tray` with shelves as stacked rows per tent, and each shelf row renders its slot/tray cells in a horizontal lane with overflow fallback. Tent cards auto-fit side-by-side when viewport width allows and stack when constrained; in two-up layout the shelf lane targets up to four visible slot/tray cells before horizontal scroll. The nested tent/shelf grid now renders directly on the step surface without an extra outer wrapper card. Filled slots render tray cards directly while empty slots retain `Slot x` + `Empty` affordances, and empty-slot destination selection now toggles on repeat click with full-cell highlight + check indicator.
 - [x] Placement save/apply actions are now unified into the shared bottom navigation flow: when current-step drafts are pending, the primary action runs save+advance (`Save & Next`), draft-change chips render in the nav bar only when pending with singular/plural labels by count, step blocker hints are rendered in the same bottom bar for all four steps, and `Reset` in that bar discards current-step draft changes. Step 1 next/save gating now evaluates draft shelf layout validity so unsaved but valid tent/slot drafts can proceed through `Save & Next`.
 - [x] Placement route bootstrap gating was corrected: `/experiments/{id}/placement` no longer redirects back to `/setup` when setup is incomplete, so setup checklist links (`Go to placement`) remain usable during bootstrap.

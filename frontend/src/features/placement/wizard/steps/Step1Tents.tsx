@@ -1,3 +1,6 @@
+import { CheckSquare, Plus, Square, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+
 import { cn } from "@/lib/utils";
 import {
   draftChipLabelForStep,
@@ -5,8 +8,10 @@ import {
 } from "@/src/features/placement/utils";
 import type { Step1Actions, Step1Model } from "@/src/features/placement/wizard/types";
 import { CountAdjustToolbar } from "@/src/components/ui/count-adjust-toolbar";
+import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
 import { DraftChangeMarker } from "@/src/components/ui/draft-change-marker";
+import { GridControlButton } from "@/src/components/ui/grid-control-button";
 import { Input } from "@/src/components/ui/input";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { buildTentLayoutSpecFromPlacementStep1 } from "@/src/lib/gridkit/builders";
@@ -20,6 +25,30 @@ type Step1TentsProps = {
 };
 
 export function Step1Tents({ model, actions }: Step1TentsProps) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const selectedTentCount = model.selectedTentIds.size;
+  const tentsWithTrays = useMemo(
+    () =>
+      model.tents.filter((tent) => model.selectedTentIds.has(tent.tent_id) && (model.trayCountByTentId[tent.tent_id] || 0) > 0),
+    [model.selectedTentIds, model.tents, model.trayCountByTentId],
+  );
+
+  const selectedTrayCount = tentsWithTrays.reduce(
+    (total, tent) => total + (model.trayCountByTentId[tent.tent_id] || 0),
+    0,
+  );
+
+  function handleRemoveSelectedTents() {
+    if (selectedTentCount === 0) {
+      return;
+    }
+    if (selectedTrayCount > 0) {
+      setConfirmOpen(true);
+      return;
+    }
+    actions.removeSelectedTents();
+  }
+
   return (
     <div className="grid gap-3">
       <SectionCard
@@ -30,19 +59,35 @@ export function Step1Tents({ model, actions }: Step1TentsProps) {
           ) : null
         }
       >
-        <CountAdjustToolbar
-          count={model.tents.length}
-          countLabel="Total tents"
-          helperText="Shelves and slots are configured per tent below."
-          onDecrement={() => void actions.removeTent()}
-          onIncrement={() => void actions.createTent()}
-          decrementDisabled={model.saving || model.locked || model.tents.length === 0}
-          incrementDisabled={model.saving || model.locked}
-        />
+        <div className={cn(styles.trayControlRow, "justify-between")}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Total tents: {model.totalDraftTentCount}</span>
+            <GridControlButton
+              aria-label="Add tent"
+              title="Add tent"
+              onClick={() => void actions.createTent()}
+              disabled={model.saving || model.locked}
+            >
+              <Plus />
+            </GridControlButton>
+          </div>
+          <GridControlButton
+            aria-label="Remove selected tents"
+            title="Remove selected tents"
+            variant="destructive"
+            onClick={handleRemoveSelectedTents}
+            disabled={model.saving || model.locked || selectedTentCount === 0}
+            className={cn(selectedTentCount === 0 && "invisible")}
+          >
+            <Trash2 />
+          </GridControlButton>
+        </div>
+        <p className="text-sm text-muted-foreground">Shelves and slots are configured per tent below.</p>
       </SectionCard>
 
       <TentGrid>
         {model.tents.map((tent) => {
+          const selected = model.selectedTentIds.has(tent.tent_id);
           const tentDraftMeta =
             model.tentDraftMetaById.get(tent.tent_id) ||
             getTentDraftMeta(
@@ -66,8 +111,24 @@ export function Step1Tents({ model, actions }: Step1TentsProps) {
             <TentCard
               key={tent.tent_id}
               title={`${tent.name}${tent.code ? ` (${tent.code})` : ""}`}
-              className={shelvesRemoved ? styles.draftChangedSurface : ""}
-              actions={model.dirtyTentIds.has(tent.tent_id) ? <DraftChangeChip label="Draft changes" /> : null}
+              className={cn(
+                shelvesRemoved ? styles.draftChangedSurface : "",
+                selected && "ring-2 ring-ring",
+              )}
+              actions={
+                <div className="flex items-center gap-2">
+                  {model.dirtyTentIds.has(tent.tent_id) ? <DraftChangeChip label="Draft changes" /> : null}
+                  <GridControlButton
+                    aria-label={selected ? `Deselect ${tent.name}` : `Select ${tent.name}`}
+                    title={selected ? "Deselect tent" : "Select tent"}
+                    variant={selected ? "secondary" : "ghost"}
+                    onClick={() => actions.toggleTentSelection(tent.tent_id)}
+                    disabled={model.saving || model.locked}
+                  >
+                    {selected ? <CheckSquare /> : <Square />}
+                  </GridControlButton>
+                </div>
+              }
             >
               {shelvesRemoved ? <DraftChangeMarker /> : null}
               <div className="grid gap-3">
@@ -178,6 +239,29 @@ export function Step1Tents({ model, actions }: Step1TentsProps) {
           );
         })}
       </TentGrid>
+      {model.totalDraftTentCount === 0 ? <p className="text-sm text-muted-foreground">No tents configured.</p> : null}
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete selected tents?"
+        description={`Deleting ${selectedTentCount} tent(s) will remove tent slots and unassign ${selectedTrayCount} tray(s) from their slots. Trays are not deleted.`}
+        confirmLabel="Delete tents"
+        onConfirm={actions.removeSelectedTents}
+        details={
+          tentsWithTrays.length > 0 ? (
+            <>
+              <span className="font-medium text-foreground">Affected tents</span>
+              <ul className="list-disc pl-5">
+                {tentsWithTrays.map((tent) => (
+                  <li key={tent.tent_id}>
+                    {tent.name}: {model.trayCountByTentId[tent.tent_id] || 0} tray(s) will be unassigned
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null
+        }
+      />
     </div>
   );
 }
