@@ -27,6 +27,14 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Placement Step 2 Save/Next Uses Draft Tray State)
+- `Completed` Placement Step 2 next-step blocker now evaluates draft tray state (count + capacity) instead of persisted tray rows only.
+  - `Save & Next` is allowed when draft state contains at least one tray with capacity `>= 1`, even before mutations are written.
+  - stepper unlock behavior remains tied to persisted completion; this change targets Step 2 blocker/next gating.
+  - updated files:
+    - `frontend/src/features/placement/wizard/usePlacementWizard.ts`
+    - `frontend/src/features/placement/utils.ts`
+
 ### 2026-02-19 (Placement Step 3 Tray Popout Parity With Overview)
 - `Completed` Placement Step 3 tray containers now use the same tray popup/folder interaction model as overview tray cells.
   - Step 3 tray cards now render through `TrayCellExpandable` under `TrayFolderProvider`, so tray click opens the GridKit popout plant view.

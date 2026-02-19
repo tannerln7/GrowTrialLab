@@ -238,6 +238,44 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     return trays.every((tray) => tray.capacity >= 1);
   }, [trays]);
 
+  const step2ReadyForNext = useMemo(() => {
+    const targetCount = Math.max(0, Math.trunc(draftTrayCount));
+    if (targetCount < 1) {
+      return false;
+    }
+
+    const persistedTrayCount = Math.min(targetCount, sortedTrayIds.length);
+    const remainingPersistedTrayIds = sortedTrayIds.slice(0, persistedTrayCount);
+    const persistedValid = remainingPersistedTrayIds.every((trayId) => {
+      const tray = trayById.get(trayId);
+      if (!tray) {
+        return false;
+      }
+      const draftCapacity = trayCapacityDraftById[trayId] ?? tray.capacity;
+      return Number.isFinite(draftCapacity) && draftCapacity >= 1;
+    });
+    if (!persistedValid) {
+      return false;
+    }
+
+    const newTrayCount = targetCount - persistedTrayCount;
+    for (let index = 0; index < newTrayCount; index += 1) {
+      const capacity = newTrayCapacities[index] ?? defaultTrayCapacity;
+      if (!Number.isFinite(capacity) || capacity < 1) {
+        return false;
+      }
+    }
+
+    return true;
+  }, [
+    defaultTrayCapacity,
+    draftTrayCount,
+    newTrayCapacities,
+    sortedTrayIds,
+    trayById,
+    trayCapacityDraftById,
+  ]);
+
   const step3Complete = useMemo(() => {
     if (sortedPlantIds.length === 0) {
       return true;
@@ -552,10 +590,11 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       step1Complete,
       step1ReadyForNext,
       step2Complete,
+      step2ReadyForNext,
       step3Complete,
       step4Complete,
     }),
-    [step1Complete, step1ReadyForNext, step2Complete, step3Complete, step4Complete],
+    [step1Complete, step1ReadyForNext, step2Complete, step2ReadyForNext, step3Complete, step4Complete],
   );
   const stepDraftCounts = useMemo(
     () => ({

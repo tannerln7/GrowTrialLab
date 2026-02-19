@@ -49,6 +49,7 @@ export type StepCompletionState = {
   step1Complete: boolean;
   step1ReadyForNext: boolean;
   step2Complete: boolean;
+  step2ReadyForNext: boolean;
   step3Complete: boolean;
   step4Complete: boolean;
 };
@@ -456,7 +457,7 @@ export function stepBlockedMessage(step: number, state: StepCompletionState): st
   if (step === 1 && !state.step1ReadyForNext) {
     return "Add at least one tent and ensure each tent has at least one slot before continuing.";
   }
-  if (step === 2 && !state.step2Complete) {
+  if (step === 2 && !state.step2ReadyForNext) {
     return "Add at least one tray with capacity before continuing.";
   }
   if (step === 3 && !state.step3Complete) {
@@ -484,6 +485,9 @@ export function isStepComplete(step: number, state: StepCompletionState): boolea
 export function isStepReadyForNext(step: number, state: StepCompletionState): boolean {
   if (step === 1) {
     return state.step1ReadyForNext;
+  }
+  if (step === 2) {
+    return state.step2ReadyForNext;
   }
   return isStepComplete(step, state);
 }

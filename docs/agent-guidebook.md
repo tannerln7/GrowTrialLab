@@ -67,6 +67,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 - Define tray container count and default capacity.
 - Tray count is staged with `+/-` controls in `Tray Manager`, and each tray cell has in-card `+/-` controls for per-tray capacity.
 - The bottom navigation action persists pending changes for the current step, then advances.
+- Step 2 `Save & Next` readiness is draft-aware: at least one draft tray with capacity `>= 1` is sufficient to proceed.
 - Goal: containers exist with constraints, but no placement yet.
 
 ### Step footer draft chips
