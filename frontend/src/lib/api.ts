@@ -48,6 +48,14 @@ export async function apiPost<TResponse>(
   return request<TResponse>("POST", path, { ...options, body });
 }
 
+export async function apiPostForm<TResponse>(
+  path: string,
+  formData: FormData,
+  options?: Omit<ApiRequestOptions, "body">,
+): Promise<TResponse> {
+  return request<TResponse>("POST", path, { ...options, body: formData });
+}
+
 export async function apiPatch<TResponse>(
   path: string,
   body?: ApiRequestBody,
@@ -67,6 +75,7 @@ export async function apiDelete<TResponse>(
 export const api = {
   get: apiGet,
   post: apiPost,
+  postForm: apiPostForm,
   patch: apiPatch,
   delete: apiDelete,
 };

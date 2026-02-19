@@ -3,6 +3,8 @@ export type ExperimentOverviewPlantsParams = {
   q?: string;
 };
 
+type QueryKeyPart = string | number | boolean | null | undefined | Record<string, unknown>;
+
 function normalizeOverviewPlantsParams(
   params?: ExperimentOverviewPlantsParams,
 ): ExperimentOverviewPlantsParams | undefined {
@@ -24,8 +26,20 @@ function normalizeOverviewPlantsParams(
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
+export function experimentRoot(experimentId: string) {
+  return ["experiment", experimentId] as const;
+}
+
 export function experimentStatus(experimentId: string) {
-  return ["experiment", experimentId, "status", "summary"] as const;
+  return [...experimentRoot(experimentId), "status", "summary"] as const;
+}
+
+export function experimentFeature(
+  experimentId: string,
+  featureName: string,
+  ...parts: QueryKeyPart[]
+) {
+  return [...experimentRoot(experimentId), "feature", featureName, ...parts] as const;
 }
 
 export function experimentOverviewPlants(
@@ -34,18 +48,19 @@ export function experimentOverviewPlants(
 ) {
   const normalized = normalizeOverviewPlantsParams(params);
   if (normalized) {
-    return [
-      "experiment",
-      experimentId,
-      "overview",
-      "plants",
-      normalized,
-    ] as const;
+    return [...experimentFeature(experimentId, "overviewPlants"), normalized] as const;
   }
-  return ["experiment", experimentId, "overview", "plants"] as const;
+  return experimentFeature(experimentId, "overviewPlants");
 }
 
 export const queryKeys = {
+  experiment: {
+    root: experimentRoot,
+    status: experimentStatus,
+    feature: experimentFeature,
+  },
+  experimentRoot,
   experimentStatus,
+  experimentFeature,
   experimentOverviewPlants,
 };

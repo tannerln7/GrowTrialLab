@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import { normalizeBackendError } from "@/lib/backend";
+import { normalizeUserFacingError } from "@/src/lib/error-normalization";
 
 type EnsureUnlockedArgs = {
   locked: boolean;
@@ -74,7 +74,7 @@ export function useSavingAction<TDiagnostics = unknown>({
         const result = await action();
         return result;
       } catch (requestError) {
-        const normalized = normalizeBackendError(requestError);
+        const normalized = normalizeUserFacingError(requestError);
         if (normalized.kind === "offline") {
           setOffline(true);
         }
