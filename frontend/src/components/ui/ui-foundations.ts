@@ -1,4 +1,5 @@
 import { cva } from "class-variance-authority";
+import { cn } from "@/lib/utils";
 
 export const uiInteraction = {
   focusRing:
@@ -7,12 +8,12 @@ export const uiInteraction = {
   transition: "transition-colors",
 } as const;
 
-export const controlBaseClass = [
+export const controlBaseClass = cn(
   "flex w-full rounded-md border border-input bg-background text-sm text-foreground shadow-xs placeholder:text-muted-foreground",
   uiInteraction.transition,
   uiInteraction.focusRing,
   uiInteraction.disabled,
-].join(" ");
+);
 
 export const surfaceVariants = cva(
   "rounded-lg border border-border bg-card text-card-foreground shadow-sm",
@@ -85,10 +86,10 @@ export const selectableCellVariants = cva(
         selected: "border-ring bg-[color:var(--gt-cell-selected)] ring-1 ring-ring/50",
       },
       interactive: {
-        true: [
+        true: cn(
           "cursor-pointer hover:border-ring/70 active:border-ring",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
-        ].join(" "),
+        ),
         false: "",
       },
       dirty: {

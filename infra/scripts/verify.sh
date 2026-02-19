@@ -10,6 +10,9 @@ echo "[verify] Running backend tests..."
 echo "[verify] Running pyright..."
 pnpm pyright
 
+echo "[verify] Running frontend guardrails..."
+pnpm frontend:guardrails
+
 echo "[verify] Building docker compose images..."
 docker compose build
 

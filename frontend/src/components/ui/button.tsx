@@ -6,13 +6,13 @@ import { cn } from "@/lib/utils";
 import { uiInteraction } from "./ui-foundations";
 
 const buttonVariants = cva(
-  [
+  cn(
     "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-transparent text-sm font-medium",
     "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
     uiInteraction.transition,
     uiInteraction.focusRing,
     uiInteraction.disabled,
-  ].join(" "),
+  ),
   {
     variants: {
       variant: {
