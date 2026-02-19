@@ -213,8 +213,9 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
     - `CellTitle`/`CellSubtitle`/`CellMeta` (`frontend/src/lib/gridkit/components/CellText.tsx`) for repeatable text rows.
     - canonical leaf cells:
       - `SlotCell`: `frontend/src/lib/gridkit/components/cells/SlotCell.tsx`
-      - `TrayCell`: `frontend/src/lib/gridkit/components/cells/TrayCell.tsx`
-      - `PlantCell`: `frontend/src/lib/gridkit/components/cells/PlantCell.tsx`
+    - `TrayCell`: `frontend/src/lib/gridkit/components/cells/TrayCell.tsx`
+    - `PlantCell`: `frontend/src/lib/gridkit/components/cells/PlantCell.tsx`
+    - leaf sizing contract (`frontend/src/lib/gridkit/components/cells/leafSizing.ts`) should keep `w-full` + `aspect-square` and avoid desktop `min-w` constraints that can collapse shelf strips from 4 columns to 3.
   - Use GridKit structural containers for tent/shelf scaffolding:
     - `TentGrid` for responsive tent layout (`1` column on small, `2` on `md+`).
     - `TentCard` as the tent wrapper (header + body).

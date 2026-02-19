@@ -27,6 +27,13 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (GridKit PositionStrip Leaf Sizing Regression Fix)
+- `Completed` Restored shelf-strip 4-column/page geometry by removing desktop-constraining leaf min widths while preserving square cell sizing.
+  - Updated canonical leaf sizing contract:
+    - `frontend/src/lib/gridkit/components/cells/leafSizing.ts`
+  - Result:
+    - shelf strips can render 4 positions per page again (`maxVisible=4`) and desktop paging remains viewport-page based.
+
 ### 2026-02-19 (GridKit Dense Control Sizing + No-Shift Conditional Controls)
 - `Completed` GridKit icon-only controls now share a compact sizing contract, and conditional tray/tent destructive actions no longer shift grid content when they appear.
   - Added shared grid control primitive:

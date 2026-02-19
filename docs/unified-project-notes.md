@@ -204,6 +204,9 @@ This document is the single consolidated source for current status, architecture
   - icon-only grid controls now use `GridControlButton` (`frontend/src/components/ui/grid-control-button.tsx`) with fixed `h-8 w-8` + `h-4 w-4` icon sizing.
   - placement/grid `+/-` controls (`StepAdjustButton`) and `PositionStrip` desktop arrows now share the same control footprint.
   - conditional destructive actions in tray/tent grid contexts now render via absolute overlay wrappers (`pointer-events-none` container + `pointer-events-auto` button) with opacity/scale animation only, preventing row/card height shifts when selection toggles.
+- [x] GridKit shelf strip page geometry was corrected after leaf sizing regression:
+  - canonical leaf sizing now keeps square cells without desktop `min-w` constraints (`frontend/src/lib/gridkit/components/cells/leafSizing.ts`), so shelf strips retain 4 columns at `POSITION_STRIP_PRESET.maxVisible = 4` when viewport width allows.
+  - desktop horizontal paging in `PositionStrip` remains viewport-page-based and no longer competes with leaf min-width sizing.
 - [x] GridKit Phase 8 finalization is active:
   - legacy adapter naming/path was retired (`components/adapters/*` removed) and replaced by canonical layout wrappers under `frontend/src/lib/gridkit/components/layouts/*`.
   - enforced guardrails now block regressions for:
