@@ -932,6 +932,14 @@ export default function PlacementPage() {
 
   const step2DraftChangeCount = trayCountDraftChangeCount + trayCapacityDraftChangeCount;
 
+  const draftRemovedTrayIds = useMemo(() => {
+    if (draftTrayCount >= sortedTrayIds.length) {
+      return new Set<string>();
+    }
+    const removeCount = sortedTrayIds.length - draftTrayCount;
+    return new Set([...sortedTrayIds].slice(-removeCount));
+  }, [draftTrayCount, sortedTrayIds]);
+
   function draftChangeCountForStep(step: number): number {
     if (step === 1) {
       return step1DraftChangeCount;
@@ -2265,9 +2273,8 @@ export default function PlacementPage() {
                   }
                 }
                 const persistedShelfCounts = buildPersistedShelfCounts(tent);
-                const shelvesDirty =
-                  tent.slots.length === 0 ||
-                  !areShelfCountsEqual(normalizedDraftShelfCounts, persistedShelfCounts);
+                const shelvesRemoved =
+                  normalizedDraftShelfCounts.length < persistedShelfCounts.length;
                 const previewShelfSlotGroups = normalizedDraftShelfCounts.map((draftSlotCount, index) => {
                   const shelfIndex = index + 1;
                   const persistedSlots: PreviewSlot[] = (slotsByShelf.get(shelfIndex) || []).map((slot) => ({
@@ -2307,8 +2314,10 @@ export default function PlacementPage() {
                   <SectionCard
                     key={tent.tent_id}
                     title={`${tent.name}${tent.code ? ` (${tent.code})` : ""}`}
+                    className={shelvesRemoved ? styles.draftChangedSurface : ""}
                     actions={dirtyTentIds.has(tent.tent_id) ? <DraftChangeChip label="Draft changes" /> : null}
                   >
+                    {shelvesRemoved ? <DraftChangeMarker /> : null}
                     <div className={"grid gap-3"}>
                       <div className={styles.trayControlRow}>
                         <label
@@ -2416,23 +2425,14 @@ export default function PlacementPage() {
 
                       <div className={"grid gap-2"}>
                         <span className={"text-sm text-muted-foreground"}>Shelves layout</span>
-                        <div
-                          className={
-                            shelvesDirty
-                              ? [styles.draftChangedSurface, "relative rounded-md p-1"].join(" ")
-                              : ""
-                          }
-                        >
-                          {shelvesDirty ? <DraftChangeMarker /> : null}
-                          <CountAdjustToolbar
-                            count={shelfCounts.length}
-                            countLabel="Total shelves"
-                            onDecrement={() => removeShelf(tent.tent_id)}
-                            onIncrement={() => addShelf(tent.tent_id)}
-                            decrementDisabled={saving || placementLocked || shelfCounts.length <= 1}
-                            incrementDisabled={saving || placementLocked}
-                          />
-                        </div>
+                        <CountAdjustToolbar
+                          count={shelfCounts.length}
+                          countLabel="Total shelves"
+                          onDecrement={() => removeShelf(tent.tent_id)}
+                          onIncrement={() => addShelf(tent.tent_id)}
+                          decrementDisabled={saving || placementLocked || shelfCounts.length <= 1}
+                          incrementDisabled={saving || placementLocked}
+                        />
                       </div>
 
                       <div className={"grid gap-2"}>
@@ -2440,7 +2440,10 @@ export default function PlacementPage() {
                         <div className={styles.step1ShelfPreviewLane}>
                           {previewShelfSlotGroups.map((group) => {
                             const persistedCount = persistedShelfCounts[group.shelfIndex - 1] || 0;
-                            const shelfDirty = tent.slots.length === 0 || group.slots.length !== persistedCount;
+                            const isNewShelf = group.shelfIndex > persistedShelfCounts.length;
+                            const removedSlotsInShelf =
+                              !isNewShelf && group.slots.length < persistedCount;
+                            const shelfDirty = isNewShelf || removedSlotsInShelf;
                             return (
                               <article
                                 key={`${tent.tent_id}-shelf-${group.shelfIndex}`}
@@ -2476,6 +2479,12 @@ export default function PlacementPage() {
 
                               <div className={styles.step1ShelfPreviewSlotGrid}>
                                 {group.slots.map((slot) => (
+                                  (() => {
+                                    const isAddedSlot =
+                                      !isNewShelf &&
+                                      slot.isDraft &&
+                                      slot.slot_index > persistedCount;
+                                    return (
                                   <article
                                     key={slot.slot_id}
                                     className={[
@@ -2483,11 +2492,13 @@ export default function PlacementPage() {
                                       styles.cellFrame,
                                       styles.cellSurfaceLevel1,
                                       "justify-items-center text-center",
+                                      isAddedSlot ? styles.draftChangedSurface : "",
                                       slot.isDraft ? "[grid-template-rows:auto_1fr]" : "",
                                     ]
                                       .filter(Boolean)
                                       .join(" ")}
                                   >
+                                    {isAddedSlot ? <DraftChangeMarker /> : null}
                                     <strong className={styles.trayGridCellId}>{`Slot ${slot.slot_index}`}</strong>
                                     {!slot.isDraft && slot.code !== `Slot ${slot.slot_index}` ? (
                                       <span className="text-sm text-muted-foreground">{slot.code}</span>
@@ -2496,6 +2507,8 @@ export default function PlacementPage() {
                                       <span className={[styles.slotPlacedChip, "self-end"].join(" ")}>New</span>
                                     ) : null}
                                   </article>
+                                    );
+                                  })()
                                 ))}
                                 {group.slots.length === 0 ? <span className="text-sm text-muted-foreground">No slots.</span> : null}
                               </div>
@@ -2523,23 +2536,14 @@ export default function PlacementPage() {
                   ) : null
                 }
               >
-                <div
-                  className={
-                    trayCountDraftChangeCount > 0
-                      ? [styles.draftChangedSurface, "relative rounded-md p-1"].join(" ")
-                      : ""
-                  }
-                >
-                  {trayCountDraftChangeCount > 0 ? <DraftChangeMarker /> : null}
-                  <CountAdjustToolbar
-                    count={draftTrayCount}
-                    countLabel="Total trays"
-                    onDecrement={decrementDraftTrayCount}
-                    onIncrement={incrementDraftTrayCount}
-                    decrementDisabled={saving || placementLocked || draftTrayCount === 0}
-                    incrementDisabled={saving || placementLocked}
-                  />
-                </div>
+                <CountAdjustToolbar
+                  count={draftTrayCount}
+                  countLabel="Total trays"
+                  onDecrement={decrementDraftTrayCount}
+                  onIncrement={incrementDraftTrayCount}
+                  decrementDisabled={saving || placementLocked || draftTrayCount === 0}
+                  incrementDisabled={saving || placementLocked}
+                />
 
                 <div className={[styles.trayManagerGrid, styles.cellGridResponsive].join(" ")} data-cell-size="lg">
                   {sortedTrayIds.map((trayId) => {
@@ -2548,6 +2552,7 @@ export default function PlacementPage() {
                       return null;
                     }
                     const draftCapacity = Math.max(1, trayCapacityDraftById[trayId] ?? tray.capacity);
+                    const trayMarkedForRemoval = draftRemovedTrayIds.has(trayId);
                     return (
                       <article
                         key={trayId}
@@ -2556,12 +2561,12 @@ export default function PlacementPage() {
                           "rounded-lg border border-border",
                           styles.cellSurfaceLevel1,
                           "justify-items-center text-center",
-                          dirtyTrayCapacityIds.has(trayId) ? styles.draftChangedSurface : "",
+                          dirtyTrayCapacityIds.has(trayId) || trayMarkedForRemoval ? styles.draftChangedSurface : "",
                         ]
                           .filter(Boolean)
                           .join(" ")}
                       >
-                        {dirtyTrayCapacityIds.has(trayId) ? <DraftChangeMarker /> : null}
+                        {dirtyTrayCapacityIds.has(trayId) || trayMarkedForRemoval ? <DraftChangeMarker /> : null}
                         <strong className={styles.trayGridCellId}>
                           {formatTrayDisplay(tray.name, tray.tray_id)}
                         </strong>
@@ -2569,6 +2574,11 @@ export default function PlacementPage() {
                           <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
                             {draftCapacity} {draftCapacity === 1 ? "plant" : "plants"}
                           </Badge>
+                          {trayMarkedForRemoval ? (
+                            <Badge variant="destructive" className={styles.recipeLegendItemCompact}>
+                              Pending removal
+                            </Badge>
+                          ) : null}
                         </div>
                         <div className={styles.trayEditorAdjustRow}>
                           <StepAdjustButton

@@ -42,6 +42,7 @@ This file is the execution-focused feature map for product and engineering statu
   - Step 1 shelf preview lane now wraps shelf cards to new rows on narrow viewports.
   - Draft highlights now use shared primitives/styles across all 4 steps (`DraftChangeChip` + shared ring/dot draft markers on changed cards/cells).
   - Draft removal highlighting now marks affected container cells (source/destination tray/slot containers), not just moved item cells.
+  - Draft highlighting was tightened to cell-level only (no toolbar highlighting); Step 2 tray removals now mark specific tray cells as pending removal.
   - Placement apply flow now uses shared bottom navigation save+advance behavior (`Save & Next`) when pending changes exist.
   - Draft-change chip now renders in the shared nav bar instead of per-step apply rows.
   - Relevant files:
