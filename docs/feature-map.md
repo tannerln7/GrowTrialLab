@@ -27,6 +27,14 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Baseline Save/Next Queue Refresh Fix)
+- `Completed` Baseline capture now forces fresh queue/plant data after save mutations to avoid stale queue replay.
+  - `refreshBaselineInitialData` now uses `fetchQuery(..., { staleTime: 0 })`.
+  - baseline plant refresh for non-selected plants also uses `staleTime: 0`.
+  - Fixes queue progression regression where second `Save & Next` could jump back to previously captured plants and leave remaining-count/capture status stale.
+  - updated file:
+    - `frontend/src/features/experiments/baseline/ExperimentBaselinePageClient.tsx`
+
 ### 2026-02-19 (Recipes Auto-Increment Defaults)
 - `Completed` Recipe create defaults now auto-increment code and name from existing recipes.
   - Initial suggestion when empty: `R0` / `Control`.

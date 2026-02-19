@@ -572,6 +572,7 @@ export function ExperimentBaselinePageClient({ experimentId }: ExperimentBaselin
     return queryClient.fetchQuery({
       queryKey: baselineInitialDataQueryKey,
       queryFn: fetchBaselineInitialData,
+      staleTime: 0,
     });
   }, [baselineInitialDataQueryKey, fetchBaselineInitialData, queryClient]);
 
@@ -616,6 +617,7 @@ export function ExperimentBaselinePageClient({ experimentId }: ExperimentBaselin
         await queryClient.fetchQuery({
           queryKey: queryKeys.experiment.feature(experimentId, "baseline", "plant", result.plantId),
           queryFn: () => api.get<PlantBaseline>(`/api/v1/plants/${result.plantId}/baseline`),
+          staleTime: 0,
         });
       }
 

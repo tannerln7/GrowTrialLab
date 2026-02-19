@@ -132,6 +132,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 - Grade behavior:
   - auto/manual grade sources supported; auto-grade is deterministic server-side
   - UI allows override via grade control
+- Baseline `Save & Next` mutation flow must force cache-fresh queue/plant reads after save (avoid fresh-cache reuse) so next-plant progression and remaining counts stay consistent.
 
 ## Frontend engineering conventions (current)
 ### Route architecture
