@@ -1,4 +1,3 @@
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CheckSquare, Layers, MoveRight, Trash2, X } from "lucide-react";
 import { memo } from "react";
 
@@ -28,7 +27,6 @@ type Step3PlantsToTraysProps = {
 };
 
 function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
-  const prefersReducedMotion = useReducedMotion();
   const isPlantPlacementDirty = (plantId: string): boolean => {
     const persisted = model.persistedPlantToTray[plantId] ?? null;
     const draft = getDraftOrPersisted<string | null>(model.draftPlantToTray, model.persistedPlantToTray, plantId, null);
@@ -194,41 +192,32 @@ function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
               });
 
               return (
-                <div key={trayId} className="relative">
-                  <TrayCellExpandable
-                    tray={traySpec}
-                    position={position}
-                    plants={trayPlants}
-                    onPlantPress={(plantId) => actions.togglePlantSelection(plantId)}
-                    className={styles.trayEditorCell}
-                    metaClassName={styles.trayHeaderActions}
-                    triggerMeta={
-                      <span className="text-sm text-muted-foreground">Selected: {selectedInTray.length}</span>
-                    }
-                  />
-                  <div className="pointer-events-none absolute right-2 top-10 z-10">
-                    <AnimatePresence initial={false}>
-                      {selectedInTray.length > 0 ? (
-                        <motion.div
-                          className="pointer-events-auto"
-                          initial={{ opacity: 0, scale: 0.92 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.92 }}
-                          transition={{ duration: prefersReducedMotion ? 0 : 0.14 }}
-                        >
-                          <GridControlButton
-                            aria-label="Return selected plants to unplaced"
-                            title="Return selected plants to unplaced"
-                            onClick={() => actions.stageRemovePlantsFromTray(trayId)}
-                            variant="destructive"
-                          >
-                            <Trash2 />
-                          </GridControlButton>
-                        </motion.div>
-                      ) : null}
-                    </AnimatePresence>
-                  </div>
-                </div>
+                <TrayCellExpandable
+                  key={trayId}
+                  tray={traySpec}
+                  position={position}
+                  plants={trayPlants}
+                  onPlantPress={(plantId) => actions.togglePlantSelection(plantId)}
+                  className={styles.trayEditorCell}
+                  metaClassName={styles.trayHeaderActions}
+                  triggerMeta={
+                    <span className="text-sm text-muted-foreground">Selected: {selectedInTray.length}</span>
+                  }
+                  overlayTitle={
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate">{trayLabel}</span>
+                      <GridControlButton
+                        aria-label="Return selected plants to unplaced"
+                        title="Return selected plants to unplaced"
+                        onClick={() => actions.stageRemovePlantsFromTray(trayId)}
+                        variant="destructive"
+                        disabled={selectedInTray.length === 0}
+                      >
+                        <Trash2 />
+                      </GridControlButton>
+                    </div>
+                  }
+                />
               );
             })}
           </div>

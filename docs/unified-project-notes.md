@@ -208,6 +208,7 @@ This document is the single consolidated source for current status, architecture
   - conditional destructive actions in tray/tent grid contexts now render via absolute overlay wrappers (`pointer-events-none` container + `pointer-events-auto` button) with opacity/scale animation only, preventing row/card height shifts when selection toggles.
 - [x] Placement Step 3 tray containers now use the same GridKit tray popup/folder interaction model as overview (`TrayCellExpandable` + `TrayFolderProvider`) and no longer embed full-size placement plant cards inline in tray bodies.
   - tray click opens the tray folder popout; plant selection toggles continue to run through the existing staged placement handlers.
+  - remove-selected tray action now appears in the popup header (top-right inline with tray label), not on the tray trigger card surface.
   - tray occupancy is now a top-right tray chip (`placement: "tr"`) rather than summary-line text below metadata.
   - tray body children render in a shrinkable content region (`min-h-0 flex-1`) to prevent clipping while preserving selection and staged move/remove semantics.
 - [x] GridKit shelf strip page geometry was corrected after leaf sizing regression:

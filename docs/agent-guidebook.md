@@ -80,7 +80,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 - Dense, mobile-first selection grid.
 - Selection is multi-select; bulk move into trays is staged in UI state.
 - Nothing persists until explicit save/confirm.
-- Tray containers should use GridKit tray popout behavior (`TrayCellExpandable` under `TrayFolderProvider`) so clicking a tray opens the same folder-style plant view used in overview, with occupancy shown as a tray chip and plant taps routed to existing selection toggles.
+- Tray containers should use GridKit tray popout behavior (`TrayCellExpandable` under `TrayFolderProvider`) so clicking a tray opens the same folder-style plant view used in overview, with occupancy shown as a tray chip and plant taps routed to existing selection toggles. Remove-selected tray action belongs in the popout header (top-right inline with tray label).
 
 ### Step 4: Trays → Slots (draft then apply)
 - Trays are placed into tent slots using the same multi-select → bulk move model.
@@ -263,7 +263,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
   - Use `GridControlButton` (`frontend/src/components/ui/grid-control-button.tsx`) for dense GridKit icon-only controls (selection trash actions, `PositionStrip` arrows, compact grid toolbars).
   - Use `TooltipIconButton` (`frontend/src/components/ui/tooltip-icon-button.tsx`) for icon-only actions that need tooltip labels.
   - Use `StepAdjustButton` (`frontend/src/components/ui/step-adjust-button.tsx`) for shared `+/-` count controls; it composes `GridControlButton` for fixed dense-grid sizing.
-  - Conditional grid controls (for example tray/tent selection trash actions) must render as absolute overlays on a `relative` parent (`absolute top-2 right-2 z-10`, wrapper `pointer-events-none`, button `pointer-events-auto`) and animate with opacity/scale only so control toggles do not reflow cell/grid content.
+  - Conditional grid controls that belong to card surfaces should render as absolute overlays on a `relative` parent (`absolute top-2 right-2 z-10`, wrapper `pointer-events-none`, button `pointer-events-auto`) with opacity/scale-only animation so control toggles do not reflow cell/grid content.
   - Use `NativeSelect` (`frontend/src/components/ui/native-select.tsx`) for native `<select>` controls instead of route-local select class strings.
   - Use `Notice` (`frontend/src/components/ui/notice.tsx`) for status/success messages instead of ad-hoc `text-emerald-*` text classes.
   - `buttonVariants` owns border styling for `default`/`secondary`/`destructive`; do not append `border border-border` at callsites.

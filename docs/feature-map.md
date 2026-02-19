@@ -31,6 +31,7 @@ This file is the execution-focused feature map for product and engineering statu
 - `Completed` Placement Step 3 tray containers now use the same tray popup/folder interaction model as overview tray cells.
   - Step 3 tray cards now render through `TrayCellExpandable` under `TrayFolderProvider`, so tray click opens the GridKit popout plant view.
   - Selection semantics are preserved: clicking plants in the popout still toggles staged selection state.
+  - Tray remove-selected action now lives in the popup header (top-right, inline with tray label) instead of on the tray card.
   - Shared helper for selectable plant occupant specs is now exported from:
     - `frontend/src/features/placement/components/placement-cells.tsx`
   - Updated file:
