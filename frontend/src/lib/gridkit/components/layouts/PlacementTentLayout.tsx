@@ -1,8 +1,9 @@
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Trash2 } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
+import { GridControlButton } from "@/src/components/ui/grid-control-button";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import type { TentLayoutSpec, TentSpec } from "@/src/lib/gridkit/spec";
@@ -36,6 +37,7 @@ export function PlacementTentLayout({
   onToggleDestinationSlot,
   renderTrayCell,
 }: PlacementTentLayoutProps) {
+  const prefersReducedMotion = useReducedMotion();
   const placementRenderers: PositionRendererMap = useMemo(
     () =>
       createPositionRendererMap({
@@ -123,14 +125,28 @@ export function PlacementTentLayout({
             chips={tentChips}
             className={styles.cellSurfaceLevel3}
             actions={
-              selectedTrayIds.length > 0 ? (
-                <TooltipIconButton
-                  label="Return selected trays to unplaced"
-                  icon={<Trash2 size={16} />}
-                  onClick={() => onReturnSelectedFromTent(tent.tentId)}
-                  variant="destructive"
-                />
-              ) : null
+              <div className="pointer-events-none relative h-8 w-8">
+                <AnimatePresence initial={false}>
+                  {selectedTrayIds.length > 0 ? (
+                    <motion.div
+                      className="pointer-events-auto absolute inset-0"
+                      initial={{ opacity: 0, scale: 0.92 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.92 }}
+                      transition={{ duration: prefersReducedMotion ? 0 : 0.14 }}
+                    >
+                      <GridControlButton
+                        aria-label="Return selected trays to unplaced"
+                        title="Return selected trays to unplaced"
+                        onClick={() => onReturnSelectedFromTent(tent.tentId)}
+                        variant="destructive"
+                      >
+                        <Trash2 />
+                      </GridControlButton>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+              </div>
             }
           >
             <ShelfStack>

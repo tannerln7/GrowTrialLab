@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
+import { GridControlButton } from "@/src/components/ui/grid-control-button";
 import { chunkArray } from "@/src/lib/collections/array";
 import { usePointerCoarse } from "@/src/lib/hooks/usePointerCoarse";
 import { usePrefersReducedMotion } from "@/src/lib/hooks/usePrefersReducedMotion";
@@ -148,25 +149,25 @@ export function PositionStrip({
   return (
     <div className={cn("relative", className)}>
       {showArrows && canPrev ? (
-        <button
-          type="button"
-          className="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-md border border-border bg-card/95 p-1 shadow-sm"
+        <GridControlButton
+          variant="secondary"
+          className="absolute left-1 top-1/2 z-10 -translate-y-1/2 border-border/80 bg-card/95 shadow-sm"
           onClick={() => scrollToPage(currentPage - 1)}
           aria-label="Previous shelf positions"
         >
-          <ChevronLeft size={16} />
-        </button>
+          <ChevronLeft />
+        </GridControlButton>
       ) : null}
 
       {showArrows && canNext ? (
-        <button
-          type="button"
-          className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-md border border-border bg-card/95 p-1 shadow-sm"
+        <GridControlButton
+          variant="secondary"
+          className="absolute right-1 top-1/2 z-10 -translate-y-1/2 border-border/80 bg-card/95 shadow-sm"
           onClick={() => scrollToPage(currentPage + 1)}
           aria-label="Next shelf positions"
         >
-          <ChevronRight size={16} />
-        </button>
+          <ChevronRight />
+        </GridControlButton>
       ) : null}
 
       <div

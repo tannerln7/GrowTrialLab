@@ -8,9 +8,9 @@ import type { Step4Actions, Step4Model } from "@/src/features/placement/wizard/t
 import { TraySelectableCell } from "@/src/features/placement/components/placement-cells";
 import { Button } from "@/src/components/ui/button";
 import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
+import { GridControlButton } from "@/src/components/ui/grid-control-button";
 import { NativeSelect } from "@/src/components/ui/native-select";
 import SectionCard from "@/src/components/ui/SectionCard";
-import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
 import { buildTentLayoutSpecFromPlacementStep4 } from "@/src/lib/gridkit/builders";
 import { PlacementTentLayout } from "@/src/lib/gridkit/components";
 
@@ -101,18 +101,22 @@ function Step4TraysToSlotsImpl({ model, actions }: Step4TraysToSlotsProps) {
             })}
           </NativeSelect>
           <div className={cn(styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2")}>
-            <TooltipIconButton
-              label="Select all unplaced trays"
-              icon={<CheckSquare size={16} />}
+            <GridControlButton
+              aria-label="Select all unplaced trays"
+              title="Select all unplaced trays"
               onClick={actions.selectAllTraysInMainGrid}
               disabled={model.mainGridTrayIds.length === 0}
-            />
-            <TooltipIconButton
-              label="Clear tray selection"
-              icon={<X size={16} />}
+            >
+              <CheckSquare />
+            </GridControlButton>
+            <GridControlButton
+              aria-label="Clear tray selection"
+              title="Clear tray selection"
               onClick={actions.clearTraySelection}
               disabled={model.selectedTrayIds.size === 0}
-            />
+            >
+              <X />
+            </GridControlButton>
             <Button
               type="button"
               disabled={model.locked || !model.destinationSlotId || model.selectedTrayIds.size === 0}

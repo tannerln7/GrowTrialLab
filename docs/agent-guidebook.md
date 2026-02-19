@@ -256,8 +256,10 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 - Use `DraftChangeMarker` (`frontend/src/components/ui/draft-change-marker.tsx`) only for non-GridKit surfaces that have not yet migrated to `CellChips`; combine with `experimentsStyles.draftChangedSurface` ring style when applicable.
   - Draft highlights must stay cell-local: do not highlight toolbars; when removals make items invisible, highlight the nearest visible container cell (for example tent/shelf/tray/slot container cells).
   - Use `StepNavBar` (`frontend/src/components/ui/step-nav-bar.tsx`) for the placement-style back/save-next bar with blocker hints + draft indicators.
+  - Use `GridControlButton` (`frontend/src/components/ui/grid-control-button.tsx`) for dense GridKit icon-only controls (selection trash actions, `PositionStrip` arrows, compact grid toolbars).
   - Use `TooltipIconButton` (`frontend/src/components/ui/tooltip-icon-button.tsx`) for icon-only actions that need tooltip labels.
-  - Use `StepAdjustButton` (`frontend/src/components/ui/step-adjust-button.tsx`) for shared `+/-` count controls instead of route-local button styling.
+  - Use `StepAdjustButton` (`frontend/src/components/ui/step-adjust-button.tsx`) for shared `+/-` count controls; it composes `GridControlButton` for fixed dense-grid sizing.
+  - Conditional grid controls (for example tray/tent selection trash actions) must render as absolute overlays on a `relative` parent (`absolute top-2 right-2 z-10`, wrapper `pointer-events-none`, button `pointer-events-auto`) and animate with opacity/scale only so control toggles do not reflow cell/grid content.
   - Use `NativeSelect` (`frontend/src/components/ui/native-select.tsx`) for native `<select>` controls instead of route-local select class strings.
   - Use `Notice` (`frontend/src/components/ui/notice.tsx`) for status/success messages instead of ad-hoc `text-emerald-*` text classes.
   - `buttonVariants` owns border styling for `default`/`secondary`/`destructive`; do not append `border border-border` at callsites.
@@ -265,6 +267,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
   - Mobile touch target baseline:
     - `Button` default/min interactive height is `h-10` (40px) and large controls are `h-11` (44px).
     - `IconButton` defaults to `h-11 w-11` (44px); compact icon actions should not go below `h-10 w-10` (40px).
+    - dense GridKit icon controls are the exception: `GridControlButton` uses `h-8 w-8` with `h-4 w-4` icons to prevent card-content compression in square cell layouts.
     - `Input` and `NativeSelect` controls use `h-10` for easier touch ergonomics.
   - Focus + state baseline:
     - Reuse `uiInteraction.focusRing` and cell-interactive focus classes for keyboard-visible focus.

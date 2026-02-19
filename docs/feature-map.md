@@ -27,6 +27,20 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (GridKit Dense Control Sizing + No-Shift Conditional Controls)
+- `Completed` GridKit icon-only controls now share a compact sizing contract, and conditional tray/tent destructive actions no longer shift grid content when they appear.
+  - Added shared grid control primitive:
+    - `frontend/src/components/ui/grid-control-button.tsx`
+  - Unified dense control usage in GridKit/placement surfaces:
+    - `StepAdjustButton` now composes `GridControlButton`
+    - `PositionStrip` desktop arrows now use `GridControlButton`
+    - placement grid toolbar icon controls now use `GridControlButton`
+  - Conditional selection-trash actions now render as absolute overlays with pointer-safe wrappers and opacity/scale-only motion:
+    - `frontend/src/features/placement/wizard/steps/Step3PlantsToTrays.tsx`
+    - `frontend/src/lib/gridkit/components/layouts/PlacementTentLayout.tsx`
+  - Layout result:
+    - tray/plant grid card height remains stable when selection toggles and destructive controls appear/disappear.
+
 ### 2026-02-19 (GridKit Phase 8 Cleanup + Guardrail Enforcement + Docs Finalization)
 - `Completed` GridKit legacy cleanup and enforcement finished; legacy adapter paths were removed and checks now fail on regressions.
   - Removed legacy adapter path and naming:

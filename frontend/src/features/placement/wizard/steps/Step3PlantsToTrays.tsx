@@ -1,3 +1,4 @@
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CheckSquare, Layers, MoveRight, Trash2, X } from "lucide-react";
 import { memo } from "react";
 
@@ -9,9 +10,9 @@ import { PlantSelectableCell } from "@/src/features/placement/components/placeme
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
+import { GridControlButton } from "@/src/components/ui/grid-control-button";
 import { NativeSelect } from "@/src/components/ui/native-select";
 import SectionCard from "@/src/components/ui/SectionCard";
-import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
 import { TrayCell } from "@/src/lib/gridkit/components";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 
@@ -23,6 +24,7 @@ type Step3PlantsToTraysProps = {
 };
 
 function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
+  const prefersReducedMotion = useReducedMotion();
   const isPlantPlacementDirty = (plantId: string): boolean => {
     const persisted = model.persistedPlantToTray[plantId] ?? null;
     const draft = getDraftOrPersisted<string | null>(model.draftPlantToTray, model.persistedPlantToTray, plantId, null);
@@ -60,24 +62,30 @@ function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
             })}
           </NativeSelect>
           <div className={cn(styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2")}>
-            <TooltipIconButton
-              label="Select all unplaced plants"
-              icon={<CheckSquare size={16} />}
+            <GridControlButton
+              aria-label="Select all unplaced plants"
+              title="Select all unplaced plants"
               onClick={actions.selectAllPlantsInMainGrid}
               disabled={model.mainGridPlantIds.length === 0}
-            />
-            <TooltipIconButton
-              label="Select same species"
-              icon={<Layers size={16} />}
+            >
+              <CheckSquare />
+            </GridControlButton>
+            <GridControlButton
+              aria-label="Select same species"
+              title="Select same species"
               onClick={actions.selectSameSpeciesInMainGrid}
               disabled={model.sameSpeciesDisabled}
-            />
-            <TooltipIconButton
-              label="Clear plant selection"
-              icon={<X size={16} />}
+            >
+              <Layers />
+            </GridControlButton>
+            <GridControlButton
+              aria-label="Clear plant selection"
+              title="Clear plant selection"
               onClick={actions.clearPlantSelection}
               disabled={model.selectedPlantIds.size === 0}
-            />
+            >
+              <X />
+            </GridControlButton>
             <Button
               type="button"
               disabled={model.locked || !model.destinationTrayId || model.selectedInMainGrid.length === 0}
@@ -146,48 +154,61 @@ function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
               : [];
 
             return (
-              <TrayCell
-                key={trayId}
-                trayId={tray.tray_id}
-                title={formatTrayDisplay(tray.name, tray.tray_id)}
-                summaryLines={[`${model.draftPlantCountByTray[trayId] || 0}/${tray.capacity}`]}
-                state={{ tone: trayDirty ? "warn" : undefined }}
-                chips={chips}
-                className={styles.trayEditorCell}
-                summaryClassName={styles.recipeLegendItemCompact}
-                metaClassName={styles.trayHeaderActions}
-                meta={
-                  <>
+              <div key={trayId} className="relative">
+                <TrayCell
+                  trayId={tray.tray_id}
+                  title={formatTrayDisplay(tray.name, tray.tray_id)}
+                  summaryLines={[`${model.draftPlantCountByTray[trayId] || 0}/${tray.capacity}`]}
+                  state={{ tone: trayDirty ? "warn" : undefined }}
+                  chips={chips}
+                  className={styles.trayEditorCell}
+                  summaryClassName={styles.recipeLegendItemCompact}
+                  metaClassName={styles.trayHeaderActions}
+                  meta={
                     <span className="text-sm text-muted-foreground">Selected: {selectedInTray.length}</span>
+                  }
+                >
+                  <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
+                    {trayPlantIds.map((plantId) => {
+                      const plant = model.plantById.get(plantId);
+                      if (!plant) {
+                        return null;
+                      }
+                      return (
+                        <PlantSelectableCell
+                          key={plant.uuid}
+                          plant={plant}
+                          selected={model.selectedPlantIds.has(plantId)}
+                          dirty={isPlantPlacementDirty(plantId)}
+                          onToggle={actions.togglePlantSelection}
+                        />
+                      );
+                    })}
+                  </div>
+                </TrayCell>
+                <div className="pointer-events-none absolute right-2 top-2 z-10">
+                  <AnimatePresence initial={false}>
                     {selectedInTray.length > 0 ? (
-                      <TooltipIconButton
-                        label="Return selected plants to unplaced"
-                        icon={<Trash2 size={16} />}
-                        onClick={() => actions.stageRemovePlantsFromTray(trayId)}
-                        variant="destructive"
-                      />
+                      <motion.div
+                        className="pointer-events-auto"
+                        initial={{ opacity: 0, scale: 0.92 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.92 }}
+                        transition={{ duration: prefersReducedMotion ? 0 : 0.14 }}
+                      >
+                        <GridControlButton
+                          aria-label="Return selected plants to unplaced"
+                          title="Return selected plants to unplaced"
+                          onClick={() => actions.stageRemovePlantsFromTray(trayId)}
+                          variant="destructive"
+                        >
+                          <Trash2 />
+                        </GridControlButton>
+                      </motion.div>
                     ) : null}
-                  </>
-                }
-              >
-                <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
-                  {trayPlantIds.map((plantId) => {
-                    const plant = model.plantById.get(plantId);
-                    if (!plant) {
-                      return null;
-                    }
-                    return (
-                      <PlantSelectableCell
-                        key={plant.uuid}
-                        plant={plant}
-                        selected={model.selectedPlantIds.has(plantId)}
-                        dirty={isPlantPlacementDirty(plantId)}
-                        onToggle={actions.togglePlantSelection}
-                      />
-                    );
-                  })}
+                  </AnimatePresence>
                 </div>
-              </TrayCell>
+              </div>
             );
           })}
         </div>

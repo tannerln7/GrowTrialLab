@@ -200,6 +200,10 @@ This document is the single consolidated source for current status, architecture
   - inventory/guardrail scripts now report:
     - `virtual_list_grid_usages`
     - `remaining_large_map_loops_in_scroll_containers`
+- [x] GridKit dense control sizing and conditional-action layout stability are now standardized:
+  - icon-only grid controls now use `GridControlButton` (`frontend/src/components/ui/grid-control-button.tsx`) with fixed `h-8 w-8` + `h-4 w-4` icon sizing.
+  - placement/grid `+/-` controls (`StepAdjustButton`) and `PositionStrip` desktop arrows now share the same control footprint.
+  - conditional destructive actions in tray/tent grid contexts now render via absolute overlay wrappers (`pointer-events-none` container + `pointer-events-auto` button) with opacity/scale animation only, preventing row/card height shifts when selection toggles.
 - [x] GridKit Phase 8 finalization is active:
   - legacy adapter naming/path was retired (`components/adapters/*` removed) and replaced by canonical layout wrappers under `frontend/src/lib/gridkit/components/layouts/*`.
   - enforced guardrails now block regressions for:

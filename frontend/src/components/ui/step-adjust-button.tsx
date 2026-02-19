@@ -1,8 +1,9 @@
 import * as React from "react";
+import { Minus, Plus } from "lucide-react";
 
-import { Button } from "./button";
+import { GridControlButton } from "./grid-control-button";
 
-type StepAdjustButtonProps = Omit<React.ComponentProps<typeof Button>, "children" | "size" | "variant" | "type"> & {
+type StepAdjustButtonProps = Omit<React.ComponentProps<typeof GridControlButton>, "children" | "aria-label"> & {
   direction: "increment" | "decrement";
 };
 
@@ -11,16 +12,14 @@ function StepAdjustButton({ className, direction, ...props }: StepAdjustButtonPr
   const label = isIncrement ? "Increase value" : "Decrease value";
 
   return (
-    <Button
-      type="button"
+    <GridControlButton
       variant="secondary"
-      size="sm"
       aria-label={label}
       className={className}
       {...props}
     >
-      {isIncrement ? "+" : "-"}
-    </Button>
+      {isIncrement ? <Plus /> : <Minus />}
+    </GridControlButton>
   );
 }
 
