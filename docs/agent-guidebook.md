@@ -54,6 +54,7 @@ This guide helps coding agents (including Codex) work effectively in this repo b
 Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce standalone `/slots` navigation.
 
 Implementation structure (current): keep `frontend/app/experiments/[id]/placement/page.tsx` as a thin route wrapper and place wizard behavior in `frontend/src/features/placement/wizard/*` (`PlacementWizardPageClient`, `usePlacementWizard`, and `steps/*`).
+- Wizard step action wrappers are intentionally stable, but the internal action ref bridge must update in a layout effect (not passive effect) so user interactions right after data refresh never hit stale one-render-behind closures.
 
 ### Step 1: Tents + Slots
 - Define tents, restrictions/parameters, and slot layout (shelves/slots).

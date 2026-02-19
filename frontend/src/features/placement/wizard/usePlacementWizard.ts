@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 
 import { unwrapList } from "@/lib/backend";
 import { ensureUnlocked, useSavingAction } from "@/src/lib/async/useSavingAction";
@@ -1737,9 +1737,10 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     stageRemoveTraysFromTent: (tentId: string) => void;
   } | null>(null);
 
-  // Keep wrapper callbacks stable while always calling the latest action implementations.
+  // Keep wrapper callbacks stable while always calling latest action implementations.
+  // `useLayoutEffect` ensures refs are refreshed before users can interact after a render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
+  useLayoutEffect(() => {
     actionRefs.current = {
       goToStep,
       goNextStep,

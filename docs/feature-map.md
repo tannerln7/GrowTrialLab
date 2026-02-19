@@ -27,6 +27,13 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Placement Wizard Stale Action Ref Timing Fix)
+- `Completed` Placement wizard action refs now refresh in `useLayoutEffect` instead of `useEffect`.
+  - Prevents post-refresh stale callback windows where step actions could run one render behind.
+  - Fixes Step 1 tent add/remove timing edge cases immediately after placement data loads.
+  - updated file:
+    - `frontend/src/features/placement/wizard/usePlacementWizard.ts`
+
 ### 2026-02-19 (Placement Step 1 Tent Add Duplicate Retry Fix)
 - `Completed` Step 1 tent creation now avoids duplicate-name races during bootstrap.
   - `createTent` now blocks add attempts until placement summary has loaded.
