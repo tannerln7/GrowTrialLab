@@ -85,7 +85,7 @@ export function TrayCell({
             ))}
           </div>
         ) : null}
-        {children}
+        {children ? <div className="min-h-0 flex-1">{children}</div> : null}
       </div>
     </CellChrome>
   );

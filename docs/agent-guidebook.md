@@ -80,6 +80,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 - Dense, mobile-first selection grid.
 - Selection is multi-select; bulk move into trays is staged in UI state.
 - Nothing persists until explicit save/confirm.
+- Tray container bodies should use compact GridKit tray-plant rendering (`TrayPlantGrid` pattern) rather than embedding full-size placement plant cards, with occupancy shown as a tray chip so selection controls do not shift body layout.
 
 ### Step 4: Trays → Slots (draft then apply)
 - Trays are placed into tent slots using the same multi-select → bulk move model.

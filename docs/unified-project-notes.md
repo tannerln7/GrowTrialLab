@@ -206,6 +206,9 @@ This document is the single consolidated source for current status, architecture
   - icon-only grid controls now use `GridControlButton` (`frontend/src/components/ui/grid-control-button.tsx`) with fixed `h-8 w-8` + `h-4 w-4` icon sizing.
   - placement/grid `+/-` controls (`StepAdjustButton`) and `PositionStrip` desktop arrows now share the same control footprint.
   - conditional destructive actions in tray/tent grid contexts now render via absolute overlay wrappers (`pointer-events-none` container + `pointer-events-auto` button) with opacity/scale animation only, preventing row/card height shifts when selection toggles.
+- [x] Placement Step 3 tray containers now use compact GridKit tray-plant content rendering (same renderer pattern as overview tray folder content) instead of embedding full-size placement plant cards inside tray bodies.
+  - tray occupancy is now a top-right tray chip (`placement: "tr"`) rather than summary-line text below metadata.
+  - tray body children render in a shrinkable content region (`min-h-0 flex-1`) to prevent clipping while preserving selection and staged move/remove semantics.
 - [x] GridKit shelf strip page geometry was corrected after leaf sizing regression:
   - canonical leaf sizing now keeps square cells without desktop `min-w` constraints (`frontend/src/lib/gridkit/components/cells/leafSizing.ts`), so shelf strips retain 4 columns at `POSITION_STRIP_PRESET.maxVisible = 4` when viewport width allows.
   - desktop horizontal paging in `PositionStrip` remains viewport-page-based and no longer competes with leaf min-width sizing.

@@ -6,7 +6,10 @@ import { cn } from "@/lib/utils";
 import { getDraftOrPersisted, isDirtyValue } from "@/src/lib/state/drafts";
 import { draftChipLabelForStep, formatTrayDisplay } from "@/src/features/placement/utils";
 import type { Step3Actions, Step3Model } from "@/src/features/placement/wizard/types";
-import { PlantSelectableCell } from "@/src/features/placement/components/placement-cells";
+import {
+  PlantSelectableCell,
+  TrayPlantContentsGrid,
+} from "@/src/features/placement/components/placement-cells";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
@@ -133,7 +136,7 @@ function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
       </SectionCard>
 
       <SectionCard title="Tray Containers">
-        <div className={cn(styles.trayManagerGrid, styles.cellGridResponsive)} data-cell-size="lg">
+        <div className={cn(styles.trayManagerGrid, styles.cellGridResponsive)} data-cell-size="sm">
           {model.sortedTrayIds.map((trayId) => {
             const tray = model.trayById.get(trayId);
             if (!tray) {
@@ -142,6 +145,7 @@ function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
             const trayPlantIds = model.trayPlantIdsByTray[trayId] || [];
             const selectedInTray = model.selectedInTrayByTrayId[trayId] || [];
             const trayDirty = model.dirtyPlantContainerTrayIds.has(trayId);
+            const occupancyLabel = `${model.draftPlantCountByTray[trayId] || 0}/${tray.capacity}`;
             const chips: ChipSpec[] = trayDirty
               ? [
                   {
@@ -152,13 +156,17 @@ function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
                   },
                 ]
               : [];
+            chips.push({
+              id: `${trayId}-occupancy`,
+              label: occupancyLabel,
+              placement: "tr",
+            });
 
             return (
               <div key={trayId} className="relative">
                 <TrayCell
                   trayId={tray.tray_id}
                   title={formatTrayDisplay(tray.name, tray.tray_id)}
-                  summaryLines={[`${model.draftPlantCountByTray[trayId] || 0}/${tray.capacity}`]}
                   state={{ tone: trayDirty ? "warn" : undefined }}
                   chips={chips}
                   className={styles.trayEditorCell}
@@ -168,23 +176,14 @@ function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
                     <span className="text-sm text-muted-foreground">Selected: {selectedInTray.length}</span>
                   }
                 >
-                  <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
-                    {trayPlantIds.map((plantId) => {
-                      const plant = model.plantById.get(plantId);
-                      if (!plant) {
-                        return null;
-                      }
-                      return (
-                        <PlantSelectableCell
-                          key={plant.uuid}
-                          plant={plant}
-                          selected={model.selectedPlantIds.has(plantId)}
-                          dirty={isPlantPlacementDirty(plantId)}
-                          onToggle={actions.togglePlantSelection}
-                        />
-                      );
-                    })}
-                  </div>
+                  <TrayPlantContentsGrid
+                    plantIds={trayPlantIds}
+                    plantById={model.plantById}
+                    selectedPlantIds={model.selectedPlantIds}
+                    isDirty={isPlantPlacementDirty}
+                    onToggle={actions.togglePlantSelection}
+                    className={styles.plantCellGridTray}
+                  />
                 </TrayCell>
                 <div className="pointer-events-none absolute right-2 top-2 z-10">
                   <AnimatePresence initial={false}>

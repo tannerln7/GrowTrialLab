@@ -27,6 +27,25 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Placement Step 3 Tray Contents Compact Grid Fix)
+- `Completed` Placement Step 3 tray containers now render tray plant contents with the GridKit compact tray-plant renderer pattern used by overview folder content.
+  - Added reusable placement tray-content bridge:
+    - `frontend/src/features/placement/components/placement-cells.tsx` (`TrayPlantContentsGrid`)
+  - Updated Step 3 tray containers:
+    - use compact tray content grid instead of embedding large `PlantSelectableCell` cards inside tray cells
+    - move occupancy from summary text to top-right chip (`placement: "tr"`)
+    - switch tray container density to `data-cell-size="sm"`
+    - file: `frontend/src/features/placement/wizard/steps/Step3PlantsToTrays.tsx`
+  - Added minimal GridKit tray content safety fix:
+    - `TrayCell` children now render in a `min-h-0 flex-1` region
+    - leaf content wrapper includes `min-h-0`
+    - files:
+      - `frontend/src/lib/gridkit/components/cells/TrayCell.tsx`
+      - `frontend/src/lib/gridkit/components/cells/leafSizing.ts`
+  - Result:
+    - tray contents no longer clip/truncate due oversized embedded leaf cards
+    - occupancy chip stays stable at top-right without shifting tray body layout
+
 ### 2026-02-19 (Overview Topology Uses Layout Spine Capacity)
 - `Completed` Overview tent/shelf topology now uses per-shelf layout capacity from placement summary instead of deriving slot capacity from observed plants.
   - Updated overview builder input contract and slot-position construction:
