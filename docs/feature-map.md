@@ -53,7 +53,7 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/src/features/placement/wizard/usePlacementWizard.ts`
     - `frontend/src/lib/queryKeys.ts`
     - `frontend/lib/experiment-status.ts`
-  - Refs: `ca8c706`
+  - Refs: `ca8c706`, `ffa44d3`
 
 ### 2026-02-19 (Frontend Phase 1.5 Mechanical Helper Rollout)
 - `Completed` Frontend route/page conventions from Phase 1 were rolled out mechanically across the active experiment/cockpit pages without feature-flow changes.
