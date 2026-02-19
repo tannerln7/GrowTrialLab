@@ -28,7 +28,7 @@ export function TentCard({ title, subtitle, chips, actions, children, className 
           </div>
         ) : null}
       </header>
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0 perf-content-auto">{children}</div>
     </article>
   );
 }

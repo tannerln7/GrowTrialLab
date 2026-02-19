@@ -24,7 +24,7 @@ export function ShelfCard({ title, chips, actions, children, className }: ShelfC
           </div>
         ) : null}
       </header>
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0 perf-content-auto">{children}</div>
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useMemo } from "react";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import type { PlantOccupantSpec, PositionSpec, TentLayoutSpec, TrayOccupantSpec } from "@/src/lib/gridkit/spec";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
@@ -30,68 +31,30 @@ export function LegacyOverviewTentLayoutAdapter({
   spec,
   onTrayPlantPress,
 }: LegacyOverviewTentLayoutAdapterProps) {
-  const overviewRenderCtx: GridRenderContext = {
-    trayFolder: {
-      enabled: true,
-      getPlantsForTray: (trayId, position) => {
-        if (position.occupant.kind === "tray" && position.occupant.trayId === trayId) {
-          return position.occupant.plants || [];
-        }
-        if (position.occupant.kind === "trayStack") {
-          const tray = position.occupant.trays.find((entry) => entry.trayId === trayId);
-          return tray?.plants || [];
-        }
-        return [];
+  const overviewRenderCtx: GridRenderContext = useMemo(
+    () => ({
+      trayFolder: {
+        enabled: true,
+        getPlantsForTray: (trayId, position) => {
+          if (position.occupant.kind === "tray" && position.occupant.trayId === trayId) {
+            return position.occupant.plants || [];
+          }
+          if (position.occupant.kind === "trayStack") {
+            const tray = position.occupant.trays.find((entry) => entry.trayId === trayId);
+            return tray?.plants || [];
+          }
+          return [];
+        },
+        onPlantPress: onTrayPlantPress,
       },
-      onPlantPress: onTrayPlantPress,
-    },
-  };
+    }),
+    [onTrayPlantPress],
+  );
 
-  const overviewRenderers: PositionRendererMap = createPositionRendererMap({
-    emptySlot: ({ position }) => (
-      <SlotCell
-        position={position}
-        variant="empty"
-        className={cn(styles.slotCell, styles.overviewSlotCell, styles.overviewSlotCellEmpty)}
-        titleClassName={styles.slotCellLabel}
-        statusClassName={styles.overviewSlotEmptyState}
-      />
-    ),
-    tray: ({ position, ctx }) => {
-      if (position.occupant.kind !== "tray") {
-        return null;
-      }
-      const plants = ctx.trayFolder?.getPlantsForTray(position.occupant.trayId, position) || position.occupant.plants || [];
-
-      return (
-        <div className="h-full min-h-[118px] max-sm:min-h-[104px]">
-          <div className={styles.overviewSlotTrayStack}>
-            <TrayCellExpandable
-              tray={position.occupant}
-              position={position}
-              plants={plants}
-              onPlantPress={ctx.trayFolder?.onPlantPress}
-              className={cn(styles.overviewTrayCell, "h-full")}
-              titleClassName={cn(styles.trayGridCellId, "text-left")}
-              metaClassName={styles.overviewTrayMeta}
-              triggerMeta={
-                position.occupant.currentCount != null &&
-                position.occupant.capacity != null ? (
-                  <span className={cn(styles.recipeLegendItem, "shrink-0")}>
-                    {position.occupant.currentCount}/{position.occupant.capacity}
-                  </span>
-                ) : null
-              }
-            />
-          </div>
-        </div>
-      );
-    },
-    trayStack: ({ position, ctx }) => {
-      const trays: TrayOccupantSpec[] =
-        position.occupant.kind === "trayStack" ? position.occupant.trays : [];
-      if (trays.length === 0) {
-        return (
+  const overviewRenderers: PositionRendererMap = useMemo(
+    () =>
+      createPositionRendererMap({
+        emptySlot: ({ position }) => (
           <SlotCell
             position={position}
             variant="empty"
@@ -99,36 +62,84 @@ export function LegacyOverviewTentLayoutAdapter({
             titleClassName={styles.slotCellLabel}
             statusClassName={styles.overviewSlotEmptyState}
           />
-        );
-      }
+        ),
+        tray: ({ position, ctx }) => {
+          if (position.occupant.kind !== "tray") {
+            return null;
+          }
+          const plants =
+            ctx.trayFolder?.getPlantsForTray(position.occupant.trayId, position) ||
+            position.occupant.plants ||
+            [];
 
-      return (
-        <div className="h-full min-h-[118px] max-sm:min-h-[104px]">
-          <div className={styles.overviewSlotTrayStack}>
-            {trays.map((tray) => (
-              <TrayCellExpandable
-                key={tray.id}
-                tray={tray}
+          return (
+            <div className="h-full min-h-[118px] max-sm:min-h-[104px]">
+              <div className={styles.overviewSlotTrayStack}>
+                <TrayCellExpandable
+                  tray={position.occupant}
+                  position={position}
+                  plants={plants}
+                  onPlantPress={ctx.trayFolder?.onPlantPress}
+                  className={cn(styles.overviewTrayCell, "h-full")}
+                  titleClassName={cn(styles.trayGridCellId, "text-left")}
+                  metaClassName={styles.overviewTrayMeta}
+                  triggerMeta={
+                    position.occupant.currentCount != null &&
+                    position.occupant.capacity != null ? (
+                      <span className={cn(styles.recipeLegendItem, "shrink-0")}>
+                        {position.occupant.currentCount}/{position.occupant.capacity}
+                      </span>
+                    ) : null
+                  }
+                />
+              </div>
+            </div>
+          );
+        },
+        trayStack: ({ position, ctx }) => {
+          const trays: TrayOccupantSpec[] =
+            position.occupant.kind === "trayStack" ? position.occupant.trays : [];
+          if (trays.length === 0) {
+            return (
+              <SlotCell
                 position={position}
-                plants={ctx.trayFolder?.getPlantsForTray(tray.trayId, position) || tray.plants || []}
-                onPlantPress={ctx.trayFolder?.onPlantPress}
-                className={cn(styles.overviewTrayCell, trays.length === 1 ? "h-full" : "")}
-                titleClassName={cn(styles.trayGridCellId, "text-left")}
-                metaClassName={styles.overviewTrayMeta}
-                triggerMeta={
-                  tray.currentCount != null && tray.capacity != null ? (
-                    <span className={cn(styles.recipeLegendItem, "shrink-0")}>
-                      {tray.currentCount}/{tray.capacity}
-                    </span>
-                  ) : null
-                }
+                variant="empty"
+                className={cn(styles.slotCell, styles.overviewSlotCell, styles.overviewSlotCellEmpty)}
+                titleClassName={styles.slotCellLabel}
+                statusClassName={styles.overviewSlotEmptyState}
               />
-            ))}
-          </div>
-        </div>
-      );
-    },
-  });
+            );
+          }
+
+          return (
+            <div className="h-full min-h-[118px] max-sm:min-h-[104px]">
+              <div className={styles.overviewSlotTrayStack}>
+                {trays.map((tray) => (
+                  <TrayCellExpandable
+                    key={tray.id}
+                    tray={tray}
+                    position={position}
+                    plants={ctx.trayFolder?.getPlantsForTray(tray.trayId, position) || tray.plants || []}
+                    onPlantPress={ctx.trayFolder?.onPlantPress}
+                    className={cn(styles.overviewTrayCell, trays.length === 1 ? "h-full" : "")}
+                    titleClassName={cn(styles.trayGridCellId, "text-left")}
+                    metaClassName={styles.overviewTrayMeta}
+                    triggerMeta={
+                      tray.currentCount != null && tray.capacity != null ? (
+                        <span className={cn(styles.recipeLegendItem, "shrink-0")}>
+                          {tray.currentCount}/{tray.capacity}
+                        </span>
+                      ) : null
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        },
+      }),
+    [],
+  );
 
   return (
     <TrayFolderProvider>

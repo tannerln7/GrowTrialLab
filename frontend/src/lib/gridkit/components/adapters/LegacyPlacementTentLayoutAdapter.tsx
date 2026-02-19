@@ -1,5 +1,5 @@
 import { Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
@@ -35,69 +35,73 @@ export function LegacyPlacementTentLayoutAdapter({
   onToggleDestinationSlot,
   renderTrayCell,
 }: LegacyPlacementTentLayoutAdapterProps) {
-  const placementRenderers: PositionRendererMap = createPositionRendererMap({
-    tray: ({ position }) => {
-      if (position.occupant.kind !== "tray") {
-        return null;
-      }
-      return (
-        <div className={styles.slotTrayCellFill}>{renderTrayCell(position.occupant.trayId, true)}</div>
-      );
-    },
-    trayStack: ({ position }) => {
-      if (position.occupant.kind !== "trayStack" || position.occupant.trays.length === 0) {
-        return null;
-      }
-      return (
-        <div className={styles.slotTrayCellFill}>
-          {renderTrayCell(position.occupant.trays[0].trayId, true)}
-        </div>
-      );
-    },
-    emptySlot: ({ position }) => {
-      const slotSelected = Boolean(position.state?.selected);
-      const dirty = position.state?.tone === "warn";
-      const slotLabel =
-        (typeof position.label === "string" && position.label.trim()) ||
-        (position.occupant.kind === "emptySlot" ? position.occupant.label : "") ||
-        `Slot ${position.positionIndex}`;
-      const chips: ChipSpec[] = [];
-      if (dirty) {
-        chips.push({
-          id: `${position.id}-dirty`,
-          label: "•",
-          tone: "warn",
-          placement: "tl",
-        });
-      }
-      if (slotSelected) {
-        chips.push({
-          id: `${position.id}-selected`,
-          label: "✓",
-          tone: "info",
-          placement: "tr",
-        });
-      }
+  const placementRenderers: PositionRendererMap = useMemo(
+    () =>
+      createPositionRendererMap({
+        tray: ({ position }) => {
+          if (position.occupant.kind !== "tray") {
+            return null;
+          }
+          return (
+            <div className={styles.slotTrayCellFill}>{renderTrayCell(position.occupant.trayId, true)}</div>
+          );
+        },
+        trayStack: ({ position }) => {
+          if (position.occupant.kind !== "trayStack" || position.occupant.trays.length === 0) {
+            return null;
+          }
+          return (
+            <div className={styles.slotTrayCellFill}>
+              {renderTrayCell(position.occupant.trays[0].trayId, true)}
+            </div>
+          );
+        },
+        emptySlot: ({ position }) => {
+          const slotSelected = Boolean(position.state?.selected);
+          const dirty = position.state?.tone === "warn";
+          const slotLabel =
+            (typeof position.label === "string" && position.label.trim()) ||
+            (position.occupant.kind === "emptySlot" ? position.occupant.label : "") ||
+            `Slot ${position.positionIndex}`;
+          const chips: ChipSpec[] = [];
+          if (dirty) {
+            chips.push({
+              id: `${position.id}-dirty`,
+              label: "•",
+              tone: "warn",
+              placement: "tl",
+            });
+          }
+          if (slotSelected) {
+            chips.push({
+              id: `${position.id}-selected`,
+              label: "✓",
+              tone: "info",
+              placement: "tr",
+            });
+          }
 
-      return (
-        <SlotCell
-          position={position}
-          variant="empty"
-          state={{
-            selected: slotSelected,
-            tone: dirty ? "warn" : undefined,
-          }}
-          interactive
-          onPress={() => onToggleDestinationSlot(position.id)}
-          ariaLabel={slotLabel}
-          chips={chips}
-          className={cn(styles.slotCell, styles.slotContainerCellFrame)}
-          titleClassName={styles.slotCellLabel}
-          statusClassName={cn(styles.slotCellEmpty, slotSelected && styles.slotCellEmptyActive)}
-        />
-      );
-    },
-  });
+          return (
+            <SlotCell
+              position={position}
+              variant="empty"
+              state={{
+                selected: slotSelected,
+                tone: dirty ? "warn" : undefined,
+              }}
+              interactive
+              onPress={() => onToggleDestinationSlot(position.id)}
+              ariaLabel={slotLabel}
+              chips={chips}
+              className={cn(styles.slotCell, styles.slotContainerCellFrame)}
+              titleClassName={styles.slotCellLabel}
+              statusClassName={cn(styles.slotCellEmpty, slotSelected && styles.slotCellEmptyActive)}
+            />
+          );
+        },
+      }),
+    [onToggleDestinationSlot, renderTrayCell],
+  );
 
   return (
     <TentGrid>

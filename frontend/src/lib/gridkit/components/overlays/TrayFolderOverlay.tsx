@@ -55,7 +55,7 @@ export function TrayFolderOverlay({
               className="rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-lg"
             >
               {title ? <div className="mb-2 text-sm font-medium">{title}</div> : null}
-              <div className="max-h-[min(65vh,28rem)] overflow-y-auto pr-1">{children}</div>
+              <div>{children}</div>
             </motion.div>
           ) : null}
         </AnimatePresence>

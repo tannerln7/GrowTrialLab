@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useMemo } from "react";
 import { StepAdjustButton } from "@/src/components/ui/step-adjust-button";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
@@ -17,53 +18,57 @@ export function LegacyPlacementShelfPreviewAdapter({
   tentSpec,
   onAdjustShelfSlotCount,
 }: LegacyPlacementShelfPreviewAdapterProps) {
-  const previewRenderers: PositionRendererMap = createPositionRendererMap({
-    slotDef: ({ position }) => {
-      if (position.occupant.kind !== "slotDef") {
-        return null;
-      }
-      const isAddedSlot = Boolean((position.meta as { isAddedSlot?: unknown } | undefined)?.isAddedSlot);
-      const isDraft = Boolean(position.occupant.isDraft);
-      const slotIndex = position.occupant.slotIndex;
-      const slotCode = position.occupant.code;
-      const chips: ChipSpec[] = [];
-      if (isAddedSlot) {
-        chips.push({
-          id: `${position.id}-added`,
-          label: "•",
-          tone: "warn",
-          placement: "tl",
-        });
-      }
-      if (isDraft) {
-        chips.push({
-          id: `${position.id}-new`,
-          label: "New",
-          tone: "success",
-          placement: "bottom",
-        });
-      }
+  const previewRenderers: PositionRendererMap = useMemo(
+    () =>
+      createPositionRendererMap({
+        slotDef: ({ position }) => {
+          if (position.occupant.kind !== "slotDef") {
+            return null;
+          }
+          const isAddedSlot = Boolean((position.meta as { isAddedSlot?: unknown } | undefined)?.isAddedSlot);
+          const isDraft = Boolean(position.occupant.isDraft);
+          const slotIndex = position.occupant.slotIndex;
+          const slotCode = position.occupant.code;
+          const chips: ChipSpec[] = [];
+          if (isAddedSlot) {
+            chips.push({
+              id: `${position.id}-added`,
+              label: "•",
+              tone: "warn",
+              placement: "tl",
+            });
+          }
+          if (isDraft) {
+            chips.push({
+              id: `${position.id}-new`,
+              label: "New",
+              tone: "success",
+              placement: "bottom",
+            });
+          }
 
-      return (
-        <SlotCell
-          position={position}
-          variant="define"
-          state={{ tone: isAddedSlot ? "warn" : undefined }}
-          chips={chips}
-          className={cn(
-            styles.trayGridCell,
-            "justify-items-center text-center",
-            isDraft && "[grid-template-rows:auto_1fr]",
-          )}
-          titleClassName={styles.trayGridCellId}
-        >
-          {!isDraft && slotCode !== `Slot ${slotIndex}` ? (
-            <span className="text-sm text-muted-foreground">{slotCode}</span>
-          ) : null}
-        </SlotCell>
-      );
-    },
-  });
+          return (
+            <SlotCell
+              position={position}
+              variant="define"
+              state={{ tone: isAddedSlot ? "warn" : undefined }}
+              chips={chips}
+              className={cn(
+                styles.trayGridCell,
+                "justify-items-center text-center",
+                isDraft && "[grid-template-rows:auto_1fr]",
+              )}
+              titleClassName={styles.trayGridCellId}
+            >
+              {!isDraft && slotCode !== `Slot ${slotIndex}` ? (
+                <span className="text-sm text-muted-foreground">{slotCode}</span>
+              ) : null}
+            </SlotCell>
+          );
+        },
+      }),
+    [],
+  );
 
   return (
     <ShelfStack>

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { POSITION_STRIP_PRESET } from "@/src/lib/gridkit/presets";
 import type { PositionSpec } from "@/src/lib/gridkit/spec";
@@ -34,6 +34,19 @@ export function PositionStripWithRenderers({
     () => createPositionRendererMap(renderers),
     [renderers],
   );
+  const renderPosition = useCallback(
+    (position: PositionSpec) => {
+      const renderer = resolvedRenderers[position.occupant.kind];
+      if (!renderer) {
+        return null;
+      }
+      return renderer({
+        position,
+        ctx: resolvedContext,
+      });
+    },
+    [resolvedContext, resolvedRenderers],
+  );
 
   return (
     <PositionStrip
@@ -43,16 +56,7 @@ export function PositionStripWithRenderers({
       pageGridClassName={pageGridClassName}
       positionClassName={positionClassName}
       ariaLabel={ariaLabel}
-      renderPosition={(position) => {
-        const renderer = resolvedRenderers[position.occupant.kind];
-        if (!renderer) {
-          return null;
-        }
-        return renderer({
-          position,
-          ctx: resolvedContext,
-        });
-      }}
+      renderPosition={renderPosition}
     />
   );
 }

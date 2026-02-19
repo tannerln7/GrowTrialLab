@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import type { PlantOccupantSpec, PositionSpec } from "@/src/lib/gridkit/spec";
+import { VirtualGrid } from "../virtual";
 import { PlantCell } from "../cells";
 
 type TrayPlantGridProps = {
@@ -10,6 +11,8 @@ type TrayPlantGridProps = {
   onPlantPress?: (plantId: string, plant: PlantOccupantSpec) => void;
   className?: string;
 };
+
+const STATIC_GRID_THRESHOLD = 24;
 
 function formatStatusLabel(status: string | undefined): string {
   if (!status) {
@@ -28,42 +31,67 @@ export function TrayPlantGrid({
     return <p className="text-sm text-muted-foreground">No plants.</p>;
   }
 
+  const gridClassName = cn("max-h-[min(65vh,28rem)] overflow-y-auto pr-1", className);
+
+  const renderPlantCell = (plant: PlantOccupantSpec) => (
+    <PlantCell
+      plantId={plant.plantId}
+      title={plant.title || "(pending)"}
+      subtitle={plant.subtitle}
+      position={position}
+      state={plant.state}
+      chips={plant.chips}
+      dnd={plant.dnd}
+      interactive={Boolean(onPlantPress)}
+      onPress={onPlantPress ? () => onPlantPress(plant.plantId, plant) : undefined}
+      linkHref={plant.linkHref}
+      className="min-h-[104px]"
+      titleClassName="text-[0.8rem]"
+      subtitleClassName="text-[0.72rem]"
+      metaClassName="flex flex-wrap items-center gap-1"
+      meta={
+        <>
+          <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[0.62rem] leading-none">
+            {plant.grade ? `Grade ${plant.grade}` : "No grade"}
+          </span>
+          <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[0.62rem] leading-none">
+            {plant.recipeCode ? `Recipe ${plant.recipeCode}` : "No recipe"}
+          </span>
+          {plant.status && plant.status !== "active" ? (
+            <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[0.62rem] leading-none">
+              {formatStatusLabel(plant.status)}
+            </span>
+          ) : null}
+        </>
+      }
+    />
+  );
+
+  if (plants.length <= STATIC_GRID_THRESHOLD) {
+    return (
+      <div className={gridClassName}>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+          {plants.map((plant) => (
+            <div key={plant.id}>
+              {renderPlantCell(plant)}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={cn("grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4", className)}>
-      {plants.map((plant) => (
-        <PlantCell
-          key={plant.id}
-          plantId={plant.plantId}
-          title={plant.title || "(pending)"}
-          subtitle={plant.subtitle}
-          position={position}
-          state={plant.state}
-          chips={plant.chips}
-          dnd={plant.dnd}
-          interactive={Boolean(onPlantPress)}
-          onPress={onPlantPress ? () => onPlantPress(plant.plantId, plant) : undefined}
-          linkHref={plant.linkHref}
-          className="min-h-[104px]"
-          titleClassName="text-[0.8rem]"
-          subtitleClassName="text-[0.72rem]"
-          metaClassName="flex flex-wrap items-center gap-1"
-          meta={
-            <>
-              <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[0.62rem] leading-none">
-                {plant.grade ? `Grade ${plant.grade}` : "No grade"}
-              </span>
-              <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[0.62rem] leading-none">
-                {plant.recipeCode ? `Recipe ${plant.recipeCode}` : "No recipe"}
-              </span>
-              {plant.status && plant.status !== "active" ? (
-                <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[0.62rem] leading-none">
-                  {formatStatusLabel(plant.status)}
-                </span>
-              ) : null}
-            </>
-          }
-        />
-      ))}
-    </div>
+    <VirtualGrid
+      items={plants}
+      getKey={(plant) => plant.id}
+      estimateRowHeight={172}
+      columnsByBreakpoint={{ base: 2, sm: 3, md: 4 }}
+      gapPx={8}
+      overscan={8}
+      className={gridClassName}
+      ariaLabel="Tray plants"
+      renderCell={(plant) => renderPlantCell(plant)}
+    />
   );
 }

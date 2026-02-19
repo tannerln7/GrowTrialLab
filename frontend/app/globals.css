@@ -62,3 +62,9 @@ a:focus-visible {
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Perf hint for large repeated card bodies; avoid applying this to scroll-snap strips directly. */
+.perf-content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 800px 600px;
+}

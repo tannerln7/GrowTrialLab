@@ -43,6 +43,47 @@ report_bucket() {
   rm -f "$tmp_file" "$work_file"
 }
 
+report_scroll_map_hotspots() {
+  local label="$1"
+  local scroll_pattern="$2"
+  local map_pattern="$3"
+  local virtual_pattern="$4"
+  local scroll_tmp
+  local map_tmp
+  local both_tmp
+  local offenders_tmp
+  scroll_tmp="$(mktemp)"
+  map_tmp="$(mktemp)"
+  both_tmp="$(mktemp)"
+  offenders_tmp="$(mktemp)"
+
+  rg -l -S "$scroll_pattern" "$TARGET_DIR" >"$scroll_tmp" || true
+  rg -l -S "$map_pattern" "$TARGET_DIR" >"$map_tmp" || true
+  comm -12 <(sort "$scroll_tmp") <(sort "$map_tmp") >"$both_tmp" || true
+
+  while IFS= read -r file_path; do
+    [[ -z "$file_path" ]] && continue
+    if [[ "$file_path" == *"frontend/src/lib/gridkit/components/virtual/"* ]]; then
+      continue
+    fi
+    if rg -q -S "$virtual_pattern" "$file_path"; then
+      continue
+    fi
+    printf '%s\n' "$file_path" >>"$offenders_tmp"
+  done <"$both_tmp"
+
+  local match_count
+  match_count="$(wc -l <"$offenders_tmp" | tr -d ' ')"
+  echo "[$label] matches=$match_count files=$match_count"
+
+  if [[ -s "$offenders_tmp" ]]; then
+    echo "[$label] top_files:"
+    sort "$offenders_tmp" | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
+  fi
+
+  rm -f "$scroll_tmp" "$map_tmp" "$both_tmp" "$offenders_tmp"
+}
+
 echo "[gridkit-inventory] target=$TARGET_DIR top_n=$TOP_N"
 report_bucket \
   "legacy_shelf_strip_heuristics" \
@@ -58,8 +99,14 @@ report_bucket "position_strip_usages" "<PositionStrip\\b"
 report_bucket "position_strip_with_renderers_usages" "<PositionStripWithRenderers\\b"
 report_bucket "renderer_registry_usages" "defaultPositionRendererMap|createPositionRendererMap|PositionStripWithRenderers"
 report_bucket "canonical_leaf_cell_usages" "<SlotCell\\b|<TrayCell\\b|<PlantCell\\b"
+report_bucket "virtual_list_grid_usages" "<VirtualList\\b|<VirtualGrid\\b"
 report_bucket "tray_folder_overlay_usages" "<TrayFolderOverlay\\b|<TrayCellExpandable\\b|<TrayFolderProvider\\b"
 report_bucket "tray_folder_ctx_usages" "trayFolder:\\s*\\{"
+report_scroll_map_hotspots \
+  "remaining_large_map_loops_in_scroll_containers" \
+  "overflow-y-auto|overflow-y-scroll|max-h-\\[" \
+  "\\.map\\(" \
+  "<VirtualList\\b|<VirtualGrid\\b"
 report_bucket \
   "remaining_direct_renderPosition_lambdas" \
   "renderPosition=\\{" \

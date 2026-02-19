@@ -25,6 +25,9 @@ TRAY_FOLDER_CTX_PATTERN="${TRAY_FOLDER_CTX_PATTERN:-trayFolder:\\s*\\{}"
 BESPOKE_TRAY_OVERLAY_PATTERN="${BESPOKE_TRAY_OVERLAY_PATTERN:-<Popover\\b|<Dialog\\b|createPortal|openTray|expandedTray|activeTray|trayFolder\\s*[:=]}"
 LEGACY_SHELF_STRIP_PATTERN="${LEGACY_SHELF_STRIP_PATTERN:-styles\\.overviewTentShelfStack|styles\\.overviewTentSlotGrid|styles\\.overviewShelfSlotGrid|styles\\.step1ShelfPreviewSlotGrid|styles\\.tentShelfSlotGrid|scrollLeft|scrollTo\\(|wheel}"
 TENT_SHELF_WRAPPER_PATTERN="${TENT_SHELF_WRAPPER_PATTERN:-styles\\.overviewTentBoardGrid|styles\\.overviewTentBoardCard|styles\\.overviewTentShelfStack|styles\\.overviewShelfGroup|styles\\.tentBoardGrid|styles\\.tentBoardCard|styles\\.tentShelfRow|styles\\.tentShelfCard|styles\\.step1ShelfPreviewLane|styles\\.step1ShelfPreviewCard|\\[grid-template-columns:repeat\\(auto-fit,minmax\\(min\\(100%,28rem\\),1fr\\)\\)\\]}"
+VIRTUAL_PATTERN="${VIRTUAL_PATTERN:-<VirtualList\\b|<VirtualGrid\\b}"
+SCROLL_PATTERN="${SCROLL_PATTERN:-overflow-y-auto|overflow-y-scroll|max-h-\\[}"
+MAP_LOOP_PATTERN="${MAP_LOOP_PATTERN:-\\.map\\(}"
 
 if [[ "$MODE" != "--report-only" && "$MODE" != "--enforce" ]]; then
   echo "[gridkit-legacy-guard] Usage: $0 [--report-only|--enforce]"
@@ -39,7 +42,11 @@ wrapper_tmp="$(mktemp)"
 legacy_strip_tmp="$(mktemp)"
 leaf_tmp="$(mktemp)"
 tray_overlay_tmp="$(mktemp)"
-trap 'rm -f "$raw_matches" "$violations" "$chip_tmp" "$shell_tmp" "$wrapper_tmp" "$legacy_strip_tmp" "$leaf_tmp" "$tray_overlay_tmp"' EXIT
+scroll_files_tmp="$(mktemp)"
+map_files_tmp="$(mktemp)"
+scroll_map_tmp="$(mktemp)"
+scroll_map_offender_tmp="$(mktemp)"
+trap 'rm -f "$raw_matches" "$violations" "$chip_tmp" "$shell_tmp" "$wrapper_tmp" "$legacy_strip_tmp" "$leaf_tmp" "$tray_overlay_tmp" "$scroll_files_tmp" "$map_files_tmp" "$scroll_map_tmp" "$scroll_map_offender_tmp"' EXIT
 
 rg -n -S "$LEGACY_PATTERN" "$TARGET_DIR" >"$raw_matches" || true
 
@@ -111,6 +118,7 @@ leaf_cell_match_count="$(
 )"
 tray_folder_usage_count="$( (rg -n -S "$TRAY_FOLDER_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
 tray_folder_ctx_usage_count="$( (rg -n -S "$TRAY_FOLDER_CTX_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
+virtual_usage_count="$( (rg -n -S "$VIRTUAL_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
 bespoke_tray_overlay_count="$(
   (
     (rg -n -S "$BESPOKE_TRAY_OVERLAY_PATTERN" "$TARGET_DIR" || true) \
@@ -137,6 +145,20 @@ legacy_shelf_strip_match_count="$(
     (rg -n -S "$LEGACY_SHELF_STRIP_PATTERN" "$TARGET_DIR" || true) | grep -E -v "frontend/src/lib/gridkit/components/PositionStrip.tsx|frontend/src/components/ui/experiments-styles.ts" || true
   ) | wc -l | tr -d ' '
 )"
+rg -l -S "$SCROLL_PATTERN" "$TARGET_DIR" >"$scroll_files_tmp" || true
+rg -l -S "$MAP_LOOP_PATTERN" "$TARGET_DIR" >"$map_files_tmp" || true
+comm -12 <(sort "$scroll_files_tmp") <(sort "$map_files_tmp") >"$scroll_map_tmp" || true
+while IFS= read -r file_path; do
+  [[ -z "$file_path" ]] && continue
+  if [[ "$file_path" == *"frontend/src/lib/gridkit/components/virtual/"* ]]; then
+    continue
+  fi
+  if rg -q -S "$VIRTUAL_PATTERN" "$file_path"; then
+    continue
+  fi
+  printf '%s\n' "$file_path" >>"$scroll_map_offender_tmp"
+done <"$scroll_map_tmp"
+remaining_large_map_scroll_count="$(wc -l <"$scroll_map_offender_tmp" | tr -d ' ')"
 echo "[gridkit-legacy-guard] builder_callsites=$builder_match_count"
 echo "[gridkit-legacy-guard] remaining_mapping_heuristics=$mapping_match_count"
 echo "[gridkit-legacy-guard] cellchrome_usages=$cellchrome_count"
@@ -148,6 +170,8 @@ echo "[gridkit-legacy-guard] renderer_registry_usages=$renderer_registry_count"
 echo "[gridkit-legacy-guard] canonical_leaf_cell_usages=$canonical_leaf_count"
 echo "[gridkit-legacy-guard] tray_folder_overlay_usages=$tray_folder_usage_count"
 echo "[gridkit-legacy-guard] tray_folder_ctx_usages=$tray_folder_ctx_usage_count"
+echo "[gridkit-legacy-guard] virtual_list_grid_usages=$virtual_usage_count"
+echo "[gridkit-legacy-guard] remaining_large_map_loops_in_scroll_containers=$remaining_large_map_scroll_count"
 echo "[gridkit-legacy-guard] remaining_direct_renderPosition_lambdas=$direct_render_position_count"
 echo "[gridkit-legacy-guard] remaining_bespoke_leaf_cell_heuristics=$leaf_cell_match_count"
 echo "[gridkit-legacy-guard] remaining_bespoke_tray_overlay_heuristics=$bespoke_tray_overlay_count"
@@ -201,6 +225,11 @@ fi
 if [[ -s "$tray_overlay_tmp" ]]; then
   echo "[gridkit-legacy-guard] bespoke_tray_overlay_top_files:"
   grep -E -v "frontend/src/lib/gridkit/components/overlays/TrayFolderOverlay.tsx|frontend/src/lib/gridkit/components/cells/TrayCellExpandable.tsx|frontend/src/lib/gridkit/state/trayFolderManager.tsx|frontend/src/lib/gridkit/state/index.ts|frontend/src/lib/gridkit/renderers/types.ts|frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx|frontend/src/lib/gridkit/components/overlays/index.ts|frontend/src/components/ui/popover.tsx|frontend/src/components/ui/dialog.tsx|frontend/src/lib/gridkit/presets.ts" "$tray_overlay_tmp" | cut -d: -f1 | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
+fi
+
+if [[ -s "$scroll_map_offender_tmp" ]]; then
+  echo "[gridkit-legacy-guard] large_map_scroll_top_files:"
+  sort "$scroll_map_offender_tmp" | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
 fi
 
 if [[ "$MODE" == "--enforce" && "$violation_matches" -gt 0 ]]; then
