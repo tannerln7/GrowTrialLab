@@ -1,12 +1,8 @@
-import { Check, Trash2 } from "lucide-react";
-import { memo, type ReactNode } from "react";
+import { memo, type ReactNode, useMemo } from "react";
 
-import { cn } from "@/lib/utils";
-import type { SlotSummary, TentSummary } from "@/src/features/placement/types";
-import { groupSlotsByShelf } from "@/src/features/placement/utils";
-import { DraftChangeMarker } from "@/src/components/ui/draft-change-marker";
-import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
-import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import type { TentSummary } from "@/src/features/placement/types";
+import { buildTentLayoutSpecFromPlacementStep4 } from "@/src/lib/gridkit/builders";
+import { LegacyPlacementTentLayoutAdapter } from "@/src/lib/gridkit/components";
 
 type TentSlotBoardProps = {
   tents: TentSummary[];
@@ -29,115 +25,26 @@ function TentSlotBoardImpl({
   onToggleDestinationSlot,
   renderTrayCell,
 }: TentSlotBoardProps) {
+  const spec = useMemo(
+    () =>
+      buildTentLayoutSpecFromPlacementStep4({
+        tents,
+        draftSlotToTray,
+        destinationSlotId,
+        dirtySlotIds,
+        selectedTraysByTentId,
+      }),
+    [destinationSlotId, dirtySlotIds, draftSlotToTray, selectedTraysByTentId, tents],
+  );
+
   return (
-    <div className={styles.tentBoardGrid}>
-      {tents.map((tent) => {
-        const selectedInTent = selectedTraysByTentId[tent.tent_id] || [];
-        const slotsByShelf = groupSlotsByShelf(tent);
-        return (
-          <article
-            key={tent.tent_id}
-            className={cn(styles.tentBoardCard, "rounded-lg border border-border", styles.cellSurfaceLevel3)}
-          >
-            <div className={cn(styles.trayHeaderRow, "items-center")}>
-              <div className={cn(styles.trayHeaderMeta, "py-0.5")}>
-                <strong className={styles.trayGridCellId}>{tent.name}</strong>
-              </div>
-              <div className={styles.trayHeaderActions}>
-                <span className={styles.recipeLegendItem}>
-                  {tent.slots.length} {tent.slots.length === 1 ? "slot" : "slots"}
-                </span>
-                {selectedInTent.length > 0 ? (
-                  <TooltipIconButton
-                    label="Return selected trays to unplaced"
-                    icon={<Trash2 size={16} />}
-                    onClick={() => onReturnSelectedFromTent(tent.tent_id)}
-                    variant="destructive"
-                  />
-                ) : null}
-              </div>
-            </div>
-
-            <div className={styles.tentShelfRow}>
-              {Array.from(slotsByShelf.entries()).map(([shelfIndex, shelfSlots]) => (
-                <article key={`${tent.tent_id}-shelf-${shelfIndex}`} className={cn(styles.tentShelfCard, styles.cellSurfaceLevel2)}>
-                  <div className={cn(styles.trayHeaderRow, "items-center")}>
-                    <div className={cn(styles.trayHeaderMeta, "py-0.5")}>
-                      <strong className={styles.trayGridCellId}>Shelf {shelfIndex}</strong>
-                    </div>
-                  </div>
-
-                  <div className={styles.tentShelfSlotGrid}>
-                    {shelfSlots.map((slot) => (
-                      <SlotCell
-                        key={slot.slot_id}
-                        slot={slot}
-                        trayId={draftSlotToTray.get(slot.slot_id) || null}
-                        destinationSlotId={destinationSlotId}
-                        dirty={dirtySlotIds.has(slot.slot_id)}
-                        onToggleDestinationSlot={onToggleDestinationSlot}
-                        renderTrayCell={renderTrayCell}
-                      />
-                    ))}
-                  </div>
-                </article>
-              ))}
-              {tent.slots.length === 0 ? <span className="text-sm text-muted-foreground">No slots generated.</span> : null}
-            </div>
-          </article>
-        );
-      })}
-    </div>
+    <LegacyPlacementTentLayoutAdapter
+      spec={spec}
+      onReturnSelectedFromTent={onReturnSelectedFromTent}
+      onToggleDestinationSlot={onToggleDestinationSlot}
+      renderTrayCell={renderTrayCell}
+    />
   );
 }
 
 export const TentSlotBoard = memo(TentSlotBoardImpl);
-
-type SlotCellProps = {
-  slot: SlotSummary;
-  trayId: string | null;
-  destinationSlotId: string;
-  dirty: boolean;
-  onToggleDestinationSlot: (slotId: string) => void;
-  renderTrayCell: (trayId: string, inSlot?: boolean) => ReactNode;
-};
-
-const SlotCell = memo(function SlotCell({
-  slot,
-  trayId,
-  destinationSlotId,
-  dirty,
-  onToggleDestinationSlot,
-  renderTrayCell,
-}: SlotCellProps) {
-  const slotSelected = destinationSlotId === slot.slot_id;
-  if (trayId) {
-    return <div className={styles.slotTrayCellFill}>{renderTrayCell(trayId, true)}</div>;
-  }
-  return (
-    <div
-      className={cn(
-        styles.slotCell,
-        styles.slotContainerCellFrame,
-        styles.cellSurfaceLevel1,
-        dirty && styles.draftChangedSurface,
-        slotSelected && styles.plantCellSelected,
-      )}
-    >
-      {dirty ? <DraftChangeMarker /> : null}
-      {slotSelected ? (
-        <span className={styles.plantCellCheck}>
-          <Check size={12} />
-        </span>
-      ) : null}
-      <span className={styles.slotCellLabel}>{slot.code}</span>
-      <button
-        type="button"
-        className={cn(styles.slotCellEmpty, slotSelected && styles.slotCellEmptyActive)}
-        onClick={() => onToggleDestinationSlot(slot.slot_id)}
-      >
-        Empty
-      </button>
-    </div>
-  );
-});

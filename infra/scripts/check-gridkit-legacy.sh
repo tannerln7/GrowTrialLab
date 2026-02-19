@@ -9,6 +9,8 @@ ALLOWLIST_FILE="${ALLOWLIST_FILE:-infra/scripts/gridkit-legacy-allowlist.txt}"
 MODE="${1:---report-only}"
 TOP_N="${TOP_N:-20}"
 LEGACY_PATTERN="${LEGACY_PATTERN:-TentSlotBoard|tent-slot-board|overviewTentShelfStack|step1ShelfPreviewSlotGrid|tentShelfSlotGrid|slotGridInline}"
+BUILDER_PATTERN="${BUILDER_PATTERN:-buildTentLayoutSpecFrom[A-Za-z0-9_]*\\(}"
+MAPPING_PATTERN="${MAPPING_PATTERN:-groupSlotsByShelf|buildStep1ShelfPreviewGroups|slotsByShelf\\s*=\\s*new Map|slotByIndex\\s*=\\s*new Map|tentMap\\s*=\\s*new Map}"
 
 if [[ "$MODE" != "--report-only" && "$MODE" != "--enforce" ]]; then
   echo "[gridkit-legacy-guard] Usage: $0 [--report-only|--enforce]"
@@ -68,6 +70,10 @@ echo "[gridkit-legacy-guard] mode=$MODE pattern=$LEGACY_PATTERN"
 echo "[gridkit-legacy-guard] allowlist_file=$ALLOWLIST_FILE entries=${#allowlist_entries[@]}"
 echo "[gridkit-legacy-guard] matches_total=$total_matches files_total=$total_files"
 echo "[gridkit-legacy-guard] matches_non_allowlisted=$violation_matches files_non_allowlisted=$violation_files"
+builder_match_count="$( (rg -n -S "$BUILDER_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
+mapping_match_count="$( (rg -n -S "$MAPPING_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
+echo "[gridkit-legacy-guard] builder_callsites=$builder_match_count"
+echo "[gridkit-legacy-guard] remaining_mapping_heuristics=$mapping_match_count"
 
 if [[ -s "$raw_matches" ]]; then
   echo "[gridkit-legacy-guard] top_matched_files:"

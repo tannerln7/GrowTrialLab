@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 import {
-  buildStep1ShelfPreviewGroups,
   draftChipLabelForStep,
   getTentDraftMeta,
 } from "@/src/features/placement/utils";
@@ -10,7 +9,8 @@ import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
 import { DraftChangeMarker } from "@/src/components/ui/draft-change-marker";
 import { Input } from "@/src/components/ui/input";
 import SectionCard from "@/src/components/ui/SectionCard";
-import { StepAdjustButton } from "@/src/components/ui/step-adjust-button";
+import { buildTentLayoutSpecFromPlacementStep1 } from "@/src/lib/gridkit/builders";
+import { LegacyPlacementShelfPreviewAdapter } from "@/src/lib/gridkit/components";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -53,8 +53,9 @@ export function Step1Tents({ model, actions }: Step1TentsProps) {
         const shelfCounts = tentDraftMeta.draftShelfCounts;
         const selectedSpecies = new Set(tentDraftMeta.draftAllowedSpeciesIds);
         const tentDraft = model.tentDraftById[tent.tent_id] || { name: tent.name, code: tent.code };
-        const previewShelfSlotGroups = buildStep1ShelfPreviewGroups(tent, shelfCounts);
-        const persistedShelfCounts = tentDraftMeta.persistedShelfCounts;
+        const tentSpec = buildTentLayoutSpecFromPlacementStep1({
+          tents: [{ tent, draftShelfCounts: shelfCounts }],
+        }).tents[0];
         const shelvesRemoved = tentDraftMeta.shelvesRemoved;
         const tentNameDirty = tentDraftMeta.tentNameDirty;
         const tentCodeDirty = tentDraftMeta.tentCodeDirty;
@@ -164,76 +165,12 @@ export function Step1Tents({ model, actions }: Step1TentsProps) {
 
               <div className="grid gap-2">
                 <span className="text-sm text-muted-foreground">Current slots</span>
-                <div className={styles.step1ShelfPreviewLane}>
-                  {previewShelfSlotGroups.map((group) => {
-                    const persistedCount = persistedShelfCounts[group.shelfIndex - 1] || 0;
-                    const shelfDirty = group.isNewShelf || group.removedSlotsInShelf;
-                    return (
-                      <article
-                        key={`${tent.tent_id}-shelf-${group.shelfIndex}`}
-                        className={cn(
-                          styles.trayEditorCell,
-                          styles.step1ShelfPreviewCard,
-                          styles.cellSurfaceLevel2,
-                          shelfDirty && styles.draftChangedSurface,
-                        )}
-                      >
-                        {shelfDirty ? <DraftChangeMarker /> : null}
-                        <div className={styles.trayHeaderRow}>
-                          <div className={styles.trayHeaderMeta}>
-                            <strong>{`Shelf ${group.shelfIndex}`}</strong>
-                          </div>
-                          <div className={styles.trayHeaderActions}>
-                            <span className={styles.recipeLegendItem}>
-                              {group.slots.length} {group.slots.length === 1 ? "slot" : "slots"}
-                            </span>
-                            <StepAdjustButton
-                              direction="decrement"
-                              onClick={() => actions.adjustShelfSlotCount(tent.tent_id, group.shelfIndex - 1, -1)}
-                              disabled={(shelfCounts[group.shelfIndex - 1] || 0) <= 0}
-                            />
-                            <StepAdjustButton
-                              direction="increment"
-                              onClick={() => actions.adjustShelfSlotCount(tent.tent_id, group.shelfIndex - 1, 1)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className={styles.step1ShelfPreviewSlotGrid}>
-                          {group.slots.map((slot) => {
-                            const isAddedSlot = !group.isNewShelf && slot.isDraft && slot.slot_index > persistedCount;
-                            return (
-                              <article
-                                key={slot.slot_id}
-                                className={cn(
-                                  styles.trayGridCell,
-                                  styles.cellFrame,
-                                  styles.cellSurfaceLevel1,
-                                  "justify-items-center text-center",
-                                  isAddedSlot && styles.draftChangedSurface,
-                                  slot.isDraft && "[grid-template-rows:auto_1fr]",
-                                )}
-                              >
-                                {isAddedSlot ? <DraftChangeMarker /> : null}
-                                <strong className={styles.trayGridCellId}>{`Slot ${slot.slot_index}`}</strong>
-                                {!slot.isDraft && slot.code !== `Slot ${slot.slot_index}` ? (
-                                  <span className="text-sm text-muted-foreground">{slot.code}</span>
-                                ) : null}
-                                {slot.isDraft ? (
-                                  <span className={cn(styles.slotPlacedChip, "self-end")}>New</span>
-                                ) : null}
-                              </article>
-                            );
-                          })}
-                          {group.slots.length === 0 ? <span className="text-sm text-muted-foreground">No slots.</span> : null}
-                        </div>
-                      </article>
-                    );
-                  })}
-                  {previewShelfSlotGroups.length === 0 ? (
-                    <span className="text-sm text-muted-foreground">No shelves configured yet.</span>
-                  ) : null}
-                </div>
+                {tentSpec ? (
+                  <LegacyPlacementShelfPreviewAdapter
+                    tentSpec={tentSpec}
+                    onAdjustShelfSlotCount={actions.adjustShelfSlotCount}
+                  />
+                ) : null}
               </div>
             </div>
           </SectionCard>

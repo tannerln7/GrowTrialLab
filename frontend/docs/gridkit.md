@@ -1,6 +1,6 @@
-# GridKit Program Stub (Phase 0)
+# GridKit Program Stub (Phase 0-1)
 
-GridKit is the shared frontend system for rendering and interacting with the canonical physical hierarchy (`Tent -> Shelf -> Position -> Tray/Plant`) with consistent structure and flexible leaf-cell content by page. Phase 0 establishes dependencies, seams, and inventory tooling without changing runtime grid behavior.
+GridKit is the shared frontend system for rendering and interacting with the canonical physical hierarchy (`Tent -> Shelf -> Position -> Tray/Plant`) with consistent structure and flexible leaf-cell content by page. Phase 0 established dependencies/seams/tooling; Phase 1 establishes typed spec contracts, presets, and pure builders/adapters so callsites can move to spec-driven data without visual changes.
 
 ## Locked library decisions
 - Shelf paging: native CSS scroll-snap (single implementation, no carousel library).
@@ -10,8 +10,9 @@ GridKit is the shared frontend system for rendering and interacting with the can
 - Container measurement: internal `useResizeObserver` hook.
 - Drag-and-drop prep: `@dnd-kit/*` metadata/ID seams only in early phases (no `DndContext` wiring yet).
 
-## Phase 0 scaffolding paths
-- GridKit placeholders: `frontend/src/lib/gridkit/*`
+## Phase 0-1 scaffolding paths
+- GridKit contracts/presets/builders/components: `frontend/src/lib/gridkit/*`
+- Legacy bridge adapters: `frontend/src/lib/gridkit/components/adapters/*`
 - DnD seams: `frontend/src/lib/dnd/*`
 - Resize observer hook: `frontend/src/lib/hooks/useResizeObserver.ts`
 - Scrollbar utility: `.hide-scrollbar` in `frontend/app/globals.css`

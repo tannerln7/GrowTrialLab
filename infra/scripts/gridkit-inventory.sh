@@ -35,3 +35,7 @@ report_bucket \
 report_bucket "grid_board_heuristics" "tent|shelf|slot|tray|plant|grid|board|matrix"
 report_bucket "tray_overlay_patterns" "popover|dialog|portal|createPortal|overlay"
 report_bucket "adhoc_scroll_paging" "overflow-x|scroll-snap|scrollTo\\(|scrollLeft|wheel"
+report_bucket "spec_builder_callsites" "buildTentLayoutSpecFrom[A-Za-z0-9_]*\\("
+report_bucket \
+  "remaining_bespoke_mapping_heuristics" \
+  "groupSlotsByShelf|buildStep1ShelfPreviewGroups|slotsByShelf\\s*=\\s*new Map|slotByIndex\\s*=\\s*new Map|tentMap\\s*=\\s*new Map"

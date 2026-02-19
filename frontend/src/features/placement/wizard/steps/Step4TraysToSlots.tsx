@@ -1,17 +1,18 @@
 import { ArrowRight, CheckSquare, X } from "lucide-react";
-import { memo, useCallback } from "react";
+import { memo, useCallback, useMemo } from "react";
 
 import { cn } from "@/lib/utils";
 import { getDraftOrPersisted, isDirtyValue } from "@/src/lib/state/drafts";
 import { draftChipLabelForStep, formatTrayDisplay } from "@/src/features/placement/utils";
 import type { Step4Actions, Step4Model } from "@/src/features/placement/wizard/types";
-import { TentSlotBoard } from "@/src/features/placement/components/tent-slot-board";
 import { TraySelectableCell } from "@/src/features/placement/components/placement-cells";
 import { Button } from "@/src/components/ui/button";
 import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
 import { NativeSelect } from "@/src/components/ui/native-select";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
+import { buildTentLayoutSpecFromPlacementStep4 } from "@/src/lib/gridkit/builders";
+import { LegacyPlacementTentLayoutAdapter } from "@/src/lib/gridkit/components";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -49,6 +50,24 @@ function Step4TraysToSlotsImpl({ model, actions }: Step4TraysToSlotsProps) {
       );
     },
     [actions.toggleTraySelection, isTraySlotDirty, model.selectedTrayIds, model.trayById],
+  );
+
+  const tentLayoutSpec = useMemo(
+    () =>
+      buildTentLayoutSpecFromPlacementStep4({
+        tents: model.tents,
+        draftSlotToTray: model.draftSlotToTray,
+        destinationSlotId: model.destinationSlotId,
+        dirtySlotIds: model.dirtySlotIds,
+        selectedTraysByTentId: model.selectedTraysByTentId,
+      }),
+    [
+      model.destinationSlotId,
+      model.dirtySlotIds,
+      model.draftSlotToTray,
+      model.selectedTraysByTentId,
+      model.tents,
+    ],
   );
 
   return (
@@ -115,12 +134,8 @@ function Step4TraysToSlotsImpl({ model, actions }: Step4TraysToSlotsProps) {
         </div>
       </SectionCard>
 
-      <TentSlotBoard
-        tents={model.tents}
-        draftSlotToTray={model.draftSlotToTray}
-        destinationSlotId={model.destinationSlotId}
-        dirtySlotIds={model.dirtySlotIds}
-        selectedTraysByTentId={model.selectedTraysByTentId}
+      <LegacyPlacementTentLayoutAdapter
+        spec={tentLayoutSpec}
         onReturnSelectedFromTent={actions.stageRemoveTraysFromTent}
         onToggleDestinationSlot={actions.toggleDestinationSlot}
         renderTrayCell={renderTrayCell}
