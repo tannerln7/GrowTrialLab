@@ -1,6 +1,6 @@
 # GrowTrialLab Unified Project Notes
 
-Last consolidated: 2026-02-18  
+Last consolidated: 2026-02-19  
 Consolidated from: `docs/README.md`, `docs/decisions.md`, `docs/v1-checklist.md`, `docs/watch-outs.md`, `docs/phase0-ui-refactor-findings.md`, `docs/ui-illustration-inventory.md`, `docs/testing-migration-notes.md`
 
 This document is the single consolidated source for current status, architecture decisions, open work, risks, and historical context. Notes that were outdated relative to the current repository were either corrected here or moved into the historical section.
@@ -225,6 +225,11 @@ This document is the single consolidated source for current status, architecture
   - canonical error helpers now live under `frontend/src/lib/errors/*` with compatibility re-exports retained for old import paths.
   - duplicate label/format helpers were consolidated in `frontend/src/lib/format/labels.ts` and reused by placement/recipes/cockpit.
   - frontend guardrail script `infra/scripts/check-no-backendfetch.sh` + `pnpm frontend:no-backendfetch` now blocks reintroduction of `backendFetch(...)` usage in `frontend/src`.
+- [x] Phase 6 performance and cache hardening is active for high-churn frontend surfaces:
+  - controller return groups (`ui/data/actions/mutations`) are memoized on core entry/checklist hooks to avoid avoidable rerenders.
+  - placement dense-cell surfaces now use memoized components (`PlantSelectableCell`, `TraySelectableCell`, `TentSlotBoard`, and heavy step modules) with stable controller model/action contracts.
+  - overview start/stop lifecycle mutations now update status cache via `queryClient.setQueryData(...)` and only invalidate the overview plant query instead of broad status+overview invalidation.
+  - frontend guardrails now also include `infra/scripts/check-no-inline-querykeys.sh` + `pnpm frontend:no-inline-querykeys` to prevent ad-hoc inline `queryKey: [...]` arrays in `frontend/src`.
 - [x] Phase 1.5 mechanical frontend helper rollout is complete for route/page conventions:
   - route/page param parsing now standardizes on `useRouteParamString("id")` / `getParamString(...)` across experiment and cockpit pages.
   - standard top-of-page alert slabs now use shared `PageAlerts` in core experiment routes.

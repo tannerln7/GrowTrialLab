@@ -27,6 +27,41 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Frontend Phase 6 Performance, Cache Tuning, and Guardrails)
+- `Completed` Frontend controller outputs and high-churn render paths were stabilized, with targeted cache refresh behavior and an added query-key guardrail.
+  - Stabilized controller return groups via `useMemo`/`useCallback` on core entry/checklist hooks:
+    - `useHomeController`
+    - `useExperimentsListController`
+    - `useNewExperimentController`
+    - `useExperimentLandingController`
+    - `useExperimentSetupController`
+  - Reduced placement rerender churn by memoizing dense reusable components and step surfaces:
+    - `PlantSelectableCell`, `TraySelectableCell`, `TentSlotBoard`
+    - `Step3PlantsToTrays`, `Step4TraysToSlots`
+    - `usePlacementWizard` now returns stable grouped controller state (`ui`, `wizard`, `stepModels`, `stepActions`)
+  - Tightened overview lifecycle mutation refresh behavior:
+    - experiment-detail name load moved to React Query
+    - start/stop mutation success updates status summary with `queryClient.setQueryData(...)`
+    - invalidation narrowed to overview plant query key
+  - Added a lightweight guardrail against ad-hoc inline query keys:
+    - `infra/scripts/check-no-inline-querykeys.sh`
+    - `pnpm frontend:no-inline-querykeys`
+  - Relevant files:
+    - `frontend/src/features/home/useHomeController.ts`
+    - `frontend/src/features/experiments/list/useExperimentsListController.ts`
+    - `frontend/src/features/experiments/new/useNewExperimentController.ts`
+    - `frontend/src/features/experiments/landing/useExperimentLandingController.ts`
+    - `frontend/src/features/experiments/setup/useExperimentSetupController.ts`
+    - `frontend/src/features/experiments/overview/ExperimentOverviewPageClient.tsx`
+    - `frontend/src/features/placement/wizard/usePlacementWizard.ts`
+    - `frontend/src/features/placement/components/placement-cells.tsx`
+    - `frontend/src/features/placement/components/tent-slot-board.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step3PlantsToTrays.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step4TraysToSlots.tsx`
+    - `infra/scripts/check-no-inline-querykeys.sh`
+    - `package.json`
+  - Refs: `83d3103`
+
 ### 2026-02-19 (Frontend Phase 5 Utility Consolidation + Legacy Guardrails)
 - `Completed` Shared frontend utility consolidation reduced repeated helper implementations and added a guardrail for legacy fetch reintroduction.
   - Added canonical helper modules:

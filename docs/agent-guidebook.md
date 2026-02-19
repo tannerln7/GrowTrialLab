@@ -133,10 +133,15 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 ### Data layer
 - React Query provider scaffold exists and query key discipline is required.
 - Active frontend route-level server state uses `api + react-query`; avoid introducing new `backendFetch + useEffect` loader patterns in UI code.
+- QueryClient defaults are currently tuned in `frontend/src/app/providers.tsx` (`staleTime: 30_000`, `refetchOnWindowFocus: false`, `retry: 1`); keep page-level overrides intentional.
+- Mutation refresh strategy should prefer targeted invalidation and direct cache updates (`queryClient.setQueryData`) for known payloads over broad root invalidation.
 - Shared helpers:
   - `frontend/src/lib/queryKeys.ts`
   - `frontend/src/lib/api.ts`
   - `frontend/src/lib/usePageQueryState.ts`
+- Regression guardrails:
+  - `pnpm frontend:no-backendfetch`
+  - `pnpm frontend:no-inline-querykeys`
 
 ### Shared page helpers
 - Route params:
