@@ -3,7 +3,13 @@ export type ExperimentOverviewPlantsParams = {
   q?: string;
 };
 
-type QueryKeyPart = string | number | boolean | null | undefined | Record<string, unknown>;
+type QueryKeyPart =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | Record<string, unknown>;
 
 function normalizeOverviewPlantsParams(
   params?: ExperimentOverviewPlantsParams,
@@ -30,6 +36,30 @@ export function experimentRoot(experimentId: string) {
   return ["experiment", experimentId] as const;
 }
 
+export function systemRoot() {
+  return ["system"] as const;
+}
+
+export function systemHealth() {
+  return [...systemRoot(), "health"] as const;
+}
+
+export function systemMe() {
+  return [...systemRoot(), "me"] as const;
+}
+
+export function experimentsRoot() {
+  return ["experiments"] as const;
+}
+
+export function experimentsList() {
+  return [...experimentsRoot(), "list"] as const;
+}
+
+export function experimentDetail(experimentId: string) {
+  return [...experimentsRoot(), "detail", experimentId] as const;
+}
+
 export function experimentStatus(experimentId: string) {
   return [...experimentRoot(experimentId), "status", "summary"] as const;
 }
@@ -40,6 +70,14 @@ export function experimentFeature(
   ...parts: QueryKeyPart[]
 ) {
   return [...experimentRoot(experimentId), "feature", featureName, ...parts] as const;
+}
+
+export function plantRoot(plantUuid: string) {
+  return ["plant", plantUuid] as const;
+}
+
+export function plantCockpit(plantUuid: string) {
+  return [...plantRoot(plantUuid), "cockpit"] as const;
 }
 
 export function experimentOverviewPlants(
@@ -54,13 +92,35 @@ export function experimentOverviewPlants(
 }
 
 export const queryKeys = {
+  system: {
+    root: systemRoot,
+    health: systemHealth,
+    me: systemMe,
+  },
+  experiments: {
+    root: experimentsRoot,
+    list: experimentsList,
+    detail: experimentDetail,
+  },
   experiment: {
     root: experimentRoot,
     status: experimentStatus,
     feature: experimentFeature,
   },
+  plant: {
+    root: plantRoot,
+    cockpit: plantCockpit,
+  },
+  systemRoot,
+  systemHealth,
+  systemMe,
+  experimentsRoot,
+  experimentsList,
+  experimentDetail,
   experimentRoot,
   experimentStatus,
   experimentFeature,
   experimentOverviewPlants,
+  plantRoot,
+  plantCockpit,
 };

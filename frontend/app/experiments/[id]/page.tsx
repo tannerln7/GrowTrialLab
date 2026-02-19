@@ -1,60 +1,52 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 
-import { backendFetch, normalizeBackendError } from "@/lib/backend";
-import { fetchExperimentStatusSummary } from "@/lib/experiment-status";
+import type { ExperimentStatusSummary } from "@/lib/experiment-status";
 import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { api } from "@/src/lib/api";
+import { queryKeys } from "@/src/lib/queryKeys";
 import { useRouteParamString } from "@/src/lib/useRouteParamString";
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
 export default function ExperimentLandingPage() {
   const router = useRouter();
   const experimentId = useRouteParamString("id") || "";
 
-  const [notInvited, setNotInvited] = useState(false);
-  const [offline, setOffline] = useState(false);
-  const [error, setError] = useState("");
+  const statusQuery = useQuery({
+    queryKey: queryKeys.experiment.status(experimentId),
+    queryFn: () =>
+      api.get<ExperimentStatusSummary>(
+        `/api/v1/experiments/${experimentId}/status/summary`,
+      ),
+    enabled: Boolean(experimentId),
+  });
+
+  const statusState = usePageQueryState(statusQuery);
+  const notInvited = statusState.errorKind === "forbidden";
+  const offline = statusState.errorKind === "offline";
+  const error = useMemo(() => {
+    if (notInvited || offline || !statusState.isError) {
+      return "";
+    }
+    return "Unable to determine experiment status.";
+  }, [notInvited, offline, statusState.isError]);
 
   useEffect(() => {
-    async function routeExperimentLanding() {
-      if (!experimentId) {
-        return;
-      }
-      setError("");
-
-      try {
-        const meResponse = await backendFetch("/api/me");
-        if (meResponse.status === 403) {
-          setNotInvited(true);
-          return;
-        }
-
-        const summary = await fetchExperimentStatusSummary(experimentId);
-        if (!summary) {
-          setError("Unable to determine experiment status.");
-          return;
-        }
-
-        if (summary.setup.is_complete) {
-          router.replace(`/experiments/${experimentId}/overview`);
-        } else {
-          router.replace(`/experiments/${experimentId}/setup`);
-        }
-      } catch (requestError) {
-        const normalized = normalizeBackendError(requestError);
-        if (normalized.kind === "offline") {
-          setOffline(true);
-        } else {
-          setError("Unable to determine experiment status.");
-        }
-      }
+    if (!experimentId || !statusQuery.data) {
+      return;
     }
 
-    void routeExperimentLanding();
-  }, [experimentId, router]);
+    if (statusQuery.data.setup.is_complete) {
+      router.replace(`/experiments/${experimentId}/overview`);
+    } else {
+      router.replace(`/experiments/${experimentId}/setup`);
+    }
+  }, [experimentId, router, statusQuery.data]);
 
   if (notInvited) {
     return (
@@ -70,7 +62,7 @@ export default function ExperimentLandingPage() {
     <PageShell title="Experiment" subtitle={experimentId || "Loading"}>
       <SectionCard>
         <PageAlerts
-          loading={!offline && !error}
+          loading={!offline && !error && statusState.isLoading}
           loadingText="Opening experiment..."
           error={error}
           offline={offline}

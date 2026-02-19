@@ -1,10 +1,12 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouteParamString } from "@/src/lib/useRouteParamString";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { backendUrl, unwrapList } from "@/lib/backend";
 import { suggestPlantId } from "@/lib/id-suggestions";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
@@ -15,7 +17,10 @@ import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { Textarea } from "@/src/components/ui/textarea";
-
+import { api, isApiError } from "@/src/lib/api";
+import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { queryKeys } from "@/src/lib/queryKeys";
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
 type PlantRow = {
   id: string;
@@ -54,15 +59,12 @@ const CARNIVOROUS_PLANT_PRESETS: PlantPreset[] = [
 ];
 
 export default function ExperimentPlantsPage() {
+  const queryClient = useQueryClient();
   const experimentId = useRouteParamString("id") || "";
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [notInvited, setNotInvited] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [offline, setOffline] = useState(false);
-  const [plants, setPlants] = useState<PlantRow[]>([]);
+  const [mutationOffline, setMutationOffline] = useState(false);
 
   const [manualSpeciesName, setManualSpeciesName] = useState("");
   const [manualCategory, setManualCategory] = useState("");
@@ -75,6 +77,27 @@ export default function ExperimentPlantsPage() {
   const [csvText, setCsvText] = useState("");
   const [csvFile, setCsvFile] = useState<File | null>(null);
 
+  const plantsQueryKey = queryKeys.experiment.feature(experimentId, "plants", "list");
+  const plantsQuery = useQuery({
+    queryKey: plantsQueryKey,
+    queryFn: () => api.get<unknown>(`/api/v1/experiments/${experimentId}/plants/`),
+    enabled: Boolean(experimentId),
+  });
+
+  const plantsState = usePageQueryState(plantsQuery);
+  const notInvited = plantsState.errorKind === "forbidden";
+
+  const plants = useMemo(() => {
+    if (!plantsQuery.data) {
+      return [] as PlantRow[];
+    }
+    try {
+      return unwrapList<PlantRow>(plantsQuery.data);
+    } catch {
+      return [] as PlantRow[];
+    }
+  }, [plantsQuery.data]);
+
   const suggestedPlantId = useMemo(
     () => suggestPlantId(plants.map((plant) => plant.plant_id).filter((id) => id), manualCategory),
     [manualCategory, plants],
@@ -86,58 +109,19 @@ export default function ExperimentPlantsPage() {
     }
   }, [manualPlantId, suggestedPlantId]);
 
-  const loadPlants = useCallback(async () => {
-    const response = await backendFetch(`/api/v1/experiments/${experimentId}/plants/`);
-    if (!response.ok) {
-      throw new Error("Unable to load plants.");
+  const queryOffline = plantsState.errorKind === "offline";
+  const queryError = useMemo(() => {
+    if (notInvited || !plantsState.isError || queryOffline) {
+      return "";
     }
-    const data = (await response.json()) as unknown;
-    setPlants(unwrapList<PlantRow>(data));
-  }, [experimentId]);
+    return "Unable to load plants.";
+  }, [notInvited, plantsState.isError, queryOffline]);
 
-  useEffect(() => {
-    async function load() {
-      if (!experimentId) {
-        return;
-      }
+  const saving = false;
 
-      setLoading(true);
-      setError("");
-      setOffline(false);
-
-      try {
-        const me = await backendFetch("/api/me");
-        if (me.status === 403) {
-          setNotInvited(true);
-          return;
-        }
-        await loadPlants();
-      } catch (requestError) {
-        const normalizedError = normalizeBackendError(requestError);
-        if (normalizedError.kind === "offline") {
-          setOffline(true);
-        }
-        setError("Unable to load plants.");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    void load();
-  }, [experimentId, loadPlants]);
-
-  async function addPlantsQuick() {
-    const quantity = Math.max(1, Number(manualQuantity) || 1);
-    if (!manualSpeciesName.trim()) {
-      setError("Species name is required.");
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-    setNotice("");
-
-    try {
+  const addPlantsMutation = useMutation({
+    mutationFn: async () => {
+      const quantity = Math.max(1, Number(manualQuantity) || 1);
       if (quantity > 1 || !manualPlantId.trim()) {
         const csvHeader = "species_name,category,cultivar,quantity,baseline_notes";
         const csvRow = [
@@ -150,44 +134,28 @@ export default function ExperimentPlantsPage() {
           .map((value) => value.replace(/,/g, " "))
           .join(",");
 
-        const response = await backendFetch(
-          `/api/v1/experiments/${experimentId}/plants/bulk-import/`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ csv_text: `${csvHeader}\n${csvRow}` }),
-          },
-        );
-
-        if (!response.ok) {
-          const payload = (await response.json()) as { detail?: string };
-          setError(payload.detail || "Unable to add plants.");
-          return;
-        }
-      } else {
-        const response = await backendFetch(`/api/v1/experiments/${experimentId}/plants/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            species_name: manualSpeciesName.trim(),
-            category: manualCategory.trim(),
-            cultivar: manualCultivar.trim(),
-            baseline_notes: manualBaselineNotes.trim(),
-            plant_id: manualPlantId.trim(),
-          }),
+        await api.post(`/api/v1/experiments/${experimentId}/plants/bulk-import/`, {
+          csv_text: `${csvHeader}\n${csvRow}`,
         });
-
-        if (!response.ok) {
-          const payload = (await response.json()) as { detail?: string; suggested_plant_id?: string };
-          if (payload.suggested_plant_id) {
-            setManualPlantId(payload.suggested_plant_id);
-          }
-          setError(payload.detail || "Unable to add plant.");
-          return;
-        }
+        return { quantity };
       }
 
-      setNotice(quantity > 1 ? `Added ${quantity} plants.` : "Plant added.");
+      await api.post(`/api/v1/experiments/${experimentId}/plants/`, {
+        species_name: manualSpeciesName.trim(),
+        category: manualCategory.trim(),
+        cultivar: manualCultivar.trim(),
+        baseline_notes: manualBaselineNotes.trim(),
+        plant_id: manualPlantId.trim(),
+      });
+      return { quantity };
+    },
+    onMutate: () => {
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: async (result) => {
+      setNotice(result.quantity > 1 ? `Added ${result.quantity} plants.` : "Plant added.");
       setManualSpeciesName("");
       setManualCategory("");
       setManualCultivar("");
@@ -195,15 +163,96 @@ export default function ExperimentPlantsPage() {
       setManualPlantId("");
       setManualQuantity(1);
       setSelectedPresetId("custom");
-      await loadPlants();
-    } catch (requestError) {
-      const normalizedError = normalizeBackendError(requestError);
-      if (normalizedError.kind === "offline") {
-        setOffline(true);
+      await queryClient.invalidateQueries({ queryKey: plantsQueryKey });
+    },
+    onError: (mutationError) => {
+      if (isApiError(mutationError)) {
+        const payload = mutationError.payload as { suggested_plant_id?: string } | undefined;
+        if (payload?.suggested_plant_id) {
+          setManualPlantId(payload.suggested_plant_id);
+        }
+      }
+      const normalized = normalizeUserFacingError(mutationError, "Unable to add plants.");
+      if (normalized.kind === "offline") {
+        setMutationOffline(true);
       }
       setError("Unable to add plants.");
-    } finally {
-      setSaving(false);
+    },
+  });
+
+  const importCsvMutation = useMutation({
+    mutationFn: async () => {
+      if (csvFile) {
+        const formData = new FormData();
+        formData.append("file", csvFile);
+        return api.postForm<{ created_count?: number }>(
+          `/api/v1/experiments/${experimentId}/plants/bulk-import/`,
+          formData,
+        );
+      }
+      return api.post<{ created_count?: number }>(
+        `/api/v1/experiments/${experimentId}/plants/bulk-import/`,
+        { csv_text: csvText },
+      );
+    },
+    onMutate: () => {
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: async (payload) => {
+      setNotice(`Imported ${payload.created_count ?? 0} plant(s).`);
+      setCsvText("");
+      setCsvFile(null);
+      await queryClient.invalidateQueries({ queryKey: plantsQueryKey });
+    },
+    onError: (mutationError) => {
+      const normalized = normalizeUserFacingError(mutationError, "Unable to import CSV.");
+      if (normalized.kind === "offline") {
+        setMutationOffline(true);
+      }
+      setError("Unable to import CSV.");
+    },
+  });
+
+  const generateIdsMutation = useMutation({
+    mutationFn: () =>
+      api.post<{ updated_count?: number }>(
+        `/api/v1/experiments/${experimentId}/plants/generate-ids/`,
+      ),
+    onMutate: () => {
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: async (payload) => {
+      setNotice(`Generated IDs for ${payload.updated_count ?? 0} plant(s).`);
+      await queryClient.invalidateQueries({ queryKey: plantsQueryKey });
+    },
+    onError: (mutationError) => {
+      const normalized = normalizeUserFacingError(mutationError, "Unable to generate IDs.");
+      if (normalized.kind === "offline") {
+        setMutationOffline(true);
+      }
+      setError("Unable to generate IDs.");
+    },
+  });
+
+  const isSaving =
+    saving || addPlantsMutation.isPending || importCsvMutation.isPending || generateIdsMutation.isPending;
+
+  async function addPlantsQuick() {
+    const quantity = Math.max(1, Number(manualQuantity) || 1);
+    if (!manualSpeciesName.trim()) {
+      setError("Species name is required.");
+      return;
+    }
+    if (!experimentId) {
+      return;
+    }
+    await addPlantsMutation.mutateAsync().catch(() => null);
+    if (quantity < 1) {
+      setError("Unable to add plants.");
     }
   }
 
@@ -212,74 +261,17 @@ export default function ExperimentPlantsPage() {
       setError("Provide CSV text or file.");
       return;
     }
-
-    setSaving(true);
-    setError("");
-    setNotice("");
-
-    try {
-      const requestInit: RequestInit = { method: "POST" };
-      if (csvFile) {
-        const formData = new FormData();
-        formData.append("file", csvFile);
-        requestInit.body = formData;
-      } else {
-        requestInit.headers = { "Content-Type": "application/json" };
-        requestInit.body = JSON.stringify({ csv_text: csvText });
-      }
-
-      const response = await backendFetch(
-        `/api/v1/experiments/${experimentId}/plants/bulk-import/`,
-        requestInit,
-      );
-
-      if (!response.ok) {
-        const payload = (await response.json()) as { detail?: string };
-        setError(payload.detail || "Unable to import CSV.");
-        return;
-      }
-
-      const payload = (await response.json()) as { created_count?: number };
-      setNotice(`Imported ${payload.created_count ?? 0} plant(s).`);
-      setCsvText("");
-      setCsvFile(null);
-      await loadPlants();
-    } catch (requestError) {
-      const normalizedError = normalizeBackendError(requestError);
-      if (normalizedError.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to import CSV.");
-    } finally {
-      setSaving(false);
+    if (!experimentId) {
+      return;
     }
+    await importCsvMutation.mutateAsync().catch(() => null);
   }
 
   async function generateMissingIds() {
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(
-        `/api/v1/experiments/${experimentId}/plants/generate-ids/`,
-        { method: "POST" },
-      );
-      if (!response.ok) {
-        setError("Unable to generate IDs.");
-        return;
-      }
-      const payload = (await response.json()) as { updated_count?: number };
-      setNotice(`Generated IDs for ${payload.updated_count ?? 0} plant(s).`);
-      await loadPlants();
-    } catch (requestError) {
-      const normalizedError = normalizeBackendError(requestError);
-      if (normalizedError.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to generate IDs.");
-    } finally {
-      setSaving(false);
+    if (!experimentId) {
+      return;
     }
+    await generateIdsMutation.mutateAsync().catch(() => null);
   }
 
   function downloadLabels() {
@@ -313,11 +305,11 @@ export default function ExperimentPlantsPage() {
       }
     >
       <PageAlerts
-        loading={loading}
+        loading={plantsState.isLoading}
         loadingText="Loading plants..."
-        error={error}
+        error={error || queryError}
         notice={notice}
-        offline={offline}
+        offline={mutationOffline || queryOffline}
       />
 
       <SectionCard title="Add Plants (Manual)">
@@ -400,7 +392,7 @@ export default function ExperimentPlantsPage() {
           <button
             className={buttonVariants({ variant: "secondary" })}
             type="button"
-            disabled={saving || !manualSpeciesName.trim()}
+            disabled={isSaving || !manualSpeciesName.trim()}
             onClick={() => void addPlantsQuick()}
           >
             Add plants
@@ -428,7 +420,7 @@ export default function ExperimentPlantsPage() {
           <button
             className={buttonVariants({ variant: "secondary" })}
             type="button"
-            disabled={saving || (!csvFile && !csvText.trim())}
+            disabled={isSaving || (!csvFile && !csvText.trim())}
             onClick={() => void importPlantsCsv()}
           >
             Import CSV
@@ -441,7 +433,7 @@ export default function ExperimentPlantsPage() {
           <button
             className={buttonVariants({ variant: "secondary" })}
             type="button"
-            disabled={saving}
+            disabled={isSaving}
             onClick={() => void generateMissingIds()}
           >
             Generate IDs for pending plants
@@ -453,7 +445,7 @@ export default function ExperimentPlantsPage() {
       </SectionCard>
 
       <SectionCard title="Plant Inventory">
-        {!loading ? (
+        {!plantsState.isLoading ? (
           <ResponsiveList
             items={plants}
             getKey={(plant) => plant.id}

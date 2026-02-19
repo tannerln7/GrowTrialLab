@@ -1,16 +1,17 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
-import { parseBackendErrorPayload } from "@/src/lib/backend-errors";
+import { unwrapList } from "@/lib/backend";
 import { ensureUnlocked, useSavingAction } from "@/src/lib/async/useSavingAction";
+import { api, isApiError } from "@/src/lib/api";
+import { queryKeys } from "@/src/lib/queryKeys";
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 import { useRouteParamString } from "@/src/lib/useRouteParamString";
-import {
-  fetchExperimentStatusSummary,
-  type ExperimentStatusSummary,
-} from "@/lib/experiment-status";
+import { type ExperimentStatusSummary } from "@/lib/experiment-status";
 import { suggestTentCode, suggestTentName, suggestTrayName } from "@/lib/id-suggestions";
 import type {
   Diagnostics,
@@ -50,14 +51,13 @@ import type { PlacementWizardController } from "@/src/features/placement/wizard/
 
 export function usePlacementWizard(initialStep: number): PlacementWizardController {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const experimentId = useRouteParamString("id") || "";
 
   const [currentStep, setCurrentStep] = useState<number>(parseStep(String(initialStep)));
 
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [notInvited, setNotInvited] = useState(false);
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -98,6 +98,20 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     setOffline,
     setDiagnostics,
   });
+
+  function toApiErrorPayload(
+    requestError: unknown,
+    fallback: string,
+  ): { detail: string; diagnostics: Diagnostics | null } {
+    if (isApiError(requestError)) {
+      const payload = requestError.payload as { detail?: string; diagnostics?: Diagnostics } | undefined;
+      return {
+        detail: payload?.detail || requestError.detail || fallback,
+        diagnostics: payload?.diagnostics ?? null,
+      };
+    }
+    return { detail: fallback, diagnostics: null };
+  }
 
   const placementLocked = statusSummary?.lifecycle.state === "running";
 
@@ -267,75 +281,74 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     setCurrentStep((current) => Math.min(Math.max(1, current), maxUnlockedStep));
   }, [maxUnlockedStep]);
 
-  const loadPage = useCallback(async (options?: { statusSummary?: ExperimentStatusSummary }) => {
-    const statusPromise = options?.statusSummary
-      ? Promise.resolve(options.statusSummary)
-      : fetchExperimentStatusSummary(experimentId);
-    const [summaryResponse, statusResponse, speciesResponse] = await Promise.all([
-      backendFetch(`/api/v1/experiments/${experimentId}/placement/summary`),
-      statusPromise,
-      backendFetch("/api/v1/species/"),
+  const placementDataQueryKey = queryKeys.experiment.feature(experimentId, "placement", "wizardData");
+
+  const fetchPlacementPageData = useCallback(async () => {
+    await api.get<{ email: string; role: string; status: string }>("/api/me");
+    const [summaryPayload, statusPayload, speciesPayload] = await Promise.all([
+      api.get<PlacementSummary>(`/api/v1/experiments/${experimentId}/placement/summary`),
+      api.get<ExperimentStatusSummary>(`/api/v1/experiments/${experimentId}/status/summary`),
+      api.get<unknown>("/api/v1/species/"),
     ]);
 
-    if (!summaryResponse.ok) {
-      throw new Error("Unable to load placement summary.");
-    }
-    if (!statusResponse) {
-      throw new Error("Unable to load status summary.");
-    }
-    if (!speciesResponse.ok) {
-      throw new Error("Unable to load species.");
-    }
-
-    const summaryPayload = (await summaryResponse.json()) as PlacementSummary;
-    const speciesPayload = (await speciesResponse.json()) as unknown;
-
-    setSummary(summaryPayload);
-    setStatusSummary(statusResponse);
-    setSpecies(unwrapList<Species>(speciesPayload));
+    return {
+      summaryPayload,
+      statusPayload,
+      species: unwrapList<Species>(speciesPayload),
+    };
   }, [experimentId]);
 
+  const placementDataQuery = useQuery({
+    queryKey: placementDataQueryKey,
+    queryFn: fetchPlacementPageData,
+    enabled: Boolean(experimentId),
+    retry: false,
+  });
+  const placementDataState = usePageQueryState(placementDataQuery);
+  const notInvited = isApiError(placementDataQuery.error) && placementDataQuery.error.status === 403;
+  const loading = Boolean(experimentId) && placementDataQuery.isPending;
+  const queryOffline = placementDataState.errorKind === "offline";
+
   useEffect(() => {
-    async function load() {
-      if (!experimentId) {
-        return;
-      }
-
-      setLoading(true);
-      setError("");
-      setOffline(false);
-
-      try {
-        const meResponse = await backendFetch("/api/me");
-        if (meResponse.status === 403) {
-          setNotInvited(true);
-          return;
-        }
-
-        const status = await fetchExperimentStatusSummary(experimentId);
-        if (!status) {
-          setError("Unable to load setup status.");
-          return;
-        }
-        if (!status.setup.is_complete) {
-          router.replace(`/experiments/${experimentId}/setup`);
-          return;
-        }
-
-        await loadPage({ statusSummary: status });
-      } catch (requestError) {
-        const normalized = normalizeBackendError(requestError);
-        if (normalized.kind === "offline") {
-          setOffline(true);
-        }
-        setError("Unable to load placement page.");
-      } finally {
-        setLoading(false);
-      }
+    const data = placementDataQuery.data;
+    if (!data) {
+      return;
     }
+    if (!data.statusPayload.setup.is_complete) {
+      router.replace(`/experiments/${experimentId}/setup`);
+      return;
+    }
+    setSummary(data.summaryPayload);
+    setStatusSummary(data.statusPayload);
+    setSpecies(data.species);
+    setError("");
+  }, [experimentId, placementDataQuery.data, router]);
 
-    void load();
-  }, [experimentId, loadPage, router]);
+  useEffect(() => {
+    if (!placementDataQuery.isError || notInvited) {
+      return;
+    }
+    if (queryOffline) {
+      setOffline(true);
+      setError("");
+      return;
+    }
+    setOffline(false);
+    setError("Unable to load placement page.");
+  }, [notInvited, placementDataQuery.isError, queryOffline]);
+
+  useEffect(() => {
+    if (placementDataQuery.isSuccess) {
+      setOffline(false);
+    }
+  }, [placementDataQuery.isSuccess]);
+
+  const reloadPlacementData = useCallback(async () => {
+    await queryClient.fetchQuery({
+      queryKey: placementDataQueryKey,
+      queryFn: fetchPlacementPageData,
+    });
+  }, [fetchPlacementPageData, placementDataQueryKey, queryClient]);
 
   useEffect(() => {
     const persistedPlacementState = buildPersistedPlacementState(
@@ -693,27 +706,20 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       fallbackError: "Unable to create tent.",
       clearDiagnostics: false,
       action: async () => {
-        const response = await backendFetch(`/api/v1/experiments/${experimentId}/tents`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        try {
+          await api.post(`/api/v1/experiments/${experimentId}/tents`, {
             name,
             code,
             allowed_species: [],
-          }),
-        });
-
-        const payload = (await response.json()) as {
-          detail?: string;
-        };
-
-        if (!response.ok) {
-          setError(payload.detail || "Unable to create tent.");
+          });
+        } catch (requestError) {
+          const payload = toApiErrorPayload(requestError, "Unable to create tent.");
+          setError(payload.detail);
           return false;
         }
 
         setNotice("Tent created.");
-        await loadPage();
+        await reloadPlacementData();
         return true;
       },
     });
@@ -739,16 +745,16 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       fallbackError: "Unable to remove tent.",
       clearDiagnostics: false,
       action: async () => {
-        const response = await backendFetch(`/api/v1/tents/${removableTent.tent_id}`, {
-          method: "DELETE",
-        });
-        if (!response.ok) {
-          const payload = await parseBackendErrorPayload<Diagnostics>(response, "Unable to remove tent.");
+        try {
+          await api.delete(`/api/v1/tents/${removableTent.tent_id}`);
+        } catch (requestError) {
+          const payload = toApiErrorPayload(requestError, "Unable to remove tent.");
           setError(payload.detail);
+          setDiagnostics(payload.diagnostics);
           return false;
         }
         setNotice(`Removed ${removableTent.name}.`);
-        await loadPage();
+        await reloadPlacementData();
         return true;
       },
     });
@@ -812,18 +818,16 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
             continue;
           }
 
-          const detailResponse = await backendFetch(`/api/v1/tents/${tent.tent_id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+          try {
+            await api.patch(`/api/v1/tents/${tent.tent_id}`, {
               name: tentDraftMeta.draftName,
               code: tentDraftMeta.draftCode,
               allowed_species: tentDraftMeta.draftAllowedSpeciesIds,
-            }),
-          });
-          const detailPayload = (await detailResponse.json()) as { detail?: string };
-          if (!detailResponse.ok) {
-            setError(`${tent.name}: ${detailPayload.detail || "Unable to update tent details."}`);
+            });
+          } catch (requestError) {
+            const payload = toApiErrorPayload(requestError, "Unable to update tent details.");
+            setError(`${tent.name}: ${payload.detail}`);
+            setDiagnostics(payload.diagnostics);
             return false;
           }
           detailAppliedCount += 1;
@@ -843,28 +847,24 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
             })),
           };
 
-          const response = await backendFetch(`/api/v1/tents/${tent.tent_id}/slots/generate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ layout }),
-          });
-
-          const payload = (await response.json()) as {
-            detail?: string;
-            diagnostics?: {
-              would_orphan_trays?: Array<{ tray_code: string; slot_shelf_index: number; slot_index: number }>;
-            };
-          };
-
-          if (!response.ok) {
-            const orphanMessage = payload.diagnostics?.would_orphan_trays?.length
-              ? ` Would orphan: ${payload.diagnostics.would_orphan_trays
+          try {
+            await api.post(`/api/v1/tents/${tent.tent_id}/slots/generate`, { layout });
+          } catch (requestError) {
+            const payload = toApiErrorPayload(requestError, "Unable to generate slots.");
+            const orphanDiagnostics = payload.diagnostics as
+              | {
+                  would_orphan_trays?: Array<{ tray_code: string; slot_shelf_index: number; slot_index: number }>;
+                }
+              | null;
+            const orphanMessage = orphanDiagnostics?.would_orphan_trays?.length
+              ? ` Would orphan: ${orphanDiagnostics.would_orphan_trays
                   .map((item) => `${item.tray_code} @ S${item.slot_shelf_index}-${item.slot_index}`)
                   .join(", ")}.`
               : "";
-            setError(`${tent.name}: ${(payload.detail || "Unable to generate slots.") + orphanMessage}`);
+            setError(`${tent.name}: ${payload.detail + orphanMessage}`);
+            setDiagnostics(payload.diagnostics);
             if (detailAppliedCount > 0 || layoutAppliedCount > 0) {
-              await loadPage();
+              await reloadPlacementData();
             }
             return false;
           }
@@ -880,7 +880,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
           messages.push(`Applied tent slot layout for ${layoutAppliedCount} tent(s).`);
         }
         setNotice(messages.join(" "));
-        await loadPage();
+        await reloadPlacementData();
         return true;
       },
     });
@@ -946,41 +946,39 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
           for (let index = 0; index < delta; index += 1) {
             const suggestedName = suggestTrayName(Array.from(existingNames));
             const draftCapacity = Math.max(1, newTrayCapacities[index] ?? defaultTrayCapacity);
-            const response = await backendFetch(`/api/v1/experiments/${experimentId}/trays`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                name: suggestedName,
-                capacity: draftCapacity,
-              }),
-            });
-
-            const payload = (await response.json()) as { detail?: string; suggested_name?: string; name?: string };
-            if (!response.ok) {
+            try {
+              const payload = await api.post<{ detail?: string; suggested_name?: string; name?: string }>(
+                `/api/v1/experiments/${experimentId}/trays`,
+                {
+                  name: suggestedName,
+                  capacity: draftCapacity,
+                },
+              );
+              existingNames.add(payload.name || payload.suggested_name || suggestedName);
+              createdCount += 1;
+              mutationCount += 1;
+            } catch (requestError) {
+              const payload = toApiErrorPayload(requestError, "Unable to add trays.");
               if (mutationCount > 0) {
-                await loadPage();
+                await reloadPlacementData();
               }
-              setError(payload.detail || "Unable to add trays.");
+              setError(payload.detail);
+              setDiagnostics(payload.diagnostics);
               return false;
             }
-
-            existingNames.add(payload.name || payload.suggested_name || suggestedName);
-            createdCount += 1;
-            mutationCount += 1;
           }
         } else {
           const removeCount = Math.abs(delta);
           const traysToRemove = [...sortedTrayIds].slice(-removeCount);
           for (const trayId of traysToRemove) {
-            const response = await backendFetch(`/api/v1/trays/${trayId}/`, {
-              method: "DELETE",
-            });
-            if (!response.ok) {
-              const parsed = await parseBackendErrorPayload<Diagnostics>(response, "Unable to remove trays.");
+            try {
+              await api.delete(`/api/v1/trays/${trayId}/`);
+            } catch (requestError) {
+              const parsed = toApiErrorPayload(requestError, "Unable to remove trays.");
               setError(parsed.detail);
               setDiagnostics(parsed.diagnostics);
               if (mutationCount > 0) {
-                await loadPage();
+                await reloadPlacementData();
               }
               return false;
             }
@@ -1002,19 +1000,16 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
           if (draftCapacity === tray.capacity) {
             continue;
           }
-          const response = await backendFetch(`/api/v1/trays/${trayId}/`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+          try {
+            await api.patch(`/api/v1/trays/${trayId}/`, {
               capacity: draftCapacity,
-            }),
-          });
-          if (!response.ok) {
-            const parsed = await parseBackendErrorPayload<Diagnostics>(response, "Unable to update tray capacity.");
+            });
+          } catch (requestError) {
+            const parsed = toApiErrorPayload(requestError, "Unable to update tray capacity.");
             setError(parsed.detail);
             setDiagnostics(parsed.diagnostics);
             if (mutationCount > 0) {
-              await loadPage();
+              await reloadPlacementData();
             }
             return false;
           }
@@ -1033,7 +1028,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
           messages.push(`Updated ${capacityUpdatedCount} tray capacity setting(s).`);
         }
         setNotice(messages.join(" "));
-        await loadPage();
+        await reloadPlacementData();
         return true;
       },
     });
@@ -1410,15 +1405,10 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
             return false;
           }
 
-          const response = await backendFetch(`/api/v1/trays/${removal.persistedTrayId}/plants/${row.trayPlantId}`, {
-            method: "DELETE",
-          });
-
-          if (!response.ok) {
-            const parsed = await parseBackendErrorPayload<Diagnostics>(
-              response,
-              "Unable to apply plant/tray layout changes.",
-            );
+          try {
+            await api.delete(`/api/v1/trays/${removal.persistedTrayId}/plants/${row.trayPlantId}`);
+          } catch (requestError) {
+            const parsed = toApiErrorPayload(requestError, "Unable to apply plant/tray layout changes.");
             setError(parsed.detail);
             setDiagnostics(parsed.diagnostics);
             return false;
@@ -1430,17 +1420,10 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
             continue;
           }
 
-          const response = await backendFetch(`/api/v1/trays/${addition.stagedTrayId}/plants`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ plant_id: addition.plantId }),
-          });
-
-          if (!response.ok) {
-            const parsed = await parseBackendErrorPayload<Diagnostics>(
-              response,
-              "Unable to apply plant/tray layout changes.",
-            );
+          try {
+            await api.post(`/api/v1/trays/${addition.stagedTrayId}/plants`, { plant_id: addition.plantId });
+          } catch (requestError) {
+            const parsed = toApiErrorPayload(requestError, "Unable to apply plant/tray layout changes.");
             setError(parsed.detail);
             setDiagnostics(parsed.diagnostics);
             return false;
@@ -1448,7 +1431,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
         }
 
         setNotice(`Applied ${placementChanges.length} plant layout change(s).`);
-        await loadPage();
+        await reloadPlacementData();
         return true;
       },
     });
@@ -1493,17 +1476,10 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
         );
 
         for (const change of clearSlotFirst) {
-          const response = await backendFetch(`/api/v1/trays/${change.trayId}/`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ slot_id: null }),
-          });
-
-          if (!response.ok) {
-            const parsed = await parseBackendErrorPayload<Diagnostics>(
-              response,
-              "Unable to apply tray/slot layout changes.",
-            );
+          try {
+            await api.patch(`/api/v1/trays/${change.trayId}/`, { slot_id: null });
+          } catch (requestError) {
+            const parsed = toApiErrorPayload(requestError, "Unable to apply tray/slot layout changes.");
             setError(parsed.detail);
             setDiagnostics(parsed.diagnostics);
             return false;
@@ -1515,17 +1491,10 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
             continue;
           }
 
-          const response = await backendFetch(`/api/v1/trays/${change.trayId}/`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ slot_id: change.draftSlotId }),
-          });
-
-          if (!response.ok) {
-            const parsed = await parseBackendErrorPayload<Diagnostics>(
-              response,
-              "Unable to apply tray/slot layout changes.",
-            );
+          try {
+            await api.patch(`/api/v1/trays/${change.trayId}/`, { slot_id: change.draftSlotId });
+          } catch (requestError) {
+            const parsed = toApiErrorPayload(requestError, "Unable to apply tray/slot layout changes.");
             setError(parsed.detail);
             setDiagnostics(parsed.diagnostics);
             return false;
@@ -1533,7 +1502,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
         }
 
         setNotice(`Applied ${slotChanges.length} tray/slot layout change(s).`);
-        await loadPage();
+        await reloadPlacementData();
         return true;
       },
     });

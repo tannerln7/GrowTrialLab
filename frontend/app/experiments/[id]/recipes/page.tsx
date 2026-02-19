@@ -1,13 +1,15 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Check, CheckSquare, Layers, Save, Trash2, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouteParamString } from "@/src/lib/useRouteParamString";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { unwrapList } from "@/lib/backend";
 import { cn } from "@/lib/utils";
-import { parseBackendErrorPayload } from "@/src/lib/backend-errors";
+import { api, isApiError } from "@/src/lib/api";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { NativeSelect } from "@/src/components/ui/native-select";
@@ -16,6 +18,9 @@ import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
 import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
+import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { queryKeys } from "@/src/lib/queryKeys";
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -122,18 +127,14 @@ function TrayHeaderToggle({
 }
 
 export default function RecipesPage() {
+  const queryClient = useQueryClient();
   const experimentId = useRouteParamString("id") || "";
 
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [notInvited, setNotInvited] = useState(false);
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
-
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [placement, setPlacement] = useState<PlacementSummary | null>(null);
 
   const [code, setCode] = useState("R0");
   const [name, setName] = useState("Control");
@@ -147,58 +148,36 @@ export default function RecipesPage() {
   const [persistedRecipeByPlantId, setPersistedRecipeByPlantId] = useState<Record<string, string | null>>({});
   const [draftPlantRecipe, setDraftPlantRecipe] = useState<Record<string, string | null>>({});
 
-  const loadRecipes = useCallback(async () => {
-    const response = await backendFetch(`/api/v1/experiments/${experimentId}/recipes`);
-    if (!response.ok) {
-      throw new Error("Unable to load recipes.");
+  const recipesQueryKey = queryKeys.experiment.feature(experimentId, "recipes");
+  const placementQueryKey = queryKeys.experiment.feature(experimentId, "placementSummary");
+
+  const recipesQuery = useQuery({
+    queryKey: recipesQueryKey,
+    queryFn: () => api.get<unknown>(`/api/v1/experiments/${experimentId}/recipes`),
+    enabled: Boolean(experimentId),
+  });
+
+  const placementQuery = useQuery({
+    queryKey: placementQueryKey,
+    queryFn: () => api.get<PlacementSummary>(`/api/v1/experiments/${experimentId}/placement/summary`),
+    enabled: Boolean(experimentId),
+  });
+
+  const recipesState = usePageQueryState(recipesQuery);
+  const placementState = usePageQueryState(placementQuery);
+
+  const recipes = useMemo(() => {
+    if (!recipesQuery.data) {
+      return [] as Recipe[];
     }
-    const payload = (await response.json()) as unknown;
-    const parsed = unwrapList<Recipe>(payload).sort((left, right) => left.code.localeCompare(right.code));
-    setRecipes(parsed);
-  }, [experimentId]);
-
-  const loadPlacement = useCallback(async () => {
-    const response = await backendFetch(`/api/v1/experiments/${experimentId}/placement/summary`);
-    if (!response.ok) {
-      throw new Error("Unable to load placement summary.");
+    try {
+      return unwrapList<Recipe>(recipesQuery.data).sort((left, right) => left.code.localeCompare(right.code));
+    } catch {
+      return [] as Recipe[];
     }
-    const payload = (await response.json()) as PlacementSummary;
-    setPlacement(payload);
-  }, [experimentId]);
+  }, [recipesQuery.data]);
 
-  const loadPage = useCallback(async () => {
-    await Promise.all([loadRecipes(), loadPlacement()]);
-  }, [loadPlacement, loadRecipes]);
-
-  useEffect(() => {
-    async function load() {
-      if (!experimentId) {
-        return;
-      }
-      setLoading(true);
-      setError("");
-      setOffline(false);
-
-      try {
-        const meResponse = await backendFetch("/api/me");
-        if (meResponse.status === 403) {
-          setNotInvited(true);
-          return;
-        }
-        await loadPage();
-      } catch (requestError) {
-        const normalized = normalizeBackendError(requestError);
-        if (normalized.kind === "offline") {
-          setOffline(true);
-        }
-        setError("Unable to load recipes page.");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    void load();
-  }, [experimentId, loadPage]);
+  const placement = placementQuery.data ?? null;
 
   useEffect(() => {
     setSelectedBulkRecipeId((current) => (current && recipes.some((recipe) => recipe.id === current) ? current : recipes[0]?.id || ""));
@@ -248,7 +227,7 @@ export default function RecipesPage() {
       }
     }
     return map;
-  }, [placement?.unplaced_plants.results, sortedTrays]);
+  }, [placement?.unplaced_plants, sortedTrays]);
 
   const allPlantIds = useMemo(() => {
     return Array.from(plantById.values()).sort(sortPlantsById).map((plant) => plant.uuid);
@@ -420,6 +399,37 @@ export default function RecipesPage() {
     setNotice("Draft recipe changes discarded.");
   }
 
+  const saveDraftMutation = useMutation({
+    mutationFn: async (updates: Array<{ plant_id: string; assigned_recipe_id: string | null }>) =>
+      api.patch(`/api/v1/experiments/${experimentId}/plants/recipes`, { updates }),
+    onMutate: () => {
+      setSaving(true);
+      setError("");
+      setNotice("");
+      setDiagnostics(null);
+      setOffline(false);
+    },
+    onSuccess: async (_result, updates) => {
+      setNotice(`Saved ${updates.length} plant recipe assignment(s).`);
+      await queryClient.invalidateQueries({ queryKey: placementQueryKey });
+    },
+    onError: (mutationError) => {
+      if (isApiError(mutationError)) {
+        setError(mutationError.detail || "Unable to save recipe assignments.");
+        setDiagnostics((mutationError.diagnostics as Diagnostics | undefined) || null);
+        return;
+      }
+      const normalized = normalizeUserFacingError(mutationError, "Unable to save recipe assignments.");
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to save recipe assignments.");
+    },
+    onSettled: () => {
+      setSaving(false);
+    },
+  });
+
   async function saveDrafts() {
     const updates = allPlantIds
       .map((plantId) => {
@@ -440,79 +450,48 @@ export default function RecipesPage() {
       return;
     }
 
-    setSaving(true);
-    setError("");
-    setNotice("");
-    setDiagnostics(null);
-
-    try {
-      const response = await backendFetch(`/api/v1/experiments/${experimentId}/plants/recipes`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates }),
-      });
-
-      if (!response.ok) {
-        const parsed = await parseBackendErrorPayload<Diagnostics>(response, "Unable to save recipe assignments.");
-        setError(parsed.detail);
-        setDiagnostics(parsed.diagnostics);
-        return;
-      }
-
-      setNotice(`Saved ${updates.length} plant recipe assignment(s).`);
-      await loadPlacement();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to save recipe assignments.");
-    } finally {
-      setSaving(false);
-    }
+    await saveDraftMutation.mutateAsync(updates).catch(() => null);
   }
 
-  async function createRecipe(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    setError("");
-    setNotice("");
-    setDiagnostics(null);
-
-    try {
-      const response = await backendFetch(`/api/v1/experiments/${experimentId}/recipes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: code.trim().toUpperCase(),
-          name: name.trim(),
-          notes: notes.trim(),
-        }),
-      });
-
-      const payload = (await response.json()) as { detail?: string; id?: string };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to create recipe.");
-        return;
-      }
-
+  const createRecipeMutation = useMutation({
+    mutationFn: () =>
+      api.post<{ detail?: string; id?: string }>(`/api/v1/experiments/${experimentId}/recipes`, {
+        code: code.trim().toUpperCase(),
+        name: name.trim(),
+        notes: notes.trim(),
+      }),
+    onMutate: () => {
+      setSaving(true);
+      setError("");
+      setNotice("");
+      setDiagnostics(null);
+      setOffline(false);
+    },
+    onSuccess: async (payload) => {
       setNotice("Recipe created.");
       setCode(`R${recipes.length}`);
       setName(`Treatment ${Math.max(1, recipes.length)}`);
       setNotes("");
-      await loadRecipes();
+      await queryClient.invalidateQueries({ queryKey: recipesQueryKey });
       if (payload.id) {
         setSelectedBulkRecipeId(payload.id);
       }
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
+    },
+    onError: (mutationError) => {
+      const normalized = normalizeUserFacingError(mutationError, "Unable to create recipe.");
       if (normalized.kind === "offline") {
         setOffline(true);
       }
       setError("Unable to create recipe.");
-    } finally {
+    },
+    onSettled: () => {
       setSaving(false);
-    }
+    },
+  });
+
+  async function createRecipe(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await createRecipeMutation.mutateAsync().catch(() => null);
   }
 
   function toggleRecipeSelection(recipeId: string) {
@@ -531,45 +510,66 @@ export default function RecipesPage() {
     setSelectedRecipeIds(new Set());
   }
 
+  const deleteRecipesMutation = useMutation({
+    mutationFn: async (selected: Recipe[]) => {
+      let deletedCount = 0;
+      for (const recipe of selected) {
+        try {
+          await api.delete(`/api/v1/recipes/${recipe.id}`);
+          deletedCount += 1;
+        } catch (mutationError) {
+          throw { mutationError, deletedCount };
+        }
+      }
+      return { deletedCount };
+    },
+    onMutate: () => {
+      setSaving(true);
+      setError("");
+      setNotice("");
+      setDiagnostics(null);
+      setOffline(false);
+    },
+    onSuccess: async ({ deletedCount }) => {
+      setSelectedRecipeIds(new Set());
+      setNotice(`Deleted ${deletedCount} recipe(s).`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: recipesQueryKey }),
+        queryClient.invalidateQueries({ queryKey: placementQueryKey }),
+      ]);
+    },
+    onError: async (wrappedError) => {
+      const details = wrappedError as unknown as { mutationError: unknown; deletedCount: number };
+      if (details.deletedCount > 0) {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: recipesQueryKey }),
+          queryClient.invalidateQueries({ queryKey: placementQueryKey }),
+        ]);
+      }
+
+      if (isApiError(details.mutationError)) {
+        setError(details.mutationError.detail || "Unable to delete selected recipes.");
+        setDiagnostics((details.mutationError.diagnostics as Diagnostics | undefined) || null);
+        return;
+      }
+
+      const normalized = normalizeUserFacingError(details.mutationError, "Unable to delete selected recipes.");
+      if (normalized.kind === "offline") {
+        setOffline(true);
+      }
+      setError("Unable to delete selected recipes.");
+    },
+    onSettled: () => {
+      setSaving(false);
+    },
+  });
+
   async function deleteSelectedRecipes() {
     const selected = recipes.filter((recipe) => selectedRecipeIds.has(recipe.id));
     if (selected.length === 0) {
       return;
     }
-
-    setSaving(true);
-    setError("");
-    setNotice("");
-    setDiagnostics(null);
-
-    try {
-      let deletedCount = 0;
-      for (const recipe of selected) {
-        const response = await backendFetch(`/api/v1/recipes/${recipe.id}`, { method: "DELETE" });
-        if (!response.ok) {
-          const parsed = await parseBackendErrorPayload<Diagnostics>(response, "Unable to delete selected recipes.");
-          setError(parsed.detail);
-          setDiagnostics(parsed.diagnostics);
-          if (deletedCount > 0) {
-            await loadPage();
-          }
-          return;
-        }
-        deletedCount += 1;
-      }
-
-      setSelectedRecipeIds(new Set());
-      setNotice(`Deleted ${deletedCount} recipe(s).`);
-      await loadPage();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to delete selected recipes.");
-    } finally {
-      setSaving(false);
-    }
+    await deleteRecipesMutation.mutateAsync(selected).catch(() => null);
   }
 
   function renderPlantCell(plantId: string) {
@@ -624,6 +624,19 @@ export default function RecipesPage() {
     );
   }
 
+  const notInvited = recipesState.errorKind === "forbidden" || placementState.errorKind === "forbidden";
+  const loading = recipesState.isLoading || placementState.isLoading;
+  const queryOffline = recipesState.errorKind === "offline" || placementState.errorKind === "offline";
+  const queryError = useMemo(() => {
+    if (notInvited) {
+      return "";
+    }
+    if ((recipesState.isError || placementState.isError) && !queryOffline) {
+      return "Unable to load recipes page.";
+    }
+    return "";
+  }, [notInvited, placementState.isError, queryOffline, recipesState.isError]);
+
   if (notInvited) {
     return (
       <PageShell title="Recipes">
@@ -647,9 +660,9 @@ export default function RecipesPage() {
       <PageAlerts
         loading={loading}
         loadingText="Loading recipes..."
-        error={error}
+        error={error || queryError}
         notice={notice}
-        offline={offline}
+        offline={offline || queryOffline}
       />
 
       <SectionCard title="Recipe Tools">

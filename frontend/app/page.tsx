@@ -1,68 +1,58 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
-import { backendFetch, normalizeBackendError } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { api } from "@/src/lib/api";
+import { normalizeUserFacingError } from "@/src/lib/error-normalization";
 
 export default function Home() {
-  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string>("");
-  const [meLoading, setMeLoading] = useState(false);
   const [meResult, setMeResult] = useState<string>("No profile loaded.");
   const [notInvited, setNotInvited] = useState(false);
   const [offline, setOffline] = useState(false);
 
-  async function checkBackendHealth() {
-    setLoading(true);
-    setResult("");
-    try {
-      const response = await backendFetch("/healthz");
-      if (!response.ok) {
-        throw new Error("Backend returned a non-OK response.");
-      }
-      const data = await response.json();
+  const healthMutation = useMutation({
+    mutationFn: () => api.get<Record<string, unknown>>("/healthz"),
+    onMutate: () => {
+      setResult("");
+      setOffline(false);
+    },
+    onSuccess: (data) => {
       setResult(JSON.stringify(data, null, 2));
       setOffline(false);
-    } catch {
+    },
+    onError: () => {
       setOffline(true);
       setResult("Unable to reach backend.");
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+  });
 
-  async function loadMe() {
-    setMeLoading(true);
-    try {
-      const response = await backendFetch("/api/me");
-      if (response.status === 403) {
+  const meMutation = useMutation({
+    mutationFn: () => api.get<{ email: string; role: string; status: string }>("/api/me"),
+    onSuccess: (data) => {
+      setMeResult(`${data.email} (${data.role}, ${data.status})`);
+      setNotInvited(false);
+      setOffline(false);
+    },
+    onError: (mutationError) => {
+      const normalized = normalizeUserFacingError(mutationError, "Unable to load profile.");
+      if (normalized.kind === "forbidden") {
         setNotInvited(true);
         setMeResult("Not invited.");
         return;
       }
-      if (!response.ok) {
-        setMeResult("Unable to load profile.");
-        return;
-      }
-      const data = await response.json();
-      setMeResult(`${data.email} (${data.role}, ${data.status})`);
-      setNotInvited(false);
-      setOffline(false);
-    } catch (requestError) {
-      const error = normalizeBackendError(requestError);
-      if (error.kind === "offline") {
+      if (normalized.kind === "offline") {
         setOffline(true);
       }
       setMeResult("Unable to load profile.");
-    } finally {
-      setMeLoading(false);
-    }
-  }
+    },
+  });
 
   return (
     <PageShell
@@ -80,19 +70,19 @@ export default function Home() {
         <div className="flex flex-wrap gap-2">
           <button
             className={buttonVariants({ variant: "default" })}
-            onClick={checkBackendHealth}
-            disabled={loading}
+            onClick={() => healthMutation.mutate()}
+            disabled={healthMutation.isPending}
             type="button"
           >
-            {loading ? "Checking..." : "Check backend health"}
+            {healthMutation.isPending ? "Checking..." : "Check backend health"}
           </button>
           <button
             className={buttonVariants({ variant: "secondary" })}
-            onClick={loadMe}
-            disabled={meLoading}
+            onClick={() => meMutation.mutate()}
+            disabled={meMutation.isPending}
             type="button"
           >
-            {meLoading ? "Loading..." : "Load my profile"}
+            {meMutation.isPending ? "Loading..." : "Load my profile"}
           </button>
         </div>
         {notInvited ? (

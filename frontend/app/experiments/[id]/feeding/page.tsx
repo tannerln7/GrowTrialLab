@@ -1,14 +1,13 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
-import {
-  fetchExperimentStatusSummary,
-  type ExperimentStatusSummary,
-} from "@/lib/experiment-status";
+import type { ExperimentStatusSummary } from "@/lib/experiment-status";
+import { unwrapList } from "@/lib/backend";
 import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -20,8 +19,11 @@ import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
 import { Textarea } from "@/src/components/ui/textarea";
+import { api } from "@/src/lib/api";
+import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { queryKeys } from "@/src/lib/queryKeys";
 import { useRouteParamString } from "@/src/lib/useRouteParamString";
-
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
 type Location = {
   status: "placed" | "unplaced";
@@ -126,27 +128,52 @@ function locationLabel(plant: FeedingQueuePlant): string {
 export default function FeedingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
 
   const experimentId = useRouteParamString("id") || "";
   const preselectedPlantId = useMemo(() => searchParams.get("plant"), [searchParams]);
   const rawFromParam = useMemo(() => searchParams.get("from"), [searchParams]);
 
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [notInvited, setNotInvited] = useState(false);
-  const [offline, setOffline] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [statusSummary, setStatusSummary] = useState<ExperimentStatusSummary | null>(null);
-  const [queue, setQueue] = useState<FeedingQueueResponse | null>(null);
+  const [mutationOffline, setMutationOffline] = useState(false);
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null);
   const [amountText, setAmountText] = useState("");
   const [showNote, setShowNote] = useState(false);
   const [note, setNote] = useState("");
 
+  const statusQueryKey = queryKeys.experiment.status(experimentId);
+  const queueQueryKey = queryKeys.experiment.feature(experimentId, "feedingQueue");
+
+  const statusQuery = useQuery({
+    queryKey: statusQueryKey,
+    queryFn: () =>
+      api.get<ExperimentStatusSummary>(
+        `/api/v1/experiments/${experimentId}/status/summary`,
+      ),
+    enabled: Boolean(experimentId),
+  });
+
+  const queueQuery = useQuery({
+    queryKey: queueQueryKey,
+    queryFn: () =>
+      api.get<FeedingQueueResponse>(
+        `/api/v1/experiments/${experimentId}/feeding/queue`,
+      ),
+    enabled:
+      Boolean(experimentId) &&
+      Boolean(statusQuery.data?.setup.is_complete) &&
+      statusQuery.data?.lifecycle.state === "running",
+  });
+
+  const statusState = usePageQueryState(statusQuery);
+  const queueState = usePageQueryState(queueQuery);
+
   const fromParam = useMemo(() => normalizeFromParam(rawFromParam), [rawFromParam]);
   const overviewHref = fromParam || `/experiments/${experimentId}/overview`;
 
+  const queue = queueQuery.data ?? null;
   const queuePlants = useMemo(() => (queue ? unwrapList<FeedingQueuePlant>(queue.plants) : []), [queue]);
 
   const selectedPlant = useMemo(
@@ -182,75 +209,36 @@ export default function FeedingPage() {
     [experimentId, preselectedPlantId, rawFromParam, router],
   );
 
-  const loadQueue = useCallback(async () => {
-    const response = await backendFetch(`/api/v1/experiments/${experimentId}/feeding/queue`);
-    if (!response.ok) {
-      throw new Error("Unable to load feeding queue.");
+  useEffect(() => {
+    if (!experimentId || !statusQuery.data) {
+      return;
     }
-    const payload = (await response.json()) as FeedingQueueResponse;
-    setQueue(payload);
-    return payload;
-  }, [experimentId]);
+    if (!statusQuery.data.setup.is_complete) {
+      router.replace(`/experiments/${experimentId}/setup`);
+    }
+  }, [experimentId, router, statusQuery.data]);
 
   useEffect(() => {
-    async function load() {
-      if (!experimentId) {
-        return;
-      }
-
-      setLoading(true);
-      setError("");
-      setOffline(false);
-      setNotInvited(false);
-      try {
-        const meResponse = await backendFetch("/api/me");
-        if (meResponse.status === 403) {
-          setNotInvited(true);
-          return;
-        }
-
-        const summary = await fetchExperimentStatusSummary(experimentId);
-        if (!summary) {
-          setError("Unable to load experiment status.");
-          return;
-        }
-        setStatusSummary(summary);
-        if (!summary.setup.is_complete) {
-          router.replace(`/experiments/${experimentId}/setup`);
-          return;
-        }
-
-        if (summary.lifecycle.state !== "running") {
-          return;
-        }
-
-        const queuePayload = await loadQueue();
-        const plants = unwrapList<FeedingQueuePlant>(queuePayload.plants);
-        if (preselectedPlantId) {
-          setSelectedPlantId(preselectedPlantId);
-        } else {
-          const nextPlant =
-            pickNextNeedingFeed(plants, null) ||
-            plants[0]?.uuid ||
-            null;
-          setSelectedPlantId(nextPlant);
-          if (nextPlant) {
-            syncPlantInUrl(nextPlant);
-          }
-        }
-      } catch (requestError) {
-        const normalized = normalizeBackendError(requestError);
-        if (normalized.kind === "offline") {
-          setOffline(true);
-        }
-        setError("Unable to load feeding queue.");
-      } finally {
-        setLoading(false);
-      }
+    if (!queue) {
+      return;
     }
 
-    void load();
-  }, [experimentId, loadQueue, preselectedPlantId, router, syncPlantInUrl]);
+    const queueIds = new Set(queuePlants.map((plant) => plant.uuid));
+    if (preselectedPlantId && queueIds.has(preselectedPlantId)) {
+      setSelectedPlantId(preselectedPlantId);
+      return;
+    }
+
+    if (selectedPlantId && queueIds.has(selectedPlantId)) {
+      return;
+    }
+
+    const nextPlant = pickNextNeedingFeed(queuePlants, null) || queuePlants[0]?.uuid || null;
+    setSelectedPlantId(nextPlant);
+    if (nextPlant) {
+      syncPlantInUrl(nextPlant);
+    }
+  }, [preselectedPlantId, queue, queuePlants, selectedPlantId, syncPlantInUrl]);
 
   function selectPlant(plantId: string | null, syncUrl = true) {
     setSelectedPlantId(plantId);
@@ -258,6 +246,32 @@ export default function FeedingPage() {
       syncPlantInUrl(plantId);
     }
   }
+
+  const saveMutation = useMutation({
+    mutationFn: async ({ plantId }: { plantId: string }) => {
+      const payload = {
+        amount_text: amountText.trim() || undefined,
+        note: note.trim() || undefined,
+      };
+      return api.post<{ detail?: string }>(`/api/v1/plants/${plantId}/feed`, payload);
+    },
+    onMutate: () => {
+      setSaving(true);
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onError: (mutationError) => {
+      const normalized = normalizeUserFacingError(mutationError, "Unable to save feeding event.");
+      if (normalized.kind === "offline") {
+        setMutationOffline(true);
+      }
+      setError("Unable to save feeding event.");
+    },
+    onSettled: () => {
+      setSaving(false);
+    },
+  });
 
   async function saveFeeding(moveNext: boolean) {
     if (!selectedPlantId) {
@@ -269,50 +283,59 @@ export default function FeedingPage() {
       return;
     }
 
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const payload = {
-        amount_text: amountText.trim() || undefined,
-        note: note.trim() || undefined,
-      };
-      const response = await backendFetch(`/api/v1/plants/${selectedPlantId}/feed`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const body = (await response.json()) as { detail?: string };
-      if (!response.ok) {
-        setError(body.detail || "Unable to save feeding event.");
+    const result = await saveMutation.mutateAsync({ plantId: selectedPlantId }).catch(() => null);
+    if (!result) {
+      return;
+    }
+
+    setNotice("Feeding saved.");
+    setAmountText("");
+    setNote("");
+    setShowNote(false);
+
+    const refreshedQueue = await queryClient.fetchQuery({
+      queryKey: queueQueryKey,
+      queryFn: () =>
+        api.get<FeedingQueueResponse>(
+          `/api/v1/experiments/${experimentId}/feeding/queue`,
+        ),
+    });
+
+    const refreshedPlants = unwrapList<FeedingQueuePlant>(refreshedQueue.plants);
+    if (moveNext) {
+      const nextPlantId = pickNextNeedingFeed(refreshedPlants, selectedPlantId);
+      if (!nextPlantId) {
+        router.push(`/experiments/${experimentId}/overview?refresh=${Date.now()}`);
         return;
       }
-
-      setNotice("Feeding saved.");
-      setAmountText("");
-      setNote("");
-      setShowNote(false);
-
-      const refreshedQueue = await loadQueue();
-      const refreshedPlants = unwrapList<FeedingQueuePlant>(refreshedQueue.plants);
-      if (moveNext) {
-        const nextPlantId = pickNextNeedingFeed(refreshedPlants, selectedPlantId);
-        if (!nextPlantId) {
-          router.push(`/experiments/${experimentId}/overview?refresh=${Date.now()}`);
-          return;
-        }
-        selectPlant(nextPlantId, true);
-      }
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to save feeding event.");
-    } finally {
-      setSaving(false);
+      selectPlant(nextPlantId, true);
     }
   }
+
+  const notInvited = statusState.errorKind === "forbidden";
+  const loading =
+    statusState.isLoading ||
+    (Boolean(statusQuery.data?.setup.is_complete) &&
+      statusQuery.data?.lifecycle.state === "running" &&
+      queueState.isLoading);
+
+  const queryError = useMemo(() => {
+    if (notInvited) {
+      return "";
+    }
+    if (statusState.isError && statusState.errorKind !== "offline") {
+      return "Unable to load feeding queue.";
+    }
+    if (queueState.isError && queueState.errorKind !== "offline") {
+      return "Unable to load feeding queue.";
+    }
+    return "";
+  }, [notInvited, queueState.errorKind, queueState.isError, statusState.errorKind, statusState.isError]);
+
+  const offline =
+    mutationOffline ||
+    statusState.errorKind === "offline" ||
+    queueState.errorKind === "offline";
 
   if (notInvited) {
     return (
@@ -337,12 +360,12 @@ export default function FeedingPage() {
       <PageAlerts
         loading={loading}
         loadingText="Loading feeding queue..."
-        error={error}
+        error={error || queryError}
         notice={notice}
         offline={offline}
       />
 
-      {statusSummary && statusSummary.lifecycle.state !== "running" ? (
+      {statusQuery.data && statusQuery.data.lifecycle.state !== "running" ? (
         <SectionCard title="Feeding Requires Running State">
           <p className={"text-sm text-muted-foreground"}>Feeding is available only while an experiment is running.</p>
           <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/overview`}>
@@ -351,7 +374,7 @@ export default function FeedingPage() {
         </SectionCard>
       ) : null}
 
-      {statusSummary && statusSummary.lifecycle.state === "running" && queue ? (
+      {statusQuery.data && statusQuery.data.lifecycle.state === "running" && queue ? (
         <>
           <SectionCard title="Queue Status">
             <div className={"grid gap-3"}>

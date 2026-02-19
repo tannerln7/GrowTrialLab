@@ -1,76 +1,77 @@
 "use client";
 
+import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 
-import { backendFetch, normalizeBackendError } from "@/lib/backend";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { Textarea } from "@/src/components/ui/textarea";
+import { api } from "@/src/lib/api";
+import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { queryKeys } from "@/src/lib/queryKeys";
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
 export default function NewExperimentPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [notInvited, setNotInvited] = useState(false);
   const [offline, setOffline] = useState(false);
 
-  useEffect(() => {
-    async function checkAccess() {
-      try {
-        const response = await backendFetch("/api/me");
-        if (response.status === 403) {
-          setNotInvited(true);
-        }
-      } catch (requestError) {
-        const normalizedError = normalizeBackendError(requestError);
-        if (normalizedError.kind === "offline") {
-          setOffline(true);
-        }
-        setError("Unable to confirm access.");
-      }
-    }
+  const meQuery = useQuery({
+    queryKey: queryKeys.system.me(),
+    queryFn: () => api.get<{ email: string; role: string; status: string }>("/api/me"),
+    staleTime: 60_000,
+  });
 
-    void checkAccess();
-  }, []);
+  const meState = usePageQueryState(meQuery);
+  const notInvited = meState.errorKind === "forbidden";
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setSaving(true);
-
-    try {
-      const response = await backendFetch("/api/v1/experiments/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim(),
-        }),
-      });
-
-      if (!response.ok) {
-        setError("Unable to create experiment.");
-        return;
-      }
-
-      const data = (await response.json()) as { id: string };
+  const createMutation = useMutation({
+    mutationFn: async () =>
+      api.post<{ id: string }>("/api/v1/experiments/", {
+        name: name.trim(),
+        description: description.trim(),
+      }),
+    onMutate: () => {
+      setError("");
+      setOffline(false);
+    },
+    onSuccess: (data) => {
       router.push(`/experiments/${data.id}`);
-    } catch (requestError) {
-      const normalizedError = normalizeBackendError(requestError);
-      if (normalizedError.kind === "offline") {
+    },
+    onError: (mutationError) => {
+      const normalized = normalizeUserFacingError(mutationError, "Unable to create experiment.");
+      if (normalized.kind === "offline") {
         setOffline(true);
       }
       setError("Unable to create experiment.");
-    } finally {
-      setSaving(false);
+    },
+  });
+
+  const queryError = useMemo(() => {
+    if (notInvited) {
+      return "";
     }
+    if (meState.isError) {
+      if (meState.errorKind === "offline") {
+        return "";
+      }
+      return "Unable to confirm access.";
+    }
+    return "";
+  }, [meState.errorKind, meState.isError, notInvited]);
+
+  const queryOffline = meState.errorKind === "offline";
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void createMutation.mutateAsync();
   }
 
   if (notInvited) {
@@ -108,17 +109,17 @@ export default function NewExperimentPage() {
           <div className={"flex flex-wrap items-center gap-2"}>
             <button
               className={buttonVariants({ variant: "default" })}
-              disabled={saving}
+              disabled={createMutation.isPending || meState.isLoading}
               type="submit"
             >
-              {saving ? "Creating..." : "Create experiment"}
+              {createMutation.isPending ? "Creating..." : "Create experiment"}
             </button>
             <Link className={buttonVariants({ variant: "secondary" })} href="/experiments">
               Cancel
             </Link>
           </div>
 
-          <PageAlerts error={error} offline={offline} />
+          <PageAlerts error={error || queryError} offline={offline || queryOffline} />
         </form>
       </SectionCard>
     </PageShell>

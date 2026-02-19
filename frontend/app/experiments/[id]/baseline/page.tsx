@@ -1,18 +1,24 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { RotateCcw } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
-import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { backendUrl, unwrapList } from "@/lib/backend";
 import { buttonVariants } from "@/src/components/ui/button";
 import { NativeSelect } from "@/src/components/ui/native-select";
 import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { Textarea } from "@/src/components/ui/textarea";
+import { api, isApiError } from "@/src/lib/api";
+import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { queryKeys } from "@/src/lib/queryKeys";
 import { useRouteParamString } from "@/src/lib/useRouteParamString";
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 import { cn } from "@/lib/utils";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
@@ -297,16 +303,13 @@ export default function BaselinePage() {
   const baselinePhotoInputId = useId();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
 
   const experimentId = useRouteParamString("id") || "";
 
   const selectedPlantFromQuery = searchParams.get("plant") || "";
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [notInvited, setNotInvited] = useState(false);
-  const [offline, setOffline] = useState(false);
+  const [mutationOffline, setMutationOffline] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [plants, setPlants] = useState<PlantRow[]>([]);
@@ -327,6 +330,45 @@ export default function BaselinePage() {
   const [baselineSnapshotByPlantId, setBaselineSnapshotByPlantId] = useState<Record<string, BaselineDraftSnapshot>>(
     {},
   );
+
+  const baselineInitialDataQueryKey = queryKeys.experiment.feature(experimentId, "baseline", "initialData");
+
+  const meQuery = useQuery({
+    queryKey: queryKeys.system.me(),
+    queryFn: () => api.get<{ email: string; role: string; status: string }>("/api/me"),
+    enabled: Boolean(experimentId),
+    retry: false,
+  });
+  const meQueryState = usePageQueryState(meQuery);
+  const notInvited = isApiError(meQuery.error) && meQuery.error.status === 403;
+
+  const fetchBaselineInitialData = useCallback(async () => {
+    const [plantsPayload, queuePayload] = await Promise.all([
+      api.get<unknown>(`/api/v1/experiments/${experimentId}/plants/`),
+      api.get<BaselineQueue>(`/api/v1/experiments/${experimentId}/baseline/queue`),
+    ]);
+
+    return {
+      plants: unwrapList<PlantRow>(plantsPayload),
+      queue: queuePayload,
+    };
+  }, [experimentId]);
+
+  const baselineInitialDataQuery = useQuery({
+    queryKey: baselineInitialDataQueryKey,
+    queryFn: fetchBaselineInitialData,
+    enabled: Boolean(experimentId) && meQuery.isSuccess,
+    retry: false,
+  });
+  const baselineInitialState = usePageQueryState(baselineInitialDataQuery);
+
+  const selectedPlantBaselineQuery = useQuery({
+    queryKey: queryKeys.experiment.feature(experimentId, "baseline", "plant", selectedPlantId || null),
+    queryFn: () => api.get<PlantBaseline>(`/api/v1/plants/${selectedPlantId}/baseline`),
+    enabled: Boolean(experimentId) && Boolean(selectedPlantId) && meQuery.isSuccess,
+    retry: false,
+  });
+  const selectedPlantBaselineState = usePageQueryState(selectedPlantBaselineQuery);
 
   const queuePlants = useMemo(
     () => (queue ? unwrapList<QueuePlant>(queue.plants) : []),
@@ -395,12 +437,6 @@ export default function BaselinePage() {
       : hasRemainingBaselines
         ? "Save & Next"
         : "Save";
-  const primarySaveDisabled =
-    saving ||
-    readOnly ||
-    !selectedPlantId ||
-    (selectedPlantHasCapturedBaseline && !selectedPlantDirty);
-
   const sliderDefinitions = useMemo(
     () => [
       { key: "vigor" as const, label: "Growth vigor" },
@@ -425,35 +461,7 @@ export default function BaselinePage() {
     };
   }, [photoFile]);
 
-  const loadQueue = useCallback(async () => {
-    const response = await backendFetch(`/api/v1/experiments/${experimentId}/baseline/queue`);
-    if (!response.ok) {
-      throw new Error("Unable to load baseline queue.");
-    }
-    const payload = (await response.json()) as BaselineQueue;
-    const queueRows = unwrapList<QueuePlant>(payload.plants);
-    const latestByPlant: Record<string, PhotoRecord> = {};
-    const capturedAtByPlant: Record<string, string> = {};
-    for (const row of queueRows) {
-      if (row.baseline_captured_at) {
-        capturedAtByPlant[row.uuid] = row.baseline_captured_at;
-      }
-      if (row.baseline_photo) {
-        latestByPlant[row.uuid] = row.baseline_photo;
-      }
-    }
-    setBaselineCapturedAtByPlantId(capturedAtByPlant);
-    setLatestBaselinePhotosByPlantId(latestByPlant);
-    setQueue(payload);
-    return payload;
-  }, [experimentId]);
-
-  const loadPlantBaseline = useCallback(async (plantId: string) => {
-    const response = await backendFetch(`/api/v1/plants/${plantId}/baseline`);
-    if (!response.ok) {
-      throw new Error("Unable to load baseline.");
-    }
-    const payload = (await response.json()) as PlantBaseline;
+  const applyPlantBaselinePayload = useCallback((plantId: string, payload: PlantBaseline) => {
     const baselineMetrics = extractBaselineV1Metrics(payload.metrics);
     const nextValues = defaultSliderValues();
     for (const key of SLIDER_KEYS) {
@@ -502,58 +510,52 @@ export default function BaselinePage() {
   }, []);
 
   useEffect(() => {
-    async function load() {
-      if (!experimentId) {
-        return;
-      }
-      setLoading(true);
-      setError("");
-      setOffline(false);
-      try {
-        const meResponse = await backendFetch("/api/me");
-        if (meResponse.status === 403) {
-          setNotInvited(true);
-          return;
-        }
-
-        const [plantsResponse, queuePayload] = await Promise.all([
-          backendFetch(`/api/v1/experiments/${experimentId}/plants/`),
-          loadQueue(),
-        ]);
-
-        if (!plantsResponse.ok) {
-          setError("Unable to load plants.");
-          return;
-        }
-
-        const plantsPayload = (await plantsResponse.json()) as unknown;
-        const rows = unwrapList<PlantRow>(plantsPayload);
-        setPlants(rows);
-
-        const fromQuery = selectedPlantFromQuery;
-        const queueRows = unwrapList<QueuePlant>(queuePayload.plants);
-        const firstMissing = queueRows.find((plant) => queueNeedsBaseline(plant));
-        const target = fromQuery || firstMissing?.uuid || queueRows[0]?.uuid || "";
-
-        if (target) {
-          setSelectedPlantId(target);
-          await loadPlantBaseline(target);
-        } else {
-          setSelectedPlantId("");
-        }
-      } catch (requestError) {
-        const normalized = normalizeBackendError(requestError);
-        if (normalized.kind === "offline") {
-          setOffline(true);
-        }
-        setError("Unable to load baseline page.");
-      } finally {
-        setLoading(false);
-      }
+    const payload = baselineInitialDataQuery.data;
+    if (!payload) {
+      return;
     }
 
-    void load();
-  }, [experimentId, loadPlantBaseline, loadQueue, selectedPlantFromQuery]);
+    const queueRows = unwrapList<QueuePlant>(payload.queue.plants);
+    const latestByPlant: Record<string, PhotoRecord> = {};
+    const capturedAtByPlant: Record<string, string> = {};
+    for (const row of queueRows) {
+      if (row.baseline_captured_at) {
+        capturedAtByPlant[row.uuid] = row.baseline_captured_at;
+      }
+      if (row.baseline_photo) {
+        latestByPlant[row.uuid] = row.baseline_photo;
+      }
+    }
+    setBaselineCapturedAtByPlantId(capturedAtByPlant);
+    setLatestBaselinePhotosByPlantId(latestByPlant);
+    setPlants(payload.plants);
+    setQueue(payload.queue);
+
+    setSelectedPlantId((current) => {
+      if (selectedPlantFromQuery) {
+        return selectedPlantFromQuery;
+      }
+      if (current && queueRows.some((row) => row.uuid === current)) {
+        return current;
+      }
+      const firstMissing = queueRows.find((plant) => queueNeedsBaseline(plant));
+      return firstMissing?.uuid || queueRows[0]?.uuid || "";
+    });
+  }, [baselineInitialDataQuery.data, selectedPlantFromQuery]);
+
+  useEffect(() => {
+    if (!selectedPlantFromQuery) {
+      return;
+    }
+    setSelectedPlantId(selectedPlantFromQuery);
+  }, [selectedPlantFromQuery]);
+
+  useEffect(() => {
+    if (!selectedPlantId || !selectedPlantBaselineQuery.data) {
+      return;
+    }
+    applyPlantBaselinePayload(selectedPlantId, selectedPlantBaselineQuery.data);
+  }, [applyPlantBaselinePayload, selectedPlantBaselineQuery.data, selectedPlantId]);
 
   function jumpToPlant(plantId: string) {
     const nextQuery = new URLSearchParams(searchParams.toString());
@@ -561,7 +563,179 @@ export default function BaselinePage() {
     router.replace(`/experiments/${experimentId}/baseline?${nextQuery.toString()}`);
   }
 
-  async function saveBaseline(saveAndNext: boolean) {
+  const refreshBaselineInitialData = useCallback(async () => {
+    return queryClient.fetchQuery({
+      queryKey: baselineInitialDataQueryKey,
+      queryFn: fetchBaselineInitialData,
+    });
+  }, [baselineInitialDataQueryKey, fetchBaselineInitialData, queryClient]);
+
+  const saveBaselineMutation = useMutation({
+    mutationFn: async (args: {
+      plantId: string;
+      saveAndNext: boolean;
+      completeValues: SliderValues;
+      gradeSource: GradeSource;
+      manualGrade: GradeValue | "";
+      notes: string;
+    }) => {
+      const body: Record<string, unknown> = {
+        metrics: {
+          baseline_v1: {
+            ...args.completeValues,
+            grade_source: args.gradeSource,
+          },
+        },
+        notes: args.notes,
+        grade_source: args.gradeSource,
+      };
+      if (args.gradeSource === "manual") {
+        body.grade = args.manualGrade;
+      }
+
+      await api.post(`/api/v1/plants/${args.plantId}/baseline`, body);
+      return args;
+    },
+    onMutate: () => {
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: async (result) => {
+      const refreshedData = await refreshBaselineInitialData();
+      const refreshedRows = unwrapList<QueuePlant>(refreshedData.queue.plants);
+
+      if (result.plantId === selectedPlantId) {
+        await selectedPlantBaselineQuery.refetch();
+      } else {
+        await queryClient.fetchQuery({
+          queryKey: queryKeys.experiment.feature(experimentId, "baseline", "plant", result.plantId),
+          queryFn: () => api.get<PlantBaseline>(`/api/v1/plants/${result.plantId}/baseline`),
+        });
+      }
+
+      setNotice("Baseline saved.");
+      if (!result.saveAndNext) {
+        return;
+      }
+
+      if (refreshedData.queue.remaining_count === 0) {
+        setNotice("All baselines complete.");
+        router.push(`/experiments/${experimentId}/overview?refresh=${Date.now()}`);
+        return;
+      }
+
+      const nextPlant =
+        refreshedRows.find((plant) => queueNeedsBaseline(plant) && plant.uuid !== result.plantId) ||
+        refreshedRows.find((plant) => queueNeedsBaseline(plant));
+      if (nextPlant) {
+        jumpToPlant(nextPlant.uuid);
+      }
+    },
+    onError: (requestError) => {
+      if (isApiError(requestError)) {
+        setError(requestError.detail || "Unable to save baseline.");
+        return;
+      }
+      const normalized = normalizeUserFacingError(requestError, "Unable to save baseline.");
+      if (normalized.kind === "offline") {
+        setMutationOffline(true);
+      }
+      setError("Unable to save baseline.");
+    },
+  });
+
+  const uploadBaselinePhotoMutation = useMutation({
+    mutationFn: async (args: { plantId: string; file: File }) => {
+      const formData = new FormData();
+      formData.append("experiment", experimentId);
+      formData.append("plant", args.plantId);
+      formData.append("tag", "baseline");
+      formData.append("week_number", "0");
+      formData.append("file", args.file);
+      return api.postForm<PhotoRecord>("/api/v1/photos/", formData);
+    },
+    onMutate: () => {
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: (uploadedPhoto, args) => {
+      setLatestBaselinePhotosByPlantId((current) => ({
+        ...current,
+        [args.plantId]: uploadedPhoto,
+      }));
+      setPhotoDirtyByPlantId((current) => ({
+        ...current,
+        [args.plantId]: true,
+      }));
+      setPhotoFile(null);
+      setNotice("Baseline photo uploaded.");
+    },
+    onError: (requestError) => {
+      if (isApiError(requestError)) {
+        setError(requestError.detail || "Unable to upload baseline photo.");
+        return;
+      }
+      const normalized = normalizeUserFacingError(requestError, "Unable to upload baseline photo.");
+      if (normalized.kind === "offline") {
+        setMutationOffline(true);
+      }
+      setError("Unable to upload baseline photo.");
+    },
+  });
+
+  const lockBaselineMutation = useMutation({
+    mutationFn: async () => {
+      await api.post(`/api/v1/experiments/${experimentId}/baseline/lock`);
+    },
+    onMutate: () => {
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: async () => {
+      setEditingUnlocked(false);
+      setNotice("Baseline locked (UI guardrail). Inputs are read-only by default.");
+      await refreshBaselineInitialData();
+    },
+    onError: (requestError) => {
+      if (isApiError(requestError)) {
+        setError(requestError.detail || "Unable to lock baseline.");
+        return;
+      }
+      const normalized = normalizeUserFacingError(requestError, "Unable to lock baseline.");
+      if (normalized.kind === "offline") {
+        setMutationOffline(true);
+      }
+      setError("Unable to lock baseline.");
+    },
+  });
+
+  const loading =
+    meQuery.isPending ||
+    baselineInitialDataQuery.isPending ||
+    (Boolean(selectedPlantId) && selectedPlantBaselineQuery.isPending);
+  const saving = saveBaselineMutation.isPending || lockBaselineMutation.isPending;
+  const uploadingPhoto = uploadBaselinePhotoMutation.isPending;
+  const primarySaveDisabled =
+    saving ||
+    readOnly ||
+    !selectedPlantId ||
+    (selectedPlantHasCapturedBaseline && !selectedPlantDirty);
+  const queryOffline =
+    meQueryState.errorKind === "offline" ||
+    baselineInitialState.errorKind === "offline" ||
+    selectedPlantBaselineState.errorKind === "offline";
+  const offline = mutationOffline || queryOffline;
+  const queryError =
+    !notInvited &&
+    !offline &&
+    (meQueryState.isError || baselineInitialState.isError || selectedPlantBaselineState.isError)
+      ? "Unable to load baseline page."
+      : "";
+
+  function saveBaseline(saveAndNext: boolean) {
     if (!selectedPlantId || readOnly) {
       return;
     }
@@ -569,143 +743,26 @@ export default function BaselinePage() {
       setError("Select a manual grade or revert to auto.");
       return;
     }
-    const completeValues = sliderValues;
 
-    setSaving(true);
-    setError("");
-    setNotice("");
-
-    try {
-      const body: Record<string, unknown> = {
-        metrics: {
-          baseline_v1: {
-            ...completeValues,
-            grade_source: gradeSource,
-          },
-        },
-        notes,
-        grade_source: gradeSource,
-      };
-      if (gradeSource === "manual") {
-        body.grade = manualGrade;
-      }
-
-      const response = await backendFetch(`/api/v1/plants/${selectedPlantId}/baseline`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const payload = (await response.json()) as { detail?: string };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to save baseline.");
-        return;
-      }
-
-      const refreshedQueue = await loadQueue();
-      await loadPlantBaseline(selectedPlantId);
-      setNotice("Baseline saved.");
-
-      if (!saveAndNext) {
-        return;
-      }
-
-      if (refreshedQueue.remaining_count === 0) {
-        setNotice("All baselines complete.");
-        router.push(`/experiments/${experimentId}/overview?refresh=${Date.now()}`);
-        return;
-      }
-
-      const refreshedRows = unwrapList<QueuePlant>(refreshedQueue.plants);
-      const nextPlant =
-        refreshedRows.find((plant) => queueNeedsBaseline(plant) && plant.uuid !== selectedPlantId) ||
-        refreshedRows.find((plant) => queueNeedsBaseline(plant));
-      if (nextPlant) {
-        jumpToPlant(nextPlant.uuid);
-      }
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to save baseline.");
-    } finally {
-      setSaving(false);
-    }
+    saveBaselineMutation.mutate({
+      plantId: selectedPlantId,
+      saveAndNext,
+      completeValues: sliderValues,
+      gradeSource,
+      manualGrade,
+      notes,
+    });
   }
 
-  async function uploadBaselinePhoto() {
+  function uploadBaselinePhoto() {
     if (!selectedPlantId || !photoFile || readOnly) {
       return;
     }
-
-    setUploadingPhoto(true);
-    setError("");
-    setNotice("");
-    try {
-      const formData = new FormData();
-      formData.append("experiment", experimentId);
-      formData.append("plant", selectedPlantId);
-      formData.append("tag", "baseline");
-      formData.append("week_number", "0");
-      formData.append("file", photoFile);
-
-      const response = await backendFetch("/api/v1/photos/", {
-        method: "POST",
-        body: formData,
-      });
-      const payload = (await response.json()) as PhotoRecord | { detail?: string };
-      if (!response.ok) {
-        setError((payload as { detail?: string }).detail || "Unable to upload baseline photo.");
-        return;
-      }
-
-      const uploadedPhoto = payload as PhotoRecord;
-      setLatestBaselinePhotosByPlantId((current) => ({
-        ...current,
-        [selectedPlantId]: uploadedPhoto,
-      }));
-      setPhotoDirtyByPlantId((current) => ({
-        ...current,
-        [selectedPlantId]: true,
-      }));
-      setPhotoFile(null);
-      setNotice("Baseline photo uploaded.");
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to upload baseline photo.");
-    } finally {
-      setUploadingPhoto(false);
-    }
+    uploadBaselinePhotoMutation.mutate({ plantId: selectedPlantId, file: photoFile });
   }
 
-  async function lockBaseline() {
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/experiments/${experimentId}/baseline/lock`, {
-        method: "POST",
-      });
-      const payload = (await response.json()) as { detail?: string };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to lock baseline.");
-        return;
-      }
-      setEditingUnlocked(false);
-      setNotice("Baseline locked (UI guardrail). Inputs are read-only by default.");
-      await loadQueue();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to lock baseline.");
-    } finally {
-      setSaving(false);
-    }
+  function lockBaseline() {
+    lockBaselineMutation.mutate();
   }
 
   if (notInvited) {
@@ -731,7 +788,7 @@ export default function BaselinePage() {
       <PageAlerts
         loading={loading}
         loadingText="Loading baseline queue..."
-        error={error}
+        error={error || queryError}
         notice={notice}
         offline={offline}
       />

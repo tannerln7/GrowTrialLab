@@ -1,14 +1,12 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
-import {
-  fetchExperimentStatusSummary,
-  type ExperimentStatusSummary,
-} from "@/lib/experiment-status";
+import type { ExperimentStatusSummary } from "@/lib/experiment-status";
+import { unwrapList } from "@/lib/backend";
 import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
 import { NativeSelect } from "@/src/components/ui/native-select";
@@ -17,8 +15,11 @@ import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { Textarea } from "@/src/components/ui/textarea";
+import { api } from "@/src/lib/api";
+import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { queryKeys } from "@/src/lib/queryKeys";
 import { useRouteParamString } from "@/src/lib/useRouteParamString";
-
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
 type Location = {
   status: "placed" | "unplaced";
@@ -113,23 +114,84 @@ function locationLabel(location: Location): string {
 
 export default function RotationPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const experimentId = useRouteParamString("id") || "";
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [notInvited, setNotInvited] = useState(false);
-  const [offline, setOffline] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [statusSummary, setStatusSummary] = useState<ExperimentStatusSummary | null>(null);
-  const [summary, setSummary] = useState<RotationSummary | null>(null);
-  const [slotOptions, setSlotOptions] = useState<SlotOption[]>([]);
-  const [traySpeciesById, setTraySpeciesById] = useState<Record<string, string[]>>({});
+  const [mutationOffline, setMutationOffline] = useState(false);
   const [selectedTrayId, setSelectedTrayId] = useState("");
   const [selectedToSlotId, setSelectedToSlotId] = useState("");
   const [note, setNote] = useState("");
 
-  const running = statusSummary?.lifecycle.state === "running";
+  const statusQuery = useQuery({
+    queryKey: queryKeys.experiment.status(experimentId),
+    queryFn: () =>
+      api.get<ExperimentStatusSummary>(
+        `/api/v1/experiments/${experimentId}/status/summary`,
+      ),
+    enabled: Boolean(experimentId),
+  });
+
+  const rotationQueryKey = queryKeys.experiment.feature(experimentId, "rotationSummary");
+  const placementQueryKey = queryKeys.experiment.feature(experimentId, "placementSummary");
+
+  const rotationQuery = useQuery({
+    queryKey: rotationQueryKey,
+    queryFn: () => api.get<RotationSummary>(`/api/v1/experiments/${experimentId}/rotation/summary`),
+    enabled: Boolean(experimentId) && Boolean(statusQuery.data?.setup.is_complete),
+  });
+
+  const placementQuery = useQuery({
+    queryKey: placementQueryKey,
+    queryFn: () => api.get<PlacementSummary>(`/api/v1/experiments/${experimentId}/placement/summary`),
+    enabled: Boolean(experimentId) && Boolean(statusQuery.data?.setup.is_complete),
+  });
+
+  const statusState = usePageQueryState(statusQuery);
+  const rotationState = usePageQueryState(rotationQuery);
+  const placementState = usePageQueryState(placementQuery);
+
+  useEffect(() => {
+    if (!experimentId || !statusQuery.data) {
+      return;
+    }
+    if (!statusQuery.data.setup.is_complete) {
+      router.replace(`/experiments/${experimentId}/setup`);
+    }
+  }, [experimentId, router, statusQuery.data]);
+
+  const summary = rotationQuery.data ?? null;
+  const placementSummary = placementQuery.data ?? null;
+
+  const slotOptions = useMemo(() => {
+    if (!placementSummary) {
+      return [] as SlotOption[];
+    }
+    const tents = unwrapList<Tent>(placementSummary.tents);
+    return tents.flatMap((tent) =>
+      tent.slots.map((slot) => ({
+        id: slot.slot_id,
+        label: `${tent.code || tent.name} / ${slot.code}`,
+        allowedSpeciesIds:
+          tent.allowed_species.length === 0 ? null : new Set(tent.allowed_species.map((species) => species.id)),
+      })),
+    );
+  }, [placementSummary]);
+
+  const traySpeciesById = useMemo(() => {
+    if (!placementSummary) {
+      return {} as Record<string, string[]>;
+    }
+    const trays = unwrapList<PlacementTray>(placementSummary.trays);
+    const next: Record<string, string[]> = {};
+    for (const tray of trays) {
+      next[tray.tray_id] = Array.from(new Set(tray.plants.map((plant) => plant.species_id)));
+    }
+    return next;
+  }, [placementSummary]);
+
+  const running = statusQuery.data?.lifecycle.state === "running";
 
   const compatibleSlotsForSelectedTray = useMemo(() => {
     if (!selectedTrayId) {
@@ -149,87 +211,31 @@ export default function RotationPage() {
 
   const selectedTrayBlocked = selectedTrayId !== "" && compatibleSlotsForSelectedTray.length === 0;
 
-  const loadSummary = useCallback(async () => {
-    const [statusResponse, rotationResponse, placementResponse] = await Promise.all([
-      fetchExperimentStatusSummary(experimentId),
-      backendFetch(`/api/v1/experiments/${experimentId}/rotation/summary`),
-      backendFetch(`/api/v1/experiments/${experimentId}/placement/summary`),
-    ]);
-    if (!statusResponse) {
-      throw new Error("Unable to load experiment status.");
-    }
-    if (!rotationResponse.ok) {
-      throw new Error("Unable to load rotation summary.");
-    }
-    if (!placementResponse.ok) {
-      throw new Error("Unable to load placement summary.");
-    }
-
-    const rotationPayload = (await rotationResponse.json()) as RotationSummary;
-    const placementPayload = (await placementResponse.json()) as PlacementSummary;
-
-    const tents = unwrapList<Tent>(placementPayload.tents);
-    const trays = unwrapList<PlacementTray>(placementPayload.trays);
-
-    setStatusSummary(statusResponse);
-    setSummary(rotationPayload);
-
-    const nextTraySpeciesById: Record<string, string[]> = {};
-    for (const tray of trays) {
-      nextTraySpeciesById[tray.tray_id] = Array.from(new Set(tray.plants.map((plant) => plant.species_id)));
-    }
-    setTraySpeciesById(nextTraySpeciesById);
-
-    const nextSlots = tents.flatMap((tent) =>
-      tent.slots.map((slot) => ({
-        id: slot.slot_id,
-        label: `${tent.code || tent.name} / ${slot.code}`,
-        allowedSpeciesIds:
-          tent.allowed_species.length === 0 ? null : new Set(tent.allowed_species.map((species) => species.id)),
-      })),
-    );
-    setSlotOptions(nextSlots);
-  }, [experimentId]);
-
-  useEffect(() => {
-    async function load() {
-      if (!experimentId) {
-        return;
-      }
-      setLoading(true);
+  const logMutation = useMutation({
+    mutationFn: () =>
+      api.post<{ detail?: string }>(`/api/v1/experiments/${experimentId}/rotation/log`, {
+        tray_id: selectedTrayId,
+        to_slot_id: selectedToSlotId || null,
+        note: note.trim() || undefined,
+      }),
+    onMutate: () => {
       setError("");
-      setOffline(false);
-      try {
-        const meResponse = await backendFetch("/api/me");
-        if (meResponse.status === 403) {
-          setNotInvited(true);
-          return;
-        }
-
-        const status = await fetchExperimentStatusSummary(experimentId);
-        if (!status) {
-          setError("Unable to load experiment status.");
-          return;
-        }
-        if (!status.setup.is_complete) {
-          router.replace(`/experiments/${experimentId}/setup`);
-          return;
-        }
-
-        await loadSummary();
-      } catch (requestError) {
-        const normalized = normalizeBackendError(requestError);
-        if (normalized.kind === "offline") {
-          setOffline(true);
-        }
-        setError("Unable to load rotation page.");
-      } finally {
-        setLoading(false);
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: async () => {
+      setNotice("Move logged.");
+      setNote("");
+      await queryClient.invalidateQueries({ queryKey: rotationQueryKey });
+    },
+    onError: (mutationError) => {
+      const normalized = normalizeUserFacingError(mutationError, "Unable to log move.");
+      if (normalized.kind === "offline") {
+        setMutationOffline(true);
       }
-    }
-
-    void load();
-  }, [experimentId, loadSummary, router]);
+      setError("Unable to log move.");
+    },
+  });
 
   async function submitLogMove() {
     if (!selectedTrayId) {
@@ -245,38 +251,30 @@ export default function RotationPage() {
       return;
     }
 
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/experiments/${experimentId}/rotation/log`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tray_id: selectedTrayId,
-          to_slot_id: selectedToSlotId || null,
-          note: note.trim() || undefined,
-        }),
-      });
-      const payload = (await response.json()) as { detail?: string };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to log move.");
-        return;
-      }
-
-      setNotice("Move logged.");
-      setNote("");
-      await loadSummary();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to log move.");
-    } finally {
-      setSaving(false);
-    }
+    await logMutation.mutateAsync().catch(() => null);
   }
+
+  const loading =
+    statusState.isLoading ||
+    (Boolean(statusQuery.data?.setup.is_complete) && (rotationState.isLoading || placementState.isLoading));
+  const notInvited = statusState.errorKind === "forbidden";
+  const offline =
+    mutationOffline ||
+    statusState.errorKind === "offline" ||
+    rotationState.errorKind === "offline" ||
+    placementState.errorKind === "offline";
+  const queryError = useMemo(() => {
+    if (notInvited) {
+      return "";
+    }
+    if (statusState.isError && statusState.errorKind !== "offline") {
+      return "Unable to load rotation page.";
+    }
+    if ((rotationState.isError || placementState.isError) && !offline) {
+      return "Unable to load rotation page.";
+    }
+    return "";
+  }, [notInvited, offline, placementState.isError, rotationState.isError, statusState.errorKind, statusState.isError]);
 
   if (notInvited) {
     return (
@@ -304,14 +302,14 @@ export default function RotationPage() {
       <PageAlerts
         loading={loading}
         loadingText="Loading rotation..."
-        error={error}
+        error={error || queryError}
         notice={notice}
         offline={offline}
       />
 
-      {statusSummary ? (
+      {statusQuery.data ? (
         <SectionCard title="Experiment State">
-          <Badge variant="secondary">{statusSummary.lifecycle.state.toUpperCase()}</Badge>
+          <Badge variant="secondary">{statusQuery.data.lifecycle.state.toUpperCase()}</Badge>
         </SectionCard>
       ) : null}
 
@@ -365,98 +363,92 @@ export default function RotationPage() {
               <button
                 className={buttonVariants({ variant: "default" })}
                 type="button"
-                disabled={saving || !selectedTrayId || selectedTrayBlocked}
+                disabled={logMutation.isPending || selectedTrayBlocked}
                 onClick={() => void submitLogMove()}
               >
-                {saving ? "Logging..." : "Log move"}
+                {logMutation.isPending ? "Saving..." : "Log move"}
               </button>
             </div>
           </SectionCard>
 
-          <SectionCard title="Current Tray Locations">
-            <p className={"text-sm text-muted-foreground"}>Unplaced trays: {summary.unplaced_trays_count}</p>
+          <SectionCard title="Trays">
             <ResponsiveList
               items={trays}
               getKey={(tray) => tray.tray_id}
               columns={[
-                { key: "tray", label: "Tray", render: (tray) => tray.tray_name },
                 {
-                  key: "slot",
-                  label: "Current Slot",
+                  key: "tray",
+                  label: "Tray",
+                  render: (tray) => tray.tray_name,
+                },
+                {
+                  key: "location",
+                  label: "Location",
                   render: (tray) => locationLabel(tray.location),
                 },
-                { key: "count", label: "Plants", render: (tray) => tray.plant_count },
                 {
-                  key: "move",
-                  label: "Action",
-                  render: (tray) => (
-                    <button
-                      className={buttonVariants({ variant: "secondary" })}
-                      type="button"
-                      onClick={() => {
-                        setSelectedTrayId(tray.tray_id);
-                        setSelectedToSlotId("");
-                      }}
-                    >
-                      Move
-                    </button>
-                  ),
+                  key: "plants",
+                  label: "Plants",
+                  render: (tray) => tray.plant_count,
                 },
               ]}
               renderMobileCard={(tray) => (
                 <div className={"grid gap-2"}>
                   <span>Tray</span>
                   <strong>{tray.tray_name}</strong>
-                  <span>Current slot</span>
+                  <span>Location</span>
                   <strong>{locationLabel(tray.location)}</strong>
                   <span>Plants</span>
                   <strong>{tray.plant_count}</strong>
-                  <button
-                    className={buttonVariants({ variant: "secondary" })}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTrayId(tray.tray_id);
-                      setSelectedToSlotId("");
-                    }}
-                  >
-                    Move
-                  </button>
                 </div>
               )}
             />
           </SectionCard>
 
-          <SectionCard title="Recent Moves">
+          <SectionCard title="Recent Logs">
             <ResponsiveList
               items={recentLogs}
-              getKey={(log) => log.id}
+              getKey={(item) => item.id}
               columns={[
-                { key: "tray", label: "Tray", render: (log) => log.tray_name },
                 {
-                  key: "from_to",
-                  label: "Move",
-                  render: (log) => `${log.from_slot?.label || "Unassigned"} -> ${log.to_slot?.label || "Unassigned"}`,
+                  key: "tray",
+                  label: "Tray",
+                  render: (item) => item.tray_name,
                 },
-                { key: "time", label: "Time", render: (log) => formatDateTime(log.occurred_at) },
-                { key: "note", label: "Note", render: (log) => log.note || "-" },
+                {
+                  key: "from",
+                  label: "From",
+                  render: (item) => item.from_slot ? `${item.from_slot.tent_name} / ${item.from_slot.code}` : "Unplaced",
+                },
+                {
+                  key: "to",
+                  label: "To",
+                  render: (item) => item.to_slot ? `${item.to_slot.tent_name} / ${item.to_slot.code}` : "Unplaced",
+                },
+                {
+                  key: "when",
+                  label: "When",
+                  render: (item) => formatDateTime(item.occurred_at),
+                },
               ]}
-              renderMobileCard={(log) => (
+              renderMobileCard={(item) => (
                 <div className={"grid gap-2"}>
                   <span>Tray</span>
-                  <strong>{log.tray_name}</strong>
-                  <span>Move</span>
-                  <strong>
-                    {log.from_slot?.label || "Unassigned"}
-                    {" -> "}
-                    {log.to_slot?.label || "Unassigned"}
-                  </strong>
-                  <span>Time</span>
-                  <strong>{formatDateTime(log.occurred_at)}</strong>
-                  <span>Note</span>
-                  <strong>{log.note || "-"}</strong>
+                  <strong>{item.tray_name}</strong>
+                  <span>From</span>
+                  <strong>{item.from_slot ? `${item.from_slot.tent_name} / ${item.from_slot.code}` : "Unplaced"}</strong>
+                  <span>To</span>
+                  <strong>{item.to_slot ? `${item.to_slot.tent_name} / ${item.to_slot.code}` : "Unplaced"}</strong>
+                  <span>When</span>
+                  <strong>{formatDateTime(item.occurred_at)}</strong>
+                  {item.note ? (
+                    <>
+                      <span>Note</span>
+                      <strong>{item.note}</strong>
+                    </>
+                  ) : null}
                 </div>
               )}
-              emptyState={<p className={"text-sm text-muted-foreground"}>No moves logged yet.</p>}
             />
           </SectionCard>
         </>

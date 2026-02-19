@@ -1,4 +1,4 @@
-import { backendFetch } from "@/lib/backend";
+import { api } from "@/src/lib/api";
 
 export type ExperimentStatusSummary = {
   setup: {
@@ -45,11 +45,11 @@ export type ExperimentStatusSummary = {
 export async function fetchExperimentStatusSummary(
   experimentId: string,
 ): Promise<ExperimentStatusSummary | null> {
-  const response = await backendFetch(
-    `/api/v1/experiments/${experimentId}/status/summary`,
-  );
-  if (!response.ok) {
+  try {
+    return await api.get<ExperimentStatusSummary>(
+      `/api/v1/experiments/${experimentId}/status/summary`,
+    );
+  } catch {
     return null;
   }
-  return (await response.json()) as ExperimentStatusSummary;
 }

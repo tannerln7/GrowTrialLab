@@ -1,15 +1,14 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { unwrapList } from "@/lib/backend";
 import { cn } from "@/lib/utils";
-import {
-  fetchExperimentStatusSummary,
-  type ExperimentStatusSummary,
-} from "@/lib/experiment-status";
+import type { ExperimentStatusSummary } from "@/lib/experiment-status";
 import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -19,7 +18,11 @@ import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import { Textarea } from "@/src/components/ui/textarea";
+import { api, isApiError } from "@/src/lib/api";
+import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { queryKeys } from "@/src/lib/queryKeys";
 import { useRouteParamString } from "@/src/lib/useRouteParamString";
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
 
 type Timeframe = "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT";
@@ -230,14 +233,12 @@ function trayRestrictionHint(
 
 export default function ExperimentSchedulePage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const experimentId = useRouteParamString("id") || "";
   const plantFilter = searchParams.get("plant");
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [notInvited, setNotInvited] = useState(false);
-  const [offline, setOffline] = useState(false);
+  const [mutationOffline, setMutationOffline] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [summary, setSummary] = useState<ExperimentStatusSummary | null>(null);
@@ -383,7 +384,7 @@ export default function ExperimentSchedulePage() {
     return warnings;
   }, [actionType, activePlants, scopeType, selectedScopeIds, summary?.lifecycle.state]);
 
-  const loadScheduleData = useCallback(async () => {
+  const fetchScheduleData = useCallback(async () => {
     const planQuery = new URLSearchParams({
       days: String(daysWindow),
     });
@@ -391,72 +392,166 @@ export default function ExperimentSchedulePage() {
       planQuery.set("plant_id", plantFilter);
     }
 
-    const [statusPayload, schedulesResponse, planResponse, placementResponse, overviewResponse] =
+    const [statusPayload, schedulesPayload, planPayload, placementPayload, overviewPayload] =
       await Promise.all([
-        fetchExperimentStatusSummary(experimentId),
-        backendFetch(`/api/v1/experiments/${experimentId}/schedules`),
-        backendFetch(`/api/v1/experiments/${experimentId}/schedules/plan?${planQuery.toString()}`),
-        backendFetch(`/api/v1/experiments/${experimentId}/placement/summary`),
-        backendFetch(`/api/v1/experiments/${experimentId}/overview/plants`),
+        api.get<ExperimentStatusSummary>(`/api/v1/experiments/${experimentId}/status/summary`),
+        api.get<{ schedules: { count: number; results: ScheduleAction[]; meta: Record<string, unknown> } }>(
+          `/api/v1/experiments/${experimentId}/schedules`,
+        ),
+        api.get<SchedulePlan>(
+          `/api/v1/experiments/${experimentId}/schedules/plan?${planQuery.toString()}`,
+        ),
+        api.get<PlacementSummary>(`/api/v1/experiments/${experimentId}/placement/summary`),
+        api.get<{ plants: { count: number; results: OverviewPlant[]; meta: Record<string, unknown> } }>(
+          `/api/v1/experiments/${experimentId}/overview/plants`,
+        ),
       ]);
 
-    if (!statusPayload) {
-      throw new Error("Unable to load status summary.");
-    }
-    setSummary(statusPayload);
-    if (!statusPayload.setup.is_complete) {
-      router.replace(`/experiments/${experimentId}/setup`);
+    return {
+      statusPayload,
+      schedulesPayload,
+      planPayload,
+      placementPayload,
+      overviewPayload,
+    };
+  }, [daysWindow, experimentId, plantFilter]);
+
+  const scheduleDataQueryKey = queryKeys.experiment.feature(
+    experimentId,
+    "scheduleData",
+    { daysWindow, plantFilter: plantFilter || null },
+  );
+
+  const scheduleDataQuery = useQuery({
+    queryKey: scheduleDataQueryKey,
+    queryFn: fetchScheduleData,
+    enabled: Boolean(experimentId),
+  });
+
+  const scheduleDataState = usePageQueryState(scheduleDataQuery);
+
+  useEffect(() => {
+    const payload = scheduleDataQuery.data;
+    if (!payload) {
       return;
     }
 
-    if (!schedulesResponse.ok || !planResponse.ok || !placementResponse.ok || !overviewResponse.ok) {
-      throw new Error("Unable to load schedules.");
-    }
-
-    const schedulesPayload = (await schedulesResponse.json()) as {
-      schedules: { count: number; results: ScheduleAction[]; meta: Record<string, unknown> };
-    };
-    const planPayload = (await planResponse.json()) as SchedulePlan;
-    const placementPayload = (await placementResponse.json()) as PlacementSummary;
-    const overviewPayload = (await overviewResponse.json()) as {
-      plants: { count: number; results: OverviewPlant[]; meta: Record<string, unknown> };
-    };
-
-    setActions(unwrapList<ScheduleAction>(schedulesPayload.schedules));
-    setPlan(planPayload);
-    setPlacementSummary(placementPayload);
-    setOverviewPlants(unwrapList<OverviewPlant>(overviewPayload.plants));
-  }, [daysWindow, experimentId, plantFilter, router]);
+    setSummary(payload.statusPayload);
+    setActions(unwrapList<ScheduleAction>(payload.schedulesPayload.schedules));
+    setPlan(payload.planPayload);
+    setPlacementSummary(payload.placementPayload);
+    setOverviewPlants(unwrapList<OverviewPlant>(payload.overviewPayload.plants));
+  }, [scheduleDataQuery.data]);
 
   useEffect(() => {
-    async function load() {
-      if (!experimentId) {
+    if (!experimentId || !summary) {
+      return;
+    }
+    if (!summary.setup.is_complete) {
+      router.replace(`/experiments/${experimentId}/setup`);
+    }
+  }, [experimentId, router, summary]);
+
+  const reloadScheduleData = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.experiment.feature(experimentId, "scheduleData"),
+    });
+  }, [experimentId, queryClient]);
+
+  const saveScheduleMutation = useMutation({
+    mutationFn: async (args: {
+      payload: Record<string, unknown>;
+      editingId: string | null;
+    }) => {
+      if (args.editingId) {
+        await api.patch(`/api/v1/schedules/${args.editingId}`, args.payload);
+      } else {
+        await api.post(`/api/v1/experiments/${experimentId}/schedules`, args.payload);
+      }
+    },
+    onMutate: () => {
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: async (_result, args) => {
+      setNotice(args.editingId ? "Schedule updated." : "Schedule created.");
+      resetForm();
+      await reloadScheduleData();
+    },
+    onError: (requestError) => {
+      if (isApiError(requestError)) {
+        const payload = requestError.payload as { detail?: string; errors?: string[] } | undefined;
+        const errors = Array.isArray(payload?.errors) ? payload?.errors.join(" ") : "";
+        setError(payload?.detail || errors || requestError.detail || "Unable to save schedule.");
         return;
       }
-      setLoading(true);
-      setError("");
-      setNotInvited(false);
-      try {
-        const meResponse = await backendFetch("/api/me");
-        if (meResponse.status === 403) {
-          setNotInvited(true);
-          return;
-        }
-        await loadScheduleData();
-        setOffline(false);
-      } catch (requestError) {
-        const normalized = normalizeBackendError(requestError);
-        if (normalized.kind === "offline") {
-          setOffline(true);
-        }
-        setError("Unable to load schedule page.");
-      } finally {
-        setLoading(false);
+      const normalized = normalizeUserFacingError(requestError, "Unable to save schedule.");
+      if (normalized.kind === "offline") {
+        setMutationOffline(true);
       }
-    }
+      setError("Unable to save schedule.");
+    },
+  });
 
-    void load();
-  }, [experimentId, loadScheduleData]);
+  const toggleEnabledMutation = useMutation({
+    mutationFn: async (args: { id: string; enabled: boolean }) => {
+      await api.patch(`/api/v1/schedules/${args.id}`, { enabled: !args.enabled });
+    },
+    onMutate: () => {
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: async () => {
+      await reloadScheduleData();
+    },
+    onError: (requestError) => {
+      if (isApiError(requestError)) {
+        setError(requestError.detail || "Unable to update schedule state.");
+        return;
+      }
+      const normalized = normalizeUserFacingError(requestError, "Unable to update schedule state.");
+      if (normalized.kind === "offline") {
+        setMutationOffline(true);
+      }
+      setError(normalized.message || "Unable to update schedule state.");
+    },
+  });
+
+  const deleteScheduleMutation = useMutation({
+    mutationFn: async (actionId: string) => {
+      await api.delete(`/api/v1/schedules/${actionId}`);
+    },
+    onMutate: () => {
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: async (_result, actionId) => {
+      setNotice("Schedule deleted.");
+      if (editingId === actionId) {
+        resetForm();
+      }
+      await reloadScheduleData();
+    },
+    onError: (requestError) => {
+      if (isApiError(requestError)) {
+        setError(requestError.detail || "Unable to delete schedule.");
+        return;
+      }
+      const normalized = normalizeUserFacingError(requestError, "Unable to delete schedule.");
+      if (normalized.kind === "offline") {
+        setMutationOffline(true);
+      }
+      setError(normalized.message || "Unable to delete schedule.");
+    },
+  });
+
+  const saving =
+    saveScheduleMutation.isPending ||
+    toggleEnabledMutation.isPending ||
+    deleteScheduleMutation.isPending;
 
   function resetForm() {
     setEditingId(null);
@@ -549,93 +644,26 @@ export default function ExperimentSchedulePage() {
       setError("Select at least one scope.");
       return;
     }
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const payload = {
-        title: title.trim(),
-        action_type: actionType,
-        description: description.trim(),
-        enabled,
-        rules: buildRulesPayload(),
-        scopes: selectedScopeIds.map((scopeId) => ({
-          scope_type: scopeType,
-          scope_id: scopeId,
-        })),
-      };
-      const response = await backendFetch(
-        editingId ? `/api/v1/schedules/${editingId}` : `/api/v1/experiments/${experimentId}/schedules`,
-        {
-          method: editingId ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        },
-      );
-      const responsePayload = await response.json();
-      if (!response.ok) {
-        const errors = Array.isArray(responsePayload.errors) ? responsePayload.errors.join(" ") : "";
-        setError(responsePayload.detail || errors || "Unable to save schedule.");
-        return;
-      }
-      setNotice(editingId ? "Schedule updated." : "Schedule created.");
-      resetForm();
-      await loadScheduleData();
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
-      if (normalized.kind === "offline") {
-        setOffline(true);
-      }
-      setError("Unable to save schedule.");
-    } finally {
-      setSaving(false);
-    }
+    const payload = {
+      title: title.trim(),
+      action_type: actionType,
+      description: description.trim(),
+      enabled,
+      rules: buildRulesPayload(),
+      scopes: selectedScopeIds.map((scopeId) => ({
+        scope_type: scopeType,
+        scope_id: scopeId,
+      })),
+    };
+    await saveScheduleMutation.mutateAsync({ payload, editingId }).catch(() => null);
   }
 
   async function toggleEnabled(action: ScheduleAction) {
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/schedules/${action.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: !action.enabled }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        setError(payload.detail || "Unable to update schedule state.");
-        return;
-      }
-      await loadScheduleData();
-    } catch (requestError) {
-      setError(normalizeBackendError(requestError).message || "Unable to update schedule state.");
-    } finally {
-      setSaving(false);
-    }
+    await toggleEnabledMutation.mutateAsync({ id: action.id, enabled: action.enabled }).catch(() => null);
   }
 
   async function deleteScheduleAction(actionId: string) {
-    setSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/schedules/${actionId}`, { method: "DELETE" });
-      if (!response.ok) {
-        const payload = (await response.json()) as { detail?: string };
-        setError(payload.detail || "Unable to delete schedule.");
-        return;
-      }
-      setNotice("Schedule deleted.");
-      if (editingId === actionId) {
-        resetForm();
-      }
-      await loadScheduleData();
-    } catch (requestError) {
-      setError(normalizeBackendError(requestError).message || "Unable to delete schedule.");
-    } finally {
-      setSaving(false);
-    }
+    await deleteScheduleMutation.mutateAsync(actionId).catch(() => null);
   }
 
   function toggleScopeSelection(scopeId: string) {
@@ -671,6 +699,14 @@ export default function ExperimentSchedulePage() {
     return Array.from(groups.entries()).sort((left, right) => left[0].localeCompare(right[0]));
   }, [activePlants]);
 
+  const notInvited = scheduleDataState.errorKind === "forbidden";
+  const loading = scheduleDataState.isLoading;
+  const offline = mutationOffline || scheduleDataState.errorKind === "offline";
+  const queryError =
+    !notInvited && scheduleDataState.isError && scheduleDataState.errorKind !== "offline"
+      ? "Unable to load schedule page."
+      : "";
+
   if (notInvited) {
     return (
       <PageShell title="Schedule">
@@ -694,7 +730,7 @@ export default function ExperimentSchedulePage() {
       <PageAlerts
         loading={loading}
         loadingText="Loading schedules..."
-        error={error}
+        error={error || queryError}
         notice={notice}
         offline={offline}
       />

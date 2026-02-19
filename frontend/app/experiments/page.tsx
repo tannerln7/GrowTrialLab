@@ -1,15 +1,19 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 
-import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { unwrapList } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { api } from "@/src/lib/api";
+import { queryKeys } from "@/src/lib/queryKeys";
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
 type Experiment = {
   id: string;
@@ -18,45 +22,54 @@ type Experiment = {
   status: string;
 };
 
+type MePayload = {
+  email: string;
+  role: string;
+  status: string;
+};
+
 export default function ExperimentsPage() {
-  const [items, setItems] = useState<Experiment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [notInvited, setNotInvited] = useState(false);
-  const [error, setError] = useState("");
-  const [offline, setOffline] = useState(false);
+  const meQuery = useQuery({
+    queryKey: queryKeys.system.me(),
+    queryFn: () => api.get<MePayload>("/api/me"),
+    staleTime: 60_000,
+  });
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setError("");
-      try {
-        const meResponse = await backendFetch("/api/me");
-        if (meResponse.status === 403) {
-          setNotInvited(true);
-          return;
-        }
+  const experimentsQuery = useQuery({
+    queryKey: queryKeys.experiments.list(),
+    queryFn: () => api.get<unknown>("/api/v1/experiments/"),
+    enabled: meQuery.isSuccess,
+  });
 
-        const response = await backendFetch("/api/v1/experiments/");
-        if (!response.ok) {
-          setError("Unable to load experiments.");
-          return;
-        }
-        const payload = (await response.json()) as unknown;
-        setItems(unwrapList<Experiment>(payload));
-        setOffline(false);
-      } catch (requestError) {
-        const normalizedError = normalizeBackendError(requestError);
-        if (normalizedError.kind === "offline") {
-          setOffline(true);
-        }
-        setError("Unable to load experiments.");
-      } finally {
-        setLoading(false);
-      }
+  const meState = usePageQueryState(meQuery);
+  const experimentsState = usePageQueryState(experimentsQuery);
+
+  const notInvited = meState.errorKind === "forbidden";
+  const loading = meState.isLoading || (meQuery.isSuccess && experimentsState.isLoading);
+  const offline = meState.errorKind === "offline" || experimentsState.errorKind === "offline";
+  const error = useMemo(() => {
+    if (notInvited) {
+      return "";
     }
+    if (meState.isError) {
+      return "Unable to load experiments.";
+    }
+    if (experimentsState.isError) {
+      return "Unable to load experiments.";
+    }
+    return "";
+  }, [experimentsState.isError, meState.isError, notInvited]);
 
-    void load();
-  }, []);
+  const items = useMemo(() => {
+    if (!experimentsQuery.data) {
+      return [] as Experiment[];
+    }
+    try {
+      return unwrapList<Experiment>(experimentsQuery.data);
+    } catch {
+      return [] as Experiment[];
+    }
+  }, [experimentsQuery.data]);
 
   if (notInvited) {
     return (

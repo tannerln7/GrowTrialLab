@@ -1,22 +1,21 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 
-import { backendFetch, normalizeBackendError } from "@/lib/backend";
-import {
-  fetchExperimentStatusSummary,
-  type ExperimentStatusSummary,
-} from "@/lib/experiment-status";
+import type { ExperimentStatusSummary } from "@/lib/experiment-status";
 import { buttonVariants } from "@/src/components/ui/button";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { api } from "@/src/lib/api";
+import { queryKeys } from "@/src/lib/queryKeys";
 import { useRouteParamString } from "@/src/lib/useRouteParamString";
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 import { cn } from "@/lib/utils";
-
 
 type ChecklistItem = {
   id: "plants" | "tents_blocks" | "recipes";
@@ -30,57 +29,36 @@ export default function ExperimentSetupPage() {
   const router = useRouter();
   const experimentId = useRouteParamString("id") || "";
 
-  const [loading, setLoading] = useState(true);
-  const [notInvited, setNotInvited] = useState(false);
-  const [offline, setOffline] = useState(false);
-  const [error, setError] = useState("");
-  const [statusSummary, setStatusSummary] = useState<ExperimentStatusSummary | null>(null);
+  const statusQuery = useQuery({
+    queryKey: queryKeys.experiment.status(experimentId),
+    queryFn: () =>
+      api.get<ExperimentStatusSummary>(
+        `/api/v1/experiments/${experimentId}/status/summary`,
+      ),
+    enabled: Boolean(experimentId),
+  });
 
-  const loadStatus = useCallback(async () => {
-    const summary = await fetchExperimentStatusSummary(experimentId);
-    if (!summary) {
-      throw new Error("Unable to load setup status.");
-    }
-    setStatusSummary(summary);
-    return summary;
-  }, [experimentId]);
+  const statusState = usePageQueryState(statusQuery);
+  const statusSummary = statusQuery.data ?? null;
 
   useEffect(() => {
-    async function load() {
-      if (!experimentId) {
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      setError("");
-      setOffline(false);
-
-      try {
-        const meResponse = await backendFetch("/api/me");
-        if (meResponse.status === 403) {
-          setNotInvited(true);
-          return;
-        }
-
-        const summary = await loadStatus();
-        if (summary.setup.is_complete) {
-          router.replace(`/experiments/${experimentId}/overview`);
-          return;
-        }
-      } catch (requestError) {
-        const normalized = normalizeBackendError(requestError);
-        if (normalized.kind === "offline") {
-          setOffline(true);
-        }
-        setError("Unable to load setup checklist.");
-      } finally {
-        setLoading(false);
-      }
+    if (!experimentId || !statusSummary) {
+      return;
     }
 
-    void load();
-  }, [experimentId, loadStatus, router]);
+    if (statusSummary.setup.is_complete) {
+      router.replace(`/experiments/${experimentId}/overview`);
+    }
+  }, [experimentId, router, statusSummary]);
+
+  const notInvited = statusState.errorKind === "forbidden";
+  const offline = statusState.errorKind === "offline";
+  const error = useMemo(() => {
+    if (!statusState.isError || notInvited || offline) {
+      return "";
+    }
+    return "Unable to load setup checklist.";
+  }, [notInvited, offline, statusState.isError]);
 
   if (notInvited) {
     return (
@@ -127,13 +105,13 @@ export default function ExperimentSetupPage() {
       }
     >
       <PageAlerts
-        loading={loading}
+        loading={statusState.isLoading}
         loadingText="Loading setup checklist..."
         error={error}
         offline={offline}
       />
 
-      {!loading ? (
+      {!statusState.isLoading ? (
         <SectionCard title="Bootstrap Checklist">
           <div className="grid gap-3">
             {checklist.map((item) => (

@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import {
   AlertCircle,
@@ -10,11 +11,12 @@ import {
   ShieldAlert,
   Tag,
 } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { backendUrl, unwrapList } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
@@ -22,12 +24,16 @@ import { Input } from "@/src/components/ui/input";
 import { NativeSelect } from "@/src/components/ui/native-select";
 import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
-import { useRouteParamString } from "@/src/lib/useRouteParamString";
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
 import { Textarea } from "@/src/components/ui/textarea";
+import { api, isApiError } from "@/src/lib/api";
+import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { queryKeys } from "@/src/lib/queryKeys";
+import { useRouteParamString } from "@/src/lib/useRouteParamString";
+import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
 import { cockpitStyles as styles } from "@/src/components/ui/cockpit-styles";
 
@@ -288,19 +294,14 @@ export default function PlantQrPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const plantUuid = useRouteParamString("id") || "";
 
-  const [loading, setLoading] = useState(true);
-  const [offline, setOffline] = useState(false);
-  const [notInvited, setNotInvited] = useState(false);
-  const [notFound, setNotFound] = useState(false);
+  const [mutationOffline, setMutationOffline] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [cockpit, setCockpit] = useState<PlantCockpit | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [uploadTag, setUploadTag] = useState<UploadTag>("identity");
   const [showReplaceModal, setShowReplaceModal] = useState(false);
   const [replaceConfirmed, setReplaceConfirmed] = useState(false);
-  const [replacing, setReplacing] = useState(false);
   const [newPlantId, setNewPlantId] = useState("");
   const [removedReason, setRemovedReason] = useState("");
   const [inheritAssignment, setInheritAssignment] = useState(true);
@@ -308,7 +309,6 @@ export default function PlantQrPage() {
   const [inheritGrade, setInheritGrade] = useState(false);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [recipeSelection, setRecipeSelection] = useState("");
-  const [recipeSaving, setRecipeSaving] = useState(false);
 
   const overviewFromParam = useMemo(
     () => normalizeFromParam(searchParams.get("from")),
@@ -328,67 +328,38 @@ export default function PlantQrPage() {
 
   const nowAction = useMemo(() => buildNowAction(cockpit), [cockpit]);
 
-  useEffect(() => {
-    async function loadCockpit() {
-      if (!plantUuid) {
-        setLoading(false);
-        setNotFound(true);
-        return;
-      }
-
-      setLoading(true);
-      setError("");
-      setNotice("");
-      setNotInvited(false);
-      setNotFound(false);
-
+  const cockpitQuery = useQuery({
+    queryKey: queryKeys.plant.cockpit(plantUuid),
+    queryFn: async () => {
+      const data = await api.get<PlantCockpit>(`/api/v1/plants/${plantUuid}/cockpit`);
+      let recipesData: Recipe[] = [];
       try {
-        const response = await backendFetch(`/api/v1/plants/${plantUuid}/cockpit`);
-        if (response.status === 403) {
-          setNotInvited(true);
-          return;
-        }
-        if (response.status === 404) {
-          setNotFound(true);
-          return;
-        }
-        if (!response.ok) {
-          setError("Unable to load plant cockpit.");
-          return;
-        }
-        const data = (await response.json()) as PlantCockpit;
-        setCockpit(data);
-        setUploadTag(data.derived.has_baseline ? "identity" : "baseline");
-        setRecipeSelection(data.derived.assigned_recipe?.id || "");
-        try {
-          const recipesResponse = await backendFetch(
-            `/api/v1/experiments/${data.plant.experiment.id}/recipes`,
-          );
-          if (recipesResponse.ok) {
-            const recipesPayload = (await recipesResponse.json()) as unknown;
-            setRecipes(unwrapList<Recipe>(recipesPayload));
-          } else {
-            setRecipes([]);
-          }
-        } catch {
-          setRecipes([]);
-        }
-        setOffline(false);
-      } catch (requestError) {
-        const normalizedError = normalizeBackendError(requestError);
-        if (normalizedError.kind === "offline") {
-          setOffline(true);
-          setError("");
-        } else {
-          setError("Unable to load plant cockpit.");
-        }
-      } finally {
-        setLoading(false);
+        const recipesPayload = await api.get<unknown>(`/api/v1/experiments/${data.plant.experiment.id}/recipes`);
+        recipesData = unwrapList<Recipe>(recipesPayload);
+      } catch {
+        recipesData = [];
       }
-    }
+      return {
+        cockpit: data,
+        recipes: recipesData,
+      };
+    },
+    enabled: Boolean(plantUuid),
+    retry: false,
+  });
+  const cockpitQueryState = usePageQueryState(cockpitQuery);
+  const notInvited = isApiError(cockpitQuery.error) && cockpitQuery.error.status === 403;
+  const notFound = !plantUuid || (isApiError(cockpitQuery.error) && cockpitQuery.error.status === 404);
 
-    void loadCockpit();
-  }, [plantUuid]);
+  useEffect(() => {
+    if (!cockpitQuery.data) {
+      return;
+    }
+    setCockpit(cockpitQuery.data.cockpit);
+    setRecipes(cockpitQuery.data.recipes);
+    setUploadTag(cockpitQuery.data.cockpit.derived.has_baseline ? "identity" : "baseline");
+    setRecipeSelection(cockpitQuery.data.cockpit.derived.assigned_recipe?.id || "");
+  }, [cockpitQuery.data]);
 
   useEffect(() => {
     if (replacementCreated) {
@@ -404,40 +375,29 @@ export default function PlantQrPage() {
     return `/p/${targetPlantId}${nextParams.toString() ? `?${nextParams.toString()}` : ""}`;
   }
 
-  async function handlePhotoUpload() {
-    if (!cockpit || !photoFile) {
-      return;
-    }
-
-    setUploading(true);
-    setError("");
-    setNotice("");
-
-    try {
+  const photoUploadMutation = useMutation({
+    mutationFn: async (args: { cockpit: PlantCockpit; file: File; uploadTag: UploadTag }) => {
       const formData = new FormData();
-      formData.append("experiment", cockpit.plant.experiment.id);
-      formData.append("plant", cockpit.plant.uuid);
-      formData.append("tag", uploadTagToApiTag(uploadTag));
-      if (uploadTag === "baseline") {
+      formData.append("experiment", args.cockpit.plant.experiment.id);
+      formData.append("plant", args.cockpit.plant.uuid);
+      formData.append("tag", uploadTagToApiTag(args.uploadTag));
+      if (args.uploadTag === "baseline") {
         formData.append("week_number", "0");
       }
-      formData.append("file", photoFile);
-
-      const response = await backendFetch("/api/v1/photos/", {
-        method: "POST",
-        body: formData,
-      });
-      if (!response.ok) {
-        setError("Photo upload failed.");
-        return;
-      }
-
-      const payload = (await response.json()) as UploadedPhoto;
+      formData.append("file", args.file);
+      return api.postForm<UploadedPhoto>("/api/v1/photos/", formData);
+    },
+    onMutate: () => {
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: (payload, args) => {
       const recentPhoto: PlantPhoto = {
         id: payload.id,
         url: toPhotoUrl(payload.file),
         created_at: payload.created_at,
-        tag: uploadTag,
+        tag: args.uploadTag,
         week_number: payload.week_number,
       };
 
@@ -459,90 +419,78 @@ export default function PlantQrPage() {
         fileInputRef.current.value = "";
       }
       setNotice("Photo added.");
-      setOffline(false);
-    } catch (requestError) {
-      const normalizedError = normalizeBackendError(requestError);
+    },
+    onError: (requestError) => {
+      if (isApiError(requestError)) {
+        setError(requestError.detail || "Photo upload failed.");
+        return;
+      }
+      const normalizedError = normalizeUserFacingError(requestError, "Photo upload failed.");
       if (normalizedError.kind === "offline") {
-        setOffline(true);
+        setMutationOffline(true);
         setError("You are offline. Photo upload is unavailable.");
       } else {
         setError("Photo upload failed.");
       }
-    } finally {
-      setUploading(false);
-    }
-  }
+    },
+  });
 
-  async function handleReplacePlant() {
-    if (!cockpit) {
-      return;
-    }
-    setReplacing(true);
-    setError("");
-    setNotice("");
-
-    try {
-      const response = await backendFetch(`/api/v1/plants/${cockpit.plant.uuid}/replace`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          new_plant_id: newPlantId.trim() || null,
-          copy_identity_fields: copyIdentity,
-          inherit_assignment: inheritAssignment,
-          inherit_grade: inheritGrade,
-          mark_original_removed: true,
-          removed_reason: removedReason.trim() || null,
-        }),
+  const replacePlantMutation = useMutation({
+    mutationFn: async (args: { cockpit: PlantCockpit }) => {
+      return api.post<ReplacementResponse>(`/api/v1/plants/${args.cockpit.plant.uuid}/replace`, {
+        new_plant_id: newPlantId.trim() || null,
+        copy_identity_fields: copyIdentity,
+        inherit_assignment: inheritAssignment,
+        inherit_grade: inheritGrade,
+        mark_original_removed: true,
+        removed_reason: removedReason.trim() || null,
       });
-
-      const payload = (await response.json()) as ReplacementResponse | { detail?: string };
-      if (!response.ok) {
-        setError(
-          (payload as { detail?: string }).detail || "Unable to replace plant.",
-        );
-        return;
-      }
+    },
+    onMutate: () => {
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: (payload) => {
       const nextParams = new URLSearchParams();
       if (overviewFromParam) {
         nextParams.set("from", overviewFromParam);
       }
       nextParams.set("replacementCreated", "1");
-      router.push(`/p/${(payload as ReplacementResponse).replacement.uuid}?${nextParams.toString()}`);
-    } catch (requestError) {
-      const normalized = normalizeBackendError(requestError);
+      router.push(`/p/${payload.replacement.uuid}?${nextParams.toString()}`);
+    },
+    onError: (requestError) => {
+      if (isApiError(requestError)) {
+        setError(requestError.detail || "Unable to replace plant.");
+        return;
+      }
+      const normalized = normalizeUserFacingError(requestError, "Unable to replace plant.");
       if (normalized.kind === "offline") {
-        setOffline(true);
+        setMutationOffline(true);
         setError("You are offline. Replacement is unavailable.");
       } else {
         setError("Unable to replace plant.");
       }
-    } finally {
-      setReplacing(false);
+    },
+    onSettled: () => {
       setShowReplaceModal(false);
       setReplaceConfirmed(false);
-    }
-  }
+    },
+  });
 
-  async function handleRecipeChange(nextRecipeId: string | null) {
-    if (!cockpit) {
-      return;
-    }
-
-    setRecipeSaving(true);
-    setError("");
-    setNotice("");
-    try {
-      const response = await backendFetch(`/api/v1/plants/${cockpit.plant.uuid}/`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assigned_recipe_id: nextRecipeId }),
+  const recipeChangeMutation = useMutation({
+    mutationFn: async (args: { cockpit: PlantCockpit; nextRecipeId: string | null }) => {
+      await api.patch(`/api/v1/plants/${args.cockpit.plant.uuid}/`, {
+        assigned_recipe_id: args.nextRecipeId,
       });
-      const payload = (await response.json()) as { detail?: string };
-      if (!response.ok) {
-        setError(payload.detail || "Unable to update recipe.");
-        return;
-      }
-
+      return args;
+    },
+    onMutate: () => {
+      setError("");
+      setNotice("");
+      setMutationOffline(false);
+    },
+    onSuccess: ({ nextRecipeId }) => {
       const selectedRecipe = nextRecipeId
         ? recipes.find((recipe) => recipe.id === nextRecipeId) || null
         : null;
@@ -562,17 +510,51 @@ export default function PlantQrPage() {
       });
       setRecipeSelection(nextRecipeId || "");
       setNotice(nextRecipeId ? "Recipe updated." : "Recipe cleared.");
-    } catch (requestError) {
-      const normalizedError = normalizeBackendError(requestError);
+    },
+    onError: (requestError) => {
+      if (isApiError(requestError)) {
+        setError(requestError.detail || "Unable to update recipe.");
+        return;
+      }
+      const normalizedError = normalizeUserFacingError(requestError, "Unable to update recipe.");
       if (normalizedError.kind === "offline") {
-        setOffline(true);
+        setMutationOffline(true);
         setError("You are offline. Recipe updates are unavailable.");
       } else {
         setError("Unable to update recipe.");
       }
-    } finally {
-      setRecipeSaving(false);
+    },
+  });
+
+  const loading = Boolean(plantUuid) && cockpitQuery.isPending;
+  const uploading = photoUploadMutation.isPending;
+  const replacing = replacePlantMutation.isPending;
+  const recipeSaving = recipeChangeMutation.isPending;
+  const offline = mutationOffline || cockpitQueryState.errorKind === "offline";
+  const queryError =
+    !notInvited && !notFound && !offline && cockpitQueryState.isError
+      ? "Unable to load plant cockpit."
+      : "";
+
+  function handlePhotoUpload() {
+    if (!cockpit || !photoFile) {
+      return;
     }
+    photoUploadMutation.mutate({ cockpit, file: photoFile, uploadTag });
+  }
+
+  function handleReplacePlant() {
+    if (!cockpit) {
+      return;
+    }
+    replacePlantMutation.mutate({ cockpit });
+  }
+
+  function handleRecipeChange(nextRecipeId: string | null) {
+    if (!cockpit) {
+      return;
+    }
+    recipeChangeMutation.mutate({ cockpit, nextRecipeId });
   }
 
   if (notInvited) {
@@ -643,7 +625,7 @@ export default function PlantQrPage() {
             inventoryId="ILL-002"
             kind="error"
             title="Something went wrong"
-            subtitle={error}
+            subtitle={error || queryError}
           />
         </SectionCard>
       ) : null}
