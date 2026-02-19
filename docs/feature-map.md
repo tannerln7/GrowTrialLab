@@ -27,6 +27,28 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (GridKit Phase 4 PositionStrip Paging Standardization)
+- `Completed` Shelf position paging is now standardized through one native scroll-snap primitive across tent/shelf adapters.
+  - Added canonical `PositionStrip`:
+    - `frontend/src/lib/gridkit/components/PositionStrip.tsx`
+  - Added small reusable helpers:
+    - `frontend/src/lib/collections/array.ts` (`chunkArray`)
+    - `frontend/src/lib/hooks/usePrefersReducedMotion.ts`
+    - `frontend/src/lib/hooks/usePointerCoarse.ts`
+  - Migrated shelf-strip rendering to `PositionStrip` in:
+    - `frontend/src/lib/gridkit/components/adapters/LegacyOverviewTentLayoutAdapter.tsx`
+    - `frontend/src/lib/gridkit/components/adapters/LegacyPlacementTentLayoutAdapter.tsx`
+    - `frontend/src/lib/gridkit/components/adapters/LegacyPlacementShelfPreviewAdapter.tsx`
+  - `POSITION_STRIP_PRESET.maxVisible` is used as the paging size source (`4` positions per page).
+  - Inventory/guardrail reporting now includes:
+    - `position_strip_usages`
+    - `remaining_legacy_shelf_strip_patterns`
+  - Relevant files:
+    - `frontend/src/lib/gridkit/components/index.ts`
+    - `infra/scripts/gridkit-inventory.sh`
+    - `infra/scripts/check-gridkit-legacy.sh`
+  - Refs: `43c3f21`
+
 ### 2026-02-19 (GridKit Phase 3 Structural Container Standardization)
 - `Completed` GridKit tent/shelf structural scaffolding was standardized with shared containers and adopted across legacy adapters and direct tent-wrapper callsites.
   - Added canonical structural container components:

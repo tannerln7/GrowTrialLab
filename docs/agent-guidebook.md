@@ -217,6 +217,11 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
     - `ShelfStack` for vertical shelf stacking inside tents.
     - `ShelfCard` as the shelf section wrapper (header + body).
     - Source: `frontend/src/lib/gridkit/components/containers/*`.
+  - Use `PositionStrip` (`frontend/src/lib/gridkit/components/PositionStrip.tsx`) for shelf position paging:
+    - one canonical native scroll-snap implementation (`snap-x`), no carousel libraries.
+    - fixed page size is `4` positions (`POSITION_STRIP_PRESET.maxVisible`).
+    - desktop arrow controls page by one viewport-width strip.
+    - hide scrollbars with `.hide-scrollbar`; preserve touch momentum.
   - Use `CountAdjustToolbar` (`frontend/src/components/ui/count-adjust-toolbar.tsx`) for shared add/remove count toolbars (tent/shelf/tray manager rows).
   - Use `DraftChangeChip` (`frontend/src/components/ui/draft-change-chip.tsx`) for consistent draft-highlight labels across step cards and nav controls.
 - Use `DraftChangeMarker` (`frontend/src/components/ui/draft-change-marker.tsx`) only for non-GridKit surfaces that have not yet migrated to `CellChips`; combine with `experimentsStyles.draftChangedSurface` ring style when applicable.

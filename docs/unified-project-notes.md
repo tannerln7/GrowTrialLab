@@ -170,6 +170,11 @@ This document is the single consolidated source for current status, architecture
   - canonical containers: `TentGrid`, `TentCard`, `ShelfStack`, `ShelfCard` under `frontend/src/lib/gridkit/components/containers/`
   - legacy tent/shelf adapters now render through these containers while preserving existing leaf content behavior
   - Step 1 tent wrappers now use `TentGrid`/`TentCard`, and inventory/guardrail scripts now report container adoption plus remaining bespoke tent/shelf wrapper heuristics.
+- [x] GridKit shelf paging is now standardized with `PositionStrip` (`frontend/src/lib/gridkit/components/PositionStrip.tsx`) across legacy tent/shelf adapters:
+  - native CSS scroll-snap (`snap-x snap-mandatory`) and touch momentum (`-webkit-overflow-scrolling: touch`)
+  - fixed page size of 4 positions (`POSITION_STRIP_PRESET.maxVisible`)
+  - desktop arrow paging (one full page per click) with reduced-motion fallback
+  - stable DnD seam `data-*` attributes (`data-pos-id`, `data-draggable-id`, `data-droppable-id`, etc.) applied on position wrappers without enabling DnD behavior.
 - [x] Tailwind-first migration is now active across the primary operator routes (`overview`, `recipes`, `placement`, `baseline`, `feeding`, `rotation`, `schedule`, `setup` + supporting setup routes, and cockpit `/p/{id}`): legacy `gt-*` class usage was removed from these flows and styling is now driven by Tailwind utility composition plus shadcn-style components/primitives.
 - [x] Route CSS modules for experiments/cockpit styling were retired in favor of shared Tailwind style maps and reusable UI primitives:
   - removed: `frontend/app/experiments/experiments.module.css`
