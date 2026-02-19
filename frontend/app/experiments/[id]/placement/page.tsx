@@ -2,7 +2,6 @@
 
 import {
   ArrowRight,
-  Check,
   CheckSquare,
   Layers,
   MoveRight,
@@ -19,6 +18,47 @@ import {
   type ExperimentStatusSummary,
 } from "@/lib/experiment-status";
 import { suggestTentCode, suggestTentName, suggestTrayName } from "@/lib/id-suggestions";
+import type {
+  Diagnostics,
+  PersistedTrayPlantRow,
+  PlacementSummary,
+  PlantCell,
+  SlotSummary,
+  Species,
+  TentDraft,
+  TentSummary,
+  TrayCell,
+} from "@/src/features/placement/types";
+import {
+  STEPS,
+  RUNNING_LOCK_MESSAGE,
+} from "@/src/features/placement/types";
+import {
+  areShelfCountsEqual,
+  buildDefaultShelves,
+  buildPlantDraftStats,
+  buildPersistedShelfCounts,
+  buildPersistedPlacementState,
+  buildRemovedTrayIds,
+  buildSortedSlots,
+  buildStep1ShelfPreviewGroups,
+  buildTrayCapacityDraftStats,
+  buildTraySlotDraftStats,
+  draftChangeCountForStep,
+  draftChipLabelForStep,
+  formatTrayDisplay,
+  getTentDraftMeta,
+  isStepComplete,
+  isStepReadyForNext,
+  isActivePlant,
+  nextButtonLabel,
+  normalizePlant,
+  parseBackendErrorPayload,
+  parseStep,
+  stepBlockedMessage,
+} from "@/src/features/placement/utils";
+import { PlantSelectableCell, TraySelectableCell } from "@/src/features/placement/components/placement-cells";
+import { TentSlotBoard } from "@/src/features/placement/components/tent-slot-board";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
@@ -35,266 +75,6 @@ import { StepAdjustButton } from "@/src/components/ui/step-adjust-button";
 import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
-
-type Species = { id: string; name: string; category: string };
-
-type SlotSummary = {
-  slot_id: string;
-  code: string;
-  label: string;
-  shelf_index: number;
-  slot_index: number;
-  tray_count: number;
-};
-
-type TentSummary = {
-  tent_id: string;
-  name: string;
-  code: string;
-  layout: {
-    schema_version: number;
-    shelves: Array<{ index: number; tray_count: number }>;
-  };
-  allowed_species_count: number;
-  allowed_species: Species[];
-  slots: SlotSummary[];
-};
-
-type Location = {
-  status: "placed" | "unplaced";
-  tent: { id: string; code: string | null; name: string } | null;
-  slot: { id: string; code: string; label: string; shelf_index: number; slot_index: number } | null;
-  tray: { id: string; code: string; name: string; capacity: number; current_count: number } | null;
-};
-
-type RecipeSummary = {
-  id: string;
-  code: string;
-  name: string;
-};
-
-type TrayPlant = {
-  tray_plant_id: string;
-  uuid: string;
-  plant_id: string;
-  species_id: string;
-  species_name: string;
-  species_category: string;
-  grade: string | null;
-  status: string;
-  assigned_recipe: RecipeSummary | null;
-};
-
-type Tray = {
-  tray_id: string;
-  name: string;
-  capacity: number;
-  current_count: number;
-  location: Location;
-  plants: TrayPlant[];
-};
-
-type UnplacedPlant = {
-  uuid: string;
-  plant_id: string;
-  species_id: string;
-  species_name: string;
-  species_category: string;
-  grade: string | null;
-  status: string;
-  assigned_recipe: RecipeSummary | null;
-};
-
-type PlacementSummary = {
-  tents: { count: number; results: TentSummary[]; meta: Record<string, unknown> };
-  trays: { count: number; results: Tray[]; meta: Record<string, unknown> };
-  unplaced_plants: {
-    count: number;
-    results: UnplacedPlant[];
-    meta: { remaining_count?: number };
-  };
-  unplaced_trays: {
-    count: number;
-    results: Array<{
-      tray_id: string;
-      tray_name: string;
-      capacity: number;
-      current_count: number;
-    }>;
-    meta: Record<string, unknown>;
-  };
-};
-
-type Diagnostics = {
-  reason_counts?: Record<string, number>;
-  unplaceable_plants?: Array<{
-    plant_id: string;
-    species_name: string;
-    reason: string;
-  }>;
-};
-
-type PlantCell = {
-  uuid: string;
-  plant_id: string;
-  species_id: string;
-  species_name: string;
-  species_category: string;
-  grade: string | null;
-  status: string;
-  assigned_recipe: RecipeSummary | null;
-};
-
-type TrayCell = {
-  tray_id: string;
-  name: string;
-  capacity: number;
-  current_count: number;
-};
-
-type PersistedTrayPlantRow = {
-  trayId: string;
-  trayPlantId: string;
-};
-
-type TentDraft = {
-  name: string;
-  code: string;
-};
-
-const RUNNING_LOCK_MESSAGE =
-  "Placement cannot be edited while the experiment is running. Stop the experiment to change placement.";
-
-const STEPS = [
-  { id: 1, title: "Tents + Slots" },
-  { id: 2, title: "Trays + Capacity" },
-  { id: 3, title: "Plants -> Trays" },
-  { id: 4, title: "Trays -> Slots" },
-] as const;
-
-function isActivePlant(status: string): boolean {
-  return status.toLowerCase() === "active";
-}
-
-function normalizePlant(plant: UnplacedPlant | TrayPlant): PlantCell {
-  return {
-    uuid: plant.uuid,
-    plant_id: plant.plant_id,
-    species_id: plant.species_id,
-    species_name: plant.species_name,
-    species_category: plant.species_category,
-    grade: plant.grade,
-    status: plant.status,
-    assigned_recipe: plant.assigned_recipe,
-  };
-}
-
-function buildDefaultShelves(tent: TentSummary): number[] {
-  if (tent.layout?.schema_version === 1 && Array.isArray(tent.layout.shelves)) {
-    const counts = tent.layout.shelves.map((shelf) => Math.max(0, shelf.tray_count));
-    if (counts.length > 0) {
-      return counts;
-    }
-  }
-  return [4];
-}
-
-function buildPersistedShelfCounts(tent: TentSummary): number[] {
-  const layoutCounts = (tent.layout?.shelves || [])
-    .slice()
-    .sort((left, right) => left.index - right.index)
-    .map((shelf) => Math.max(0, shelf.tray_count));
-
-  if (tent.slots.length === 0) {
-    return layoutCounts;
-  }
-
-  const slotCountByShelf = new Map<number, number>();
-  for (const slot of tent.slots) {
-    slotCountByShelf.set(slot.shelf_index, (slotCountByShelf.get(slot.shelf_index) || 0) + 1);
-  }
-
-  const maxShelfIndex = Math.max(
-    layoutCounts.length,
-    ...Array.from(slotCountByShelf.keys(), (shelfIndex) => Math.max(1, shelfIndex)),
-  );
-  const counts: number[] = [];
-  for (let index = 1; index <= maxShelfIndex; index += 1) {
-    counts.push(slotCountByShelf.get(index) || 0);
-  }
-  return counts;
-}
-
-function areShelfCountsEqual(left: number[], right: number[]): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-  for (let index = 0; index < left.length; index += 1) {
-    if (left[index] !== right[index]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function areStringSetsEqual(left: string[], right: string[]): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-  const leftSet = new Set(left);
-  if (leftSet.size !== right.length) {
-    return false;
-  }
-  for (const value of right) {
-    if (!leftSet.has(value)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function parseStep(rawStep: string | null): number {
-  const parsed = Number.parseInt(rawStep || "1", 10);
-  if (!Number.isFinite(parsed)) {
-    return 1;
-  }
-  return Math.min(4, Math.max(1, parsed));
-}
-
-function formatTrayDisplay(rawValue: string | null | undefined, fallbackValue?: string): string {
-  const raw = (rawValue || "").trim() || (fallbackValue || "").trim();
-  if (!raw) {
-    return "";
-  }
-  const match = raw.match(/^(?:tray|tr|t)?[\s_-]*0*([0-9]+)$/i);
-  if (!match) {
-    return raw;
-  }
-  const trayNumber = Number.parseInt(match[1], 10);
-  if (!Number.isFinite(trayNumber)) {
-    return raw;
-  }
-  return `Tray ${trayNumber}`;
-}
-
-function formatDraftChipLabel(count: number, singular: string): string {
-  return `${count} ${singular}${count === 1 ? "" : "s"}`;
-}
-
-async function parseBackendErrorPayload(
-  response: Response,
-  fallback: string,
-): Promise<{ detail: string; diagnostics: Diagnostics | null }> {
-  try {
-    const payload = (await response.json()) as { detail?: string; diagnostics?: Diagnostics };
-    return {
-      detail: payload.detail || fallback,
-      diagnostics: payload.diagnostics || null,
-    };
-  } catch {
-    return { detail: fallback, diagnostics: null };
-  }
-}
 
 export default function PlacementPage() {
   const params = useParams();
@@ -439,41 +219,7 @@ export default function PlacementPage() {
     return map;
   }, [tents]);
 
-  const sortedSlots = useMemo(() => {
-    return tents
-      .flatMap((tent) =>
-        [...tent.slots]
-          .sort((left, right) => {
-            if (left.shelf_index !== right.shelf_index) {
-              return left.shelf_index - right.shelf_index;
-            }
-            if (left.slot_index !== right.slot_index) {
-              return left.slot_index - right.slot_index;
-            }
-            return left.slot_id.localeCompare(right.slot_id);
-          })
-          .map((slot) => ({
-            slot_id: slot.slot_id,
-            label: `${tent.code || tent.name} / ${slot.code}`,
-            shelf_index: slot.shelf_index,
-            slot_index: slot.slot_index,
-            tent_id: tent.tent_id,
-          })),
-      )
-      .sort((left, right) => {
-        const leftTent = tents.find((tent) => tent.tent_id === left.tent_id);
-        const rightTent = tents.find((tent) => tent.tent_id === right.tent_id);
-        const leftTentLabel = leftTent ? leftTent.code || leftTent.name : "";
-        const rightTentLabel = rightTent ? rightTent.code || rightTent.name : "";
-        if (leftTentLabel !== rightTentLabel) {
-          return leftTentLabel.localeCompare(rightTentLabel);
-        }
-        if (left.shelf_index !== right.shelf_index) {
-          return left.shelf_index - right.shelf_index;
-        }
-        return left.slot_index - right.slot_index;
-      });
-  }, [tents]);
+  const sortedSlots = useMemo(() => buildSortedSlots(tents), [tents]);
 
   const tentAllowedSpeciesById = useMemo(() => {
     const map = new Map<string, Set<string> | null>();
@@ -623,39 +369,15 @@ export default function PlacementPage() {
   }, [experimentId, loadPage, router]);
 
   useEffect(() => {
-    const nextPersistedPlantToTray: Record<string, string | null> = {};
-    const nextPersistedRows: Record<string, PersistedTrayPlantRow> = {};
-
-    for (const plant of summary?.unplaced_plants.results || []) {
-      if (isActivePlant(plant.status)) {
-        nextPersistedPlantToTray[plant.uuid] = null;
-      }
-    }
-
-    for (const tray of trays) {
-      for (const plant of tray.plants) {
-        if (!isActivePlant(plant.status)) {
-          continue;
-        }
-        nextPersistedPlantToTray[plant.uuid] = tray.tray_id;
-        nextPersistedRows[plant.uuid] = {
-          trayId: tray.tray_id,
-          trayPlantId: plant.tray_plant_id,
-        };
-      }
-    }
-
-    const nextPersistedTrayToSlot: Record<string, string | null> = {};
-    for (const tray of trays) {
-      nextPersistedTrayToSlot[tray.tray_id] = tray.location.slot?.id || null;
-    }
-
-    setPersistedPlantToTray(nextPersistedPlantToTray);
-    setDraftPlantToTray(nextPersistedPlantToTray);
-    setPersistedTrayPlantRowByPlantId(nextPersistedRows);
-
-    setPersistedTrayToSlot(nextPersistedTrayToSlot);
-    setDraftTrayToSlot(nextPersistedTrayToSlot);
+    const persistedPlacementState = buildPersistedPlacementState(
+      summary?.unplaced_plants.results || [],
+      trays,
+    );
+    setPersistedPlantToTray(persistedPlacementState.persistedPlantToTray);
+    setDraftPlantToTray(persistedPlacementState.persistedPlantToTray);
+    setPersistedTrayPlantRowByPlantId(persistedPlacementState.persistedTrayPlantRowByPlantId);
+    setPersistedTrayToSlot(persistedPlacementState.persistedTrayToSlot);
+    setDraftTrayToSlot(persistedPlacementState.persistedTrayToSlot);
 
     setShelfCountsByTent((current) => {
       const next = { ...current };
@@ -773,247 +495,121 @@ export default function PlacementPage() {
     return grouped;
   }, [draftTrayToSlot, selectedTrayIds, slotById, tents]);
 
-  const placementDraftChangeCount = useMemo(() => {
-    let count = 0;
-    for (const plantId of sortedPlantIds) {
-      const persistedTrayId = persistedPlantToTray[plantId] ?? null;
-      const draftTrayId = draftPlantToTray[plantId] ?? persistedTrayId;
-      if ((persistedTrayId || null) !== (draftTrayId || null)) {
-        count += 1;
-      }
-    }
-    return count;
-  }, [draftPlantToTray, persistedPlantToTray, sortedPlantIds]);
+  const plantDraftStats = useMemo(
+    () =>
+      buildPlantDraftStats(
+        sortedPlantIds,
+        persistedPlantToTray,
+        draftPlantToTray,
+      ),
+    [draftPlantToTray, persistedPlantToTray, sortedPlantIds],
+  );
+  const placementDraftChangeCount = plantDraftStats.changeCount;
+  const dirtyPlantContainerTrayIds = plantDraftStats.dirtyContainerTrayIds;
 
-  const dirtyPlantContainerTrayIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const plantId of sortedPlantIds) {
-      const persistedTrayId = persistedPlantToTray[plantId] ?? null;
-      const draftTrayId = draftPlantToTray[plantId] ?? persistedTrayId;
-      if ((persistedTrayId || null) === (draftTrayId || null)) {
-        continue;
-      }
-      if (persistedTrayId) {
-        ids.add(persistedTrayId);
-      }
-      if (draftTrayId) {
-        ids.add(draftTrayId);
-      }
-    }
-    return ids;
-  }, [draftPlantToTray, persistedPlantToTray, sortedPlantIds]);
+  const traySlotDraftStats = useMemo(
+    () =>
+      buildTraySlotDraftStats(
+        sortedTrayIds,
+        persistedTrayToSlot,
+        draftTrayToSlot,
+      ),
+    [draftTrayToSlot, persistedTrayToSlot, sortedTrayIds],
+  );
+  const traySlotDraftChangeCount = traySlotDraftStats.changeCount;
+  const dirtySlotIds = traySlotDraftStats.dirtySlotIds;
 
-  const traySlotDraftChangeCount = useMemo(() => {
-    let count = 0;
-    for (const trayId of sortedTrayIds) {
-      const persistedSlotId = persistedTrayToSlot[trayId] ?? null;
-      const draftSlotId = draftTrayToSlot[trayId] ?? persistedSlotId;
-      if ((persistedSlotId || null) !== (draftSlotId || null)) {
-        count += 1;
-      }
-    }
-    return count;
-  }, [draftTrayToSlot, persistedTrayToSlot, sortedTrayIds]);
+  const step1DraftStats = useMemo(() => {
+    let tentSlotDraftChangeCount = 0;
+    let tentDetailsDraftChangeCount = 0;
+    const dirtyTentIds = new Set<string>();
+    const tentDraftMetaById = new Map<string, ReturnType<typeof getTentDraftMeta>>();
 
-  const dirtySlotIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const trayId of sortedTrayIds) {
-      const persistedSlotId = persistedTrayToSlot[trayId] ?? null;
-      const draftSlotId = draftTrayToSlot[trayId] ?? persistedSlotId;
-      if ((persistedSlotId || null) === (draftSlotId || null)) {
-        continue;
-      }
-      if (persistedSlotId) {
-        ids.add(persistedSlotId);
-      }
-      if (draftSlotId) {
-        ids.add(draftSlotId);
-      }
-    }
-    return ids;
-  }, [draftTrayToSlot, persistedTrayToSlot, sortedTrayIds]);
-
-  const tentSlotDraftChangeCount = useMemo(() => {
-    let count = 0;
     for (const tent of tents) {
-      const draftShelfCounts = (shelfCountsByTent[tent.tent_id] || buildDefaultShelves(tent)).map((value) =>
-        Math.max(0, value),
+      const tentDraftMeta = getTentDraftMeta(
+        tent,
+        shelfCountsByTent,
+        tentAllowedSpeciesDraftById,
+        tentDraftById,
       );
-      const persistedShelfCounts = buildPersistedShelfCounts(tent);
-      const hasNoPersistedSlots = tent.slots.length === 0;
-
-      if (hasNoPersistedSlots || !areShelfCountsEqual(draftShelfCounts, persistedShelfCounts)) {
-        count += 1;
+      tentDraftMetaById.set(tent.tent_id, tentDraftMeta);
+      if (tentDraftMeta.layoutDirty) {
+        tentSlotDraftChangeCount += 1;
+      }
+      if (tentDraftMeta.detailDirty) {
+        tentDetailsDraftChangeCount += 1;
+      }
+      if (tentDraftMeta.layoutDirty || tentDraftMeta.detailDirty) {
+        dirtyTentIds.add(tent.tent_id);
       }
     }
-    return count;
-  }, [shelfCountsByTent, tents]);
 
-  const tentDetailsDraftChangeCount = useMemo(() => {
-    let count = 0;
-    for (const tent of tents) {
-      const draft = tentDraftById[tent.tent_id] || {
-        name: tent.name,
-        code: tent.code,
-      };
-      const draftName = draft.name.trim();
-      const draftCode = draft.code.trim();
-      const persistedAllowedSpeciesIds = tent.allowed_species.map((item) => item.id);
-      const draftAllowedSpeciesIds =
-        tentAllowedSpeciesDraftById[tent.tent_id] || persistedAllowedSpeciesIds;
-      const hasNameOrCodeChange = draftName !== tent.name || draftCode !== tent.code;
-      const hasRestrictionChange = !areStringSetsEqual(
-        draftAllowedSpeciesIds,
-        persistedAllowedSpeciesIds,
-      );
-      if (hasNameOrCodeChange || hasRestrictionChange) {
-        count += 1;
-      }
-    }
-    return count;
-  }, [tentAllowedSpeciesDraftById, tentDraftById, tents]);
+    return {
+      tentSlotDraftChangeCount,
+      tentDetailsDraftChangeCount,
+      dirtyTentIds,
+      tentDraftMetaById,
+    };
+  }, [
+    shelfCountsByTent,
+    tentAllowedSpeciesDraftById,
+    tentDraftById,
+    tents,
+  ]);
+  const tentSlotDraftChangeCount = step1DraftStats.tentSlotDraftChangeCount;
+  const tentDetailsDraftChangeCount = step1DraftStats.tentDetailsDraftChangeCount;
+  const dirtyTentIds = step1DraftStats.dirtyTentIds;
+  const tentDraftMetaById = step1DraftStats.tentDraftMetaById;
 
-  const dirtyTentIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const tent of tents) {
-      const draft = tentDraftById[tent.tent_id] || {
-        name: tent.name,
-        code: tent.code,
-      };
-      const draftName = draft.name.trim();
-      const draftCode = draft.code.trim();
-      const persistedAllowedSpeciesIds = tent.allowed_species.map((item) => item.id);
-      const draftAllowedSpeciesIds =
-        tentAllowedSpeciesDraftById[tent.tent_id] || persistedAllowedSpeciesIds;
-      const hasNameOrCodeChange = draftName !== tent.name || draftCode !== tent.code;
-      const hasRestrictionChange = !areStringSetsEqual(
-        draftAllowedSpeciesIds,
-        persistedAllowedSpeciesIds,
-      );
-      const draftShelfCounts = (
-        shelfCountsByTent[tent.tent_id] || buildDefaultShelves(tent)
-      ).map((value) => Math.max(0, value));
-      const persistedShelfCounts = buildPersistedShelfCounts(tent);
-      const hasLayoutChange =
-        tent.slots.length === 0 || !areShelfCountsEqual(draftShelfCounts, persistedShelfCounts);
-      if (hasNameOrCodeChange || hasRestrictionChange || hasLayoutChange) {
-        ids.add(tent.tent_id);
-      }
-    }
-    return ids;
-  }, [shelfCountsByTent, tentAllowedSpeciesDraftById, tentDraftById, tents]);
-
-  const step1DraftChangeCount =
-    tentSlotDraftChangeCount + tentDetailsDraftChangeCount;
+  const step1DraftChangeCount = tentSlotDraftChangeCount + tentDetailsDraftChangeCount;
 
   const trayCountDraftChangeCount = Math.abs(draftTrayCount - trays.length);
-
-  const trayCapacityDraftChangeCount = useMemo(() => {
-    let count = 0;
-    for (const tray of trays) {
-      const draftCapacity = trayCapacityDraftById[tray.tray_id] ?? tray.capacity;
-      if (draftCapacity !== tray.capacity) {
-        count += 1;
-      }
-    }
-    return count;
-  }, [trayCapacityDraftById, trays]);
-
-  const dirtyTrayCapacityIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const tray of trays) {
-      const draftCapacity = trayCapacityDraftById[tray.tray_id] ?? tray.capacity;
-      if (draftCapacity !== tray.capacity) {
-        ids.add(tray.tray_id);
-      }
-    }
-    return ids;
-  }, [trayCapacityDraftById, trays]);
+  const trayCapacityDraftStats = useMemo(
+    () => buildTrayCapacityDraftStats(trays, trayCapacityDraftById),
+    [trayCapacityDraftById, trays],
+  );
+  const trayCapacityDraftChangeCount = trayCapacityDraftStats.changeCount;
+  const dirtyTrayCapacityIds = trayCapacityDraftStats.dirtyTrayCapacityIds;
 
   const step2DraftChangeCount = trayCountDraftChangeCount + trayCapacityDraftChangeCount;
 
-  const draftRemovedTrayIds = useMemo(() => {
-    if (draftTrayCount >= sortedTrayIds.length) {
-      return new Set<string>();
-    }
-    const removeCount = sortedTrayIds.length - draftTrayCount;
-    return new Set([...sortedTrayIds].slice(-removeCount));
-  }, [draftTrayCount, sortedTrayIds]);
-
-  function draftChangeCountForStep(step: number): number {
-    if (step === 1) {
-      return step1DraftChangeCount;
-    }
-    if (step === 2) {
-      return step2DraftChangeCount;
-    }
-    if (step === 3) {
-      return placementDraftChangeCount;
-    }
-    return traySlotDraftChangeCount;
-  }
-
-  function draftChipLabelForStep(step: number): string {
-    const count = draftChangeCountForStep(step);
-    if (step === 1) {
-      return formatDraftChipLabel(count, "step 1 change");
-    }
-    if (step === 2) {
-      return formatDraftChipLabel(count, "tray change");
-    }
-    if (step === 3) {
-      return formatDraftChipLabel(count, "plant layout change");
-    }
-    return formatDraftChipLabel(count, "tray/slot change");
-  }
-
-  const currentStepDraftChangeCount = draftChangeCountForStep(currentStep);
-  const currentStepBlockedMessage = !isStepReadyForNext(currentStep)
-    ? stepBlockedMessage(currentStep)
+  const draftRemovedTrayIds = useMemo(
+    () => buildRemovedTrayIds(sortedTrayIds, draftTrayCount),
+    [draftTrayCount, sortedTrayIds],
+  );
+  const stepCompletionState = useMemo(
+    () => ({
+      step1Complete,
+      step1ReadyForNext,
+      step2Complete,
+      step3Complete,
+      step4Complete,
+    }),
+    [step1Complete, step1ReadyForNext, step2Complete, step3Complete, step4Complete],
+  );
+  const stepDraftCounts = useMemo(
+    () => ({
+      step1DraftChangeCount,
+      step2DraftChangeCount,
+      placementDraftChangeCount,
+      traySlotDraftChangeCount,
+    }),
+    [
+      placementDraftChangeCount,
+      step1DraftChangeCount,
+      step2DraftChangeCount,
+      traySlotDraftChangeCount,
+    ],
+  );
+  const currentStepDraftChangeCount = draftChangeCountForStep(currentStep, stepDraftCounts);
+  const currentStepBlockedMessage = !isStepReadyForNext(currentStep, stepCompletionState)
+    ? stepBlockedMessage(currentStep, stepCompletionState)
     : "";
-  const nextButtonLabel = saving
-    ? "Saving..."
-    : currentStepDraftChangeCount > 0
-      ? "Save & Next"
-      : currentStep === 4
-        ? "Go to Overview"
-        : "Next";
-
-  function stepBlockedMessage(step: number): string {
-    if (step === 1 && !step1ReadyForNext) {
-      return "Add at least one tent and ensure each tent has at least one slot before continuing.";
-    }
-    if (step === 2 && !step2Complete) {
-      return "Add at least one tray with capacity before continuing.";
-    }
-    if (step === 3 && !step3Complete) {
-      return "Place all active plants into trays before continuing.";
-    }
-    if (step === 4 && !step4Complete) {
-      return "Place all trays into tent slots before continuing.";
-    }
-    return "";
-  }
-
-  function isStepComplete(step: number): boolean {
-    if (step === 1) {
-      return step1Complete;
-    }
-    if (step === 2) {
-      return step2Complete;
-    }
-    if (step === 3) {
-      return step3Complete;
-    }
-    return step4Complete;
-  }
-
-  function isStepReadyForNext(step: number): boolean {
-    if (step === 1) {
-      return step1ReadyForNext;
-    }
-    return isStepComplete(step);
-  }
+  const nextPrimaryButtonLabel = nextButtonLabel(
+    saving,
+    currentStep,
+    currentStepDraftChangeCount,
+  );
 
   function goToStep(step: number) {
     const next = Math.min(Math.max(1, step), maxUnlockedStep);
@@ -1021,8 +617,8 @@ export default function PlacementPage() {
   }
 
   async function goNextStep() {
-    if (!isStepReadyForNext(currentStep)) {
-      setError(stepBlockedMessage(currentStep));
+    if (!isStepReadyForNext(currentStep, stepCompletionState)) {
+      setError(stepBlockedMessage(currentStep, stepCompletionState));
       return;
     }
     setError("");
@@ -1227,30 +823,13 @@ export default function PlacementPage() {
       return false;
     }
 
-    const changedTentDetails = tents.filter((tent) => {
-      const draft = tentDraftById[tent.tent_id] || {
-        name: tent.name,
-        code: tent.code,
-      };
-      const draftName = draft.name.trim();
-      const draftCode = draft.code.trim();
-      const persistedAllowedSpeciesIds = tent.allowed_species.map((item) => item.id);
-      const draftAllowedSpeciesIds =
-        tentAllowedSpeciesDraftById[tent.tent_id] || persistedAllowedSpeciesIds;
-      return (
-        draftName !== tent.name ||
-        draftCode !== tent.code ||
-        !areStringSetsEqual(draftAllowedSpeciesIds, persistedAllowedSpeciesIds)
-      );
-    });
+    const changedTentDetails = tents.filter(
+      (tent) => tentDraftMetaById.get(tent.tent_id)?.detailDirty,
+    );
 
-    const changedTentLayouts = tents.filter((tent) => {
-      const draftShelfCounts = (shelfCountsByTent[tent.tent_id] || buildDefaultShelves(tent)).map((count) =>
-        Math.max(0, count),
-      );
-      const persistedShelfCounts = buildPersistedShelfCounts(tent);
-      return tent.slots.length === 0 || !areShelfCountsEqual(draftShelfCounts, persistedShelfCounts);
-    });
+    const changedTentLayouts = tents.filter(
+      (tent) => tentDraftMetaById.get(tent.tent_id)?.layoutDirty,
+    );
 
     if (changedTentDetails.length === 0 && changedTentLayouts.length === 0) {
       setNotice("No step 1 changes to apply.");
@@ -1267,21 +846,18 @@ export default function PlacementPage() {
       let layoutAppliedCount = 0;
 
       for (const tent of changedTentDetails) {
-        const draft = tentDraftById[tent.tent_id] || {
-          name: tent.name,
-          code: tent.code,
-        };
-        const allowedSpeciesIds =
-          tentAllowedSpeciesDraftById[tent.tent_id] ||
-          tent.allowed_species.map((item) => item.id);
+        const tentDraftMeta = tentDraftMetaById.get(tent.tent_id);
+        if (!tentDraftMeta) {
+          continue;
+        }
 
         const detailResponse = await backendFetch(`/api/v1/tents/${tent.tent_id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: draft.name.trim(),
-            code: draft.code.trim(),
-            allowed_species: allowedSpeciesIds,
+            name: tentDraftMeta.draftName,
+            code: tentDraftMeta.draftCode,
+            allowed_species: tentDraftMeta.draftAllowedSpeciesIds,
           }),
         });
         const detailPayload = (await detailResponse.json()) as { detail?: string };
@@ -1293,7 +869,11 @@ export default function PlacementPage() {
       }
 
       for (const tent of changedTentLayouts) {
-        const shelfCounts = shelfCountsByTent[tent.tent_id] || [4];
+        const tentDraftMeta = tentDraftMetaById.get(tent.tent_id);
+        if (!tentDraftMeta) {
+          continue;
+        }
+        const shelfCounts = tentDraftMeta.draftShelfCounts;
         const layout = {
           schema_version: 1,
           shelves: shelfCounts.map((trayCount, index) => ({
@@ -1850,50 +1430,14 @@ export default function PlacementPage() {
     if (!plant) {
       return null;
     }
-
-    const selected = selectedPlantIds.has(plantId);
-    const persistedTrayId = persistedPlantToTray[plantId] ?? null;
-    const draftTrayId = draftPlantToTray[plantId] ?? persistedTrayId;
-    const dirty = (persistedTrayId || null) !== (draftTrayId || null);
-    const gradeLabel = plant.grade ? `Grade ${plant.grade}` : "Grade -";
-
     return (
-      <article
+      <PlantSelectableCell
         key={plant.uuid}
-        className={[
-          styles.plantCell,
-          styles.cellFrame,
-          styles.cellSurfaceLevel1,
-          styles.cellInteractive,
-          "justify-items-center text-center",
-          dirty ? styles.draftChangedSurface : "",
-          selected ? styles.plantCellSelected : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        onClick={() => togglePlantSelection(plant.uuid)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            togglePlantSelection(plant.uuid);
-          }
-        }}
-        role="button"
-        tabIndex={0}
-        aria-pressed={selected}
-      >
-        {selected ? (
-          <span className={styles.plantCellCheck}>
-            <Check size={12} />
-          </span>
-        ) : null}
-        {dirty ? <DraftChangeMarker /> : null}
-        <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
-        <span className={styles.plantCellSpecies}>{plant.species_name}</span>
-        <div className={[styles.plantCellMetaRow, "justify-center"].join(" ")}>
-          <Badge variant={plant.grade ? "secondary" : "outline"}>{gradeLabel}</Badge>
-        </div>
-      </article>
+        plant={plant}
+        selected={selectedPlantIds.has(plantId)}
+        dirty={(persistedPlantToTray[plantId] ?? null) !== (draftPlantToTray[plantId] ?? persistedPlantToTray[plantId] ?? null)}
+        onToggle={togglePlantSelection}
+      />
     );
   }
 
@@ -1903,60 +1447,15 @@ export default function PlacementPage() {
       return null;
     }
 
-    const selected = selectedTrayIds.has(trayId);
-    const persistedSlotId = persistedTrayToSlot[trayId] ?? null;
-    const draftSlotId = draftTrayToSlot[trayId] ?? persistedSlotId;
-    const dirty = (persistedSlotId || null) !== (draftSlotId || null);
-
     return (
-      <article
+      <TraySelectableCell
         key={trayId}
-        className={[
-          styles.trayGridCell,
-          inSlot ? styles.cellFrameCompact : styles.cellFrame,
-          styles.cellSurfaceLevel1,
-          styles.cellInteractive,
-          inSlot ? styles.slotTrayCellFill : "",
-          dirty ? styles.draftChangedSurface : "",
-          selected ? styles.plantCellSelected : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        onClick={() => toggleTraySelection(trayId)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            toggleTraySelection(trayId);
-          }
-        }}
-        role="button"
-        tabIndex={0}
-        aria-pressed={selected}
-      >
-        {selected ? (
-          <span className={styles.plantCellCheck}>
-            <Check size={12} />
-          </span>
-        ) : null}
-        {dirty ? <DraftChangeMarker /> : null}
-        <strong
-          className={[
-            styles.trayGridCellId,
-            inSlot ? styles.trayGridCellIdInSlot : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          {formatTrayDisplay(tray.name, tray.tray_id)}
-        </strong>
-        <Badge
-          variant="secondary"
-          className={[styles.recipeLegendItemCompact, inSlot ? "justify-self-center" : ""].filter(Boolean).join(" ")}
-        >
-          {tray.current_count}/{tray.capacity} plants
-        </Badge>
-        {inSlot ? <span className={styles.slotPlacedChip}>Placed</span> : null}
-      </article>
+        tray={tray}
+        inSlot={inSlot}
+        selected={selectedTrayIds.has(trayId)}
+        dirty={(persistedTrayToSlot[trayId] ?? null) !== (draftTrayToSlot[trayId] ?? persistedTrayToSlot[trayId] ?? null)}
+        onToggle={toggleTraySelection}
+      />
     );
   }
 
@@ -2189,7 +1688,7 @@ export default function PlacementPage() {
       <SectionCard title="Placement Workflow">
         <div className={styles.stepperRow}>
           {STEPS.map((step) => {
-            const complete = isStepComplete(step.id);
+            const complete = isStepComplete(step.id, stepCompletionState);
             const active = step.id === currentStep;
             const disabled = step.id > maxUnlockedStep;
             return (
@@ -2220,7 +1719,7 @@ export default function PlacementPage() {
                 title="Tent Manager"
                 actions={
                   step1DraftChangeCount > 0 ? (
-                    <DraftChangeChip label={draftChipLabelForStep(1)} />
+                    <DraftChangeChip label={draftChipLabelForStep(1, step1DraftChangeCount)} />
                   ) : null
                 }
               >
@@ -2236,79 +1735,26 @@ export default function PlacementPage() {
               </SectionCard>
 
               {tents.map((tent) => {
-                type PreviewSlot = SlotSummary & { isDraft?: boolean };
-                const shelfCounts = shelfCountsByTent[tent.tent_id] || buildDefaultShelves(tent);
-                const normalizedDraftShelfCounts = shelfCounts.map((value) => Math.max(0, value));
-                const selectedSpecies = new Set(
-                  tentAllowedSpeciesDraftById[tent.tent_id] || tent.allowed_species.map((item) => item.id),
-                );
+                const tentDraftMeta =
+                  tentDraftMetaById.get(tent.tent_id) ||
+                  getTentDraftMeta(
+                    tent,
+                    shelfCountsByTent,
+                    tentAllowedSpeciesDraftById,
+                    tentDraftById,
+                  );
+                const shelfCounts = tentDraftMeta.draftShelfCounts;
+                const selectedSpecies = new Set(tentDraftMeta.draftAllowedSpeciesIds);
                 const tentDraft = tentDraftById[tent.tent_id] || { name: tent.name, code: tent.code };
-                const draftTentName = tentDraft.name.trim();
-                const draftTentCode = tentDraft.code.trim();
-                const tentNameDirty = draftTentName !== tent.name;
-                const tentCodeDirty = draftTentCode !== tent.code;
-                const persistedAllowedSpeciesIds = tent.allowed_species.map((item) => item.id);
-                const draftAllowedSpeciesIds =
-                  tentAllowedSpeciesDraftById[tent.tent_id] || persistedAllowedSpeciesIds;
-                const restrictionsDirty = !areStringSetsEqual(
-                  draftAllowedSpeciesIds,
-                  persistedAllowedSpeciesIds,
+                const previewShelfSlotGroups = buildStep1ShelfPreviewGroups(
+                  tent,
+                  shelfCounts,
                 );
-                const sortedTentSlots = [...tent.slots].sort((left, right) => {
-                  if (left.shelf_index !== right.shelf_index) {
-                    return left.shelf_index - right.shelf_index;
-                  }
-                  if (left.slot_index !== right.slot_index) {
-                    return left.slot_index - right.slot_index;
-                  }
-                  return left.slot_id.localeCompare(right.slot_id);
-                });
-                const slotsByShelf = new Map<number, SlotSummary[]>();
-                for (const slot of sortedTentSlots) {
-                  const shelfSlots = slotsByShelf.get(slot.shelf_index);
-                  if (shelfSlots) {
-                    shelfSlots.push(slot);
-                  } else {
-                    slotsByShelf.set(slot.shelf_index, [slot]);
-                  }
-                }
-                const persistedShelfCounts = buildPersistedShelfCounts(tent);
-                const shelvesRemoved =
-                  normalizedDraftShelfCounts.length < persistedShelfCounts.length;
-                const previewShelfSlotGroups = normalizedDraftShelfCounts.map((draftSlotCount, index) => {
-                  const shelfIndex = index + 1;
-                  const persistedSlots: PreviewSlot[] = (slotsByShelf.get(shelfIndex) || []).map((slot) => ({
-                    ...slot,
-                    isDraft: false,
-                  }));
-                  const usePersistedShelfPreview =
-                    tent.slots.length > 0 && draftSlotCount === persistedSlots.length;
-
-                  if (usePersistedShelfPreview) {
-                    return {
-                      shelfIndex,
-                      slots: persistedSlots,
-                    };
-                  }
-
-                  const previewSlots = persistedSlots.slice(0, draftSlotCount);
-                  for (let slotIndex = previewSlots.length; slotIndex < draftSlotCount; slotIndex += 1) {
-                    previewSlots.push({
-                      slot_id: `draft-${tent.tent_id}-${shelfIndex}-${slotIndex + 1}`,
-                      code: `Slot ${slotIndex + 1}`,
-                      label: `Shelf ${shelfIndex} Slot ${slotIndex + 1}`,
-                      shelf_index: shelfIndex,
-                      slot_index: slotIndex + 1,
-                      tray_count: 0,
-                      isDraft: true,
-                    });
-                  }
-
-                  return {
-                    shelfIndex,
-                    slots: previewSlots,
-                  };
-                });
+                const persistedShelfCounts = tentDraftMeta.persistedShelfCounts;
+                const shelvesRemoved = tentDraftMeta.shelvesRemoved;
+                const tentNameDirty = tentDraftMeta.tentNameDirty;
+                const tentCodeDirty = tentDraftMeta.tentCodeDirty;
+                const restrictionsDirty = tentDraftMeta.restrictionsDirty;
 
                 return (
                   <SectionCard
@@ -2440,10 +1886,7 @@ export default function PlacementPage() {
                         <div className={styles.step1ShelfPreviewLane}>
                           {previewShelfSlotGroups.map((group) => {
                             const persistedCount = persistedShelfCounts[group.shelfIndex - 1] || 0;
-                            const isNewShelf = group.shelfIndex > persistedShelfCounts.length;
-                            const removedSlotsInShelf =
-                              !isNewShelf && group.slots.length < persistedCount;
-                            const shelfDirty = isNewShelf || removedSlotsInShelf;
+                            const shelfDirty = group.isNewShelf || group.removedSlotsInShelf;
                             return (
                               <article
                                 key={`${tent.tent_id}-shelf-${group.shelfIndex}`}
@@ -2478,13 +1921,12 @@ export default function PlacementPage() {
                               </div>
 
                               <div className={styles.step1ShelfPreviewSlotGrid}>
-                                {group.slots.map((slot) => (
-                                  (() => {
-                                    const isAddedSlot =
-                                      !isNewShelf &&
-                                      slot.isDraft &&
-                                      slot.slot_index > persistedCount;
-                                    return (
+                                {group.slots.map((slot) => {
+                                  const isAddedSlot =
+                                    !group.isNewShelf &&
+                                    slot.isDraft &&
+                                    slot.slot_index > persistedCount;
+                                  return (
                                   <article
                                     key={slot.slot_id}
                                     className={[
@@ -2507,9 +1949,8 @@ export default function PlacementPage() {
                                       <span className={[styles.slotPlacedChip, "self-end"].join(" ")}>New</span>
                                     ) : null}
                                   </article>
-                                    );
-                                  })()
-                                ))}
+                                  );
+                                })}
                                 {group.slots.length === 0 ? <span className="text-sm text-muted-foreground">No slots.</span> : null}
                               </div>
                               </article>
@@ -2532,7 +1973,7 @@ export default function PlacementPage() {
                 title="Tray Manager"
                 actions={
                   step2DraftChangeCount > 0 ? (
-                    <DraftChangeChip label={draftChipLabelForStep(2)} />
+                    <DraftChangeChip label={draftChipLabelForStep(2, step2DraftChangeCount)} />
                   ) : null
                 }
               >
@@ -2644,7 +2085,7 @@ export default function PlacementPage() {
                 title="Plants -> Trays (Draft)"
                 actions={
                   placementDraftChangeCount > 0 ? (
-                    <DraftChangeChip label={draftChipLabelForStep(3)} />
+                    <DraftChangeChip label={draftChipLabelForStep(3, placementDraftChangeCount)} />
                   ) : null
                 }
               >
@@ -2781,7 +2222,7 @@ export default function PlacementPage() {
                 title="Trays -> Slots (Draft)"
                 actions={
                   traySlotDraftChangeCount > 0 ? (
-                    <DraftChangeChip label={draftChipLabelForStep(4)} />
+                    <DraftChangeChip label={draftChipLabelForStep(4, traySlotDraftChangeCount)} />
                   ) : null
                 }
               >
@@ -2840,116 +2281,16 @@ export default function PlacementPage() {
                 </div>
               </SectionCard>
 
-              <div className={styles.tentBoardGrid}>
-                {tents.map((tent) => {
-                  const selectedInTent = selectedTraysByTentId[tent.tent_id] || [];
-                  const slotsByShelf = [...tent.slots]
-                    .sort((left, right) => {
-                      if (left.shelf_index !== right.shelf_index) {
-                        return left.shelf_index - right.shelf_index;
-                      }
-                      if (left.slot_index !== right.slot_index) {
-                        return left.slot_index - right.slot_index;
-                      }
-                      return left.slot_id.localeCompare(right.slot_id);
-                    })
-                    .reduce<Map<number, SlotSummary[]>>((map, slot) => {
-                      const shelfSlots = map.get(slot.shelf_index);
-                      if (shelfSlots) {
-                        shelfSlots.push(slot);
-                      } else {
-                        map.set(slot.shelf_index, [slot]);
-                      }
-                      return map;
-                    }, new Map<number, SlotSummary[]>());
-
-                  return (
-                    <article key={tent.tent_id} className={[styles.tentBoardCard, "rounded-lg border border-border", styles.cellSurfaceLevel3].join(" ")}>
-                      <div className={[styles.trayHeaderRow, "items-center"].join(" ")}>
-                        <div className={[styles.trayHeaderMeta, "py-0.5"].join(" ")}>
-                          <strong className={styles.trayGridCellId}>{tent.name}</strong>
-                        </div>
-                        <div className={styles.trayHeaderActions}>
-                          <span className={styles.recipeLegendItem}>
-                            {tent.slots.length} {tent.slots.length === 1 ? "slot" : "slots"}
-                          </span>
-                          {selectedInTent.length > 0 ? (
-                            <TooltipIconButton
-                              label="Return selected trays to unplaced"
-                              icon={<Trash2 size={16} />}
-                              onClick={() => stageRemoveTraysFromTent(tent.tent_id)}
-                              variant="destructive"
-                            />
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className={styles.tentShelfRow}>
-                        {Array.from(slotsByShelf.entries()).map(([shelfIndex, shelfSlots]) => (
-                          <article key={`${tent.tent_id}-shelf-${shelfIndex}`} className={[styles.tentShelfCard, styles.cellSurfaceLevel2].join(" ")}>
-                            <div className={[styles.trayHeaderRow, "items-center"].join(" ")}>
-                              <div className={[styles.trayHeaderMeta, "py-0.5"].join(" ")}>
-                                <strong className={styles.trayGridCellId}>Shelf {shelfIndex}</strong>
-                              </div>
-                            </div>
-
-                            <div className={styles.tentShelfSlotGrid}>
-                              {shelfSlots.map((slot) => {
-                                const trayId = draftSlotToTray.get(slot.slot_id) || null;
-                                const slotSelected = destinationSlotId === slot.slot_id;
-                                if (trayId) {
-                                  return (
-                                    <div key={slot.slot_id} className={styles.slotTrayCellFill}>
-                                      {renderTrayCell(trayId, true)}
-                                    </div>
-                                  );
-                                }
-                                return (
-                                  <div
-                                    key={slot.slot_id}
-                                    className={[
-                                      styles.slotCell,
-                                      styles.slotContainerCellFrame,
-                                      styles.cellSurfaceLevel1,
-                                      dirtySlotIds.has(slot.slot_id) ? styles.draftChangedSurface : "",
-                                      slotSelected ? styles.plantCellSelected : "",
-                                    ]
-                                      .filter(Boolean)
-                                      .join(" ")}
-                                  >
-                                    {dirtySlotIds.has(slot.slot_id) ? (
-                                      <DraftChangeMarker />
-                                    ) : null}
-                                    {slotSelected ? (
-                                      <span className={styles.plantCellCheck}>
-                                        <Check size={12} />
-                                      </span>
-                                    ) : null}
-                                    <span className={styles.slotCellLabel}>{slot.code}</span>
-                                    <button
-                                      type="button"
-                                      className={[
-                                        styles.slotCellEmpty,
-                                        slotSelected ? styles.slotCellEmptyActive : "",
-                                      ]
-                                        .filter(Boolean)
-                                        .join(" ")}
-                                      onClick={() => toggleDestinationSlot(slot.slot_id)}
-                                    >
-                                      Empty
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </article>
-                        ))}
-                        {tent.slots.length === 0 ? <span className="text-sm text-muted-foreground">No slots generated.</span> : null}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
+              <TentSlotBoard
+                tents={tents}
+                draftSlotToTray={draftSlotToTray}
+                destinationSlotId={destinationSlotId}
+                dirtySlotIds={dirtySlotIds}
+                selectedTraysByTentId={selectedTraysByTentId}
+                onReturnSelectedFromTent={stageRemoveTraysFromTent}
+                onToggleDestinationSlot={toggleDestinationSlot}
+                renderTrayCell={renderTrayCell}
+              />
             </div>
           ) : null}
         </div>
@@ -2962,12 +2303,12 @@ export default function PlacementPage() {
           onReset={resetCurrentStepDrafts}
           resetDisabled={saving}
           onNext={() => void goNextStep()}
-          nextDisabled={saving || !isStepReadyForNext(currentStep)}
-          nextLabel={nextButtonLabel}
+          nextDisabled={saving || !isStepReadyForNext(currentStep, stepCompletionState)}
+          nextLabel={nextPrimaryButtonLabel}
           blockerHint={currentStepBlockedMessage}
           draftIndicator={
             currentStepDraftChangeCount > 0 ? (
-              <DraftChangeChip label={draftChipLabelForStep(currentStep)} />
+              <DraftChangeChip label={draftChipLabelForStep(currentStep, currentStepDraftChangeCount)} />
             ) : null
           }
         />
