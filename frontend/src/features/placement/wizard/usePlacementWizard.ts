@@ -107,8 +107,6 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
   const tents = useMemo(() => summary?.tents.results || [], [summary?.tents.results]);
   const trays = useMemo(() => summary?.trays.results || [], [summary?.trays.results]);
 
-  const tentNameSuggestion = useMemo(() => suggestTentName(tents.map((tent) => tent.name)), [tents]);
-  const tentCodeSuggestion = useMemo(() => suggestTentCode(tents.map((tent) => tent.code)), [tents]);
   const defaultTrayCapacity = useMemo(() => trays[0]?.capacity ?? 4, [trays]);
 
   useEffect(() => {
@@ -704,12 +702,8 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     if (!ensureUnlocked({ locked: placementLocked, message: RUNNING_LOCK_MESSAGE, setError })) {
       return;
     }
-
-    const name = tentNameSuggestion;
-    const code = tentCodeSuggestion;
-
-    if (!name) {
-      setError("Tent name is required.");
+    if (!summary) {
+      setError("Placement data is still loading. Try again.");
       return;
     }
 
@@ -719,21 +713,45 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       fallbackError: "Unable to create tent.",
       clearDiagnostics: false,
       action: async () => {
-        try {
-          await api.post(`/api/v1/experiments/${experimentId}/tents`, {
-            name,
-            code,
-            allowed_species: [],
-          });
-        } catch (requestError) {
-          const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to create tent.");
-          setError(payload.detail);
-          return false;
+        const knownNames = tents.map((tent) => tent.name).filter(Boolean);
+        const knownCodes = tents.map((tent) => tent.code).filter(Boolean);
+
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          const name = suggestTentName(knownNames);
+          const code = suggestTentCode(knownCodes);
+
+          if (!name) {
+            setError("Tent name is required.");
+            return false;
+          }
+
+          try {
+            await api.post(`/api/v1/experiments/${experimentId}/tents`, {
+              name,
+              code,
+              allowed_species: [],
+            });
+            setNotice("Tent created.");
+            await reloadPlacementData();
+            return true;
+          } catch (requestError) {
+            const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to create tent.");
+            const detailLower = payload.detail.toLowerCase();
+            const duplicateName = detailLower.includes("tent name already exists");
+            const duplicateCode = detailLower.includes("tent code already exists");
+
+            if (!duplicateName && !duplicateCode) {
+              setError(payload.detail);
+              return false;
+            }
+
+            knownNames.push(name);
+            knownCodes.push(code);
+          }
         }
 
-        setNotice("Tent created.");
-        await reloadPlacementData();
-        return true;
+        setError("Unable to create a unique tent name/code. Try again.");
+        return false;
       },
     });
   }

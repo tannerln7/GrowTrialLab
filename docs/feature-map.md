@@ -27,6 +27,13 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Placement Step 1 Tent Add Duplicate Retry Fix)
+- `Completed` Step 1 tent creation now avoids duplicate-name races during bootstrap.
+  - `createTent` now blocks add attempts until placement summary has loaded.
+  - On duplicate tent name/code responses, tent add auto-retries with incremented suggestions (`Tent N` / `TNN`) before surfacing an error.
+  - updated file:
+    - `frontend/src/features/placement/wizard/usePlacementWizard.ts`
+
 ### 2026-02-19 (Placement Bootstrap Redirect Loop Fix)
 - `Completed` Placement wizard no longer forces users back to setup during bootstrap.
   - Removed setup-incomplete redirect from placement wizard data load path.

@@ -152,6 +152,7 @@ This document is the single consolidated source for current status, architecture
 - [x] Placement Step 1 shelf preview cards now content-fit to slot-cell rows (auto-sized shelf width) instead of fixed shelf-card minimums, reducing empty horizontal slack and keeping shelf geometry tied to slot count.
 - [x] Placement Step 1 shelf preview lane now wraps shelf cards to new rows when screen width is constrained; individual shelf slot rows can still scroll within a shelf card when a single shelf exceeds available width.
 - [x] Placement Step 1 tent metadata and restriction edits now stage in-card and persist through the shared bottom `Save & Next` action (per-tent `Save tent` buttons removed); Step 1 blocker/help text reflects this single save path.
+- [x] Placement Step 1 `+` tent creation now guards against pre-load clicks and retries duplicate-name/code conflicts with incremented suggestions, preventing bootstrap-time `Tent name already exists` loops when adding multiple tents.
 - [x] Placement Step 2 `Tray Manager` now uses add + selection-delete staging:
   - toolbar keeps a single `+` add control and a contextual trash action for selected trays (no top-level `-` count control)
   - tray cards are multi-selectable; selected persisted trays are staged for deletion and removed from the draft grid immediately, while selected draft-added trays are dropped from draft state
