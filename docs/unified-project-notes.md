@@ -64,11 +64,12 @@ This document is the single consolidated source for current status, architecture
 
 ### In Progress / Not Complete
 - [ ] Pin and document one explicit local/CI version matrix for `pnpm`, `uv`, Docker, and expected verification output.
-- [ ] Add reproducible seed/dev fixture commands for demos (without bypassing auth model semantics).
+- [x] Add reproducible seed/dev fixture command for plant demo data (`infra/scripts/seed-plants-by-species.sh`), using authenticated API calls against running containers (first experiment when present, auto-create experiment/species defaults when missing).
 
 ### Applicable files/code segments
 - `docker-compose.yml`
 - `infra/scripts/reset-dev.sh`
+- `infra/scripts/seed-plants-by-species.sh`
 - `frontend/app/`
 - `backend/manage.py`
 

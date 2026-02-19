@@ -128,6 +128,28 @@ What it runs:
 - `docker compose up --build -d`
 - waits for backend health at `http://localhost:8000/healthz` while backend startup runs migrations/bootstrap
 
+## Seed Plants By Species (Dev API)
+
+Seeds `4` plants per species into an experiment via API while backend/db containers are running.
+
+```bash
+infra/scripts/seed-plants-by-species.sh
+```
+
+Behavior:
+- If experiments exist, uses the first experiment returned by `GET /api/v1/experiments/`.
+- If no experiments exist, creates one and seeds into it.
+- If no species exist, creates a default species set before seeding plants.
+
+Optional env vars:
+- `API_BASE` (default `http://localhost:8000`)
+- `PLANTS_PER_SPECIES` (default `4`)
+- `AUTO_CREATE_EXPERIMENT_IF_MISSING` (default `1`)
+- `AUTO_CREATE_SPECIES_IF_MISSING` (default `1`)
+- `NEW_EXPERIMENT_NAME` (default `Seeded Experiment`)
+- `NEW_EXPERIMENT_DESCRIPTION`
+- `API_AUTH_HEADER` (for non-dev auth setups, e.g. `Cf-Access-Jwt-Assertion: <token>`)
+
 ## Auth behavior
 
 - There is no login UI and no password auth.

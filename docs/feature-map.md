@@ -27,6 +27,14 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Dev Seed Script: 4 Plants Per Species)
+- `Completed` Added infra seed script to create plant demo data through API against running containers.
+  - New script: `infra/scripts/seed-plants-by-species.sh`
+  - Seeds `PLANTS_PER_SPECIES` (default `4`) for every species from `GET /api/v1/species/`.
+  - Uses first experiment from `GET /api/v1/experiments/` when multiple exist; creates a new experiment when none exist.
+  - Auto-creates a default species set if `GET /api/v1/species/` is empty.
+  - Supports optional `API_AUTH_HEADER` for non-dev auth paths.
+
 ### 2026-02-19 (Placement Wizard Stale Action Ref Timing Fix)
 - `Completed` Placement wizard action refs now refresh in `useLayoutEffect` instead of `useEffect`.
   - Prevents post-refresh stale callback windows where step actions could run one render behind.

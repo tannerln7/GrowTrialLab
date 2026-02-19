@@ -17,6 +17,8 @@ This guide helps coding agents (including Codex) work effectively in this repo b
 - Backend: `backend/` (Django + DRF)
 - Frontend: `frontend/` (Next.js App Router + TypeScript)
 - Infra scripts: `infra/scripts/`
+  - `reset-dev.sh`: reset local compose Postgres volume + restart stack
+  - `seed-plants-by-species.sh`: seed `N` plants per species via API into first (or newly created) experiment; can auto-create default species set when empty
 - Local runtime: `docker-compose.yml`
 - Canonical docs: `docs/`
 
