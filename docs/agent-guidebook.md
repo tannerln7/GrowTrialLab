@@ -207,9 +207,13 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
     - surface variants (`surfaceVariants`, `panelSurfaceVariants`, `toolbarRowVariants`)
     - selectable cell state variants (`selectableCellVariants`)
 - Shared primitive usage conventions:
+  - Use GridKit cell primitives for dense slot/tray/plant list/grid cells:
+    - `CellChrome` (`frontend/src/lib/gridkit/components/CellChrome.tsx`) as the outer shell (selected/hover/focus/disabled/locked semantics).
+    - `CellChips` (`frontend/src/lib/gridkit/components/CellChips.tsx`) for fixed-placement chip overlays (`tl`, `tr`, `bl`, `br`, `top`, `bottom`).
+    - `CellTitle`/`CellSubtitle`/`CellMeta` (`frontend/src/lib/gridkit/components/CellText.tsx`) for repeatable text rows.
   - Use `CountAdjustToolbar` (`frontend/src/components/ui/count-adjust-toolbar.tsx`) for shared add/remove count toolbars (tent/shelf/tray manager rows).
   - Use `DraftChangeChip` (`frontend/src/components/ui/draft-change-chip.tsx`) for consistent draft-highlight labels across step cards and nav controls.
-- Use `DraftChangeMarker` (`frontend/src/components/ui/draft-change-marker.tsx`) for the dot marker on changed cells/surfaces; combine with `experimentsStyles.draftChangedSurface` ring style.
+- Use `DraftChangeMarker` (`frontend/src/components/ui/draft-change-marker.tsx`) only for non-GridKit surfaces that have not yet migrated to `CellChips`; combine with `experimentsStyles.draftChangedSurface` ring style when applicable.
   - Draft highlights must stay cell-local: do not highlight toolbars; when removals make items invisible, highlight the nearest visible container cell (for example tent/shelf/tray/slot container cells).
   - Use `StepNavBar` (`frontend/src/components/ui/step-nav-bar.tsx`) for the placement-style back/save-next bar with blocker hints + draft indicators.
   - Use `TooltipIconButton` (`frontend/src/components/ui/tooltip-icon-button.tsx`) for icon-only actions that need tooltip labels.

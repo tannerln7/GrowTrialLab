@@ -27,6 +27,32 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (GridKit Phase 2 CellChrome Standardization)
+- `Completed` GridKit cell chrome primitives were introduced and adopted across dense slot/tray/plant surfaces while preserving existing behavior.
+  - Added canonical GridKit cell primitives:
+    - `frontend/src/lib/gridkit/components/CellChrome.tsx`
+    - `frontend/src/lib/gridkit/components/CellChips.tsx`
+    - `frontend/src/lib/gridkit/components/CellText.tsx`
+  - Migrated placement/recipes/overview/baseline and GridKit legacy-adapter cell shells from bespoke `article/div + role/key handlers + local chip overlays` to `CellChrome` + `CellChips`.
+  - GridKit inventory/guardrail reporting now includes:
+    - `CellChrome` and `CellChips` usage counts
+    - remaining bespoke chip overlay heuristics
+    - remaining bespoke cell shell heuristics
+  - Relevant files:
+    - `frontend/src/features/placement/components/placement-cells.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step2Trays.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step3PlantsToTrays.tsx`
+    - `frontend/src/features/experiments/overview/ExperimentOverviewPageClient.tsx`
+    - `frontend/src/features/experiments/recipes/ExperimentRecipesPageClient.tsx`
+    - `frontend/src/features/experiments/recipes/components/RecipePanels.tsx`
+    - `frontend/src/features/experiments/baseline/components/BaselinePanels.tsx`
+    - `frontend/src/lib/gridkit/components/adapters/LegacyOverviewTentLayoutAdapter.tsx`
+    - `frontend/src/lib/gridkit/components/adapters/LegacyPlacementShelfPreviewAdapter.tsx`
+    - `frontend/src/lib/gridkit/components/adapters/LegacyPlacementTentLayoutAdapter.tsx`
+    - `infra/scripts/gridkit-inventory.sh`
+    - `infra/scripts/check-gridkit-legacy.sh`
+  - Refs: `4759a05`
+
 ### 2026-02-19 (Frontend Phase 7 Consistency Lock-In + Final Cleanup)
 - `Completed` Final consistency enforcement landed with legacy cleanup, guardrail expansion, and durable frontend architecture docs.
   - Legacy/dead code cleanup:
