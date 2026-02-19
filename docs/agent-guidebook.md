@@ -124,6 +124,11 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
   - keep redirects/gating behavior equivalent to prior route behavior
 - Interactive route logic should live in feature clients: `frontend/src/features/**/**/*PageClient.tsx`.
 - Complex logic should use feature controller hooks (`use<Feature>Controller`, `use<Feature>Wizard`) with grouped return shapes (for example `ui`, `data`, `actions`, `wizard/nav`).
+- Large UI sections should be extracted from page clients into feature modules (`features/<feature>/components/*` or `features/<feature>/wizard/steps/*`) using compact contracts:
+  - `model`: render-ready values and derived state
+  - `actions`: event callbacks
+  - keep prop surfaces small; avoid passing scattered setters across many props
+- Keep `model`/`actions` references stable (`useMemo`/`useCallback`) for dense grids/lists and wizard steps to avoid rerender churn.
 
 ### Data layer
 - React Query provider scaffold exists and query key discipline is required.

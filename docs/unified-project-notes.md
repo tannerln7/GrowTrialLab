@@ -216,6 +216,10 @@ This document is the single consolidated source for current status, architecture
   - app-route `page.tsx` files are thin server wrappers.
   - interactive implementations live in feature `*PageClient.tsx` modules under `frontend/src/features/**`.
   - controller-hook pattern is established for entry/checklist pages and the placement wizard (`usePlacementWizard`) remains the canonical complex-flow controller pattern.
+- [x] Phase 4 UI modularization is active across core experiment operation surfaces:
+  - large inline JSX blocks were extracted into feature-level panel/component modules with compact `model/actions` contracts.
+  - extracted panel modules now cover baseline, feeding, plants, recipes, rotation, and overview shared sections under `frontend/src/features/experiments/*/components/`.
+  - page clients now focus on orchestration + controller state wiring while preserving existing labels/gating/lock semantics.
 - [x] Phase 1.5 mechanical frontend helper rollout is complete for route/page conventions:
   - route/page param parsing now standardizes on `useRouteParamString("id")` / `getParamString(...)` across experiment and cockpit pages.
   - standard top-of-page alert slabs now use shared `PageAlerts` in core experiment routes.

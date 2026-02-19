@@ -27,6 +27,32 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Frontend Phase 4 UI Modularization Rollout)
+- `Completed` Core experiment operation clients now use feature-level panel modules with compact model/action contracts to reduce page-client bloat without UX changes.
+  - Extracted panel modules and wiring landed for:
+    - baseline (`BaselinePanels`)
+    - feeding (`FeedingPanels`)
+    - plants (`PlantsPanels`)
+    - recipes (`RecipePanels`)
+    - rotation (`RotationPanels`)
+    - overview shared top sections (`OverviewPanels`)
+  - Updated page clients now focus on orchestration and controller state wiring, while large JSX sections live in feature submodules under `frontend/src/features/experiments/*/components/`.
+  - Stable `model/actions` handoff pattern (`useMemo` + `useCallback`) is now established across these pages to avoid prop explosion and unnecessary rerenders in dense grids/lists.
+  - Relevant files:
+    - `frontend/src/features/experiments/baseline/ExperimentBaselinePageClient.tsx`
+    - `frontend/src/features/experiments/baseline/components/BaselinePanels.tsx`
+    - `frontend/src/features/experiments/feeding/ExperimentFeedingPageClient.tsx`
+    - `frontend/src/features/experiments/feeding/components/FeedingPanels.tsx`
+    - `frontend/src/features/experiments/plants/ExperimentPlantsPageClient.tsx`
+    - `frontend/src/features/experiments/plants/components/PlantsPanels.tsx`
+    - `frontend/src/features/experiments/recipes/ExperimentRecipesPageClient.tsx`
+    - `frontend/src/features/experiments/recipes/components/RecipePanels.tsx`
+    - `frontend/src/features/experiments/rotation/ExperimentRotationPageClient.tsx`
+    - `frontend/src/features/experiments/rotation/components/RotationPanels.tsx`
+    - `frontend/src/features/experiments/overview/ExperimentOverviewPageClient.tsx`
+    - `frontend/src/features/experiments/overview/components/OverviewPanels.tsx`
+  - Refs: `81909ae`
+
 ### 2026-02-19 (Frontend Phase 3 Route Architecture Normalization)
 - `Completed` Frontend route architecture now follows a thin-wrapper pattern across interactive app routes.
   - Route files under `frontend/app/**/page.tsx` are now thin server wrappers that parse route params via `getParamString(...)` and render feature `*PageClient` modules.
