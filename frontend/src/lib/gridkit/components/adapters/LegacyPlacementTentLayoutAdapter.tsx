@@ -4,10 +4,12 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import { POSITION_STRIP_PRESET } from "@/src/lib/gridkit/presets";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import type { TentLayoutSpec, TentSpec } from "@/src/lib/gridkit/spec";
 import { CellChrome } from "../CellChrome";
 import { CellTitle } from "../CellText";
+import { PositionStrip } from "../PositionStrip";
 import { ShelfCard, ShelfStack, TentCard, TentGrid } from "../containers";
 
 type LegacyPlacementTentLayoutAdapterProps = {
@@ -71,19 +73,18 @@ export function LegacyPlacementTentLayoutAdapter({
                   title={<span className={styles.trayGridCellId}>{shelf.label}</span>}
                   className={styles.cellSurfaceLevel2}
                 >
-                  <div className={styles.tentShelfSlotGrid}>
-                    {shelf.positions.map((position) => {
+                  <PositionStrip
+                    positions={shelf.positions}
+                    pageSize={POSITION_STRIP_PRESET.maxVisible}
+                    ariaLabel={`${tent.label} ${shelf.label} positions`}
+                    renderPosition={(position) => {
                       if (position.occupant.kind === "tray") {
-                        return (
-                          <div key={position.id} className={styles.slotTrayCellFill}>
-                            {renderTrayCell(position.occupant.trayId, true)}
-                          </div>
-                        );
+                        return <div className={styles.slotTrayCellFill}>{renderTrayCell(position.occupant.trayId, true)}</div>;
                       }
 
                       if (position.occupant.kind === "trayStack" && position.occupant.trays.length > 0) {
                         return (
-                          <div key={position.id} className={styles.slotTrayCellFill}>
+                          <div className={styles.slotTrayCellFill}>
                             {renderTrayCell(position.occupant.trays[0].trayId, true)}
                           </div>
                         );
@@ -115,7 +116,6 @@ export function LegacyPlacementTentLayoutAdapter({
 
                       return (
                         <CellChrome
-                          key={position.id}
                           state={{
                             selected: slotSelected,
                             tone: dirty ? "warn" : undefined,
@@ -124,10 +124,7 @@ export function LegacyPlacementTentLayoutAdapter({
                           onPress={() => onToggleDestinationSlot(position.id)}
                           ariaLabel={slotLabel}
                           chips={chips}
-                          className={cn(
-                            styles.slotCell,
-                            styles.slotContainerCellFrame,
-                          )}
+                          className={cn(styles.slotCell, styles.slotContainerCellFrame)}
                         >
                           <CellTitle className={styles.slotCellLabel}>{slotLabel}</CellTitle>
                           <span className={cn(styles.slotCellEmpty, slotSelected && styles.slotCellEmptyActive)}>
@@ -135,8 +132,8 @@ export function LegacyPlacementTentLayoutAdapter({
                           </span>
                         </CellChrome>
                       );
-                    })}
-                  </div>
+                    }}
+                  />
                 </ShelfCard>
               ))}
               {slotCount === 0 ? <span className="text-sm text-muted-foreground">No slots generated.</span> : null}

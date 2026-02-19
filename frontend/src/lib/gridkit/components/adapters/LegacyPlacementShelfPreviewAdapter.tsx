@@ -1,10 +1,12 @@
 import { cn } from "@/lib/utils";
 import { StepAdjustButton } from "@/src/components/ui/step-adjust-button";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import { POSITION_STRIP_PRESET } from "@/src/lib/gridkit/presets";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import type { TentSpec } from "@/src/lib/gridkit/spec";
 import { CellChrome } from "../CellChrome";
 import { CellTitle } from "../CellText";
+import { PositionStrip } from "../PositionStrip";
 import { ShelfCard, ShelfStack } from "../containers";
 
 type LegacyPlacementShelfPreviewAdapterProps = {
@@ -59,54 +61,60 @@ export function LegacyPlacementShelfPreviewAdapter({
               shelfDirty && styles.draftChangedSurface,
             )}
           >
-            <div className={styles.step1ShelfPreviewSlotGrid}>
-              {shelf.positions.map((position) => {
-                if (position.occupant.kind !== "slotDef") {
-                  return null;
-                }
+            {slotCount > 0 ? (
+              <PositionStrip
+                positions={shelf.positions}
+                pageSize={POSITION_STRIP_PRESET.maxVisible}
+                className="[--gt-cell-min-height:6.5rem] [--gt-cell-pad:var(--gt-space-md)]"
+                ariaLabel={`${shelf.label} preview positions`}
+                renderPosition={(position) => {
+                  if (position.occupant.kind !== "slotDef") {
+                    return null;
+                  }
 
-                const isAddedSlot = Boolean((position.meta as { isAddedSlot?: unknown } | undefined)?.isAddedSlot);
-                const isDraft = Boolean(position.occupant.isDraft);
-                const slotIndex = position.occupant.slotIndex;
-                const slotCode = position.occupant.code;
-                const chips: ChipSpec[] = [];
-                if (isAddedSlot) {
-                  chips.push({
-                    id: `${position.id}-added`,
-                    label: "•",
-                    tone: "warn",
-                    placement: "tl",
-                  });
-                }
-                if (isDraft) {
-                  chips.push({
-                    id: `${position.id}-new`,
-                    label: "New",
-                    tone: "success",
-                    placement: "bottom",
-                  });
-                }
+                  const isAddedSlot = Boolean((position.meta as { isAddedSlot?: unknown } | undefined)?.isAddedSlot);
+                  const isDraft = Boolean(position.occupant.isDraft);
+                  const slotIndex = position.occupant.slotIndex;
+                  const slotCode = position.occupant.code;
+                  const chips: ChipSpec[] = [];
+                  if (isAddedSlot) {
+                    chips.push({
+                      id: `${position.id}-added`,
+                      label: "•",
+                      tone: "warn",
+                      placement: "tl",
+                    });
+                  }
+                  if (isDraft) {
+                    chips.push({
+                      id: `${position.id}-new`,
+                      label: "New",
+                      tone: "success",
+                      placement: "bottom",
+                    });
+                  }
 
-                return (
-                  <CellChrome
-                    key={position.id}
-                    state={{ tone: isAddedSlot ? "warn" : undefined }}
-                    chips={chips}
-                    className={cn(
-                      styles.trayGridCell,
-                      "justify-items-center text-center",
-                      isDraft && "[grid-template-rows:auto_1fr]",
-                    )}
-                  >
-                    <CellTitle className={styles.trayGridCellId}>{`Slot ${slotIndex}`}</CellTitle>
-                    {!isDraft && slotCode !== `Slot ${slotIndex}` ? (
-                      <span className="text-sm text-muted-foreground">{slotCode}</span>
-                    ) : null}
-                  </CellChrome>
-                );
-              })}
-              {slotCount === 0 ? <span className="text-sm text-muted-foreground">No slots.</span> : null}
-            </div>
+                  return (
+                    <CellChrome
+                      state={{ tone: isAddedSlot ? "warn" : undefined }}
+                      chips={chips}
+                      className={cn(
+                        styles.trayGridCell,
+                        "justify-items-center text-center",
+                        isDraft && "[grid-template-rows:auto_1fr]",
+                      )}
+                    >
+                      <CellTitle className={styles.trayGridCellId}>{`Slot ${slotIndex}`}</CellTitle>
+                      {!isDraft && slotCode !== `Slot ${slotIndex}` ? (
+                        <span className="text-sm text-muted-foreground">{slotCode}</span>
+                      ) : null}
+                    </CellChrome>
+                  );
+                }}
+              />
+            ) : (
+              <span className="text-sm text-muted-foreground">No slots.</span>
+            )}
           </ShelfCard>
         );
       })}
