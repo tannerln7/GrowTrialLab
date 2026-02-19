@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/src/components/ui/button";
 import SectionCard from "@/src/components/ui/SectionCard";
-import { CellChrome, CellMeta, CellSubtitle, CellTitle } from "@/src/lib/gridkit/components";
+import { PlantCell } from "@/src/lib/gridkit/components";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
@@ -99,23 +99,27 @@ export function BaselinePlantQueuePanel({ model, actions }: { model: PlantQueueM
               : [];
 
             return (
-              <CellChrome
+              <PlantCell
                 key={plant.uuid}
+                plantId={plant.uuid}
+                title={plant.plant_id || "(pending)"}
+                subtitle={plant.species_name}
                 state={{ selected }}
                 interactive
                 onPress={() => actions.onJumpToPlant(plant.uuid)}
                 ariaLabel={plant.plant_id || "Plant"}
                 chips={chips}
                 className={cn(styles.plantCell, styles.baselineQueuePlantCell, "justify-items-center text-center")}
-              >
-                <CellTitle className={styles.plantCellId}>{plant.plant_id || "(pending)"}</CellTitle>
-                <CellSubtitle className={styles.plantCellSpecies}>{plant.species_name}</CellSubtitle>
-                <CellMeta className={styles.baselineQueueStatusRow}>
+                titleClassName={styles.plantCellId}
+                subtitleClassName={styles.plantCellSpecies}
+                metaClassName={styles.baselineQueueStatusRow}
+                meta={
                   <span className={plant.has_baseline ? styles.baselineStatusReady : styles.baselineStatusMissing}>
                     {plant.has_baseline ? "Captured" : "No baseline"}
                   </span>
-                </CellMeta>
-              </CellChrome>
+                }
+                contentClassName="justify-items-center text-center"
+              />
             );
           })}
         </div>

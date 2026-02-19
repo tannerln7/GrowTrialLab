@@ -17,6 +17,7 @@ type CellChromeProps = {
   body?: React.ReactNode;
   footer?: React.ReactNode;
   children?: React.ReactNode;
+  dataAttributes?: Record<string, string | number | undefined>;
 };
 
 const BASE_CLASS =
@@ -48,6 +49,7 @@ export function CellChrome({
   body,
   footer,
   children,
+  dataAttributes,
 }: CellChromeProps) {
   const isDisabled = disabled || locked || Boolean(state?.disabled) || Boolean(state?.locked);
   const isInteractive = (interactive || Boolean(onPress)) && !isDisabled;
@@ -79,6 +81,7 @@ export function CellChrome({
         disabled={isDisabled}
         aria-pressed={state?.selected}
         aria-label={ariaLabel}
+        {...dataAttributes}
       >
         {content}
       </button>
@@ -90,6 +93,7 @@ export function CellChrome({
       className={commonClassName}
       aria-label={ariaLabel}
       aria-disabled={isDisabled || undefined}
+      {...dataAttributes}
     >
       {content}
     </div>

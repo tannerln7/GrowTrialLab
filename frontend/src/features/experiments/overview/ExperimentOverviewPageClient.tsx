@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -19,11 +18,8 @@ import {
   buildTentLayoutSpecFromOverviewPlants,
 } from "@/src/lib/gridkit/builders";
 import {
-  CellChrome,
-  CellMeta,
-  CellSubtitle,
-  CellTitle,
   LegacyOverviewTentLayoutAdapter,
+  PlantCell,
 } from "@/src/lib/gridkit/components";
 import type { PlantOccupantSpec } from "@/src/lib/gridkit/spec";
 import { api, isApiError } from "@/src/lib/api";
@@ -419,26 +415,22 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
         : "Unknown";
 
     return (
-      <CellChrome
+      <PlantCell
         key={plant.id}
-        className={cn(
-          styles.plantCell,
-          styles.overviewPlantCell,
-          "p-0",
+        plantId={plant.plantId}
+        title={plant.title || "(pending)"}
+        subtitle={speciesLine}
+        className={cn(styles.plantCell, styles.overviewPlantCell, "p-0")}
+        contentClassName={cn(
+          "gap-1 p-[var(--gt-cell-pad,var(--gt-space-md))]",
+          styles.overviewPlantCellLink,
         )}
-      >
-        <Link
-          href={plantLink(plant)}
-          className={cn(
-            "grid h-full content-start gap-1 p-[var(--gt-cell-pad,var(--gt-space-md))]",
-            styles.overviewPlantCellLink,
-          )}
-        >
-          <CellTitle className={styles.plantCellId}>{plant.title || "(pending)"}</CellTitle>
-          <CellSubtitle className={cn(styles.plantCellSpecies, styles.overviewPlantSpecies)}>
-            {speciesLine}
-          </CellSubtitle>
-          <CellMeta className={styles.overviewPlantStatusRow}>
+        titleClassName={styles.plantCellId}
+        subtitleClassName={cn(styles.plantCellSpecies, styles.overviewPlantSpecies)}
+        metaClassName={styles.overviewPlantStatusRow}
+        linkHref={plantLink(plant)}
+        meta={
+          <>
             <span
               className={cn(
                 styles.overviewPlantChip,
@@ -460,9 +452,9 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
                 {statusLabel}
               </span>
             ) : null}
-          </CellMeta>
-        </Link>
-      </CellChrome>
+          </>
+        }
+      />
     );
   }
 

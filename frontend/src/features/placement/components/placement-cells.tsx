@@ -1,11 +1,11 @@
 import { memo } from "react";
 
 import { cn } from "@/lib/utils";
-import type { PlantCell, TrayCell } from "@/src/features/placement/types";
+import type { PlantCell as PlantCellModel, TrayCell as TrayCellModel } from "@/src/features/placement/types";
 import { formatTrayDisplay } from "@/src/features/placement/utils";
 import { Badge } from "@/src/components/ui/badge";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
-import { CellChrome, CellMeta, CellSubtitle, CellTitle } from "@/src/lib/gridkit/components";
+import { PlantCell, TrayCell } from "@/src/lib/gridkit/components";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 
 function buildCellChips(input: {
@@ -43,7 +43,7 @@ function buildCellChips(input: {
 }
 
 type PlantSelectableCellProps = {
-  plant: PlantCell;
+  plant: PlantCellModel;
   selected: boolean;
   dirty: boolean;
   onToggle: (plantId: string) => void;
@@ -52,7 +52,10 @@ type PlantSelectableCellProps = {
 function PlantSelectableCellImpl({ plant, selected, dirty, onToggle }: PlantSelectableCellProps) {
   const gradeLabel = plant.grade ? `Grade ${plant.grade}` : "Grade -";
   return (
-    <CellChrome
+    <PlantCell
+      plantId={plant.uuid}
+      title={plant.plant_id || "(pending)"}
+      subtitle={plant.species_name}
       state={{
         selected,
         tone: dirty ? "warn" : undefined,
@@ -66,20 +69,21 @@ function PlantSelectableCellImpl({ plant, selected, dirty, onToggle }: PlantSele
         dirty,
       })}
       className={cn(styles.plantCell, "justify-items-center text-center")}
-    >
-      <CellTitle className={styles.plantCellId}>{plant.plant_id || "(pending)"}</CellTitle>
-      <CellSubtitle className={styles.plantCellSpecies}>{plant.species_name}</CellSubtitle>
-      <CellMeta className={cn(styles.plantCellMetaRow, "justify-center")}>
+      titleClassName={styles.plantCellId}
+      subtitleClassName={styles.plantCellSpecies}
+      metaClassName={cn(styles.plantCellMetaRow, "justify-center")}
+      meta={
         <Badge variant={plant.grade ? "secondary" : "outline"}>{gradeLabel}</Badge>
-      </CellMeta>
-    </CellChrome>
+      }
+      contentClassName="justify-items-center text-center"
+    />
   );
 }
 
 export const PlantSelectableCell = memo(PlantSelectableCellImpl);
 
 type TraySelectableCellProps = {
-  tray: TrayCell;
+  tray: TrayCellModel;
   selected: boolean;
   dirty: boolean;
   inSlot?: boolean;
@@ -94,7 +98,9 @@ function TraySelectableCellImpl({
   onToggle,
 }: TraySelectableCellProps) {
   return (
-    <CellChrome
+    <TrayCell
+      trayId={tray.tray_id}
+      title={formatTrayDisplay(tray.name, tray.tray_id)}
       state={{
         selected,
         tone: dirty ? "warn" : undefined,
@@ -113,17 +119,17 @@ function TraySelectableCellImpl({
         inSlot && "h-full min-h-0 p-2",
         inSlot && styles.slotTrayCellFill,
       )}
-    >
-      <CellTitle className={cn(styles.trayGridCellId, inSlot && styles.trayGridCellIdInSlot)}>
-        {formatTrayDisplay(tray.name, tray.tray_id)}
-      </CellTitle>
-      <Badge
-        variant="secondary"
-        className={cn(styles.recipeLegendItemCompact, inSlot && "justify-self-center")}
-      >
-        {tray.current_count}/{tray.capacity} plants
-      </Badge>
-    </CellChrome>
+      titleClassName={cn(styles.trayGridCellId, inSlot && styles.trayGridCellIdInSlot)}
+      meta={
+        <Badge
+          variant="secondary"
+          className={cn(styles.recipeLegendItemCompact, inSlot && "justify-self-center")}
+        >
+          {tray.current_count}/{tray.capacity} plants
+        </Badge>
+      }
+      contentClassName={cn(inSlot && "items-center")}
+    />
   );
 }
 

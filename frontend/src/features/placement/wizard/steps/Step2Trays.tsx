@@ -6,7 +6,7 @@ import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
 import { CountAdjustToolbar } from "@/src/components/ui/count-adjust-toolbar";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { StepAdjustButton } from "@/src/components/ui/step-adjust-button";
-import { CellChrome, CellMeta, CellTitle } from "@/src/lib/gridkit/components";
+import { TrayCell } from "@/src/lib/gridkit/components";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
@@ -57,23 +57,29 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
               : [];
 
             return (
-              <CellChrome
+              <TrayCell
                 key={trayId}
+                trayId={tray.tray_id}
+                title={formatTrayDisplay(tray.name, tray.tray_id)}
                 state={{ tone: trayDirty ? "warn" : undefined }}
                 chips={chips}
                 className={cn(styles.trayEditorCell, "justify-items-center text-center")}
-              >
-                <CellTitle className={styles.trayGridCellId}>{formatTrayDisplay(tray.name, tray.tray_id)}</CellTitle>
-                <CellMeta className={styles.trayEditorBadgeRow}>
-                  <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
-                    {draftCapacity} {draftCapacity === 1 ? "plant" : "plants"}
-                  </Badge>
-                  {trayMarkedForRemoval ? (
-                    <Badge variant="destructive" className={styles.recipeLegendItemCompact}>
-                      Pending removal
+                titleClassName={styles.trayGridCellId}
+                metaClassName={styles.trayEditorBadgeRow}
+                meta={
+                  <>
+                    <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
+                      {draftCapacity} {draftCapacity === 1 ? "plant" : "plants"}
                     </Badge>
-                  ) : null}
-                </CellMeta>
+                    {trayMarkedForRemoval ? (
+                      <Badge variant="destructive" className={styles.recipeLegendItemCompact}>
+                        Pending removal
+                      </Badge>
+                    ) : null}
+                  </>
+                }
+                contentClassName="justify-items-center text-center"
+              >
                 <div className={styles.trayEditorAdjustRow}>
                   <StepAdjustButton
                     direction="decrement"
@@ -86,7 +92,7 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
                     disabled={model.saving || model.locked}
                   />
                 </div>
-              </CellChrome>
+              </TrayCell>
             );
           })}
           {model.draftTrayCount > model.sortedTrayIds.length
@@ -102,8 +108,10 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
                 ];
 
                 return (
-                  <CellChrome
+                  <TrayCell
                     key={`draft-tray-${index + 1}`}
+                    trayId={`draft-tray-${index + 1}`}
+                    title="New tray"
                     state={{ tone: "warn" }}
                     chips={chips}
                     className={cn(
@@ -111,13 +119,15 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
                       "justify-items-center text-center",
                       "border-dashed",
                     )}
-                  >
-                    <CellTitle className={styles.trayGridCellId}>New tray</CellTitle>
-                    <CellMeta className={styles.trayEditorBadgeRow}>
+                    titleClassName={styles.trayGridCellId}
+                    metaClassName={styles.trayEditorBadgeRow}
+                    meta={
                       <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
                         {draftCapacity} {draftCapacity === 1 ? "plant" : "plants"}
                       </Badge>
-                    </CellMeta>
+                    }
+                    contentClassName="justify-items-center text-center"
+                  >
                     <div className={styles.trayEditorAdjustRow}>
                       <StepAdjustButton
                         direction="decrement"
@@ -130,7 +140,7 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
                         disabled={model.saving || model.locked}
                       />
                     </div>
-                  </CellChrome>
+                  </TrayCell>
                 );
               })
             : null}

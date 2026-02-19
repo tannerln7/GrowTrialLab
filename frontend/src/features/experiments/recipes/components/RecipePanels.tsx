@@ -8,7 +8,7 @@ import { NativeSelect } from "@/src/components/ui/native-select";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
 import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
-import { CellChrome, CellMeta, CellSubtitle, CellTitle } from "@/src/lib/gridkit/components";
+import { CellChrome, CellSubtitle, CellTitle, TrayCell } from "@/src/lib/gridkit/components";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
@@ -290,13 +290,15 @@ export function RecipePlantDraftPanel({
 
       <div className={cn(styles.trayManagerGrid, styles.cellGridResponsive)} data-cell-size="lg">
         {model.trays.map((tray) => (
-          <CellChrome key={tray.trayId} className={styles.trayEditorCell}>
-            <div className={styles.trayHeaderRow}>
-              <div className={styles.trayHeaderMeta}>
-                <CellTitle>{formatTrayDisplay(tray.trayName, tray.trayCode)}</CellTitle>
-                <CellSubtitle>Occupancy: {tray.plantIds.length}/{tray.capacity}</CellSubtitle>
-              </div>
-              <CellMeta className={styles.trayHeaderActions}>
+          <TrayCell
+            key={tray.trayId}
+            trayId={tray.trayId}
+            title={formatTrayDisplay(tray.trayName, tray.trayCode)}
+            subtitle={`Occupancy: ${tray.plantIds.length}/${tray.capacity}`}
+            className={styles.trayEditorCell}
+            metaClassName={styles.trayHeaderActions}
+            meta={
+              <>
                 <span className="text-sm text-muted-foreground">Selected: {tray.selectedCount}</span>
                 <TrayHeaderToggle
                   onClick={() => actions.onToggleContainer(tray.plantIds)}
@@ -304,22 +306,24 @@ export function RecipePlantDraftPanel({
                   label={formatTrayDisplay(tray.trayName, tray.trayCode)}
                   icon={CheckSquare}
                 />
-              </CellMeta>
-            </div>
+              </>
+            }
+          >
             <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
               {tray.plantIds.map((plantId) => renderPlantCell(plantId))}
             </div>
-          </CellChrome>
+          </TrayCell>
         ))}
 
         {model.unplaced ? (
-          <CellChrome className={styles.trayEditorCell}>
-            <div className={styles.trayHeaderRow}>
-              <div className={styles.trayHeaderMeta}>
-                <CellTitle>Unplaced</CellTitle>
-                <CellSubtitle>Plants: {model.unplaced.plantIds.length}</CellSubtitle>
-              </div>
-              <CellMeta className={styles.trayHeaderActions}>
+          <TrayCell
+            trayId="unplaced"
+            title="Unplaced"
+            subtitle={`Plants: ${model.unplaced.plantIds.length}`}
+            className={styles.trayEditorCell}
+            metaClassName={styles.trayHeaderActions}
+            meta={
+              <>
                 <span className="text-sm text-muted-foreground">Selected: {model.unplaced.selectedCount}</span>
                 <TrayHeaderToggle
                   onClick={() => actions.onToggleContainer(model.unplaced?.plantIds ?? [])}
@@ -327,12 +331,13 @@ export function RecipePlantDraftPanel({
                   label="Unplaced"
                   icon={CheckSquare}
                 />
-              </CellMeta>
-            </div>
+              </>
+            }
+          >
             <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
               {model.unplaced.plantIds.map((plantId) => renderPlantCell(plantId))}
             </div>
-          </CellChrome>
+          </TrayCell>
         ) : null}
       </div>
     </SectionCard>

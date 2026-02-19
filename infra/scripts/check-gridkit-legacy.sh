@@ -15,6 +15,11 @@ CHIP_PATTERN="${CHIP_PATTERN:-DraftChangeMarker|plantCellCheck|plantCellDirtyDot
 CELL_SHELL_PATTERN="${CELL_SHELL_PATTERN:-styles\\.cellFrame|styles\\.cellInteractive|styles\\.cellSurfaceLevel[0-9]|rounded-lg border border-border}"
 CONTAINER_PATTERN="${CONTAINER_PATTERN:-<TentGrid\\b|<TentCard\\b|<ShelfStack\\b|<ShelfCard\\b}"
 POSITION_STRIP_PATTERN="${POSITION_STRIP_PATTERN:-<PositionStrip\\b}"
+POSITION_STRIP_WITH_RENDERERS_PATTERN="${POSITION_STRIP_WITH_RENDERERS_PATTERN:-<PositionStripWithRenderers\\b}"
+RENDERER_REGISTRY_PATTERN="${RENDERER_REGISTRY_PATTERN:-defaultPositionRendererMap|createPositionRendererMap|PositionStripWithRenderers}"
+CANONICAL_LEAF_PATTERN="${CANONICAL_LEAF_PATTERN:-<SlotCell\\b|<TrayCell\\b|<PlantCell\\b}"
+DIRECT_RENDER_POSITION_PATTERN="${DIRECT_RENDER_POSITION_PATTERN:-renderPosition=\\{}"
+LEAF_CELL_PATTERN="${LEAF_CELL_PATTERN:-<CellChrome\\b|renderPlantCell\\(|renderTrayCell\\(|PlantSelectableCellImpl|TraySelectableCellImpl}"
 LEGACY_SHELF_STRIP_PATTERN="${LEGACY_SHELF_STRIP_PATTERN:-styles\\.overviewTentShelfStack|styles\\.overviewTentSlotGrid|styles\\.overviewShelfSlotGrid|styles\\.step1ShelfPreviewSlotGrid|styles\\.tentShelfSlotGrid|scrollLeft|scrollTo\\(|wheel}"
 TENT_SHELF_WRAPPER_PATTERN="${TENT_SHELF_WRAPPER_PATTERN:-styles\\.overviewTentBoardGrid|styles\\.overviewTentBoardCard|styles\\.overviewTentShelfStack|styles\\.overviewShelfGroup|styles\\.tentBoardGrid|styles\\.tentBoardCard|styles\\.tentShelfRow|styles\\.tentShelfCard|styles\\.step1ShelfPreviewLane|styles\\.step1ShelfPreviewCard|\\[grid-template-columns:repeat\\(auto-fit,minmax\\(min\\(100%,28rem\\),1fr\\)\\)\\]}"
 
@@ -29,7 +34,8 @@ chip_tmp="$(mktemp)"
 shell_tmp="$(mktemp)"
 wrapper_tmp="$(mktemp)"
 legacy_strip_tmp="$(mktemp)"
-trap 'rm -f "$raw_matches" "$violations" "$chip_tmp" "$shell_tmp" "$wrapper_tmp" "$legacy_strip_tmp"' EXIT
+leaf_tmp="$(mktemp)"
+trap 'rm -f "$raw_matches" "$violations" "$chip_tmp" "$shell_tmp" "$wrapper_tmp" "$legacy_strip_tmp" "$leaf_tmp"' EXIT
 
 rg -n -S "$LEGACY_PATTERN" "$TARGET_DIR" >"$raw_matches" || true
 
@@ -86,6 +92,19 @@ cellchrome_count="$( (rg -n -S "<CellChrome\\b" "$TARGET_DIR" || true) | wc -l |
 cellchips_count="$( (rg -n -S "<CellChips\\b" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
 container_count="$( (rg -n -S "$CONTAINER_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
 position_strip_count="$( (rg -n -S "$POSITION_STRIP_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
+position_strip_with_renderers_count="$( (rg -n -S "$POSITION_STRIP_WITH_RENDERERS_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
+renderer_registry_count="$( (rg -n -S "$RENDERER_REGISTRY_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
+canonical_leaf_count="$( (rg -n -S "$CANONICAL_LEAF_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
+direct_render_position_count="$(
+  (
+    (rg -n -S "$DIRECT_RENDER_POSITION_PATTERN" "$TARGET_DIR" || true) | grep -E -v "frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx" || true
+  ) | wc -l | tr -d ' '
+)"
+leaf_cell_match_count="$(
+  (
+    (rg -n -S "$LEAF_CELL_PATTERN" "$TARGET_DIR" || true) | grep -E -v "frontend/src/lib/gridkit/components/cells/|frontend/src/lib/gridkit/renderers/" || true
+  ) | wc -l | tr -d ' '
+)"
 chip_match_count="$(
   (
     (rg -n -S "$CHIP_PATTERN" "$TARGET_DIR" || true) | grep -E -v "frontend/src/lib/gridkit/components/CellChips.tsx" || true
@@ -112,6 +131,11 @@ echo "[gridkit-legacy-guard] cellchrome_usages=$cellchrome_count"
 echo "[gridkit-legacy-guard] cellchips_usages=$cellchips_count"
 echo "[gridkit-legacy-guard] gridkit_container_callsites=$container_count"
 echo "[gridkit-legacy-guard] position_strip_usages=$position_strip_count"
+echo "[gridkit-legacy-guard] position_strip_with_renderers_usages=$position_strip_with_renderers_count"
+echo "[gridkit-legacy-guard] renderer_registry_usages=$renderer_registry_count"
+echo "[gridkit-legacy-guard] canonical_leaf_cell_usages=$canonical_leaf_count"
+echo "[gridkit-legacy-guard] remaining_direct_renderPosition_lambdas=$direct_render_position_count"
+echo "[gridkit-legacy-guard] remaining_bespoke_leaf_cell_heuristics=$leaf_cell_match_count"
 echo "[gridkit-legacy-guard] remaining_bespoke_tent_shelf_wrappers=$tent_shelf_wrapper_match_count"
 echo "[gridkit-legacy-guard] remaining_legacy_shelf_strip_patterns=$legacy_shelf_strip_match_count"
 echo "[gridkit-legacy-guard] remaining_bespoke_chip_overlays=$chip_match_count"
@@ -150,6 +174,12 @@ fi
 if [[ -s "$legacy_strip_tmp" ]]; then
   echo "[gridkit-legacy-guard] legacy_shelf_strip_top_files:"
   grep -E -v "frontend/src/lib/gridkit/components/PositionStrip.tsx|frontend/src/components/ui/experiments-styles.ts" "$legacy_strip_tmp" | cut -d: -f1 | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
+fi
+
+rg -n -S "$LEAF_CELL_PATTERN" "$TARGET_DIR" >"$leaf_tmp" || true
+if [[ -s "$leaf_tmp" ]]; then
+  echo "[gridkit-legacy-guard] bespoke_leaf_cell_top_files:"
+  grep -E -v "frontend/src/lib/gridkit/components/cells/|frontend/src/lib/gridkit/renderers/" "$leaf_tmp" | cut -d: -f1 | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
 fi
 
 if [[ "$MODE" == "--enforce" && "$violation_matches" -gt 0 ]]; then

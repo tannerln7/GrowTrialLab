@@ -1,12 +1,10 @@
 import { cn } from "@/lib/utils";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
-import { POSITION_STRIP_PRESET } from "@/src/lib/gridkit/presets";
 import type { PlantOccupantSpec, TentLayoutSpec, TrayOccupantSpec } from "@/src/lib/gridkit/spec";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
+import { createPositionRendererMap, PositionStripWithRenderers, type PositionRendererMap } from "@/src/lib/gridkit/renderers";
 import type { ReactNode } from "react";
-import { CellChrome } from "../CellChrome";
-import { CellTitle } from "../CellText";
-import { PositionStrip } from "../PositionStrip";
+import { SlotCell, TrayCell } from "../cells";
 import { ShelfCard, ShelfStack, TentCard, TentGrid } from "../containers";
 
 function readTrayCount(value: unknown): number {
@@ -23,6 +21,100 @@ export function LegacyOverviewTentLayoutAdapter({
   spec,
   renderPlantCell,
 }: LegacyOverviewTentLayoutAdapterProps) {
+  const overviewRenderers: PositionRendererMap = createPositionRendererMap({
+    emptySlot: ({ position }) => (
+      <SlotCell
+        position={position}
+        variant="empty"
+        className={cn(styles.slotCell, styles.overviewSlotCell, styles.overviewSlotCellEmpty)}
+        titleClassName={styles.slotCellLabel}
+        statusClassName={styles.overviewSlotEmptyState}
+      />
+    ),
+    tray: ({ position }) => {
+      if (position.occupant.kind !== "tray") {
+        return null;
+      }
+
+      return (
+        <div className="h-full min-h-[118px] max-sm:min-h-[104px]">
+          <div className={styles.overviewSlotTrayStack}>
+            <TrayCell
+              trayId={position.occupant.trayId}
+              title={position.occupant.title}
+              position={position}
+              state={position.occupant.state || position.state}
+              chips={position.occupant.chips || position.chips}
+              dnd={position.occupant.dnd || position.dnd}
+              className={cn(styles.overviewTrayCell, "h-full")}
+              titleClassName={cn(styles.trayGridCellId, "text-left")}
+              metaClassName={styles.overviewTrayMeta}
+              meta={
+                position.occupant.currentCount != null &&
+                position.occupant.capacity != null ? (
+                  <span className={cn(styles.recipeLegendItem, "shrink-0")}>
+                    {position.occupant.currentCount}/{position.occupant.capacity}
+                  </span>
+                ) : null
+              }
+            >
+              <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
+                {(position.occupant.plants || []).map((plant) => renderPlantCell(plant))}
+              </div>
+            </TrayCell>
+          </div>
+        </div>
+      );
+    },
+    trayStack: ({ position }) => {
+      const trays: TrayOccupantSpec[] =
+        position.occupant.kind === "trayStack" ? position.occupant.trays : [];
+      if (trays.length === 0) {
+        return (
+          <SlotCell
+            position={position}
+            variant="empty"
+            className={cn(styles.slotCell, styles.overviewSlotCell, styles.overviewSlotCellEmpty)}
+            titleClassName={styles.slotCellLabel}
+            statusClassName={styles.overviewSlotEmptyState}
+          />
+        );
+      }
+
+      return (
+        <div className="h-full min-h-[118px] max-sm:min-h-[104px]">
+          <div className={styles.overviewSlotTrayStack}>
+            {trays.map((tray) => (
+              <TrayCell
+                key={tray.id}
+                trayId={tray.trayId}
+                title={tray.title}
+                position={position}
+                state={tray.state || position.state}
+                chips={tray.chips || position.chips}
+                dnd={tray.dnd || position.dnd}
+                className={cn(styles.overviewTrayCell, trays.length === 1 ? "h-full" : "")}
+                titleClassName={cn(styles.trayGridCellId, "text-left")}
+                metaClassName={styles.overviewTrayMeta}
+                meta={
+                  tray.currentCount != null && tray.capacity != null ? (
+                    <span className={cn(styles.recipeLegendItem, "shrink-0")}>
+                      {tray.currentCount}/{tray.capacity}
+                    </span>
+                  ) : null
+                }
+              >
+                <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
+                  {(tray.plants || []).map((plant) => renderPlantCell(plant))}
+                </div>
+              </TrayCell>
+            ))}
+          </div>
+        </div>
+      );
+    },
+  });
+
   return (
     <TentGrid>
       {spec.tents.map((tent) => {
@@ -60,65 +152,11 @@ export function LegacyOverviewTentLayoutAdapter({
                     key={shelf.shelfId}
                     title={<span className={styles.overviewShelfLabel}>{`Shelf ${shelfIndex}`}</span>}
                   >
-                    <PositionStrip
+                    <PositionStripWithRenderers
                       positions={shelf.positions}
-                      pageSize={POSITION_STRIP_PRESET.maxVisible}
                       pageGridClassName="max-sm:gap-1"
                       ariaLabel={`${tent.label} shelf ${shelfIndex} positions`}
-                      renderPosition={(position) => {
-                        if (position.occupant.kind === "emptySlot") {
-                          return (
-                            <CellChrome
-                              className={cn(styles.slotCell, styles.overviewSlotCell, styles.overviewSlotCellEmpty)}
-                            >
-                              <CellTitle className={styles.slotCellLabel}>Slot {position.positionIndex}</CellTitle>
-                              <div className={styles.overviewSlotEmptyState}>Empty</div>
-                            </CellChrome>
-                          );
-                        }
-
-                        const trays: TrayOccupantSpec[] =
-                          position.occupant.kind === "tray"
-                            ? [position.occupant]
-                            : position.occupant.kind === "trayStack"
-                              ? position.occupant.trays
-                              : [];
-
-                        if (trays.length === 0) {
-                          return (
-                            <CellChrome
-                              className={cn(styles.slotCell, styles.overviewSlotCell, styles.overviewSlotCellEmpty)}
-                            >
-                              <CellTitle className={styles.slotCellLabel}>Slot {position.positionIndex}</CellTitle>
-                              <div className={styles.overviewSlotEmptyState}>Empty</div>
-                            </CellChrome>
-                          );
-                        }
-
-                        return (
-                          <div className="h-full min-h-[118px] max-sm:min-h-[104px]">
-                            <div className={styles.overviewSlotTrayStack}>
-                              {trays.map((tray) => (
-                                <CellChrome key={tray.id} className={cn(styles.overviewTrayCell, trays.length === 1 ? "h-full" : "")}>
-                                  <div className={styles.overviewTrayMeta}>
-                                    <CellTitle className={cn(styles.trayGridCellId, "text-left")}>
-                                      {tray.title}
-                                    </CellTitle>
-                                    {tray.currentCount != null && tray.capacity != null ? (
-                                      <span className={cn(styles.recipeLegendItem, "shrink-0")}>
-                                        {tray.currentCount}/{tray.capacity}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
-                                    {(tray.plants || []).map((plant) => renderPlantCell(plant))}
-                                  </div>
-                                </CellChrome>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      }}
+                      renderers={overviewRenderers}
                     />
                   </ShelfCard>
                 );

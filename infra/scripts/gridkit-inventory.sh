@@ -55,6 +55,13 @@ report_bucket "cellchrome_usages" "<CellChrome\\b"
 report_bucket "cellchips_usages" "<CellChips\\b"
 report_bucket "gridkit_container_callsites" "<TentGrid\\b|<TentCard\\b|<ShelfStack\\b|<ShelfCard\\b"
 report_bucket "position_strip_usages" "<PositionStrip\\b"
+report_bucket "position_strip_with_renderers_usages" "<PositionStripWithRenderers\\b"
+report_bucket "renderer_registry_usages" "defaultPositionRendererMap|createPositionRendererMap|PositionStripWithRenderers"
+report_bucket "canonical_leaf_cell_usages" "<SlotCell\\b|<TrayCell\\b|<PlantCell\\b"
+report_bucket \
+  "remaining_direct_renderPosition_lambdas" \
+  "renderPosition=\\{" \
+  "frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx"
 report_bucket \
   "remaining_bespoke_mapping_heuristics" \
   "groupSlotsByShelf|buildStep1ShelfPreviewGroups|slotsByShelf\\s*=\\s*new Map|slotByIndex\\s*=\\s*new Map|tentMap\\s*=\\s*new Map"
@@ -74,3 +81,7 @@ report_bucket \
   "remaining_bespoke_cell_shells" \
   "styles\\.cellFrame|styles\\.cellInteractive|styles\\.cellSurfaceLevel[0-9]|rounded-lg border border-border" \
   "frontend/src/lib/gridkit/components/CellChrome.tsx"
+report_bucket \
+  "remaining_bespoke_leaf_cell_heuristics" \
+  "<CellChrome\\b|renderPlantCell\\(|renderTrayCell\\(|PlantSelectableCellImpl|TraySelectableCellImpl" \
+  "frontend/src/lib/gridkit/components/cells/|frontend/src/lib/gridkit/renderers/"

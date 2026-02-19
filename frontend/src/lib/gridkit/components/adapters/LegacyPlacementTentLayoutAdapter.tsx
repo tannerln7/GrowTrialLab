@@ -4,12 +4,10 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
-import { POSITION_STRIP_PRESET } from "@/src/lib/gridkit/presets";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import type { TentLayoutSpec, TentSpec } from "@/src/lib/gridkit/spec";
-import { CellChrome } from "../CellChrome";
-import { CellTitle } from "../CellText";
-import { PositionStrip } from "../PositionStrip";
+import { createPositionRendererMap, PositionStripWithRenderers, type PositionRendererMap } from "@/src/lib/gridkit/renderers";
+import { SlotCell } from "../cells";
 import { ShelfCard, ShelfStack, TentCard, TentGrid } from "../containers";
 
 type LegacyPlacementTentLayoutAdapterProps = {
@@ -37,6 +35,70 @@ export function LegacyPlacementTentLayoutAdapter({
   onToggleDestinationSlot,
   renderTrayCell,
 }: LegacyPlacementTentLayoutAdapterProps) {
+  const placementRenderers: PositionRendererMap = createPositionRendererMap({
+    tray: ({ position }) => {
+      if (position.occupant.kind !== "tray") {
+        return null;
+      }
+      return (
+        <div className={styles.slotTrayCellFill}>{renderTrayCell(position.occupant.trayId, true)}</div>
+      );
+    },
+    trayStack: ({ position }) => {
+      if (position.occupant.kind !== "trayStack" || position.occupant.trays.length === 0) {
+        return null;
+      }
+      return (
+        <div className={styles.slotTrayCellFill}>
+          {renderTrayCell(position.occupant.trays[0].trayId, true)}
+        </div>
+      );
+    },
+    emptySlot: ({ position }) => {
+      const slotSelected = Boolean(position.state?.selected);
+      const dirty = position.state?.tone === "warn";
+      const slotLabel =
+        (typeof position.label === "string" && position.label.trim()) ||
+        (position.occupant.kind === "emptySlot" ? position.occupant.label : "") ||
+        `Slot ${position.positionIndex}`;
+      const chips: ChipSpec[] = [];
+      if (dirty) {
+        chips.push({
+          id: `${position.id}-dirty`,
+          label: "•",
+          tone: "warn",
+          placement: "tl",
+        });
+      }
+      if (slotSelected) {
+        chips.push({
+          id: `${position.id}-selected`,
+          label: "✓",
+          tone: "info",
+          placement: "tr",
+        });
+      }
+
+      return (
+        <SlotCell
+          position={position}
+          variant="empty"
+          state={{
+            selected: slotSelected,
+            tone: dirty ? "warn" : undefined,
+          }}
+          interactive
+          onPress={() => onToggleDestinationSlot(position.id)}
+          ariaLabel={slotLabel}
+          chips={chips}
+          className={cn(styles.slotCell, styles.slotContainerCellFrame)}
+          titleClassName={styles.slotCellLabel}
+          statusClassName={cn(styles.slotCellEmpty, slotSelected && styles.slotCellEmptyActive)}
+        />
+      );
+    },
+  });
+
   return (
     <TentGrid>
       {spec.tents.map((tent) => {
@@ -73,66 +135,10 @@ export function LegacyPlacementTentLayoutAdapter({
                   title={<span className={styles.trayGridCellId}>{shelf.label}</span>}
                   className={styles.cellSurfaceLevel2}
                 >
-                  <PositionStrip
+                  <PositionStripWithRenderers
                     positions={shelf.positions}
-                    pageSize={POSITION_STRIP_PRESET.maxVisible}
                     ariaLabel={`${tent.label} ${shelf.label} positions`}
-                    renderPosition={(position) => {
-                      if (position.occupant.kind === "tray") {
-                        return <div className={styles.slotTrayCellFill}>{renderTrayCell(position.occupant.trayId, true)}</div>;
-                      }
-
-                      if (position.occupant.kind === "trayStack" && position.occupant.trays.length > 0) {
-                        return (
-                          <div className={styles.slotTrayCellFill}>
-                            {renderTrayCell(position.occupant.trays[0].trayId, true)}
-                          </div>
-                        );
-                      }
-
-                      const slotSelected = Boolean(position.state?.selected);
-                      const dirty = position.state?.tone === "warn";
-                      const slotLabel =
-                        (typeof position.label === "string" && position.label.trim()) ||
-                        (position.occupant.kind === "emptySlot" ? position.occupant.label : "") ||
-                        `Slot ${position.positionIndex}`;
-                      const chips: ChipSpec[] = [];
-                      if (dirty) {
-                        chips.push({
-                          id: `${position.id}-dirty`,
-                          label: "•",
-                          tone: "warn",
-                          placement: "tl",
-                        });
-                      }
-                      if (slotSelected) {
-                        chips.push({
-                          id: `${position.id}-selected`,
-                          label: "✓",
-                          tone: "info",
-                          placement: "tr",
-                        });
-                      }
-
-                      return (
-                        <CellChrome
-                          state={{
-                            selected: slotSelected,
-                            tone: dirty ? "warn" : undefined,
-                          }}
-                          interactive
-                          onPress={() => onToggleDestinationSlot(position.id)}
-                          ariaLabel={slotLabel}
-                          chips={chips}
-                          className={cn(styles.slotCell, styles.slotContainerCellFrame)}
-                        >
-                          <CellTitle className={styles.slotCellLabel}>{slotLabel}</CellTitle>
-                          <span className={cn(styles.slotCellEmpty, slotSelected && styles.slotCellEmptyActive)}>
-                            Empty
-                          </span>
-                        </CellChrome>
-                      );
-                    }}
+                    renderers={placementRenderers}
                   />
                 </ShelfCard>
               ))}

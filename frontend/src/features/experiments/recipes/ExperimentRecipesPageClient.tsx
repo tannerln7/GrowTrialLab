@@ -22,7 +22,7 @@ import {
 } from "@/src/features/experiments/recipes/components/RecipePanels";
 import { buildPersistedRecipeMap, isActivePlant, recipeLabel, sortPlantsById } from "@/src/features/experiments/recipes/utils";
 import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
-import { CellChrome, CellMeta, CellSubtitle, CellTitle } from "@/src/lib/gridkit/components";
+import { PlantCell } from "@/src/lib/gridkit/components";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
@@ -504,8 +504,11 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     }
 
     return (
-      <CellChrome
+      <PlantCell
         key={plant.uuid}
+        plantId={plant.uuid}
+        title={plant.plant_id || "(pending)"}
+        subtitle={plant.species_name}
         state={{
           selected,
           tone: dirty ? "warn" : undefined,
@@ -515,16 +518,18 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
         ariaLabel={plant.plant_id || "Plant"}
         chips={chips}
         className={styles.plantCell}
-      >
-        <CellTitle className={styles.plantCellId}>{plant.plant_id || "(pending)"}</CellTitle>
-        <CellSubtitle className={styles.plantCellSpecies}>{plant.species_name}</CellSubtitle>
-        <CellMeta className={styles.plantCellMetaRow}>
-          <span className={draftRecipe ? styles.recipeBadge : styles.recipeBadgeEmpty}>
-            {draftRecipe ? draftRecipe.code : "No recipe"}
-          </span>
-          {dirty ? <span className={styles.recipeLegendItem}>Draft</span> : null}
-        </CellMeta>
-      </CellChrome>
+        titleClassName={styles.plantCellId}
+        subtitleClassName={styles.plantCellSpecies}
+        metaClassName={styles.plantCellMetaRow}
+        meta={
+          <>
+            <span className={draftRecipe ? styles.recipeBadge : styles.recipeBadgeEmpty}>
+              {draftRecipe ? draftRecipe.code : "No recipe"}
+            </span>
+            {dirty ? <span className={styles.recipeLegendItem}>Draft</span> : null}
+          </>
+        }
+      />
     );
   }, [draftPlantRecipe, persistedRecipeByPlantId, plantById, recipeById, selectedPlantIds, togglePlantSelection]);
 

@@ -6,6 +6,7 @@ import { chunkArray } from "@/src/lib/collections/array";
 import { usePointerCoarse } from "@/src/lib/hooks/usePointerCoarse";
 import { usePrefersReducedMotion } from "@/src/lib/hooks/usePrefersReducedMotion";
 import { useResizeObserver } from "@/src/lib/hooks/useResizeObserver";
+import { getDndDataAttributes } from "@/src/lib/dnd";
 import type { PositionSpec } from "@/src/lib/gridkit/spec";
 
 type PositionStripProps = {
@@ -146,12 +147,13 @@ export function PositionStrip({
                     <div
                       key={position.id}
                       className={positionClassName}
+                      data-cell-kind="position"
                       data-pos-id={position.id}
                       data-pos-index={position.positionIndex}
+                      data-position-index={position.positionIndex}
                       data-shelf-id={position.shelfId}
                       data-tent-id={position.tentId}
-                      data-draggable-id={dndSpec.draggableId}
-                      data-droppable-id={dndSpec.droppableId}
+                      {...getDndDataAttributes(dndSpec)}
                     >
                       {renderPosition(position)}
                     </div>
