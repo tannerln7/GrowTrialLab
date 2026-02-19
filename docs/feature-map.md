@@ -27,6 +27,32 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (GridKit Phase 6 Tray Folder Overlay Standardization)
+- `Completed` Tray expansion now uses one GridKit folder-overlay system (Radix Popover + Framer Motion) with single-open coordination and renderer-context wiring.
+  - Added canonical tray folder overlay primitives:
+    - `frontend/src/lib/gridkit/components/overlays/TrayFolderOverlay.tsx`
+    - `frontend/src/lib/gridkit/components/cells/TrayCellExpandable.tsx`
+    - `frontend/src/lib/gridkit/components/grids/TrayPlantGrid.tsx`
+  - Added single-open folder manager:
+    - `frontend/src/lib/gridkit/state/trayFolderManager.tsx`
+  - Renderer integration updates:
+    - `GridRenderContext` now supports `trayFolder` configuration (`enabled`, `getPlantsForTray`, `onPlantPress`).
+    - default tray renderer can switch between static tray cells and expandable tray-folder behavior.
+  - Overview adapter migration:
+    - `frontend/src/lib/gridkit/components/adapters/LegacyOverviewTentLayoutAdapter.tsx` now scopes `TrayFolderProvider` and renders tray/tray-stack cells as expandable overlays.
+    - placement/other static tray surfaces remain non-expandable in this phase.
+  - Inventory/guardrail reporting now includes:
+    - `tray_folder_overlay_usages`
+    - `tray_folder_ctx_usages`
+    - `remaining_bespoke_tray_overlay_heuristics`
+  - Relevant files:
+    - `frontend/src/features/experiments/overview/ExperimentOverviewPageClient.tsx`
+    - `frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx`
+    - `frontend/src/lib/gridkit/renderers/types.ts`
+    - `infra/scripts/gridkit-inventory.sh`
+    - `infra/scripts/check-gridkit-legacy.sh`
+  - Refs: `4ce566c`
+
 ### 2026-02-19 (GridKit Phase 5 Canonical Leaf Cells + Renderer Registry + DnD Seams)
 - `Completed` GridKit leaf rendering is now standardized around canonical slot/tray/plant cells and a shared occupant renderer registry.
   - Added canonical leaf cells:

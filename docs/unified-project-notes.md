@@ -180,6 +180,16 @@ This document is the single consolidated source for current status, architecture
   - canonical renderer registry + wrapper: `frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx`, `frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx`
   - all GridKit shelf adapters now render through renderer maps (`LegacyOverviewTentLayoutAdapter`, `LegacyPlacementTentLayoutAdapter`, `LegacyPlacementShelfPreviewAdapter`) instead of direct `renderPosition` lambdas
   - DnD seam metadata helpers now live in `frontend/src/lib/dnd/attributes.ts` and `frontend/src/lib/dnd/shells.tsx`, with canonical leaf cells emitting consistent `data-cell-kind`, `data-tent-id`, `data-shelf-id`, `data-position-index`, `data-draggable-id`, and `data-droppable-id` attributes without enabling active DnD behavior.
+- [x] GridKit tray folder overlay behavior is now standardized for tent-layout tray expansion using Radix Popover + Framer Motion:
+  - canonical folder overlay primitives:
+    - `frontend/src/lib/gridkit/components/overlays/TrayFolderOverlay.tsx`
+    - `frontend/src/lib/gridkit/components/cells/TrayCellExpandable.tsx`
+    - `frontend/src/lib/gridkit/components/grids/TrayPlantGrid.tsx`
+  - single-open coordination manager:
+    - `frontend/src/lib/gridkit/state/trayFolderManager.tsx`
+  - renderer context now supports tray-folder wiring (`ctx.trayFolder`) and default tray rendering can switch between static `TrayCell` and expandable tray-folder behavior without changing DnD mode.
+  - overview tent/shelf adapter now scopes a `TrayFolderProvider` and renders tray occupants through expandable tray cells; placement adapters remain static (no new overlay behavior introduced there).
+  - inventory/guardrail scripts now report tray-folder usage and remaining bespoke tray-overlay heuristics in report-only mode.
 - [x] Tailwind-first migration is now active across the primary operator routes (`overview`, `recipes`, `placement`, `baseline`, `feeding`, `rotation`, `schedule`, `setup` + supporting setup routes, and cockpit `/p/{id}`): legacy `gt-*` class usage was removed from these flows and styling is now driven by Tailwind utility composition plus shadcn-style components/primitives.
 - [x] Route CSS modules for experiments/cockpit styling were retired in favor of shared Tailwind style maps and reusable UI primitives:
   - removed: `frontend/app/experiments/experiments.module.css`

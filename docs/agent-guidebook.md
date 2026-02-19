@@ -230,6 +230,12 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
     - default map: `frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx`
     - wrapper: `frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx`
     - adapters/pages can override only specific occupant kinds while inheriting defaults.
+  - For tray folder expansion behavior, use GridKit overlay primitives (not ad-hoc route-local popovers/dialogs):
+    - `TrayFolderOverlay`: `frontend/src/lib/gridkit/components/overlays/TrayFolderOverlay.tsx` (Radix Popover, non-modal, portal, Framer Motion animation).
+    - `TrayCellExpandable`: `frontend/src/lib/gridkit/components/cells/TrayCellExpandable.tsx` (canonical tray trigger + folder overlay wiring).
+    - `TrayPlantGrid`: `frontend/src/lib/gridkit/components/grids/TrayPlantGrid.tsx` (overlay plant grid content using canonical `PlantCell`).
+    - `TrayFolderProvider`/`useTrayFolderManager`: `frontend/src/lib/gridkit/state/trayFolderManager.tsx` for single-open coordination in a logical view scope.
+    - enable expansion per renderer context via `ctx.trayFolder`; keep it disabled for views that should remain static.
   - DnD seam metadata is helper-driven and passive in this phase:
     - helpers: `frontend/src/lib/dnd/attributes.ts`, `frontend/src/lib/dnd/shells.tsx`
     - no `DndContext`/sensors/hooks are active yet; only stable `data-*` attributes are emitted.
