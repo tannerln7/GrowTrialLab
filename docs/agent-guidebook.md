@@ -124,6 +124,16 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
   - `frontend/src/lib/api.ts`
   - `frontend/src/lib/usePageQueryState.ts`
 
+### Shared page helpers
+- Route params:
+  - Use `frontend/src/lib/useRouteParamString.ts` (`useRouteParamString("id")`) in client pages instead of repeating `params.id` parsing boilerplate.
+  - Use `frontend/src/lib/routing.ts` (`getParamString`) in wrappers/server contexts where `searchParams` or route params can be `string | string[]`.
+- Top-of-page status slabs:
+  - Use `frontend/src/components/ui/PageAlerts.tsx` for standard loading/error/notice/offline/not-invited rendering.
+  - Keep bespoke/non-standard error sections (for example custom not-found or rich error cards) outside `PageAlerts`.
+- Class composition:
+  - Use `cn(...)` (`frontend/src/lib/utils.ts`) for className composition; avoid `[].join(" ")` and `filter(Boolean).join(" ")` in className paths.
+
 ### Styling
 - Tailwind v4 + shadcn-style components are canonical.
 - Theme bridging:

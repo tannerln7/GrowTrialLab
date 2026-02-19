@@ -208,6 +208,11 @@ This document is the single consolidated source for current status, architecture
   - normalized API helper (`frontend/src/lib/api.ts`)
   - shared query-state hook (`frontend/src/lib/usePageQueryState.ts`)
   - overview page migration to query/mutation pattern
+- [x] Phase 1.5 mechanical frontend helper rollout is complete for route/page conventions:
+  - route/page param parsing now standardizes on `useRouteParamString("id")` / `getParamString(...)` across experiment and cockpit pages.
+  - standard top-of-page alert slabs now use shared `PageAlerts` in core experiment routes.
+  - className array joins in page-level className paths were replaced with shared `cn(...)`.
+  - existing React Query usage (`overview`) now uses generic `queryKeys.experiment.*` helpers rather than legacy aliases.
 
 ### In Progress / Not Complete
 - [ ] Continue page-by-page React Query + RHF/Zod migration (baseline/placement/rotation/feeding/schedule forms and fetch orchestration).

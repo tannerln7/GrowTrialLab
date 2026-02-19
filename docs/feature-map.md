@@ -27,6 +27,28 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Frontend Phase 1.5 Mechanical Helper Rollout)
+- `Completed` Frontend route/page conventions from Phase 1 were rolled out mechanically across the active experiment/cockpit pages without feature-flow changes.
+  - Route-param parsing boilerplate (`params.id` with `string | string[]` checks) was standardized to `useRouteParamString("id")` for client pages and existing `getParamString(...)` wrapper usage for route wrappers.
+  - Standard top-of-page status slabs were consolidated onto shared `PageAlerts` (loading/error/notice/offline/not-invited) where behavior mapped 1:1.
+  - ClassName assembly in page-level JSX was normalized to `cn(...)`; className `[].join(" ")`/`filter(Boolean).join(" ")` patterns were removed from frontend page callsites.
+  - Existing React Query usage on `overview` was normalized to generic `queryKeys.experiment.*` helpers (`status`, `feature`) and invalidations were updated to match.
+  - Relevant files:
+    - `frontend/app/experiments/page.tsx`
+    - `frontend/app/experiments/new/page.tsx`
+    - `frontend/app/experiments/[id]/page.tsx`
+    - `frontend/app/experiments/[id]/overview/page.tsx`
+    - `frontend/app/experiments/[id]/setup/page.tsx`
+    - `frontend/app/experiments/[id]/plants/page.tsx`
+    - `frontend/app/experiments/[id]/recipes/page.tsx`
+    - `frontend/app/experiments/[id]/rotation/page.tsx`
+    - `frontend/app/experiments/[id]/schedule/page.tsx`
+    - `frontend/app/experiments/[id]/baseline/page.tsx`
+    - `frontend/app/p/[id]/page.tsx`
+    - `docs/agent-guidebook.md`
+    - `docs/unified-project-notes.md`
+  - Refs: `1b8d0c5`
+
 ### 2026-02-19 (Placement Wizard Modular Refactor)
 - `Completed` Placement route was refactored into a thin wrapper plus modular wizard feature implementation without changing operator behavior.
   - Route wrapper now parses `searchParams.step` once and passes `initialStep` into the client orchestrator.
