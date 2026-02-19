@@ -1,5 +1,5 @@
 import { Check, Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 import type { SlotSummary, TentSummary } from "@/src/features/placement/types";
@@ -19,7 +19,7 @@ type TentSlotBoardProps = {
   renderTrayCell: (trayId: string, inSlot?: boolean) => ReactNode;
 };
 
-export function TentSlotBoard({
+function TentSlotBoardImpl({
   tents,
   draftSlotToTray,
   destinationSlotId,
@@ -91,6 +91,8 @@ export function TentSlotBoard({
   );
 }
 
+export const TentSlotBoard = memo(TentSlotBoardImpl);
+
 type SlotCellProps = {
   slot: SlotSummary;
   trayId: string | null;
@@ -100,7 +102,7 @@ type SlotCellProps = {
   renderTrayCell: (trayId: string, inSlot?: boolean) => ReactNode;
 };
 
-function SlotCell({
+const SlotCell = memo(function SlotCell({
   slot,
   trayId,
   destinationSlotId,
@@ -138,4 +140,4 @@ function SlotCell({
       </button>
     </div>
   );
-}
+});

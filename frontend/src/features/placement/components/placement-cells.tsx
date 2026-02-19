@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import { memo } from "react";
 
 import { cn } from "@/lib/utils";
 import type { PlantCell, TrayCell } from "@/src/features/placement/types";
@@ -14,7 +15,7 @@ type PlantSelectableCellProps = {
   onToggle: (plantId: string) => void;
 };
 
-export function PlantSelectableCell({ plant, selected, dirty, onToggle }: PlantSelectableCellProps) {
+function PlantSelectableCellImpl({ plant, selected, dirty, onToggle }: PlantSelectableCellProps) {
   const gradeLabel = plant.grade ? `Grade ${plant.grade}` : "Grade -";
   return (
     <article
@@ -53,6 +54,8 @@ export function PlantSelectableCell({ plant, selected, dirty, onToggle }: PlantS
   );
 }
 
+export const PlantSelectableCell = memo(PlantSelectableCellImpl);
+
 type TraySelectableCellProps = {
   tray: TrayCell;
   selected: boolean;
@@ -61,7 +64,7 @@ type TraySelectableCellProps = {
   onToggle: (trayId: string) => void;
 };
 
-export function TraySelectableCell({
+function TraySelectableCellImpl({
   tray,
   selected,
   dirty,
@@ -111,3 +114,5 @@ export function TraySelectableCell({
     </article>
   );
 }
+
+export const TraySelectableCell = memo(TraySelectableCellImpl);

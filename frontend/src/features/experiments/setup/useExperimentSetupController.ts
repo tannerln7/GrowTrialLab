@@ -49,39 +49,52 @@ export function useExperimentSetupController(experimentId: string) {
     return "Unable to load setup checklist.";
   }, [notInvited, offline, statusState.isError]);
 
-  const checklist: SetupChecklistItem[] = [
-    {
-      id: "plants",
-      title: "Plants",
-      complete: !statusSummary?.setup.missing.plants,
-      href: `/experiments/${experimentId}/plants`,
-      actionLabel: "Go to plants",
-    },
-    {
-      id: "tents_blocks",
-      title: "Tents + Slots",
-      complete: !statusSummary?.setup.missing.tents && !statusSummary?.setup.missing.slots,
-      href: `/experiments/${experimentId}/placement?step=1`,
-      actionLabel: "Go to placement",
-    },
-    {
-      id: "recipes",
-      title: "Recipes",
-      complete: !statusSummary?.setup.missing.recipes,
-      href: `/experiments/${experimentId}/recipes`,
-      actionLabel: "Go to recipes",
-    },
-  ];
+  const checklist: SetupChecklistItem[] = useMemo(
+    () => [
+      {
+        id: "plants",
+        title: "Plants",
+        complete: !statusSummary?.setup.missing.plants,
+        href: `/experiments/${experimentId}/plants`,
+        actionLabel: "Go to plants",
+      },
+      {
+        id: "tents_blocks",
+        title: "Tents + Slots",
+        complete: !statusSummary?.setup.missing.tents && !statusSummary?.setup.missing.slots,
+        href: `/experiments/${experimentId}/placement?step=1`,
+        actionLabel: "Go to placement",
+      },
+      {
+        id: "recipes",
+        title: "Recipes",
+        complete: !statusSummary?.setup.missing.recipes,
+        href: `/experiments/${experimentId}/recipes`,
+        actionLabel: "Go to recipes",
+      },
+    ],
+    [experimentId, statusSummary?.setup.missing.plants, statusSummary?.setup.missing.recipes, statusSummary?.setup.missing.slots, statusSummary?.setup.missing.tents],
+  );
 
-  return {
-    ui: {
+  const ui = useMemo(
+    () => ({
       notInvited,
       offline,
       error,
       loading: statusState.isLoading,
-    },
-    data: {
+    }),
+    [error, notInvited, offline, statusState.isLoading],
+  );
+
+  const data = useMemo(
+    () => ({
       checklist,
-    },
+    }),
+    [checklist],
+  );
+
+  return {
+    ui,
+    data,
   };
 }

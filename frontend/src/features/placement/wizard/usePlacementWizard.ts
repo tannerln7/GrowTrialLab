@@ -1,9 +1,8 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 
 import { unwrapList } from "@/lib/backend";
 import { ensureUnlocked, useSavingAction } from "@/src/lib/async/useSavingAction";
@@ -1595,62 +1594,200 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     [diagnostics, error, loading, notInvited, notice, offline, saving],
   );
 
+  const actionRefs = useRef<{
+    goToStep: (step: number) => void;
+    goNextStep: () => Promise<void>;
+    goPreviousStep: () => void;
+    resetCurrentStepDrafts: () => void;
+    createTent: () => Promise<void>;
+    removeTent: () => Promise<void>;
+    addShelf: (tentId: string) => void;
+    removeShelf: (tentId: string) => void;
+    adjustShelfSlotCount: (tentId: string, shelfIndex: number, delta: number) => void;
+    setTentName: (tentId: string, name: string, defaults: { name: string; code: string }) => void;
+    setTentCode: (tentId: string, code: string, defaults: { name: string; code: string }) => void;
+    toggleTentAllowedSpecies: (tentId: string, speciesId: string) => void;
+    incrementDraftTrayCount: () => void;
+    decrementDraftTrayCount: () => void;
+    adjustTrayCapacity: (trayId: string, delta: number) => void;
+    adjustPendingTrayCapacity: (index: number, delta: number) => void;
+    setDestinationTrayId: (value: SetStateAction<string>) => void;
+    togglePlantSelection: (plantId: string) => void;
+    selectAllPlantsInMainGrid: () => void;
+    selectSameSpeciesInMainGrid: () => void;
+    clearPlantSelection: () => void;
+    stageMovePlantsToTray: () => void;
+    stageRemovePlantsFromTray: (trayId: string) => void;
+    setDestinationSlotId: (value: SetStateAction<string>) => void;
+    toggleTraySelection: (trayId: string) => void;
+    clearTraySelection: () => void;
+    selectAllTraysInMainGrid: () => void;
+    toggleDestinationSlot: (slotId: string) => void;
+    stageMoveTraysToSlots: () => void;
+    stageRemoveTraysFromTent: (tentId: string) => void;
+  } | null>(null);
 
-  return {
-    ui: uiState,
-    wizard: {
+  // Keep wrapper callbacks stable while always calling the latest action implementations.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    actionRefs.current = {
+      goToStep,
+      goNextStep,
+      goPreviousStep,
+      resetCurrentStepDrafts,
+      createTent,
+      removeTent,
+      addShelf,
+      removeShelf,
+      adjustShelfSlotCount,
+      setTentName,
+      setTentCode,
+      toggleTentAllowedSpecies,
+      incrementDraftTrayCount,
+      decrementDraftTrayCount,
+      adjustTrayCapacity,
+      adjustPendingTrayCapacity,
+      setDestinationTrayId,
+      togglePlantSelection,
+      selectAllPlantsInMainGrid,
+      selectSameSpeciesInMainGrid,
+      clearPlantSelection,
+      stageMovePlantsToTray,
+      stageRemovePlantsFromTray,
+      setDestinationSlotId,
+      toggleTraySelection,
+      clearTraySelection,
+      selectAllTraysInMainGrid,
+      toggleDestinationSlot,
+      stageMoveTraysToSlots,
+      stageRemoveTraysFromTent,
+    };
+  });
+
+  const wizardActions = useMemo(
+    () => ({
+      goToStep: (step: number) => actionRefs.current?.goToStep(step),
+      goNextStep: async () => {
+        await actionRefs.current?.goNextStep();
+      },
+      goPreviousStep: () => actionRefs.current?.goPreviousStep(),
+      resetCurrentStepDrafts: () => actionRefs.current?.resetCurrentStepDrafts(),
+    }),
+    [],
+  );
+
+  const stepActions = useMemo(
+    () => ({
+      step1: {
+        createTent: async () => {
+          await actionRefs.current?.createTent();
+        },
+        removeTent: async () => {
+          await actionRefs.current?.removeTent();
+        },
+        addShelf: (tentId: string) => actionRefs.current?.addShelf(tentId),
+        removeShelf: (tentId: string) => actionRefs.current?.removeShelf(tentId),
+        adjustShelfSlotCount: (tentId: string, shelfIndex: number, delta: number) =>
+          actionRefs.current?.adjustShelfSlotCount(tentId, shelfIndex, delta),
+        setTentName: (tentId: string, name: string, defaults: { name: string; code: string }) =>
+          actionRefs.current?.setTentName(tentId, name, defaults),
+        setTentCode: (tentId: string, code: string, defaults: { name: string; code: string }) =>
+          actionRefs.current?.setTentCode(tentId, code, defaults),
+        toggleTentAllowedSpecies: (tentId: string, speciesId: string) =>
+          actionRefs.current?.toggleTentAllowedSpecies(tentId, speciesId),
+      },
+      step2: {
+        incrementDraftTrayCount: () => actionRefs.current?.incrementDraftTrayCount(),
+        decrementDraftTrayCount: () => actionRefs.current?.decrementDraftTrayCount(),
+        adjustTrayCapacity: (trayId: string, delta: number) => actionRefs.current?.adjustTrayCapacity(trayId, delta),
+        adjustPendingTrayCapacity: (index: number, delta: number) =>
+          actionRefs.current?.adjustPendingTrayCapacity(index, delta),
+      },
+      step3: {
+        setDestinationTrayId: (value: SetStateAction<string>) => {
+          const target = actionRefs.current;
+          if (!target) {
+            return;
+          }
+          target.setDestinationTrayId(value);
+        },
+        togglePlantSelection: (plantId: string) => actionRefs.current?.togglePlantSelection(plantId),
+        selectAllPlantsInMainGrid: () => actionRefs.current?.selectAllPlantsInMainGrid(),
+        selectSameSpeciesInMainGrid: () => actionRefs.current?.selectSameSpeciesInMainGrid(),
+        clearPlantSelection: () => actionRefs.current?.clearPlantSelection(),
+        stageMovePlantsToTray: () => actionRefs.current?.stageMovePlantsToTray(),
+        stageRemovePlantsFromTray: (trayId: string) => actionRefs.current?.stageRemovePlantsFromTray(trayId),
+      },
+      step4: {
+        setDestinationSlotId: (value: SetStateAction<string>) => {
+          const target = actionRefs.current;
+          if (!target) {
+            return;
+          }
+          target.setDestinationSlotId(value);
+        },
+        toggleTraySelection: (trayId: string) => actionRefs.current?.toggleTraySelection(trayId),
+        clearTraySelection: () => actionRefs.current?.clearTraySelection(),
+        selectAllTraysInMainGrid: () => actionRefs.current?.selectAllTraysInMainGrid(),
+        toggleDestinationSlot: (slotId: string) => actionRefs.current?.toggleDestinationSlot(slotId),
+        stageMoveTraysToSlots: () => actionRefs.current?.stageMoveTraysToSlots(),
+        stageRemoveTraysFromTent: (tentId: string) => actionRefs.current?.stageRemoveTraysFromTent(tentId),
+      },
+    }),
+    [],
+  );
+
+  const wizardState = useMemo(
+    () => ({
       currentStep,
       maxUnlockedStep,
       currentStepDraftChangeCount,
       blockerHint: currentStepBlockedMessage,
       nextLabel: nextPrimaryButtonLabel,
       stepCompletionState,
-      goToStep,
-      goNextStep,
-      goPreviousStep,
-      resetCurrentStepDrafts,
-    },
-    locked: placementLocked,
-    stepModels,
-    stepActions: {
-      step1: {
-        createTent,
-        removeTent,
-        addShelf,
-        removeShelf,
-        adjustShelfSlotCount,
-        setTentName,
-        setTentCode,
-        toggleTentAllowedSpecies,
-      },
-      step2: {
-        incrementDraftTrayCount,
-        decrementDraftTrayCount,
-        adjustTrayCapacity,
-        adjustPendingTrayCapacity,
-      },
-      step3: {
-        setDestinationTrayId,
-        togglePlantSelection,
-        selectAllPlantsInMainGrid,
-        selectSameSpeciesInMainGrid,
-        clearPlantSelection,
-        stageMovePlantsToTray,
-        stageRemovePlantsFromTray,
-      },
-      step4: {
-        setDestinationSlotId,
-        toggleTraySelection,
-        clearTraySelection,
-        selectAllTraysInMainGrid,
-        toggleDestinationSlot,
-        stageMoveTraysToSlots,
-        stageRemoveTraysFromTent,
-      },
-    },
-    summary,
-    statusSummary,
-    persistedTrayPlantRowByPlantId,
-    experimentId,
-  };
+      goToStep: wizardActions.goToStep,
+      goNextStep: wizardActions.goNextStep,
+      goPreviousStep: wizardActions.goPreviousStep,
+      resetCurrentStepDrafts: wizardActions.resetCurrentStepDrafts,
+    }),
+    [
+      currentStep,
+      currentStepBlockedMessage,
+      currentStepDraftChangeCount,
+      maxUnlockedStep,
+      nextPrimaryButtonLabel,
+      stepCompletionState,
+      wizardActions.goNextStep,
+      wizardActions.goPreviousStep,
+      wizardActions.goToStep,
+      wizardActions.resetCurrentStepDrafts,
+    ],
+  );
+
+  const controllerState = useMemo(
+    () => ({
+      ui: uiState,
+      wizard: wizardState,
+      locked: placementLocked,
+      stepModels,
+      stepActions,
+      summary,
+      statusSummary,
+      persistedTrayPlantRowByPlantId,
+      experimentId,
+    }),
+    [
+      experimentId,
+      persistedTrayPlantRowByPlantId,
+      placementLocked,
+      statusSummary,
+      stepActions,
+      stepModels,
+      summary,
+      uiState,
+      wizardState,
+    ],
+  );
+
+  return controllerState;
 }

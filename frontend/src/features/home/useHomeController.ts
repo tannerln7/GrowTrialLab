@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { api } from "@/src/lib/api";
 import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
@@ -47,20 +47,43 @@ export function useHomeController() {
     },
   });
 
-  return {
-    ui: {
+  const runHealthCheck = useCallback(() => {
+    healthMutation.mutate();
+  }, [healthMutation]);
+
+  const loadMyProfile = useCallback(() => {
+    meMutation.mutate();
+  }, [meMutation]);
+
+  const ui = useMemo(
+    () => ({
       result,
       meResult,
       notInvited,
       offline,
-    },
-    actions: {
-      runHealthCheck: () => healthMutation.mutate(),
-      loadMyProfile: () => meMutation.mutate(),
-    },
-    mutations: {
+    }),
+    [meResult, notInvited, offline, result],
+  );
+
+  const actions = useMemo(
+    () => ({
+      runHealthCheck,
+      loadMyProfile,
+    }),
+    [loadMyProfile, runHealthCheck],
+  );
+
+  const mutations = useMemo(
+    () => ({
       healthMutation,
       meMutation,
-    },
+    }),
+    [healthMutation, meMutation],
+  );
+
+  return {
+    ui,
+    actions,
+    mutations,
   };
 }

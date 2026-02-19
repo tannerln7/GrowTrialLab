@@ -1,5 +1,5 @@
 import { ArrowRight, CheckSquare, X } from "lucide-react";
-import { useCallback } from "react";
+import { memo, useCallback } from "react";
 
 import { cn } from "@/lib/utils";
 import { getDraftOrPersisted, isDirtyValue } from "@/src/lib/state/drafts";
@@ -20,7 +20,7 @@ type Step4TraysToSlotsProps = {
   actions: Step4Actions;
 };
 
-export function Step4TraysToSlots({ model, actions }: Step4TraysToSlotsProps) {
+function Step4TraysToSlotsImpl({ model, actions }: Step4TraysToSlotsProps) {
   const isTraySlotDirty = useCallback(
     (trayId: string) => {
       const persisted = model.persistedTrayToSlot[trayId] ?? null;
@@ -128,3 +128,5 @@ export function Step4TraysToSlots({ model, actions }: Step4TraysToSlotsProps) {
     </div>
   );
 }
+
+export const Step4TraysToSlots = memo(Step4TraysToSlotsImpl);

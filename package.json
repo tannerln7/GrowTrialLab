@@ -7,6 +7,7 @@
     "frontend:typecheck": "pnpm --dir frontend run typecheck",
     "frontend:tailwind-drift": "bash infra/scripts/check-tailwind-drift.sh",
     "frontend:no-backendfetch": "bash infra/scripts/check-no-backendfetch.sh",
+    "frontend:no-inline-querykeys": "bash infra/scripts/check-no-inline-querykeys.sh",
     "backend:lint": "cd backend && uv run ruff check",
     "backend:typecheck": "cd backend && uv run pyright"
   },

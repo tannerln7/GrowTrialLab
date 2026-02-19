@@ -1,4 +1,5 @@
 import { CheckSquare, Layers, MoveRight, Trash2, X } from "lucide-react";
+import { memo } from "react";
 
 import { cn } from "@/lib/utils";
 import { getDraftOrPersisted, isDirtyValue } from "@/src/lib/state/drafts";
@@ -20,7 +21,7 @@ type Step3PlantsToTraysProps = {
   actions: Step3Actions;
 };
 
-export function Step3PlantsToTrays({ model, actions }: Step3PlantsToTraysProps) {
+function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
   const isPlantPlacementDirty = (plantId: string): boolean => {
     const persisted = model.persistedPlantToTray[plantId] ?? null;
     const draft = getDraftOrPersisted<string | null>(model.draftPlantToTray, model.persistedPlantToTray, plantId, null);
@@ -187,3 +188,5 @@ export function Step3PlantsToTrays({ model, actions }: Step3PlantsToTraysProps) 
     </div>
   );
 }
+
+export const Step3PlantsToTrays = memo(Step3PlantsToTraysImpl);

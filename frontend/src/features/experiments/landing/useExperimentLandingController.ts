@@ -29,6 +29,16 @@ export function useExperimentLandingController(experimentId: string) {
     return "Unable to determine experiment status.";
   }, [notInvited, offline, statusState.isError]);
 
+  const ui = useMemo(
+    () => ({
+      notInvited,
+      offline,
+      error,
+      loading: !offline && !error && statusState.isLoading,
+    }),
+    [error, notInvited, offline, statusState.isLoading],
+  );
+
   useEffect(() => {
     if (!experimentId || !statusQuery.data) {
       return;
@@ -42,11 +52,6 @@ export function useExperimentLandingController(experimentId: string) {
   }, [experimentId, router, statusQuery.data]);
 
   return {
-    ui: {
-      notInvited,
-      offline,
-      error,
-      loading: !offline && !error && statusState.isLoading,
-    },
+    ui,
   };
 }

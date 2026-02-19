@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useMemo, useState } from "react";
 
 import { api } from "@/src/lib/api";
 import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
@@ -60,31 +60,51 @@ export function useNewExperimentController() {
 
   const queryOffline = meState.errorKind === "offline";
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
+  const onSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     void createMutation.mutateAsync();
-  }
+  }, [createMutation]);
 
-  return {
-    ui: {
+  const ui = useMemo(
+    () => ({
       error,
       offline,
       queryError,
       queryOffline,
       notInvited,
       isLoadingMe: meState.isLoading,
-    },
-    form: {
+    }),
+    [error, meState.isLoading, notInvited, offline, queryError, queryOffline],
+  );
+
+  const form = useMemo(
+    () => ({
       name,
       description,
       setName,
       setDescription,
-    },
-    actions: {
+    }),
+    [description, name],
+  );
+
+  const actions = useMemo(
+    () => ({
       onSubmit,
-    },
-    mutations: {
+    }),
+    [onSubmit],
+  );
+
+  const mutations = useMemo(
+    () => ({
       createMutation,
-    },
+    }),
+    [createMutation],
+  );
+
+  return {
+    ui,
+    form,
+    actions,
+    mutations,
   };
 }

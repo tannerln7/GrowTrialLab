@@ -249,9 +249,9 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
 
   const [notice, setNotice] = useState("");
   const [actionError, setActionError] = useState("");
-  const [experimentName, setExperimentName] = useState("");
   const statusQueryKey = queryKeys.experiment.status(experimentId);
   const overviewQueryKey = queryKeys.experiment.feature(experimentId, "overviewPlants");
+  const experimentDetailQueryKey = queryKeys.experiments.detail(experimentId);
 
   const statusQuery = useQuery({
     queryKey: statusQueryKey,
@@ -275,19 +275,22 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
     refetchOnWindowFocus: false,
   });
 
+  const experimentDetailQuery = useQuery({
+    queryKey: experimentDetailQueryKey,
+    queryFn: () => api.get<{ name?: string }>(`/api/v1/experiments/${experimentId}/`),
+    enabled: Boolean(experimentId),
+    staleTime: 60_000,
+    retry: 0,
+  });
+
   const statusPageState = usePageQueryState(statusQuery);
   const overviewPageState = usePageQueryState(overviewQuery);
 
-  const invalidateOverviewData = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: statusQueryKey,
-      }),
-      queryClient.invalidateQueries({
-        queryKey: overviewQueryKey,
-      }),
-    ]);
-  }, [overviewQueryKey, queryClient, statusQueryKey]);
+  const refreshOverviewData = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: overviewQueryKey,
+    });
+  }, [overviewQueryKey, queryClient]);
 
   const startMutation = useMutation({
     mutationFn: () =>
@@ -296,9 +299,10 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
       setActionError("");
       setNotice("");
     },
-    onSuccess: async () => {
+    onSuccess: async (nextStatusSummary) => {
       setNotice("Experiment started.");
-      await invalidateOverviewData();
+      queryClient.setQueryData(statusQueryKey, nextStatusSummary);
+      await refreshOverviewData();
     },
     onError: (error) => {
       setActionError(formatActionError(error, "Unable to start experiment."));
@@ -312,9 +316,10 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
       setActionError("");
       setNotice("");
     },
-    onSuccess: async () => {
+    onSuccess: async (nextStatusSummary) => {
       setNotice("Experiment stopped.");
-      await invalidateOverviewData();
+      queryClient.setQueryData(statusQueryKey, nextStatusSummary);
+      await refreshOverviewData();
     },
     onError: (error) => {
       setActionError(formatActionError(error, "Unable to stop experiment."));
@@ -322,37 +327,11 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
   });
 
   useEffect(() => {
-    if (!experimentId) {
-      return;
-    }
-
-    let isMounted = true;
-    void (async () => {
-      try {
-        const payload = await api.get<{ name?: string }>(
-          `/api/v1/experiments/${experimentId}/`,
-        );
-        if (isMounted) {
-          setExperimentName(payload.name ?? "");
-        }
-      } catch {
-        if (isMounted) {
-          setExperimentName("");
-        }
-      }
-    })();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [experimentId]);
-
-  useEffect(() => {
     if (!experimentId || !refreshToken) {
       return;
     }
-    void invalidateOverviewData();
-  }, [experimentId, invalidateOverviewData, refreshToken]);
+    void refreshOverviewData();
+  }, [experimentId, refreshOverviewData, refreshToken]);
 
   useEffect(() => {
     if (!experimentId) {
@@ -364,6 +343,7 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
   }, [experimentId, router, statusQuery.data]);
 
   const summary = statusQuery.data ?? null;
+  const experimentName = experimentDetailQuery.data?.name ?? "";
   const data = overviewQuery.data ?? null;
   const busy = startMutation.isPending || stopMutation.isPending;
 

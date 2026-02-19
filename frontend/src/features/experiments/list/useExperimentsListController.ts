@@ -60,15 +60,25 @@ export function useExperimentsListController() {
     }
   }, [experimentsQuery.data]);
 
-  return {
-    ui: {
+  const ui = useMemo(
+    () => ({
       loading,
       offline,
       error,
       notInvited,
-    },
-    data: {
+    }),
+    [error, loading, notInvited, offline],
+  );
+
+  const data = useMemo(
+    () => ({
       items,
-    },
+    }),
+    [items],
+  );
+
+  return {
+    ui,
+    data,
   };
 }
