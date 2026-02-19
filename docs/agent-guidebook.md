@@ -148,6 +148,19 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 - Class composition:
   - Use `cn(...)` (`frontend/src/lib/utils.ts`) for className composition; avoid `[].join(" ")` and `filter(Boolean).join(" ")` in className paths.
 
+### Shared utility modules
+- Selection set operations:
+  - Use `frontend/src/lib/collections/sets.ts` for immutable `Set` mutations (`toggleSet`, `addManyToSet`, `removeManyFromSet`, `setHasAll`, `setDifference`) instead of reimplementing `new Set(current)` loops in page/client code.
+- Draft vs persisted comparisons:
+  - Use `frontend/src/lib/state/drafts.ts` (`getDraftOrPersisted`, `isDirtyValue`, `buildChangeset`) for map-based draft workflows.
+- Error helpers:
+  - Canonical error paths are:
+    - `frontend/src/lib/errors/normalizeError.ts`
+    - `frontend/src/lib/errors/backendErrors.ts`
+  - Legacy shim imports (`frontend/src/lib/error-normalization.ts`, `frontend/src/lib/backend-errors.ts`) are compatibility-only.
+- Shared formatting:
+  - Use `frontend/src/lib/format/labels.ts` for `formatRecipeLabel` and `formatTrayDisplay` to avoid per-feature duplicates.
+
 ### Styling
 - Tailwind v4 + shadcn-style components are canonical.
 - Theme bridging:

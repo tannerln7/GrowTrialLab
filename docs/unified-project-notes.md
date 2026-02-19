@@ -220,6 +220,11 @@ This document is the single consolidated source for current status, architecture
   - large inline JSX blocks were extracted into feature-level panel/component modules with compact `model/actions` contracts.
   - extracted panel modules now cover baseline, feeding, plants, recipes, rotation, and overview shared sections under `frontend/src/features/experiments/*/components/`.
   - page clients now focus on orchestration + controller state wiring while preserving existing labels/gating/lock semantics.
+- [x] Phase 5 utility consolidation and legacy guardrails are active across frontend shared code:
+  - canonical shared helpers were added for set-selection mutations (`frontend/src/lib/collections/sets.ts`) and draft-vs-persisted comparisons (`frontend/src/lib/state/drafts.ts`), with placement + recipes callsites migrated.
+  - canonical error helpers now live under `frontend/src/lib/errors/*` with compatibility re-exports retained for old import paths.
+  - duplicate label/format helpers were consolidated in `frontend/src/lib/format/labels.ts` and reused by placement/recipes/cockpit.
+  - frontend guardrail script `infra/scripts/check-no-backendfetch.sh` + `pnpm frontend:no-backendfetch` now blocks reintroduction of `backendFetch(...)` usage in `frontend/src`.
 - [x] Phase 1.5 mechanical frontend helper rollout is complete for route/page conventions:
   - route/page param parsing now standardizes on `useRouteParamString("id")` / `getParamString(...)` across experiment and cockpit pages.
   - standard top-of-page alert slabs now use shared `PageAlerts` in core experiment routes.

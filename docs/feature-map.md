@@ -27,6 +27,39 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Frontend Phase 5 Utility Consolidation + Legacy Guardrails)
+- `Completed` Shared frontend utility consolidation reduced repeated helper implementations and added a guardrail for legacy fetch reintroduction.
+  - Added canonical helper modules:
+    - `frontend/src/lib/collections/sets.ts`
+    - `frontend/src/lib/state/drafts.ts`
+    - `frontend/src/lib/errors/backendErrors.ts`
+    - `frontend/src/lib/errors/normalizeError.ts`
+    - `frontend/src/lib/format/labels.ts`
+  - Migrated high-churn duplication callsites:
+    - placement wizard selection + draft-change comparisons now use shared set/draft helpers
+    - recipes selection + draft changesets now use shared set/draft helpers
+    - placement/recipes/cockpit now share canonical recipe/tray label formatting
+  - Canonical error imports now target `frontend/src/lib/errors/*`; legacy paths remain as compatibility shims.
+  - Added guardrail script and package entry to prevent `backendFetch` usage from returning in UI code:
+    - `infra/scripts/check-no-backendfetch.sh`
+    - `pnpm frontend:no-backendfetch`
+  - Relevant files:
+    - `frontend/src/lib/collections/sets.ts`
+    - `frontend/src/lib/state/drafts.ts`
+    - `frontend/src/lib/errors/backendErrors.ts`
+    - `frontend/src/lib/errors/normalizeError.ts`
+    - `frontend/src/lib/format/labels.ts`
+    - `frontend/src/features/placement/utils.ts`
+    - `frontend/src/features/placement/wizard/usePlacementWizard.ts`
+    - `frontend/src/features/placement/wizard/steps/Step3PlantsToTrays.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step4TraysToSlots.tsx`
+    - `frontend/src/features/experiments/recipes/ExperimentRecipesPageClient.tsx`
+    - `frontend/src/features/experiments/recipes/utils.ts`
+    - `frontend/src/features/plants/cockpit/PlantCockpitPageClient.tsx`
+    - `package.json`
+    - `infra/scripts/check-no-backendfetch.sh`
+  - Refs: `2573746`
+
 ### 2026-02-19 (Frontend Phase 4 UI Modularization Rollout)
 - `Completed` Core experiment operation clients now use feature-level panel modules with compact model/action contracts to reduce page-client bloat without UX changes.
   - Extracted panel modules and wiring landed for:
