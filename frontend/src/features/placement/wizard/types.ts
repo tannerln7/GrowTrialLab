@@ -64,21 +64,22 @@ export type Step2Model = {
   step2DraftChangeCount: number;
   saving: boolean;
   locked: boolean;
-  draftTrayCount: number;
   sortedTrayIds: string[];
   trayById: Map<string, TrayCell>;
   trayCapacityDraftById: Record<string, number>;
   dirtyTrayCapacityIds: Set<string>;
   draftRemovedTrayIds: Set<string>;
-  defaultTrayCapacity: number;
-  newTrayCapacities: number[];
+  selectedTrayDraftKeys: Set<string>;
+  draftNewTrays: Array<{ id: string; capacity: number }>;
+  totalDraftTrayCount: number;
 };
 
 export type Step2Actions = {
-  incrementDraftTrayCount: () => void;
-  decrementDraftTrayCount: () => void;
+  addDraftTray: () => void;
+  toggleTraySelection: (trayKey: string) => void;
+  removeSelectedTrays: () => void;
   adjustTrayCapacity: (trayId: string, delta: number) => void;
-  adjustPendingTrayCapacity: (index: number, delta: number) => void;
+  adjustPendingTrayCapacity: (draftTrayId: string, delta: number) => void;
 };
 
 export type Step3Model = {

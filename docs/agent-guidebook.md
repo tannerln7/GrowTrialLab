@@ -65,9 +65,11 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 
 ### Step 2: Trays + Capacity
 - Define tray container count and default capacity.
-- Tray count is staged with `+/-` controls in `Tray Manager`, and each tray cell has in-card `+/-` controls for per-tray capacity.
+- Tray manager uses an add-only `+` toolbar control, multi-select tray cells, and a contextual toolbar trash action to stage removals.
+- Selected persisted trays are staged for deletion and removed from the draft grid immediately; selected draft-added trays are removed from draft state.
+- Each tray cell keeps in-card `+/-` controls for per-tray capacity.
 - The bottom navigation action persists pending changes for the current step, then advances.
-- Step 2 `Save & Next` readiness is draft-aware: at least one draft tray with capacity `>= 1` is sufficient to proceed.
+- Step 2 `Save & Next` readiness is draft-aware: at least one effective draft tray (persisted minus staged removals plus additions) with capacity `>= 1` is sufficient to proceed.
 - Goal: containers exist with constraints, but no placement yet.
 
 ### Step footer draft chips
@@ -256,7 +258,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
   - DnD seam metadata is helper-driven and passive in this phase:
     - helpers: `frontend/src/lib/dnd/attributes.ts`, `frontend/src/lib/dnd/shells.tsx`
     - no `DndContext`/sensors/hooks are active yet; only stable `data-*` attributes are emitted.
-  - Use `CountAdjustToolbar` (`frontend/src/components/ui/count-adjust-toolbar.tsx`) for shared add/remove count toolbars (tent/shelf/tray manager rows).
+  - Use `CountAdjustToolbar` (`frontend/src/components/ui/count-adjust-toolbar.tsx`) for shared add/remove count toolbars where counts are the direct draft primitive (for example tent/shelf rows).
   - Use `DraftChangeChip` (`frontend/src/components/ui/draft-change-chip.tsx`) for consistent draft-highlight labels across step cards and nav controls.
 - Use `DraftChangeMarker` (`frontend/src/components/ui/draft-change-marker.tsx`) only for non-GridKit surfaces that have not yet migrated to `CellChips`; combine with `experimentsStyles.draftChangedSurface` ring style when applicable.
   - Draft highlights must stay cell-local: do not highlight toolbars; when removals make items invisible, highlight the nearest visible container cell (for example tent/shelf/tray/slot container cells).

@@ -318,17 +318,6 @@ export function buildTrayCapacityDraftStats(
   return { changeCount, dirtyTrayCapacityIds };
 }
 
-export function buildRemovedTrayIds(
-  sortedTrayIds: string[],
-  draftTrayCount: number,
-): Set<string> {
-  if (draftTrayCount >= sortedTrayIds.length) {
-    return new Set<string>();
-  }
-  const removeCount = sortedTrayIds.length - draftTrayCount;
-  return new Set([...sortedTrayIds].slice(-removeCount));
-}
-
 export function buildSortedSlots(tents: TentSummary[]): SortedSlot[] {
   const tentLabelById = new Map(
     tents.map((tent) => [tent.tent_id, tent.code || tent.name] as const),

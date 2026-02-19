@@ -1,9 +1,11 @@
+import { Plus, Trash2 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { draftChipLabelForStep, formatTrayDisplay } from "@/src/features/placement/utils";
 import type { Step2Actions, Step2Model } from "@/src/features/placement/wizard/types";
 import { Badge } from "@/src/components/ui/badge";
 import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
-import { CountAdjustToolbar } from "@/src/components/ui/count-adjust-toolbar";
+import { GridControlButton } from "@/src/components/ui/grid-control-button";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { StepAdjustButton } from "@/src/components/ui/step-adjust-button";
 import { TrayCell } from "@/src/lib/gridkit/components";
@@ -17,6 +19,9 @@ type Step2TraysProps = {
 };
 
 export function Step2Trays({ model, actions }: Step2TraysProps) {
+  const visiblePersistedTrayIds = model.sortedTrayIds.filter((trayId) => !model.draftRemovedTrayIds.has(trayId));
+  const selectedTrayCount = model.selectedTrayDraftKeys.size;
+
   return (
     <div className="grid gap-3">
       <SectionCard
@@ -27,41 +32,70 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
           ) : null
         }
       >
-        <CountAdjustToolbar
-          count={model.draftTrayCount}
-          countLabel="Total trays"
-          onDecrement={actions.decrementDraftTrayCount}
-          onIncrement={actions.incrementDraftTrayCount}
-          decrementDisabled={model.saving || model.locked || model.draftTrayCount === 0}
-          incrementDisabled={model.saving || model.locked}
-        />
+        <div className={cn(styles.trayControlRow, "justify-between")}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Total trays: {model.totalDraftTrayCount}</span>
+            <GridControlButton
+              aria-label="Add tray"
+              title="Add tray"
+              onClick={actions.addDraftTray}
+              disabled={model.saving || model.locked}
+            >
+              <Plus />
+            </GridControlButton>
+          </div>
+          <GridControlButton
+            aria-label="Remove selected trays"
+            title="Remove selected trays"
+            variant="destructive"
+            onClick={actions.removeSelectedTrays}
+            disabled={model.saving || model.locked || selectedTrayCount === 0}
+            className={cn(selectedTrayCount === 0 && "invisible")}
+          >
+            <Trash2 />
+          </GridControlButton>
+        </div>
 
-        <div className={cn(styles.trayManagerGrid, styles.cellGridResponsive)} data-cell-size="lg">
-          {model.sortedTrayIds.map((trayId) => {
+        <div className={cn(styles.trayManagerGrid, styles.cellGridResponsive)} data-cell-size="sm">
+          {visiblePersistedTrayIds.map((trayId) => {
             const tray = model.trayById.get(trayId);
             if (!tray) {
               return null;
             }
+            const trayKey = `persisted:${trayId}`;
+            const selected = model.selectedTrayDraftKeys.has(trayKey);
             const draftCapacity = Math.max(1, model.trayCapacityDraftById[trayId] ?? tray.capacity);
-            const trayMarkedForRemoval = model.draftRemovedTrayIds.has(trayId);
-            const trayDirty = model.dirtyTrayCapacityIds.has(trayId) || trayMarkedForRemoval;
-            const chips: ChipSpec[] = trayDirty
-              ? [
-                  {
-                    id: `${trayId}-dirty`,
-                    label: "•",
-                    tone: "warn",
-                    placement: "tl",
-                  },
-                ]
-              : [];
+            const trayDirty = model.dirtyTrayCapacityIds.has(trayId);
+            const chips: ChipSpec[] = [];
+            if (trayDirty) {
+              chips.push({
+                id: `${trayId}-dirty`,
+                label: "•",
+                tone: "warn",
+                placement: "tl",
+              });
+            }
+            if (selected) {
+              chips.push({
+                id: `${trayId}-selected`,
+                label: "✓",
+                tone: "info",
+                placement: "tr",
+              });
+            }
 
             return (
               <TrayCell
                 key={trayId}
                 trayId={tray.tray_id}
                 title={formatTrayDisplay(tray.name, tray.tray_id)}
-                state={{ tone: trayDirty ? "warn" : undefined }}
+                state={{ selected, tone: trayDirty ? "warn" : undefined }}
+                interactive={!model.saving && !model.locked}
+                onPress={
+                  model.saving || model.locked
+                    ? undefined
+                    : () => actions.toggleTraySelection(trayKey)
+                }
                 chips={chips}
                 className={cn(styles.trayEditorCell, "justify-items-center text-center")}
                 titleClassName={styles.trayGridCellId}
@@ -71,11 +105,6 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
                     <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
                       {draftCapacity} {draftCapacity === 1 ? "plant" : "plants"}
                     </Badge>
-                    {trayMarkedForRemoval ? (
-                      <Badge variant="destructive" className={styles.recipeLegendItemCompact}>
-                        Pending removal
-                      </Badge>
-                    ) : null}
                   </>
                 }
                 contentClassName="justify-items-center text-center"
@@ -95,56 +124,69 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
               </TrayCell>
             );
           })}
-          {model.draftTrayCount > model.sortedTrayIds.length
-            ? Array.from({ length: model.draftTrayCount - model.sortedTrayIds.length }, (_, index) => {
-                const draftCapacity = Math.max(1, model.newTrayCapacities[index] ?? model.defaultTrayCapacity);
-                const chips: ChipSpec[] = [
-                  {
-                    id: `draft-tray-${index + 1}-dirty`,
-                    label: "•",
-                    tone: "warn",
-                    placement: "tl",
-                  },
-                ];
+          {model.draftNewTrays.map((draftTray, index) => {
+            const trayKey = `draft:${draftTray.id}`;
+            const selected = model.selectedTrayDraftKeys.has(trayKey);
+            const chips: ChipSpec[] = [
+              {
+                id: `${draftTray.id}-dirty`,
+                label: "•",
+                tone: "warn",
+                placement: "tl",
+              },
+            ];
+            if (selected) {
+              chips.push({
+                id: `${draftTray.id}-selected`,
+                label: "✓",
+                tone: "info",
+                placement: "tr",
+              });
+            }
 
-                return (
-                  <TrayCell
-                    key={`draft-tray-${index + 1}`}
-                    trayId={`draft-tray-${index + 1}`}
-                    title="New tray"
-                    state={{ tone: "warn" }}
-                    chips={chips}
-                    className={cn(
-                      styles.trayEditorCell,
-                      "justify-items-center text-center",
-                      "border-dashed",
-                    )}
-                    titleClassName={styles.trayGridCellId}
-                    metaClassName={styles.trayEditorBadgeRow}
-                    meta={
-                      <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
-                        {draftCapacity} {draftCapacity === 1 ? "plant" : "plants"}
-                      </Badge>
-                    }
-                    contentClassName="justify-items-center text-center"
-                  >
-                    <div className={styles.trayEditorAdjustRow}>
-                      <StepAdjustButton
-                        direction="decrement"
-                        onClick={() => actions.adjustPendingTrayCapacity(index, -1)}
-                        disabled={model.saving || model.locked || draftCapacity <= 1}
-                      />
-                      <StepAdjustButton
-                        direction="increment"
-                        onClick={() => actions.adjustPendingTrayCapacity(index, 1)}
-                        disabled={model.saving || model.locked}
-                      />
-                    </div>
-                  </TrayCell>
-                );
-              })
-            : null}
-          {model.draftTrayCount === 0 ? <p className="text-sm text-muted-foreground">No trays configured.</p> : null}
+            return (
+              <TrayCell
+                key={draftTray.id}
+                trayId={`draft-tray-${index + 1}`}
+                title="New tray"
+                state={{ selected, tone: "warn" }}
+                interactive={!model.saving && !model.locked}
+                onPress={
+                  model.saving || model.locked
+                    ? undefined
+                    : () => actions.toggleTraySelection(trayKey)
+                }
+                chips={chips}
+                className={cn(
+                  styles.trayEditorCell,
+                  "justify-items-center text-center",
+                  "border-dashed",
+                )}
+                titleClassName={styles.trayGridCellId}
+                metaClassName={styles.trayEditorBadgeRow}
+                meta={
+                  <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
+                    {draftTray.capacity} {draftTray.capacity === 1 ? "plant" : "plants"}
+                  </Badge>
+                }
+                contentClassName="justify-items-center text-center"
+              >
+                <div className={styles.trayEditorAdjustRow}>
+                  <StepAdjustButton
+                    direction="decrement"
+                    onClick={() => actions.adjustPendingTrayCapacity(draftTray.id, -1)}
+                    disabled={model.saving || model.locked || draftTray.capacity <= 1}
+                  />
+                  <StepAdjustButton
+                    direction="increment"
+                    onClick={() => actions.adjustPendingTrayCapacity(draftTray.id, 1)}
+                    disabled={model.saving || model.locked}
+                  />
+                </div>
+              </TrayCell>
+            );
+          })}
+          {model.totalDraftTrayCount === 0 ? <p className="text-sm text-muted-foreground">No trays configured.</p> : null}
         </div>
       </SectionCard>
     </div>

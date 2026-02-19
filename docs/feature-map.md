@@ -27,6 +27,18 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Placement Step 2 Selection-Based Tray Deletion Drafts)
+- `Completed` Placement Step 2 tray removal moved from count-decrement semantics to explicit tray selection drafts.
+  - Tray Manager toolbar now keeps add (`+`) and contextual remove-selected trash controls; top-level decrement was removed.
+  - Tray cells in Step 2 are multi-selectable for deletion drafting; selected persisted trays are hidden from the draft grid and removed on save, selected draft-added trays are dropped from draft state.
+  - Save/apply now removes tray plants from staged-for-delete trays before deleting trays.
+  - Step 2 draft readiness now uses effective draft trays (persisted minus staged deletions plus additions) with `capacity >= 1`.
+  - updated files:
+    - `frontend/src/features/placement/wizard/steps/Step2Trays.tsx`
+    - `frontend/src/features/placement/wizard/usePlacementWizard.ts`
+    - `frontend/src/features/placement/wizard/types.ts`
+    - `frontend/src/features/placement/utils.ts`
+
 ### 2026-02-19 (Placement Step 2 Save/Next Uses Draft Tray State)
 - `Completed` Placement Step 2 next-step blocker now evaluates draft tray state (count + capacity) instead of persisted tray rows only.
   - `Save & Next` is allowed when draft state contains at least one tray with capacity `>= 1`, even before mutations are written.

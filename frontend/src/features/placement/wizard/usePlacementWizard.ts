@@ -35,7 +35,6 @@ import {
   buildPlantDraftStats,
   buildPersistedShelfCounts,
   buildPersistedPlacementState,
-  buildRemovedTrayIds,
   buildSortedSlots,
   buildTrayCapacityDraftStats,
   buildTraySlotDraftStats,
@@ -73,9 +72,11 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
   const [tentDraftById, setTentDraftById] = useState<Record<string, TentDraft>>({});
   const [tentAllowedSpeciesDraftById, setTentAllowedSpeciesDraftById] = useState<Record<string, string[]>>({});
 
-  const [draftTrayCount, setDraftTrayCount] = useState(0);
   const [trayCapacityDraftById, setTrayCapacityDraftById] = useState<Record<string, number>>({});
-  const [newTrayCapacities, setNewTrayCapacities] = useState<number[]>([]);
+  const [draftRemovedTrayIds, setDraftRemovedTrayIds] = useState<Set<string>>(new Set());
+  const [step2SelectedTrayKeys, setStep2SelectedTrayKeys] = useState<Set<string>>(new Set());
+  const [draftNewTrays, setDraftNewTrays] = useState<Array<{ id: string; capacity: number }>>([]);
+  const draftTrayIdCounterRef = useRef(1);
 
   const [persistedPlantToTray, setPersistedPlantToTray] = useState<Record<string, string | null>>({});
   const [draftPlantToTray, setDraftPlantToTray] = useState<Record<string, string | null>>({});
@@ -111,22 +112,13 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
   const defaultTrayCapacity = useMemo(() => trays[0]?.capacity ?? 4, [trays]);
 
   useEffect(() => {
-    setDraftTrayCount(trays.length);
     setTrayCapacityDraftById(
       Object.fromEntries(trays.map((tray) => [tray.tray_id, Math.max(1, tray.capacity)])),
     );
+    setDraftRemovedTrayIds(setWithAll<string>([]));
+    setStep2SelectedTrayKeys(setWithAll<string>([]));
+    setDraftNewTrays([]);
   }, [trays]);
-
-  useEffect(() => {
-    setNewTrayCapacities((current) => {
-      const required = Math.max(0, draftTrayCount - trays.length);
-      const next = current.slice(0, required);
-      while (next.length < required) {
-        next.push(defaultTrayCapacity);
-      }
-      return next;
-    });
-  }, [defaultTrayCapacity, draftTrayCount, trays.length]);
 
   const trayById = useMemo(() => {
     const map = new Map<string, TrayCell>();
@@ -239,13 +231,12 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
   }, [trays]);
 
   const step2ReadyForNext = useMemo(() => {
-    const targetCount = Math.max(0, Math.trunc(draftTrayCount));
-    if (targetCount < 1) {
+    const remainingPersistedTrayIds = sortedTrayIds.filter((trayId) => !draftRemovedTrayIds.has(trayId));
+    const totalDraftTrayCount = remainingPersistedTrayIds.length + draftNewTrays.length;
+    if (totalDraftTrayCount < 1) {
       return false;
     }
 
-    const persistedTrayCount = Math.min(targetCount, sortedTrayIds.length);
-    const remainingPersistedTrayIds = sortedTrayIds.slice(0, persistedTrayCount);
     const persistedValid = remainingPersistedTrayIds.every((trayId) => {
       const tray = trayById.get(trayId);
       if (!tray) {
@@ -258,9 +249,8 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       return false;
     }
 
-    const newTrayCount = targetCount - persistedTrayCount;
-    for (let index = 0; index < newTrayCount; index += 1) {
-      const capacity = newTrayCapacities[index] ?? defaultTrayCapacity;
+    for (const draftTray of draftNewTrays) {
+      const capacity = draftTray.capacity;
       if (!Number.isFinite(capacity) || capacity < 1) {
         return false;
       }
@@ -268,9 +258,8 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
 
     return true;
   }, [
-    defaultTrayCapacity,
-    draftTrayCount,
-    newTrayCapacities,
+    draftNewTrays,
+    draftRemovedTrayIds,
     sortedTrayIds,
     trayById,
     trayCapacityDraftById,
@@ -571,20 +560,20 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
 
   const step1DraftChangeCount = tentSlotDraftChangeCount + tentDetailsDraftChangeCount;
 
-  const trayCountDraftChangeCount = Math.abs(draftTrayCount - trays.length);
+  const retainedPersistedTrays = useMemo(
+    () => trays.filter((tray) => !draftRemovedTrayIds.has(tray.tray_id)),
+    [draftRemovedTrayIds, trays],
+  );
+  const trayCountDraftChangeCount = draftRemovedTrayIds.size + draftNewTrays.length;
   const trayCapacityDraftStats = useMemo(
-    () => buildTrayCapacityDraftStats(trays, trayCapacityDraftById),
-    [trayCapacityDraftById, trays],
+    () => buildTrayCapacityDraftStats(retainedPersistedTrays, trayCapacityDraftById),
+    [retainedPersistedTrays, trayCapacityDraftById],
   );
   const trayCapacityDraftChangeCount = trayCapacityDraftStats.changeCount;
   const dirtyTrayCapacityIds = trayCapacityDraftStats.dirtyTrayCapacityIds;
 
   const step2DraftChangeCount = trayCountDraftChangeCount + trayCapacityDraftChangeCount;
-
-  const draftRemovedTrayIds = useMemo(
-    () => buildRemovedTrayIds(sortedTrayIds, draftTrayCount),
-    [draftTrayCount, sortedTrayIds],
-  );
+  const totalDraftTrayCount = retainedPersistedTrays.length + draftNewTrays.length;
   const stepCompletionState = useMemo(
     () => ({
       step1Complete,
@@ -691,11 +680,12 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       });
       setNotice("Discarded step 1 draft changes.");
     } else if (currentStep === 2) {
-      setDraftTrayCount(trays.length);
       setTrayCapacityDraftById(
         Object.fromEntries(trays.map((tray) => [tray.tray_id, Math.max(1, tray.capacity)])),
       );
-      setNewTrayCapacities([]);
+      setDraftRemovedTrayIds(setWithAll<string>([]));
+      setStep2SelectedTrayKeys(setWithAll<string>([]));
+      setDraftNewTrays([]);
       setNotice("Discarded step 2 draft changes.");
     } else if (currentStep === 3) {
       setDraftPlantToTray(persistedPlantToTray);
@@ -913,12 +903,59 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     });
   }
 
-  function incrementDraftTrayCount() {
-    setDraftTrayCount((current) => current + 1);
+  function addDraftTray() {
+    const draftId = `draft-tray-${draftTrayIdCounterRef.current}`;
+    draftTrayIdCounterRef.current += 1;
+    setDraftNewTrays((current) => [
+      ...current,
+      {
+        id: draftId,
+        capacity: defaultTrayCapacity,
+      },
+    ]);
   }
 
-  function decrementDraftTrayCount() {
-    setDraftTrayCount((current) => Math.max(0, current - 1));
+  function toggleStep2TraySelection(trayKey: string) {
+    setStep2SelectedTrayKeys((current) => toggleSet(current, trayKey));
+  }
+
+  function removeSelectedDraftTrays() {
+    if (!ensureUnlocked({ locked: placementLocked, message: RUNNING_LOCK_MESSAGE, setError })) {
+      return;
+    }
+    if (step2SelectedTrayKeys.size === 0) {
+      return;
+    }
+
+    const persistedTrayIdsToRemove: string[] = [];
+    const draftTrayIdsToRemove = new Set<string>();
+
+    for (const trayKey of step2SelectedTrayKeys) {
+      if (trayKey.startsWith("persisted:")) {
+        persistedTrayIdsToRemove.push(trayKey.slice("persisted:".length));
+      } else if (trayKey.startsWith("draft:")) {
+        draftTrayIdsToRemove.add(trayKey.slice("draft:".length));
+      }
+    }
+
+    if (persistedTrayIdsToRemove.length > 0) {
+      setDraftRemovedTrayIds((current) => {
+        const next = new Set(current);
+        for (const trayId of persistedTrayIdsToRemove) {
+          next.add(trayId);
+        }
+        return next;
+      });
+    }
+
+    if (draftTrayIdsToRemove.size > 0) {
+      setDraftNewTrays((current) => current.filter((tray) => !draftTrayIdsToRemove.has(tray.id)));
+    }
+
+    setStep2SelectedTrayKeys(setWithAll<string>([]));
+    setError("");
+    setDiagnostics(null);
+    setNotice(`${persistedTrayIdsToRemove.length + draftTrayIdsToRemove.size} tray(s) staged for removal.`);
   }
 
   function adjustTrayCapacity(trayId: string, delta: number) {
@@ -935,15 +972,17 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     });
   }
 
-  function adjustPendingTrayCapacity(index: number, delta: number) {
-    setNewTrayCapacities((current) => {
-      if (index < 0 || index >= current.length) {
-        return current;
-      }
-      const next = [...current];
-      next[index] = Math.max(1, next[index] + delta);
-      return next;
-    });
+  function adjustPendingTrayCapacity(draftTrayId: string, delta: number) {
+    setDraftNewTrays((current) =>
+      current.map((tray) =>
+        tray.id === draftTrayId
+          ? {
+              ...tray,
+              capacity: Math.max(1, tray.capacity + delta),
+            }
+          : tray,
+      ),
+    );
   }
 
   async function applyTrayCountDraft(): Promise<boolean> {
@@ -951,57 +990,33 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       return false;
     }
 
-    const targetCount = Math.max(0, draftTrayCount);
-    const currentCount = trays.length;
-    const delta = targetCount - currentCount;
-    if (delta === 0 && trayCapacityDraftChangeCount === 0) {
+    const traysToRemove = sortedTrayIds.filter((trayId) => draftRemovedTrayIds.has(trayId));
+    const remainingTrayIds = sortedTrayIds.filter((trayId) => !draftRemovedTrayIds.has(trayId));
+    if (traysToRemove.length === 0 && draftNewTrays.length === 0 && trayCapacityDraftChangeCount === 0) {
       return true;
     }
 
     return runSavingAction({
       locked: placementLocked,
       lockMessage: RUNNING_LOCK_MESSAGE,
-      fallbackError: "Unable to apply tray count changes.",
+      fallbackError: "Unable to apply tray manager changes.",
       action: async () => {
         let createdCount = 0;
         let deletedCount = 0;
+        let detachedPlantCount = 0;
         let capacityUpdatedCount = 0;
         let mutationCount = 0;
+        const traySummaryById = new Map(trays.map((tray) => [tray.tray_id, tray] as const));
 
-        if (delta > 0) {
-          const existingNames = new Set(trays.map((tray) => tray.name));
-          for (let index = 0; index < delta; index += 1) {
-            const suggestedName = suggestTrayName(Array.from(existingNames));
-            const draftCapacity = Math.max(1, newTrayCapacities[index] ?? defaultTrayCapacity);
+        for (const trayId of traysToRemove) {
+          const tray = traySummaryById.get(trayId);
+          const trayPlants = tray?.plants || [];
+
+          for (const trayPlant of trayPlants) {
             try {
-              const payload = await api.post<{ detail?: string; suggested_name?: string; name?: string }>(
-                `/api/v1/experiments/${experimentId}/trays`,
-                {
-                  name: suggestedName,
-                  capacity: draftCapacity,
-                },
-              );
-              existingNames.add(payload.name || payload.suggested_name || suggestedName);
-              createdCount += 1;
-              mutationCount += 1;
+              await api.delete(`/api/v1/trays/${trayId}/plants/${trayPlant.tray_plant_id}`);
             } catch (requestError) {
-              const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to add trays.");
-              if (mutationCount > 0) {
-                await reloadPlacementData();
-              }
-              setError(payload.detail);
-              setDiagnostics(payload.diagnostics);
-              return false;
-            }
-          }
-        } else {
-          const removeCount = Math.abs(delta);
-          const traysToRemove = [...sortedTrayIds].slice(-removeCount);
-          for (const trayId of traysToRemove) {
-            try {
-              await api.delete(`/api/v1/trays/${trayId}/`);
-            } catch (requestError) {
-              const parsed = parseApiErrorPayload<Diagnostics>(requestError, "Unable to remove trays.");
+              const parsed = parseApiErrorPayload<Diagnostics>(requestError, "Unable to clear tray plants.");
               setError(parsed.detail);
               setDiagnostics(parsed.diagnostics);
               if (mutationCount > 0) {
@@ -1009,14 +1024,52 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
               }
               return false;
             }
-            deletedCount += 1;
+            detachedPlantCount += 1;
             mutationCount += 1;
           }
+
+          try {
+            await api.delete(`/api/v1/trays/${trayId}/`);
+          } catch (requestError) {
+            const parsed = parseApiErrorPayload<Diagnostics>(requestError, "Unable to remove trays.");
+            setError(parsed.detail);
+            setDiagnostics(parsed.diagnostics);
+            if (mutationCount > 0) {
+              await reloadPlacementData();
+            }
+            return false;
+          }
+          deletedCount += 1;
+          mutationCount += 1;
         }
 
-        const removeCount = delta < 0 ? Math.abs(delta) : 0;
-        const remainingTrayIds =
-          removeCount > 0 ? [...sortedTrayIds].slice(0, sortedTrayIds.length - removeCount) : sortedTrayIds;
+        const existingNames = new Set(
+          trays.filter((tray) => !draftRemovedTrayIds.has(tray.tray_id)).map((tray) => tray.name),
+        );
+        for (const draftTray of draftNewTrays) {
+          const suggestedName = suggestTrayName(Array.from(existingNames));
+          const draftCapacity = Math.max(1, draftTray.capacity);
+          try {
+            const payload = await api.post<{ detail?: string; suggested_name?: string; name?: string }>(
+              `/api/v1/experiments/${experimentId}/trays`,
+              {
+                name: suggestedName,
+                capacity: draftCapacity,
+              },
+            );
+            existingNames.add(payload.name || payload.suggested_name || suggestedName);
+            createdCount += 1;
+            mutationCount += 1;
+          } catch (requestError) {
+            const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to add trays.");
+            if (mutationCount > 0) {
+              await reloadPlacementData();
+            }
+            setError(payload.detail);
+            setDiagnostics(payload.diagnostics);
+            return false;
+          }
+        }
 
         for (const trayId of remainingTrayIds) {
           const tray = trayById.get(trayId);
@@ -1047,6 +1100,9 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
         const messages: string[] = [];
         if (createdCount > 0) {
           messages.push(`Added ${createdCount} tray(s).`);
+        }
+        if (detachedPlantCount > 0) {
+          messages.push(`Removed ${detachedPlantCount} plant placement(s) from deleted trays.`);
         }
         if (deletedCount > 0) {
           messages.push(`Removed ${deletedCount} tray(s).`);
@@ -1527,14 +1583,14 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
         step2DraftChangeCount,
         saving,
         locked: placementLocked,
-        draftTrayCount,
         sortedTrayIds,
         trayById,
         trayCapacityDraftById,
         dirtyTrayCapacityIds,
         draftRemovedTrayIds,
-        defaultTrayCapacity,
-        newTrayCapacities,
+        selectedTrayDraftKeys: step2SelectedTrayKeys,
+        draftNewTrays,
+        totalDraftTrayCount,
       },
       step3: {
         placementDraftChangeCount,
@@ -1574,9 +1630,9 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       },
     }),
     [
-      defaultTrayCapacity,
       destinationSlotId,
       destinationTrayId,
+      draftNewTrays,
       diagnostics,
       dirtyPlantContainerTrayIds,
       dirtySlotIds,
@@ -1585,11 +1641,9 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       draftPlantToTray,
       draftRemovedTrayIds,
       draftSlotToTray,
-      draftTrayCount,
       draftTrayToSlot,
       mainGridPlantIds,
       mainGridTrayIds,
-      newTrayCapacities,
       persistedPlantToTray,
       persistedTrayToSlot,
       placementDraftChangeCount,
@@ -1599,6 +1653,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       selectedInMainGrid,
       selectedInTrayByTrayId,
       selectedPlantIds,
+      step2SelectedTrayKeys,
       selectedTraysByTentId,
       selectedTrayIds,
       shelfCountsByTent,
@@ -1611,6 +1666,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       tentDraftById,
       tentDraftMetaById,
       tents,
+      totalDraftTrayCount,
       trayById,
       trayCapacityDraftById,
       trayPlantIdsByTray,
@@ -1646,10 +1702,11 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     setTentName: (tentId: string, name: string, defaults: { name: string; code: string }) => void;
     setTentCode: (tentId: string, code: string, defaults: { name: string; code: string }) => void;
     toggleTentAllowedSpecies: (tentId: string, speciesId: string) => void;
-    incrementDraftTrayCount: () => void;
-    decrementDraftTrayCount: () => void;
+    addDraftTray: () => void;
+    toggleStep2TraySelection: (trayKey: string) => void;
+    removeSelectedDraftTrays: () => void;
     adjustTrayCapacity: (trayId: string, delta: number) => void;
-    adjustPendingTrayCapacity: (index: number, delta: number) => void;
+    adjustPendingTrayCapacity: (draftTrayId: string, delta: number) => void;
     setDestinationTrayId: (value: SetStateAction<string>) => void;
     togglePlantSelection: (plantId: string) => void;
     selectAllPlantsInMainGrid: () => void;
@@ -1682,8 +1739,9 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       setTentName,
       setTentCode,
       toggleTentAllowedSpecies,
-      incrementDraftTrayCount,
-      decrementDraftTrayCount,
+      addDraftTray,
+      toggleStep2TraySelection,
+      removeSelectedDraftTrays,
       adjustTrayCapacity,
       adjustPendingTrayCapacity,
       setDestinationTrayId,
@@ -1736,11 +1794,12 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
           actionRefs.current?.toggleTentAllowedSpecies(tentId, speciesId),
       },
       step2: {
-        incrementDraftTrayCount: () => actionRefs.current?.incrementDraftTrayCount(),
-        decrementDraftTrayCount: () => actionRefs.current?.decrementDraftTrayCount(),
+        addDraftTray: () => actionRefs.current?.addDraftTray(),
+        toggleTraySelection: (trayKey: string) => actionRefs.current?.toggleStep2TraySelection(trayKey),
+        removeSelectedTrays: () => actionRefs.current?.removeSelectedDraftTrays(),
         adjustTrayCapacity: (trayId: string, delta: number) => actionRefs.current?.adjustTrayCapacity(trayId, delta),
-        adjustPendingTrayCapacity: (index: number, delta: number) =>
-          actionRefs.current?.adjustPendingTrayCapacity(index, delta),
+        adjustPendingTrayCapacity: (draftTrayId: string, delta: number) =>
+          actionRefs.current?.adjustPendingTrayCapacity(draftTrayId, delta),
       },
       step3: {
         setDestinationTrayId: (value: SetStateAction<string>) => {
