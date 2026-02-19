@@ -6,11 +6,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ExperimentStatusSummary } from "@/lib/experiment-status";
-import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
+import {
+  OverviewEmptyPanel,
+  OverviewSchedulePanel,
+  OverviewStatePanel,
+} from "@/src/features/experiments/overview/components/OverviewPanels";
 import { api, isApiError } from "@/src/lib/api";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
@@ -405,21 +409,26 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
   const scheduleNeedsAttention =
     (summary?.schedule.due_counts_today ?? 0) > 0 || summary?.schedule.next_scheduled_slot == null;
 
-  function actionButtonClass(needsAttention: boolean): string {
-    return cn(
-      needsAttention
-        ? buttonVariants({ variant: "default" })
-        : buttonVariants({ variant: "secondary" }),
-      styles.overviewActionButton,
-    );
-  }
+  const actionButtonClass = useCallback(
+    (needsAttention: boolean): string =>
+      cn(
+        needsAttention
+          ? buttonVariants({ variant: "default" })
+          : buttonVariants({ variant: "secondary" }),
+        styles.overviewActionButton,
+      ),
+    [],
+  );
 
-  const readinessItems = [
-    { key: "baseline", label: "Needs baseline", value: data?.counts.needs_baseline ?? 0 },
-    { key: "grade", label: "Needs grade", value: data?.counts.needs_grade ?? 0 },
-    { key: "placement", label: "Needs placement", value: data?.counts.needs_placement ?? 0 },
-    { key: "recipe", label: "Needs plant recipe", value: data?.counts.needs_plant_recipe ?? 0 },
-  ];
+  const readinessItems = useMemo(
+    () => [
+      { key: "baseline", label: "Needs baseline", value: data?.counts.needs_baseline ?? 0 },
+      { key: "grade", label: "Needs grade", value: data?.counts.needs_grade ?? 0 },
+      { key: "placement", label: "Needs placement", value: data?.counts.needs_placement ?? 0 },
+      { key: "recipe", label: "Needs plant recipe", value: data?.counts.needs_plant_recipe ?? 0 },
+    ],
+    [data?.counts.needs_baseline, data?.counts.needs_grade, data?.counts.needs_placement, data?.counts.needs_plant_recipe],
+  );
 
   const visiblePlants = useMemo(() => data?.plants.results ?? [], [data?.plants.results]);
 
@@ -636,16 +645,16 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
     };
   }, [sortedPlants]);
 
-  function startExperiment() {
+  const startExperiment = useCallback(() => {
     if (!startReady) {
       return;
     }
     startMutation.mutate();
-  }
+  }, [startMutation, startReady]);
 
-  function stopExperiment() {
+  const stopExperiment = useCallback(() => {
     stopMutation.mutate();
-  }
+  }, [stopMutation]);
 
   function plantLink(plant: OverviewPlant): string {
     const from = encodeURIComponent(`/experiments/${experimentId}/overview?${searchParams.toString()}`);
@@ -703,6 +712,73 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
     );
   }
 
+  const overviewStateModel = useMemo(
+    () => ({
+      lifecycleState: summary?.lifecycle.state || "unknown",
+      readinessItems,
+      busy,
+      startReady,
+      showStop: summary?.lifecycle.state === "running",
+      stateActionLinks: [
+        {
+          href: `/experiments/${experimentId}/baseline`,
+          className: actionButtonClass(baselineNeedsAttention),
+          label: "Capture baselines",
+        },
+        {
+          href: `/experiments/${experimentId}/placement`,
+          className: actionButtonClass(placementNeedsAttention),
+          label: "Manage placement",
+        },
+        {
+          href: `/experiments/${experimentId}/recipes`,
+          className: actionButtonClass(recipesNeedsAttention),
+          label: "Manage recipes",
+        },
+        {
+          href: `/experiments/${experimentId}/rotation`,
+          className: actionButtonClass(rotationNeedsAttention),
+          label: "Rotation",
+        },
+        {
+          href: `/experiments/${experimentId}/feeding`,
+          className: actionButtonClass(feedingNeedsAttention),
+          label: "Feeding",
+        },
+      ],
+    }),
+    [
+      baselineNeedsAttention,
+      busy,
+      experimentId,
+      feedingNeedsAttention,
+      placementNeedsAttention,
+      actionButtonClass,
+      readinessItems,
+      recipesNeedsAttention,
+      rotationNeedsAttention,
+      startReady,
+      summary?.lifecycle.state,
+    ],
+  );
+
+  const overviewStateActions = useMemo(
+    () => ({
+      onStart: startExperiment,
+      onStop: stopExperiment,
+    }),
+    [startExperiment, stopExperiment],
+  );
+
+  const overviewScheduleModel = useMemo(
+    () => ({
+      nextScheduleSlotText: formatScheduleSlot(summary?.schedule.next_scheduled_slot || null),
+      scheduleHref: `/experiments/${experimentId}/schedule`,
+      scheduleClassName: actionButtonClass(scheduleNeedsAttention),
+    }),
+    [actionButtonClass, experimentId, scheduleNeedsAttention, summary?.schedule.next_scheduled_slot],
+  );
+
   if (notInvited) {
     return (
       <PageShell title="Overview">
@@ -723,75 +799,8 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
         offline={offline}
       />
 
-      <SectionCard title="Experiment State">
-        <div className={styles.overviewStateCard}>
-          <p className="text-sm text-muted-foreground">State: {summary?.lifecycle.state.toUpperCase() || "UNKNOWN"}</p>
-          <div className={styles.overviewReadinessRow}>
-            {readinessItems.map((item) => (
-              <span
-                key={item.key}
-                className={cn(
-                  styles.overviewReadinessChip,
-                  item.value === 0 ? styles.overviewReadinessChipReady : styles.overviewReadinessChipPending,
-                )}
-              >
-                {item.label}: {item.value}
-              </span>
-            ))}
-          </div>
-          <div className={styles.overviewStateActionRow}>
-            <button
-              className={cn(buttonVariants({ variant: "default" }), styles.overviewActionButton)}
-              type="button"
-              disabled={busy || !startReady}
-              onClick={startExperiment}
-            >
-              Start
-            </button>
-            {summary?.lifecycle.state === "running" ? (
-              <button
-                className={cn(buttonVariants({ variant: "destructive" }), styles.overviewActionButton)}
-                type="button"
-                disabled={busy}
-                onClick={stopExperiment}
-              >
-                Stop
-              </button>
-            ) : null}
-            <Link className={actionButtonClass(baselineNeedsAttention)} href={`/experiments/${experimentId}/baseline`}>
-              Capture baselines
-            </Link>
-            <Link className={actionButtonClass(placementNeedsAttention)} href={`/experiments/${experimentId}/placement`}>
-              Manage placement
-            </Link>
-            <Link className={actionButtonClass(recipesNeedsAttention)} href={`/experiments/${experimentId}/recipes`}>
-              Manage recipes
-            </Link>
-            <Link className={actionButtonClass(rotationNeedsAttention)} href={`/experiments/${experimentId}/rotation`}>
-              Rotation
-            </Link>
-            <Link className={actionButtonClass(feedingNeedsAttention)} href={`/experiments/${experimentId}/feeding`}>
-              Feeding
-            </Link>
-          </div>
-          {!startReady ? (
-            <p className={"text-sm text-muted-foreground"}>Start blocked until readiness is complete.</p>
-          ) : null}
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Schedule">
-        <div className={styles.overviewScheduleCard}>
-          <p className="text-sm text-muted-foreground">
-            Next schedule slot: {formatScheduleSlot(summary?.schedule.next_scheduled_slot || null)}
-          </p>
-          <div className={"flex flex-wrap items-center gap-2"}>
-            <Link className={actionButtonClass(scheduleNeedsAttention)} href={`/experiments/${experimentId}/schedule`}>
-              Schedule
-            </Link>
-          </div>
-        </div>
-      </SectionCard>
+      <OverviewStatePanel model={overviewStateModel} actions={overviewStateActions} />
+      <OverviewSchedulePanel model={overviewScheduleModel} />
 
       {placementGroups.tents.length > 0 ? (
         <SectionCard title="Tent -> Slot -> Tray -> Plants">
@@ -912,12 +921,7 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
         </SectionCard>
       ) : null}
 
-      {!loading && sortedPlants.length === 0 ? (
-        <SectionCard>
-          <IllustrationPlaceholder inventoryId="ILL-201" kind="generic" />
-          <p className="text-sm text-muted-foreground">No plants available for this experiment.</p>
-        </SectionCard>
-      ) : null}
+      {!loading && sortedPlants.length === 0 ? <OverviewEmptyPanel /> : null}
     </PageShell>
   );
 }

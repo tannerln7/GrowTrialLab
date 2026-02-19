@@ -2,21 +2,22 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, CheckSquare, Layers, Save, Trash2, X, type LucideIcon } from "lucide-react";
+import { Check } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { unwrapList } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { api, isApiError } from "@/src/lib/api";
 import { buttonVariants } from "@/src/components/ui/button";
-import { Input } from "@/src/components/ui/input";
-import { NativeSelect } from "@/src/components/ui/native-select";
 import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
-import StickyActionBar from "@/src/components/ui/StickyActionBar";
-import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
+import {
+  RecipeDraftActionBar,
+  RecipePlantDraftPanel,
+  RecipeToolsPanel,
+} from "@/src/features/experiments/recipes/components/RecipePanels";
 import { normalizeUserFacingError } from "@/src/lib/error-normalization";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
@@ -104,25 +105,6 @@ function formatTrayDisplay(rawValue: string | null | undefined, fallbackValue?: 
     return raw;
   }
   return `Tray ${trayNumber}`;
-}
-
-function TrayHeaderToggle({
-  onClick,
-  allSelected,
-  label,
-  icon: Icon,
-}: {
-  onClick: () => void;
-  allSelected: boolean;
-  label: string;
-  icon: LucideIcon;
-}) {
-  return (
-    <button className={styles.trayHeaderSelect} type="button" onClick={onClick}>
-      <Icon size={14} />
-      {allSelected ? "Deselect" : "Select"} {label}
-    </button>
-  );
 }
 
 type ExperimentRecipesPageClientProps = {
@@ -295,7 +277,7 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     });
   }, [activePlantAnchorId, allPlantIds, plantById]);
 
-  function togglePlantSelection(plantId: string) {
+  const togglePlantSelection = useCallback((plantId: string) => {
     if (!plantById.has(plantId)) {
       return;
     }
@@ -309,9 +291,9 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
       return next;
     });
     setActivePlantAnchorId(plantId);
-  }
+  }, [plantById]);
 
-  function togglePlantsSelectionByContainer(plantIds: string[]) {
+  const togglePlantsSelectionByContainer = useCallback((plantIds: string[]) => {
     if (plantIds.length === 0) {
       return;
     }
@@ -327,14 +309,14 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
       }
       return next;
     });
-  }
+  }, []);
 
-  function selectAllPlants() {
+  const selectAllPlants = useCallback(() => {
     setSelectedPlantIds(new Set(allPlantIds));
     setActivePlantAnchorId((current) => current || allPlantIds[0] || null);
-  }
+  }, [allPlantIds]);
 
-  function selectSameSpecies() {
+  const selectSameSpecies = useCallback(() => {
     if (!activePlantAnchorId) {
       return;
     }
@@ -344,14 +326,14 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     }
     const matching = allPlantIds.filter((plantId) => plantById.get(plantId)?.species_id === anchor.species_id);
     setSelectedPlantIds(new Set(matching));
-  }
+  }, [activePlantAnchorId, allPlantIds, plantById]);
 
-  function clearPlantSelection() {
+  const clearPlantSelection = useCallback(() => {
     setSelectedPlantIds(new Set());
     setActivePlantAnchorId(null);
-  }
+  }, []);
 
-  function stageApplyRecipeToSelection() {
+  const stageApplyRecipeToSelection = useCallback(() => {
     if (selectedPlantIds.size === 0) {
       setError("Select one or more plants first.");
       return;
@@ -373,9 +355,9 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     setError("");
     const recipe = recipeById.get(selectedBulkRecipeId);
     setNotice(`Staged ${recipe ? recipeLabel(recipe) : "recipe"} for ${selectedPlantIds.size} plant(s).`);
-  }
+  }, [recipeById, selectedBulkRecipeId, selectedPlantIds]);
 
-  function stageRemoveRecipeFromSelection() {
+  const stageRemoveRecipeFromSelection = useCallback(() => {
     if (selectedPlantIds.size === 0) {
       setError("Select one or more plants first.");
       return;
@@ -392,14 +374,14 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     setDiagnostics(null);
     setError("");
     setNotice(`Staged recipe removal for ${selectedPlantIds.size} plant(s).`);
-  }
+  }, [selectedPlantIds]);
 
-  function resetDrafts() {
+  const resetDrafts = useCallback(() => {
     setDraftPlantRecipe(persistedRecipeByPlantId);
     setDiagnostics(null);
     setError("");
     setNotice("Draft recipe changes discarded.");
-  }
+  }, [persistedRecipeByPlantId]);
 
   const saveDraftMutation = useMutation({
     mutationFn: async (updates: Array<{ plant_id: string; assigned_recipe_id: string | null }>) =>
@@ -432,7 +414,7 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     },
   });
 
-  async function saveDrafts() {
+  const saveDrafts = useCallback(async () => {
     const updates = allPlantIds
       .map((plantId) => {
         const persistedRecipeId = persistedRecipeByPlantId[plantId] ?? null;
@@ -453,7 +435,7 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     }
 
     await saveDraftMutation.mutateAsync(updates).catch(() => null);
-  }
+  }, [allPlantIds, draftPlantRecipe, persistedRecipeByPlantId, saveDraftMutation]);
 
   const createRecipeMutation = useMutation({
     mutationFn: () =>
@@ -491,12 +473,12 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     },
   });
 
-  async function createRecipe(event: FormEvent<HTMLFormElement>) {
+  const createRecipe = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await createRecipeMutation.mutateAsync().catch(() => null);
-  }
+  }, [createRecipeMutation]);
 
-  function toggleRecipeSelection(recipeId: string) {
+  const toggleRecipeSelection = useCallback((recipeId: string) => {
     setSelectedRecipeIds((current) => {
       const next = new Set(current);
       if (next.has(recipeId)) {
@@ -506,11 +488,11 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
       }
       return next;
     });
-  }
+  }, []);
 
-  function clearRecipeSelection() {
+  const clearRecipeSelection = useCallback(() => {
     setSelectedRecipeIds(new Set());
-  }
+  }, []);
 
   const deleteRecipesMutation = useMutation({
     mutationFn: async (selected: Recipe[]) => {
@@ -566,15 +548,15 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     },
   });
 
-  async function deleteSelectedRecipes() {
+  const deleteSelectedRecipes = useCallback(async () => {
     const selected = recipes.filter((recipe) => selectedRecipeIds.has(recipe.id));
     if (selected.length === 0) {
       return;
     }
     await deleteRecipesMutation.mutateAsync(selected).catch(() => null);
-  }
+  }, [deleteRecipesMutation, recipes, selectedRecipeIds]);
 
-  function renderPlantCell(plantId: string) {
+  const renderPlantCell = useCallback((plantId: string) => {
     const plant = plantById.get(plantId);
     if (!plant) {
       return null;
@@ -624,7 +606,7 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
         </div>
       </article>
     );
-  }
+  }, [draftPlantRecipe, persistedRecipeByPlantId, plantById, recipeById, selectedPlantIds, togglePlantSelection]);
 
   const notInvited = recipesState.errorKind === "forbidden" || placementState.errorKind === "forbidden";
   const loading = recipesState.isLoading || placementState.isLoading;
@@ -638,6 +620,128 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     }
     return "";
   }, [notInvited, placementState.isError, queryOffline, recipesState.isError]);
+
+  const recipeToolsModel = useMemo(
+    () => ({
+      code,
+      name,
+      notes,
+      saving,
+      recipes,
+      selectedRecipeIds,
+    }),
+    [code, name, notes, recipes, saving, selectedRecipeIds],
+  );
+
+  const recipeToolsActions = useMemo(
+    () => ({
+      onCodeChange: setCode,
+      onNameChange: setName,
+      onNotesChange: setNotes,
+      onCreateRecipe: (event: FormEvent<HTMLFormElement>) => {
+        void createRecipe(event);
+      },
+      onToggleRecipeSelection: toggleRecipeSelection,
+      onClearRecipeSelection: clearRecipeSelection,
+      onDeleteSelectedRecipes: () => {
+        void deleteSelectedRecipes();
+      },
+    }),
+    [clearRecipeSelection, createRecipe, deleteSelectedRecipes, toggleRecipeSelection],
+  );
+
+  const trayViewModels = useMemo(
+    () =>
+      sortedTrays.map((tray) => {
+        const trayPlantIds = trayPlantIdsByTray[tray.tray_id] || [];
+        const selectedCount = trayPlantIds.filter((plantId) => selectedPlantIds.has(plantId)).length;
+        return {
+          trayId: tray.tray_id,
+          trayName: tray.name,
+          trayCode: tray.tray_id,
+          capacity: tray.capacity,
+          plantIds: trayPlantIds,
+          selectedCount,
+          allSelected: trayPlantIds.length > 0 && selectedCount === trayPlantIds.length,
+        };
+      }),
+    [selectedPlantIds, sortedTrays, trayPlantIdsByTray],
+  );
+
+  const unplacedViewModel = useMemo(() => {
+    if (unplacedPlantIds.length === 0) {
+      return null;
+    }
+    const selectedCount = unplacedPlantIds.filter((plantId) => selectedPlantIds.has(plantId)).length;
+    return {
+      plantIds: unplacedPlantIds,
+      selectedCount,
+      allSelected: unplacedPlantIds.every((plantId) => selectedPlantIds.has(plantId)),
+    };
+  }, [selectedPlantIds, unplacedPlantIds]);
+
+  const plantDraftModel = useMemo(
+    () => ({
+      selectedBulkRecipeId,
+      recipes,
+      allPlantCount: allPlantIds.length,
+      selectedPlantCount: selectedPlantIds.size,
+      draftChangeCount,
+      sameSpeciesDisabled,
+      diagnostics,
+      trays: trayViewModels,
+      unplaced: unplacedViewModel,
+    }),
+    [
+      allPlantIds.length,
+      diagnostics,
+      draftChangeCount,
+      recipes,
+      sameSpeciesDisabled,
+      selectedBulkRecipeId,
+      selectedPlantIds.size,
+      trayViewModels,
+      unplacedViewModel,
+    ],
+  );
+
+  const plantDraftActions = useMemo(
+    () => ({
+      onBulkRecipeChange: setSelectedBulkRecipeId,
+      onSelectAllPlants: selectAllPlants,
+      onSelectSameSpecies: selectSameSpecies,
+      onClearPlantSelection: clearPlantSelection,
+      onApplyRecipeToSelection: stageApplyRecipeToSelection,
+      onRemoveRecipeFromSelection: stageRemoveRecipeFromSelection,
+      onToggleContainer: togglePlantsSelectionByContainer,
+    }),
+    [
+      clearPlantSelection,
+      selectAllPlants,
+      selectSameSpecies,
+      stageApplyRecipeToSelection,
+      stageRemoveRecipeFromSelection,
+      togglePlantsSelectionByContainer,
+    ],
+  );
+
+  const actionBarModel = useMemo(
+    () => ({
+      draftChangeCount,
+      saving,
+    }),
+    [draftChangeCount, saving],
+  );
+
+  const actionBarActions = useMemo(
+    () => ({
+      onSaveDrafts: () => {
+        void saveDrafts();
+      },
+      onDiscardDrafts: resetDrafts,
+    }),
+    [resetDrafts, saveDrafts],
+  );
 
   if (notInvited) {
     return (
@@ -667,240 +771,15 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
         offline={offline || queryOffline}
       />
 
-      <SectionCard title="Recipe Tools">
-        <form className={styles.recipeCreateCompact} onSubmit={(event) => void createRecipe(event)}>
-          <Input
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            placeholder="Code (R0)"
-            aria-label="Recipe code"
-          />
-          <Input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Name"
-            aria-label="Recipe name"
-          />
-          <Input
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Notes (optional)"
-            aria-label="Recipe notes"
-          />
-          <button className={buttonVariants({ variant: "default" })} type="submit" disabled={saving}>
-            {saving ? "Saving..." : "Create recipe"}
-          </button>
-        </form>
-
-        <div className={cn(styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2")}>
-          <span className="text-sm text-muted-foreground">Recipes: {recipes.length}</span>
-          <span className="text-sm text-muted-foreground">Selected: {selectedRecipeIds.size}</span>
-          <div className={cn(styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2")}>
-            <TooltipIconButton
-              label="Clear recipe selection"
-              icon={<X size={16} />}
-              onClick={clearRecipeSelection}
-              disabled={selectedRecipeIds.size === 0}
-              size="sm"
-            />
-            {selectedRecipeIds.size > 0 ? (
-              <TooltipIconButton
-                label="Delete selected recipes"
-                icon={<Trash2 size={16} />}
-                onClick={() => void deleteSelectedRecipes()}
-                variant="destructive"
-                disabled={saving}
-                size="sm"
-              />
-            ) : null}
-          </div>
-        </div>
-
-        <div className={cn(styles.trayMainGrid, styles.cellGridResponsive)} data-cell-size="md">
-          {recipes.map((recipe) => {
-            const selected = selectedRecipeIds.has(recipe.id);
-            return (
-              <article
-                key={recipe.id}
-                className={cn(
-                  styles.trayGridCell,
-                  styles.recipeCell,
-                  styles.cellFrame,
-                  styles.cellSurfaceLevel1,
-                  styles.cellInteractive,
-                  selected ? styles.plantCellSelected : "",
-                )}
-                onClick={() => toggleRecipeSelection(recipe.id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    toggleRecipeSelection(recipe.id);
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-                aria-pressed={selected}
-              >
-                {selected ? (
-                  <span className={styles.plantCellCheck}>
-                    <Check size={12} />
-                  </span>
-                ) : null}
-                <strong className={styles.recipeCellCode}>{recipe.code}</strong>
-                <span className={styles.recipeCellName}>{recipe.name}</span>
-              </article>
-            );
-          })}
-          {recipes.length === 0 ? <p className="text-sm text-muted-foreground">No recipes yet.</p> : null}
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Plants by Tray (Draft)">
-        <div className={styles.placementToolbar}>
-          <NativeSelect
-            className={styles.toolbarInlineSelect}
-            value={selectedBulkRecipeId}
-            onChange={(event) => setSelectedBulkRecipeId(event.target.value)}
-            aria-label="Recipe for selected plants"
-          >
-            <option value="">Select recipe</option>
-            {recipes.map((recipe) => (
-              <option key={recipe.id} value={recipe.id}>
-                {recipeLabel(recipe)}
-              </option>
-            ))}
-          </NativeSelect>
-          <div className={cn(styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2")}>
-            <TooltipIconButton
-              label="Select all plants"
-              icon={<CheckSquare size={16} />}
-              onClick={selectAllPlants}
-              disabled={allPlantIds.length === 0}
-              size="sm"
-            />
-            <TooltipIconButton
-              label="Select same species"
-              icon={<Layers size={16} />}
-              onClick={selectSameSpecies}
-              disabled={sameSpeciesDisabled}
-              size="sm"
-            />
-            <TooltipIconButton
-              label="Clear plant selection"
-              icon={<X size={16} />}
-              onClick={clearPlantSelection}
-              disabled={selectedPlantIds.size === 0}
-              size="sm"
-            />
-            <button
-              className={buttonVariants({ variant: "default" })}
-              type="button"
-              disabled={selectedPlantIds.size === 0 || !selectedBulkRecipeId}
-              onClick={stageApplyRecipeToSelection}
-            >
-              <ArrowRight size={16} />
-              Apply to selected
-            </button>
-            <button
-              className={buttonVariants({ variant: "secondary" })}
-              type="button"
-              disabled={selectedPlantIds.size === 0}
-              onClick={stageRemoveRecipeFromSelection}
-            >
-              <X size={16} />
-              Remove recipe
-            </button>
-          </div>
-        </div>
-
-        <div className={cn(styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2")}>
-          <span className="text-sm text-muted-foreground">Plants in view: {allPlantIds.length}</span>
-          <span className="text-sm text-muted-foreground">Selected plants: {selectedPlantIds.size}</span>
-          <span className="text-sm text-muted-foreground">Draft changes: {draftChangeCount}</span>
-        </div>
-
-        {diagnostics?.reason_counts ? (
-          <div className={"grid gap-2"}>
-            <span>Diagnostics</span>
-            <strong>{Object.entries(diagnostics.reason_counts).map(([key, value]) => `${key}: ${value}`).join(" · ")}</strong>
-            {diagnostics.invalid_updates?.slice(0, 8).map((item) => (
-              <span key={`${item.plant_id}-${item.reason}`}>{`${item.plant_id} · ${item.reason}`}</span>
-            ))}
-          </div>
-        ) : null}
-
-        <div className={cn(styles.trayManagerGrid, styles.cellGridResponsive)} data-cell-size="lg">
-          {sortedTrays.map((tray) => {
-            const trayPlantIds = trayPlantIdsByTray[tray.tray_id] || [];
-            const selectedCount = trayPlantIds.filter((plantId) => selectedPlantIds.has(plantId)).length;
-            const allSelected = trayPlantIds.length > 0 && selectedCount === trayPlantIds.length;
-
-            return (
-              <article key={tray.tray_id} className={cn(styles.trayEditorCell, "rounded-lg border border-border shadow-sm", styles.cellSurfaceLevel2)}>
-                <div className={styles.trayHeaderRow}>
-                  <div className={styles.trayHeaderMeta}>
-                    <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
-                    <span className="text-sm text-muted-foreground">Occupancy: {trayPlantIds.length}/{tray.capacity}</span>
-                  </div>
-                  <div className={styles.trayHeaderActions}>
-                    <span className="text-sm text-muted-foreground">Selected: {selectedCount}</span>
-                    <TrayHeaderToggle
-                      onClick={() => togglePlantsSelectionByContainer(trayPlantIds)}
-                      allSelected={allSelected}
-                      label={formatTrayDisplay(tray.name, tray.tray_id)}
-                      icon={CheckSquare}
-                    />
-                  </div>
-                </div>
-                <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
-                  {trayPlantIds.map((plantId) => renderPlantCell(plantId))}
-                </div>
-              </article>
-            );
-          })}
-
-          {unplacedPlantIds.length > 0 ? (
-            <article className={cn(styles.trayEditorCell, "rounded-lg border border-border shadow-sm", styles.cellSurfaceLevel2)}>
-              <div className={styles.trayHeaderRow}>
-                <div className={styles.trayHeaderMeta}>
-                  <strong>Unplaced</strong>
-                  <span className="text-sm text-muted-foreground">Plants: {unplacedPlantIds.length}</span>
-                </div>
-                <div className={styles.trayHeaderActions}>
-                  <span className="text-sm text-muted-foreground">
-                    Selected: {unplacedPlantIds.filter((plantId) => selectedPlantIds.has(plantId)).length}
-                  </span>
-                  <TrayHeaderToggle
-                    onClick={() => togglePlantsSelectionByContainer(unplacedPlantIds)}
-                    allSelected={unplacedPlantIds.every((plantId) => selectedPlantIds.has(plantId))}
-                    label="Unplaced"
-                    icon={CheckSquare}
-                  />
-                </div>
-              </div>
-              <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
-                {unplacedPlantIds.map((plantId) => renderPlantCell(plantId))}
-              </div>
-            </article>
-          ) : null}
-        </div>
-      </SectionCard>
-
-      <StickyActionBar>
-        <span className={styles.recipeLegendItem}>{draftChangeCount} recipe mapping change(s)</span>
-        <button
-          className={buttonVariants({ variant: "default" })}
-          type="button"
-          disabled={saving || draftChangeCount === 0}
-          onClick={() => void saveDrafts()}
-        >
-          <Save size={16} />
-          {saving ? "Saving..." : "Save Recipe Mapping"}
-        </button>
-        <button className={buttonVariants({ variant: "secondary" })} type="button" disabled={saving || draftChangeCount === 0} onClick={resetDrafts}>
-          Discard drafts
-        </button>
-      </StickyActionBar>
+      <RecipeToolsPanel model={recipeToolsModel} actions={recipeToolsActions} />
+      <RecipePlantDraftPanel
+        model={plantDraftModel}
+        actions={plantDraftActions}
+        recipeLabel={recipeLabel}
+        formatTrayDisplay={formatTrayDisplay}
+        renderPlantCell={renderPlantCell}
+      />
+      <RecipeDraftActionBar model={actionBarModel} actions={actionBarActions} />
     </PageShell>
   );
 }

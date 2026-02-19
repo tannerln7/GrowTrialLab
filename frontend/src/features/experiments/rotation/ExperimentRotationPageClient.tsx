@@ -3,18 +3,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ExperimentStatusSummary } from "@/lib/experiment-status";
 import { unwrapList } from "@/lib/backend";
-import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
-import { NativeSelect } from "@/src/components/ui/native-select";
 import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
-import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
-import { Textarea } from "@/src/components/ui/textarea";
+import {
+  LogMovePanel,
+  RotationLogsPanel,
+  RotationRequiresRunningPanel,
+  RotationStatePanel,
+  RotationTraysPanel,
+} from "@/src/features/experiments/rotation/components/RotationPanels";
 import { api } from "@/src/lib/api";
 import { normalizeUserFacingError } from "@/src/lib/error-normalization";
 import { queryKeys } from "@/src/lib/queryKeys";
@@ -239,7 +242,7 @@ export function ExperimentRotationPageClient({ experimentId }: ExperimentRotatio
     },
   });
 
-  async function submitLogMove() {
+  const submitLogMove = useCallback(async () => {
     if (!selectedTrayId) {
       setError("Select a tray first.");
       return;
@@ -254,7 +257,7 @@ export function ExperimentRotationPageClient({ experimentId }: ExperimentRotatio
     }
 
     await logMutation.mutateAsync().catch(() => null);
-  }
+  }, [compatibleSlotsForSelectedTray, logMutation, selectedToSlotId, selectedTrayBlocked, selectedTrayId]);
 
   const loading =
     statusState.isLoading ||
@@ -278,6 +281,46 @@ export function ExperimentRotationPageClient({ experimentId }: ExperimentRotatio
     return "";
   }, [notInvited, offline, placementState.isError, rotationState.isError, statusState.errorKind, statusState.isError]);
 
+  const trays = useMemo(() => (summary ? unwrapList<RotationTray>(summary.trays) : []), [summary]);
+  const recentLogs = useMemo(() => (summary ? unwrapList<RotationLog>(summary.recent_logs) : []), [summary]);
+
+  const logMoveModel = useMemo(
+    () => ({
+      trays,
+      selectedTrayId,
+      selectedToSlotId,
+      compatibleSlotsForSelectedTray: compatibleSlotsForSelectedTray.map((slot) => ({ id: slot.id, label: slot.label })),
+      selectedTrayBlocked,
+      note,
+      isSaving: logMutation.isPending,
+      experimentId,
+    }),
+    [
+      compatibleSlotsForSelectedTray,
+      experimentId,
+      logMutation.isPending,
+      note,
+      selectedToSlotId,
+      selectedTrayBlocked,
+      selectedTrayId,
+      trays,
+    ],
+  );
+
+  const logMoveActions = useMemo(
+    () => ({
+      onSelectTray: setSelectedTrayId,
+      onSelectToSlot: setSelectedToSlotId,
+      onNoteChange: setNote,
+      onSubmit: () => {
+        void submitLogMove();
+      },
+    }),
+    [submitLogMove],
+  );
+
+  const trayLocationLabel = useCallback((tray: RotationTray) => locationLabel(tray.location), []);
+
   if (notInvited) {
     return (
       <PageShell title="Rotation">
@@ -287,9 +330,6 @@ export function ExperimentRotationPageClient({ experimentId }: ExperimentRotatio
       </PageShell>
     );
   }
-
-  const trays = summary ? unwrapList<RotationTray>(summary.trays) : [];
-  const recentLogs = summary ? unwrapList<RotationLog>(summary.recent_logs) : [];
 
   return (
     <PageShell
@@ -309,150 +349,15 @@ export function ExperimentRotationPageClient({ experimentId }: ExperimentRotatio
         offline={offline}
       />
 
-      {statusQuery.data ? (
-        <SectionCard title="Experiment State">
-          <Badge variant="secondary">{statusQuery.data.lifecycle.state.toUpperCase()}</Badge>
-        </SectionCard>
-      ) : null}
+      {statusQuery.data ? <RotationStatePanel lifecycleState={statusQuery.data.lifecycle.state} /> : null}
 
-      {!running ? (
-        <SectionCard title="Rotation Requires Running State">
-          <p className={"text-sm text-muted-foreground"}>
-            Rotation logs are intended for running experiments. Start the experiment first.
-          </p>
-          <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/overview`}>
-            Start experiment from Overview
-          </Link>
-        </SectionCard>
-      ) : null}
+      {!running ? <RotationRequiresRunningPanel experimentId={experimentId} /> : null}
 
       {running && summary ? (
         <>
-          <SectionCard title="Log a Move">
-            <div className={"grid gap-3"}>
-              <label className={"grid gap-2"}>
-                <span className={"text-sm text-muted-foreground"}>Tray</span>
-                <NativeSelect value={selectedTrayId} onChange={(event) => setSelectedTrayId(event.target.value)}>
-                  <option value="">Select tray</option>
-                  {trays.map((tray) => (
-                    <option key={tray.tray_id} value={tray.tray_id}>
-                      {tray.tray_name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </label>
-              <label className={"grid gap-2"}>
-                <span className={"text-sm text-muted-foreground"}>Destination slot</span>
-                <NativeSelect value={selectedToSlotId} onChange={(event) => setSelectedToSlotId(event.target.value)}>
-                  <option value="">None / Unassigned</option>
-                  {compatibleSlotsForSelectedTray.map((slot) => (
-                    <option key={slot.id} value={slot.id}>
-                      {slot.label}
-                    </option>
-                  ))}
-                </NativeSelect>
-                {selectedTrayBlocked ? (
-                  <p className={"text-sm text-muted-foreground"}>
-                    No compatible destination slots for this tray. This tray contains plants not allowed in restricted tents.
-                    <Link href={`/experiments/${experimentId}/placement?step=1`}> Adjust tent restrictions</Link>.
-                  </p>
-                ) : null}
-              </label>
-              <label className={"grid gap-2"}>
-                <span className={"text-sm text-muted-foreground"}>Note (optional)</span>
-                <Textarea value={note} onChange={(event) => setNote(event.target.value)} />
-              </label>
-              <button
-                className={buttonVariants({ variant: "default" })}
-                type="button"
-                disabled={logMutation.isPending || selectedTrayBlocked}
-                onClick={() => void submitLogMove()}
-              >
-                {logMutation.isPending ? "Saving..." : "Log move"}
-              </button>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Trays">
-            <ResponsiveList
-              items={trays}
-              getKey={(tray) => tray.tray_id}
-              columns={[
-                {
-                  key: "tray",
-                  label: "Tray",
-                  render: (tray) => tray.tray_name,
-                },
-                {
-                  key: "location",
-                  label: "Location",
-                  render: (tray) => locationLabel(tray.location),
-                },
-                {
-                  key: "plants",
-                  label: "Plants",
-                  render: (tray) => tray.plant_count,
-                },
-              ]}
-              renderMobileCard={(tray) => (
-                <div className={"grid gap-2"}>
-                  <span>Tray</span>
-                  <strong>{tray.tray_name}</strong>
-                  <span>Location</span>
-                  <strong>{locationLabel(tray.location)}</strong>
-                  <span>Plants</span>
-                  <strong>{tray.plant_count}</strong>
-                </div>
-              )}
-            />
-          </SectionCard>
-
-          <SectionCard title="Recent Logs">
-            <ResponsiveList
-              items={recentLogs}
-              getKey={(item) => item.id}
-              columns={[
-                {
-                  key: "tray",
-                  label: "Tray",
-                  render: (item) => item.tray_name,
-                },
-                {
-                  key: "from",
-                  label: "From",
-                  render: (item) => item.from_slot ? `${item.from_slot.tent_name} / ${item.from_slot.code}` : "Unplaced",
-                },
-                {
-                  key: "to",
-                  label: "To",
-                  render: (item) => item.to_slot ? `${item.to_slot.tent_name} / ${item.to_slot.code}` : "Unplaced",
-                },
-                {
-                  key: "when",
-                  label: "When",
-                  render: (item) => formatDateTime(item.occurred_at),
-                },
-              ]}
-              renderMobileCard={(item) => (
-                <div className={"grid gap-2"}>
-                  <span>Tray</span>
-                  <strong>{item.tray_name}</strong>
-                  <span>From</span>
-                  <strong>{item.from_slot ? `${item.from_slot.tent_name} / ${item.from_slot.code}` : "Unplaced"}</strong>
-                  <span>To</span>
-                  <strong>{item.to_slot ? `${item.to_slot.tent_name} / ${item.to_slot.code}` : "Unplaced"}</strong>
-                  <span>When</span>
-                  <strong>{formatDateTime(item.occurred_at)}</strong>
-                  {item.note ? (
-                    <>
-                      <span>Note</span>
-                      <strong>{item.note}</strong>
-                    </>
-                  ) : null}
-                </div>
-              )}
-            />
-          </SectionCard>
+          <LogMovePanel model={logMoveModel} actions={logMoveActions} />
+          <RotationTraysPanel trays={trays} locationLabel={trayLocationLabel} />
+          <RotationLogsPanel logs={recentLogs} formatDateTime={formatDateTime} />
         </>
       ) : null}
     </PageShell>

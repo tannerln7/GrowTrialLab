@@ -13,6 +13,10 @@ import { NativeSelect } from "@/src/components/ui/native-select";
 import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
+import {
+  BaselinePlantQueuePanel,
+  BaselineQueueStatusPanel,
+} from "@/src/features/experiments/baseline/components/BaselinePanels";
 import { Textarea } from "@/src/components/ui/textarea";
 import { api, isApiError } from "@/src/lib/api";
 import { normalizeUserFacingError } from "@/src/lib/error-normalization";
@@ -558,11 +562,11 @@ export function ExperimentBaselinePageClient({ experimentId }: ExperimentBaselin
     applyPlantBaselinePayload(selectedPlantId, selectedPlantBaselineQuery.data);
   }, [applyPlantBaselinePayload, selectedPlantBaselineQuery.data, selectedPlantId]);
 
-  function jumpToPlant(plantId: string) {
+  const jumpToPlant = useCallback((plantId: string) => {
     const nextQuery = new URLSearchParams(searchParams.toString());
     nextQuery.set("plant", plantId);
     router.replace(`/experiments/${experimentId}/baseline?${nextQuery.toString()}`);
-  }
+  }, [experimentId, router, searchParams]);
 
   const refreshBaselineInitialData = useCallback(async () => {
     return queryClient.fetchQuery({
@@ -736,7 +740,7 @@ export function ExperimentBaselinePageClient({ experimentId }: ExperimentBaselin
       ? "Unable to load baseline page."
       : "";
 
-  function saveBaseline(saveAndNext: boolean) {
+  const saveBaseline = useCallback((saveAndNext: boolean) => {
     if (!selectedPlantId || readOnly) {
       return;
     }
@@ -753,18 +757,68 @@ export function ExperimentBaselinePageClient({ experimentId }: ExperimentBaselin
       manualGrade,
       notes,
     });
-  }
+  }, [gradeSource, manualGrade, notes, readOnly, saveBaselineMutation, selectedPlantId, sliderValues]);
 
-  function uploadBaselinePhoto() {
+  const uploadBaselinePhoto = useCallback(() => {
     if (!selectedPlantId || !photoFile || readOnly) {
       return;
     }
     uploadBaselinePhotoMutation.mutate({ plantId: selectedPlantId, file: photoFile });
-  }
+  }, [photoFile, readOnly, selectedPlantId, uploadBaselinePhotoMutation]);
 
-  function lockBaseline() {
+  const lockBaseline = useCallback(() => {
     lockBaselineMutation.mutate();
-  }
+  }, [lockBaselineMutation]);
+
+  const queueStatusModel = useMemo(
+    () => ({
+      remainingCount: queue?.remaining_count ?? 0,
+      baselineLocked,
+      editingUnlocked,
+      allBaselinesCaptured,
+      saving,
+      primarySaveDisabled,
+      primarySaveLabel,
+    }),
+    [
+      allBaselinesCaptured,
+      baselineLocked,
+      editingUnlocked,
+      primarySaveDisabled,
+      primarySaveLabel,
+      queue?.remaining_count,
+      saving,
+    ],
+  );
+
+  const queueStatusActions = useMemo(
+    () => ({
+      onUnlockEditing: () => setEditingUnlocked(true),
+      onRelockEditing: () => setEditingUnlocked(false),
+      onFinishAndLock: () => {
+        void lockBaseline();
+      },
+      onPrimarySave: () => {
+        void saveBaseline(primarySaveLabel === "Save & Next");
+      },
+    }),
+    [lockBaseline, primarySaveLabel, saveBaseline],
+  );
+
+  const plantQueueModel = useMemo(
+    () => ({
+      queuePlants,
+      selectedPlantId,
+    }),
+    [queuePlants, selectedPlantId],
+  );
+
+  const plantQueueActions = useMemo(
+    () => ({
+      onJumpToPlant: jumpToPlant,
+    }),
+    [jumpToPlant],
+  );
 
   if (notInvited) {
     return (
@@ -794,50 +848,7 @@ export function ExperimentBaselinePageClient({ experimentId }: ExperimentBaselin
         offline={offline}
       />
 
-      <SectionCard title="Queue Status">
-        <p className="text-sm text-muted-foreground">Remaining baselines: {queue?.remaining_count ?? 0}</p>
-        {baselineLocked ? (
-          <p className={"text-sm text-muted-foreground"}>Baseline is locked in UI. Unlock editing for this session to continue.</p>
-        ) : null}
-        <div className={"flex flex-wrap items-center gap-2"}>
-          {baselineLocked && !editingUnlocked ? (
-            <button
-              className={buttonVariants({ variant: "destructive" })}
-              type="button"
-              onClick={() => setEditingUnlocked(true)}
-            >
-              Unlock editing
-            </button>
-          ) : null}
-          {baselineLocked && editingUnlocked ? (
-            <button
-              className={buttonVariants({ variant: "secondary" })}
-              type="button"
-              onClick={() => setEditingUnlocked(false)}
-            >
-              Re-lock UI
-            </button>
-          ) : null}
-          {!baselineLocked && allBaselinesCaptured ? (
-            <button
-              className={buttonVariants({ variant: "secondary" })}
-              type="button"
-              disabled={saving}
-              onClick={() => void lockBaseline()}
-            >
-              Finish and Lock
-            </button>
-          ) : null}
-          <button
-            className={buttonVariants({ variant: "default" })}
-            type="button"
-            disabled={primarySaveDisabled}
-            onClick={() => void saveBaseline(primarySaveLabel === "Save & Next")}
-          >
-            {saving ? "Saving..." : primarySaveLabel}
-          </button>
-        </div>
-      </SectionCard>
+      <BaselineQueueStatusPanel model={queueStatusModel} actions={queueStatusActions} />
 
       {selectedPlantId ? (
         <SectionCard title="Capture Baseline">
@@ -1019,47 +1030,7 @@ export function ExperimentBaselinePageClient({ experimentId }: ExperimentBaselin
         </SectionCard>
       ) : null}
 
-      <SectionCard title="Plant Queue">
-        {queuePlants.length > 0 ? (
-          <div className={cn(styles.plantCellGrid, styles.cellGridResponsive)} data-cell-size="sm">
-            {queuePlants.map((plant) => {
-              const selected = plant.uuid === selectedPlantId;
-              return (
-                <article
-                  key={plant.uuid}
-                  className={cn(
-                    styles.plantCell,
-                    styles.baselineQueuePlantCell,
-                    styles.cellFrame,
-                    styles.cellSurfaceLevel1,
-                    styles.cellInteractive,
-                    selected ? styles.plantCellSelected : "",
-                  )}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => jumpToPlant(plant.uuid)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      jumpToPlant(plant.uuid);
-                    }
-                  }}
-                >
-                  <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
-                  <span className={styles.plantCellSpecies}>{plant.species_name}</span>
-                  <div className={styles.baselineQueueStatusRow}>
-                    <span className={plant.has_baseline ? styles.baselineStatusReady : styles.baselineStatusMissing}>
-                      {plant.has_baseline ? "Captured" : "No baseline"}
-                    </span>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <p className={"text-sm text-muted-foreground"}>No active plants found in this queue.</p>
-        )}
-      </SectionCard>
+      <BaselinePlantQueuePanel model={plantQueueModel} actions={plantQueueActions} />
 
     </PageShell>
   );

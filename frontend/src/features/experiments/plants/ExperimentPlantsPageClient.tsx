@@ -3,19 +3,20 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendUrl, unwrapList } from "@/lib/backend";
 import { suggestPlantId } from "@/lib/id-suggestions";
-import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
-import { Input } from "@/src/components/ui/input";
-import { NativeSelect } from "@/src/components/ui/native-select";
 import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
-import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
-import { Textarea } from "@/src/components/ui/textarea";
+import {
+  CsvImportPanel,
+  ManualAddPlantsPanel,
+  PlantInventoryPanel,
+  PlantsToolsPanel,
+} from "@/src/features/experiments/plants/components/PlantsPanels";
 import { api, isApiError } from "@/src/lib/api";
 import { normalizeUserFacingError } from "@/src/lib/error-normalization";
 import { queryKeys } from "@/src/lib/queryKeys";
@@ -243,7 +244,7 @@ export function ExperimentPlantsPageClient({ experimentId }: ExperimentPlantsPag
   const isSaving =
     saving || addPlantsMutation.isPending || importCsvMutation.isPending || generateIdsMutation.isPending;
 
-  async function addPlantsQuick() {
+  const addPlantsQuick = useCallback(async () => {
     const quantity = Math.max(1, Number(manualQuantity) || 1);
     if (!manualSpeciesName.trim()) {
       setError("Species name is required.");
@@ -256,9 +257,9 @@ export function ExperimentPlantsPageClient({ experimentId }: ExperimentPlantsPag
     if (quantity < 1) {
       setError("Unable to add plants.");
     }
-  }
+  }, [addPlantsMutation, experimentId, manualQuantity, manualSpeciesName]);
 
-  async function importPlantsCsv() {
+  const importPlantsCsv = useCallback(async () => {
     if (!csvText.trim() && !csvFile) {
       setError("Provide CSV text or file.");
       return;
@@ -267,22 +268,126 @@ export function ExperimentPlantsPageClient({ experimentId }: ExperimentPlantsPag
       return;
     }
     await importCsvMutation.mutateAsync().catch(() => null);
-  }
+  }, [csvFile, csvText, experimentId, importCsvMutation]);
 
-  async function generateMissingIds() {
+  const generateMissingIds = useCallback(async () => {
     if (!experimentId) {
       return;
     }
     await generateIdsMutation.mutateAsync().catch(() => null);
-  }
+  }, [experimentId, generateIdsMutation]);
 
-  function downloadLabels() {
+  const downloadLabels = useCallback(() => {
     window.open(
       backendUrl(`/api/v1/experiments/${experimentId}/plants/labels.pdf?mode=all`),
       "_blank",
       "noopener,noreferrer",
     );
-  }
+  }, [experimentId]);
+
+  const handlePresetChange = useCallback(
+    (nextPresetId: string) => {
+      setSelectedPresetId(nextPresetId);
+      if (nextPresetId === "custom") {
+        return;
+      }
+      const preset = CARNIVOROUS_PLANT_PRESETS.find((item) => item.id === nextPresetId);
+      if (!preset) {
+        return;
+      }
+      setManualSpeciesName(preset.speciesName);
+      setManualCategory(preset.category);
+      setManualCultivar(preset.cultivar ?? "");
+    },
+    [],
+  );
+
+  const manualAddModel = useMemo(
+    () => ({
+      selectedPresetId,
+      presets: CARNIVOROUS_PLANT_PRESETS,
+      manualSpeciesName,
+      manualCategory,
+      manualCultivar,
+      manualQuantity,
+      manualPlantId,
+      suggestedPlantId,
+      manualBaselineNotes,
+      isSaving,
+    }),
+    [
+      isSaving,
+      manualBaselineNotes,
+      manualCategory,
+      manualCultivar,
+      manualPlantId,
+      manualQuantity,
+      manualSpeciesName,
+      selectedPresetId,
+      suggestedPlantId,
+    ],
+  );
+
+  const manualAddActions = useMemo(
+    () => ({
+      onPresetChange: handlePresetChange,
+      onSpeciesNameChange: setManualSpeciesName,
+      onCategoryChange: setManualCategory,
+      onCultivarChange: setManualCultivar,
+      onQuantityChange: (value: string) => setManualQuantity(Number(value) || 1),
+      onPlantIdChange: setManualPlantId,
+      onBaselineNotesChange: setManualBaselineNotes,
+      onAddPlants: () => {
+        void addPlantsQuick();
+      },
+    }),
+    [addPlantsQuick, handlePresetChange],
+  );
+
+  const csvImportModel = useMemo(
+    () => ({
+      csvText,
+      csvFileName: csvFile?.name || "",
+      isSaving,
+    }),
+    [csvFile?.name, csvText, isSaving],
+  );
+
+  const csvImportActions = useMemo(
+    () => ({
+      onCsvTextChange: setCsvText,
+      onCsvFileChange: setCsvFile,
+      onImportCsv: () => {
+        void importPlantsCsv();
+      },
+    }),
+    [importPlantsCsv],
+  );
+
+  const toolsModel = useMemo(
+    () => ({
+      isSaving,
+    }),
+    [isSaving],
+  );
+
+  const toolsActions = useMemo(
+    () => ({
+      onGenerateIds: () => {
+        void generateMissingIds();
+      },
+      onDownloadLabels: downloadLabels,
+    }),
+    [downloadLabels, generateMissingIds],
+  );
+
+  const inventoryModel = useMemo(
+    () => ({
+      plants,
+      loading: plantsState.isLoading,
+    }),
+    [plants, plantsState.isLoading],
+  );
 
   if (notInvited) {
     return (
@@ -314,189 +419,10 @@ export function ExperimentPlantsPageClient({ experimentId }: ExperimentPlantsPag
         offline={mutationOffline || queryOffline}
       />
 
-      <SectionCard title="Add Plants (Manual)">
-        <div className={"grid gap-3"}>
-          <label className={"grid gap-2"}>
-            <span className={"text-sm text-muted-foreground"}>Plant preset</span>
-            <NativeSelect
-              value={selectedPresetId}
-              onChange={(event) => {
-                const nextPresetId = event.target.value;
-                setSelectedPresetId(nextPresetId);
-                if (nextPresetId === "custom") {
-                  return;
-                }
-                const preset = CARNIVOROUS_PLANT_PRESETS.find((item) => item.id === nextPresetId);
-                if (!preset) {
-                  return;
-                }
-                setManualSpeciesName(preset.speciesName);
-                setManualCategory(preset.category);
-                setManualCultivar(preset.cultivar ?? "");
-              }}
-            >
-              <option value="custom">Custom (not listed)</option>
-              {CARNIVOROUS_PLANT_PRESETS.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.speciesName}
-                  {preset.cultivar ? ` — ${preset.cultivar}` : ""}
-                </option>
-              ))}
-            </NativeSelect>
-          </label>
-          <label className={"grid gap-2"}>
-            <span className={"text-sm text-muted-foreground"}>Species name</span>
-            <Input
-              value={manualSpeciesName}
-              onChange={(event) => setManualSpeciesName(event.target.value)}
-              placeholder="Nepenthes ventricosa"
-            />
-          </label>
-          <label className={"grid gap-2"}>
-            <span className={"text-sm text-muted-foreground"}>Category</span>
-            <Input
-              value={manualCategory}
-              onChange={(event) => setManualCategory(event.target.value)}
-              placeholder="nepenthes"
-            />
-          </label>
-          <label className={"grid gap-2"}>
-            <span className={"text-sm text-muted-foreground"}>Cultivar</span>
-            <Input
-              value={manualCultivar}
-              onChange={(event) => setManualCultivar(event.target.value)}
-            />
-          </label>
-          <label className={"grid gap-2"}>
-            <span className={"text-sm text-muted-foreground"}>Quantity</span>
-            <Input
-              type="number"
-              min={1}
-              value={manualQuantity}
-              onChange={(event) => setManualQuantity(Number(event.target.value) || 1)}
-            />
-          </label>
-          <label className={"grid gap-2"}>
-            <span className={"text-sm text-muted-foreground"}>Plant ID (optional)</span>
-            <Input
-              value={manualPlantId}
-              onChange={(event) => setManualPlantId(event.target.value)}
-              placeholder={suggestedPlantId}
-            />
-          </label>
-          <label className={"grid gap-2"}>
-            <span className={"text-sm text-muted-foreground"}>Baseline notes</span>
-            <Textarea
-              value={manualBaselineNotes}
-              onChange={(event) => setManualBaselineNotes(event.target.value)}
-            />
-          </label>
-          <button
-            className={buttonVariants({ variant: "secondary" })}
-            type="button"
-            disabled={isSaving || !manualSpeciesName.trim()}
-            onClick={() => void addPlantsQuick()}
-          >
-            Add plants
-          </button>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Bulk Import CSV">
-        <p className={"text-sm text-muted-foreground"}>
-          Columns: species_name, category, cultivar, quantity, plant_id, baseline_notes
-        </p>
-        <div className={"grid gap-3"}>
-          <Textarea
-            value={csvText}
-            onChange={(event) => setCsvText(event.target.value)}
-            placeholder={
-              "species_name,category,cultivar,quantity,plant_id,baseline_notes\\nNepenthes alata,nepenthes,,3,,batch A"
-            }
-          />
-          <Input
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(event) => setCsvFile(event.target.files?.[0] ?? null)}
-          />
-          <button
-            className={buttonVariants({ variant: "secondary" })}
-            type="button"
-            disabled={isSaving || (!csvFile && !csvText.trim())}
-            onClick={() => void importPlantsCsv()}
-          >
-            Import CSV
-          </button>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Tools">
-        <div className={"flex flex-wrap items-center gap-2"}>
-          <button
-            className={buttonVariants({ variant: "secondary" })}
-            type="button"
-            disabled={isSaving}
-            onClick={() => void generateMissingIds()}
-          >
-            Generate IDs for pending plants
-          </button>
-          <button className={buttonVariants({ variant: "secondary" })} type="button" onClick={downloadLabels}>
-            Download labels PDF
-          </button>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Plant Inventory">
-        {!plantsState.isLoading ? (
-          <ResponsiveList
-            items={plants}
-            getKey={(plant) => plant.id}
-            columns={[
-              {
-                key: "plant_id",
-                label: "Plant ID",
-                render: (plant) => (
-                  <Link href={`/p/${plant.id}`}>{plant.plant_id || "(pending)"}</Link>
-                ),
-              },
-              {
-                key: "species",
-                label: "Species",
-                render: (plant) =>
-                  `${plant.species_name}${plant.species_category ? ` (${plant.species_category})` : ""}`,
-              },
-              {
-                key: "cultivar",
-                label: "Cultivar",
-                render: (plant) => plant.cultivar || "-",
-              },
-              {
-                key: "status",
-                label: "Status",
-                render: (plant) => plant.status,
-              },
-            ]}
-            renderMobileCard={(plant) => (
-              <div className={"grid gap-2"}>
-                <span>Plant ID</span>
-                <strong>
-                  <Link href={`/p/${plant.id}`}>{plant.plant_id || "(pending)"}</Link>
-                </strong>
-                <span>Species</span>
-                <strong>
-                  {plant.species_name}
-                  {plant.species_category ? ` (${plant.species_category})` : ""}
-                </strong>
-                <span>Cultivar</span>
-                <strong>{plant.cultivar || "-"}</strong>
-                <span>Status</span>
-                <strong>{plant.status}</strong>
-              </div>
-            )}
-            emptyState={<IllustrationPlaceholder inventoryId="ILL-201" kind="noPlants" />}
-          />
-        ) : null}
-      </SectionCard>
+      <ManualAddPlantsPanel model={manualAddModel} actions={manualAddActions} />
+      <CsvImportPanel model={csvImportModel} actions={csvImportActions} />
+      <PlantsToolsPanel model={toolsModel} actions={toolsActions} />
+      <PlantInventoryPanel model={inventoryModel} />
     </PageShell>
   );
 }

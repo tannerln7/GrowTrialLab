@@ -8,17 +8,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ExperimentStatusSummary } from "@/lib/experiment-status";
 import { unwrapList } from "@/lib/backend";
-import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
-import { Input } from "@/src/components/ui/input";
-import { NativeSelect } from "@/src/components/ui/native-select";
-import { Notice } from "@/src/components/ui/notice";
 import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
-import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
-import StickyActionBar from "@/src/components/ui/StickyActionBar";
-import { Textarea } from "@/src/components/ui/textarea";
+import {
+  FeedingActionBar,
+  FeedingAllCompletePanel,
+  FeedingBlockedPanel,
+  FeedingQueueStatusPanel,
+  FeedingRequiresRunningPanel,
+  FeedingUpNextPanel,
+  FeedPlantPanel,
+} from "@/src/features/experiments/feeding/components/FeedingPanels";
 import { api } from "@/src/lib/api";
 import { normalizeUserFacingError } from "@/src/lib/error-normalization";
 import { queryKeys } from "@/src/lib/queryKeys";
@@ -241,12 +243,12 @@ export function ExperimentFeedingPageClient({ experimentId }: ExperimentFeedingP
     }
   }, [preselectedPlantId, queue, queuePlants, selectedPlantId, syncPlantInUrl]);
 
-  function selectPlant(plantId: string | null, syncUrl = true) {
+  const selectPlant = useCallback((plantId: string | null, syncUrl = true) => {
     setSelectedPlantId(plantId);
     if (syncUrl) {
       syncPlantInUrl(plantId);
     }
-  }
+  }, [syncPlantInUrl]);
 
   const saveMutation = useMutation({
     mutationFn: async ({ plantId }: { plantId: string }) => {
@@ -274,7 +276,7 @@ export function ExperimentFeedingPageClient({ experimentId }: ExperimentFeedingP
     },
   });
 
-  async function saveFeeding(moveNext: boolean) {
+  const saveFeeding = useCallback(async (moveNext: boolean) => {
     if (!selectedPlantId) {
       setError("Choose a plant to feed.");
       return;
@@ -311,7 +313,16 @@ export function ExperimentFeedingPageClient({ experimentId }: ExperimentFeedingP
       }
       selectPlant(nextPlantId, true);
     }
-  }
+  }, [
+    experimentId,
+    queueQueryKey,
+    queryClient,
+    saveBlockedReason,
+    saveMutation,
+    selectedPlantId,
+    selectPlant,
+    router,
+  ]);
 
   const notInvited = statusState.errorKind === "forbidden";
   const loading =
@@ -337,6 +348,97 @@ export function ExperimentFeedingPageClient({ experimentId }: ExperimentFeedingP
     mutationOffline ||
     statusState.errorKind === "offline" ||
     queueState.errorKind === "offline";
+
+  const queueStatusModel = useMemo(
+    () => ({
+      remainingCount: queue?.remaining_count ?? 0,
+      windowDays: queue?.window_days ?? 0,
+      hasSelectedPlant: Boolean(selectedPlant),
+      selectedPlantNeedsFeeding: Boolean(selectedPlant?.needs_feeding),
+    }),
+    [queue?.remaining_count, queue?.window_days, selectedPlant],
+  );
+
+  const queueStatusActions = useMemo(
+    () => ({
+      onNextNeedingFeed: () => {
+        const next = pickNextNeedingFeed(queuePlants, selectedPlantId);
+        if (next) {
+          selectPlant(next, true);
+        }
+      },
+    }),
+    [queuePlants, selectPlant, selectedPlantId],
+  );
+
+  const feedPlantModel = useMemo(
+    () => ({
+      selectedPlantId: selectedPlantId ?? "",
+      queuePlants,
+      selectedPlant,
+      amountText,
+      showNote,
+      note,
+      selectedPlantLastFedLabel: formatLastFed(selectedPlant?.last_fed_at ?? null),
+      selectedPlantLocationLabel: selectedPlant ? locationLabel(selectedPlant) : "Unplaced",
+    }),
+    [amountText, note, queuePlants, selectedPlant, selectedPlantId, showNote],
+  );
+
+  const feedPlantActions = useMemo(
+    () => ({
+      onSelectPlant: (plantId: string) => selectPlant(plantId || null, true),
+      onAmountChange: setAmountText,
+      onToggleNote: () => setShowNote((current) => !current),
+      onNoteChange: setNote,
+    }),
+    [selectPlant],
+  );
+
+  const blockedModel = useMemo(
+    () => ({
+      saveBlockedReason: saveBlockedReason || "",
+      experimentId,
+      overviewHref,
+    }),
+    [experimentId, overviewHref, saveBlockedReason],
+  );
+
+  const upNextModel = useMemo(
+    () => ({
+      upNext,
+    }),
+    [upNext],
+  );
+
+  const upNextActions = useMemo(
+    () => ({
+      onSelectPlant: (plantId: string) => selectPlant(plantId, true),
+    }),
+    [selectPlant],
+  );
+
+  const actionBarModel = useMemo(
+    () => ({
+      selectedPlantId: selectedPlantId ?? "",
+      saving,
+      canSaveAndNext,
+      saveBlocked,
+    }),
+    [canSaveAndNext, saveBlocked, saving, selectedPlantId],
+  );
+
+  const actionBarActions = useMemo(
+    () => ({
+      onSave: () => {
+        void saveFeeding(false);
+      },
+      onSaveNext: () => {
+        void saveFeeding(true);
+      },
+    }),
+    [saveFeeding],
+  );
 
   if (notInvited) {
     return (
@@ -367,177 +469,28 @@ export function ExperimentFeedingPageClient({ experimentId }: ExperimentFeedingP
       />
 
       {statusQuery.data && statusQuery.data.lifecycle.state !== "running" ? (
-        <SectionCard title="Feeding Requires Running State">
-          <p className={"text-sm text-muted-foreground"}>Feeding is available only while an experiment is running.</p>
-          <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/overview`}>
-            Start experiment from Overview
-          </Link>
-        </SectionCard>
+        <FeedingRequiresRunningPanel experimentId={experimentId} />
       ) : null}
 
       {statusQuery.data && statusQuery.data.lifecycle.state === "running" && queue ? (
         <>
-          <SectionCard title="Queue Status">
-            <div className={"grid gap-3"}>
-              <Badge variant="secondary">Remaining feedings: {queue.remaining_count}</Badge>
-              <p className={"text-sm text-muted-foreground"}>Window: feed plants at least once every {queue.window_days} days.</p>
-              {selectedPlant && !selectedPlant.needs_feeding ? (
-                <p className={"text-sm text-muted-foreground"}>This plant is already within the feeding window.</p>
-              ) : null}
-              {queue.remaining_count > 0 ? (
-                <button
-                  className={buttonVariants({ variant: "secondary" })}
-                  type="button"
-                  onClick={() => {
-                    const next = pickNextNeedingFeed(queuePlants, selectedPlantId);
-                    if (next) {
-                      selectPlant(next, true);
-                    }
-                  }}
-                >
-                  Next needing feeding
-                </button>
-              ) : (
-                <Notice variant="success">All plants are up to date.</Notice>
-              )}
-            </div>
-          </SectionCard>
+          <FeedingQueueStatusPanel model={queueStatusModel} actions={queueStatusActions} />
 
           {queue.remaining_count === 0 && !selectedPlant ? (
-            <SectionCard title="All Feedings Complete">
-              <p className={"text-sm text-muted-foreground"}>No active plants currently need feeding.</p>
-              <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/overview`}>
-                Back to Overview
-              </Link>
-            </SectionCard>
+            <FeedingAllCompletePanel experimentId={experimentId} />
           ) : null}
 
-          <SectionCard title="Feed Plant">
-            <div className={"grid gap-3"}>
-              <label className={"grid gap-2"}>
-                <span className={"text-sm text-muted-foreground"}>Plant</span>
-                <NativeSelect
-                  value={selectedPlantId ?? ""}
-                  onChange={(event) => selectPlant(event.target.value || null, true)}
-                >
-                  <option value="">Select plant</option>
-                  {queuePlants.map((plant) => (
-                    <option key={plant.uuid} value={plant.uuid}>
-                      {plant.plant_id || "(pending)"} - {plant.species_name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </label>
-              {selectedPlant ? (
-                <div className={"grid gap-3"}>
-                  <p className={"text-sm text-muted-foreground"}>Last fed: {formatLastFed(selectedPlant.last_fed_at)}</p>
-                  <p className={"text-sm text-muted-foreground"}>
-                    Assigned recipe:{" "}
-                    {selectedPlant.assigned_recipe
-                      ? `${selectedPlant.assigned_recipe.code}${selectedPlant.assigned_recipe.name ? ` - ${selectedPlant.assigned_recipe.name}` : ""}`
-                      : "Unassigned"}
-                  </p>
-                  <p className={"text-sm text-muted-foreground"}>Location: {locationLabel(selectedPlant)}</p>
-                  {selectedPlant.blocked_reason ? (
-                    <p className={"text-sm text-destructive"}>Blocked: {selectedPlant.blocked_reason}</p>
-                  ) : null}
-                </div>
-              ) : null}
-              <label className={"grid gap-2"}>
-                <span className={"text-sm text-muted-foreground"}>Amount (optional)</span>
-                <Input
-                  value={amountText}
-                  onChange={(event) => setAmountText(event.target.value)}
-                  placeholder="3 drops"
-                />
-              </label>
-              <button className={buttonVariants({ variant: "secondary" })} type="button" onClick={() => setShowNote((current) => !current)}>
-                {showNote ? "Hide note" : "Add note"}
-              </button>
-              {showNote ? (
-                <label className={"grid gap-2"}>
-                  <span className={"text-sm text-muted-foreground"}>Note (optional)</span>
-                  <Textarea value={note} onChange={(event) => setNote(event.target.value)} />
-                </label>
-              ) : null}
-            </div>
-          </SectionCard>
+          <FeedPlantPanel model={feedPlantModel} actions={feedPlantActions} />
 
           {saveBlocked ? (
-            <SectionCard title="Feeding Blocked">
-              <p className={"text-sm text-muted-foreground"}>
-                {saveBlockedReason === "Unplaced"
-                  ? "This plant needs placement in a tray before feeding."
-                  : "This plant needs a plant recipe before feeding."}
-              </p>
-              <div className={"flex flex-wrap items-center gap-2"}>
-                <Link className={buttonVariants({ variant: "default" })} href={`/experiments/${experimentId}/placement`}>
-                  Fix placement
-                </Link>
-                <Link className={buttonVariants({ variant: "secondary" })} href={overviewHref}>
-                  Back to Overview
-                </Link>
-              </div>
-            </SectionCard>
+            <FeedingBlockedPanel model={blockedModel} />
           ) : null}
 
           {upNext.length > 0 ? (
-            <SectionCard title="Up Next">
-              <ResponsiveList
-                items={upNext}
-                getKey={(plant) => plant.uuid}
-                columns={[
-                  {
-                    key: "plant_id",
-                    label: "Plant",
-                    render: (plant) => plant.plant_id || "(pending)",
-                  },
-                  {
-                    key: "species",
-                    label: "Species",
-                    render: (plant) => plant.species_name,
-                  },
-                  {
-                    key: "last_fed",
-                    label: "Last fed",
-                    render: (plant) => formatLastFed(plant.last_fed_at),
-                  },
-                ]}
-                renderMobileCard={(plant) => (
-                  <div className={"grid gap-2"}>
-                    <span>Plant</span>
-                    <strong>{plant.plant_id || "(pending)"}</strong>
-                    <span>Species</span>
-                    <strong>{plant.species_name}</strong>
-                    <span>Last fed</span>
-                    <strong>{formatLastFed(plant.last_fed_at)}</strong>
-                    <button className={buttonVariants({ variant: "secondary" })} type="button" onClick={() => selectPlant(plant.uuid, true)}>
-                      Select
-                    </button>
-                  </div>
-                )}
-              />
-            </SectionCard>
+            <FeedingUpNextPanel model={upNextModel} actions={upNextActions} formatLastFed={formatLastFed} />
           ) : null}
 
-          <StickyActionBar>
-            <button
-              className={buttonVariants({ variant: "default" })}
-              type="button"
-              disabled={!selectedPlantId || saving || saveBlocked}
-              onClick={() => void saveFeeding(false)}
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
-            <button
-              className={buttonVariants({ variant: "secondary" })}
-              type="button"
-              disabled={!selectedPlantId || saving || !canSaveAndNext || saveBlocked}
-              onClick={() => void saveFeeding(true)}
-            >
-              Save & Next
-            </button>
-          </StickyActionBar>
+          <FeedingActionBar model={actionBarModel} actions={actionBarActions} />
         </>
       ) : null}
     </PageShell>
