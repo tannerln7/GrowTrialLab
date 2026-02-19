@@ -1,19 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
 import { backendFetch, normalizeBackendError } from "@/lib/backend";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
 } from "@/lib/experiment-status";
-import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { useRouteParamString } from "@/src/lib/useRouteParamString";
+import { cn } from "@/lib/utils";
 
 
 type ChecklistItem = {
@@ -25,17 +27,8 @@ type ChecklistItem = {
 };
 
 export default function ExperimentSetupPage() {
-  const params = useParams();
   const router = useRouter();
-  const experimentId = useMemo(() => {
-    if (typeof params.id === "string") {
-      return params.id;
-    }
-    if (Array.isArray(params.id)) {
-      return params.id[0] ?? "";
-    }
-    return "";
-  }, [params]);
+  const experimentId = useRouteParamString("id") || "";
 
   const [loading, setLoading] = useState(true);
   const [notInvited, setNotInvited] = useState(false);
@@ -93,7 +86,7 @@ export default function ExperimentSetupPage() {
     return (
       <PageShell title="Setup">
         <SectionCard>
-          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
+          <PageAlerts notInvited />
         </SectionCard>
       </PageShell>
     );
@@ -133,15 +126,18 @@ export default function ExperimentSetupPage() {
         </Link>
       }
     >
-      {loading ? <p className="text-sm text-muted-foreground">Loading setup checklist...</p> : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
+      <PageAlerts
+        loading={loading}
+        loadingText="Loading setup checklist..."
+        error={error}
+        offline={offline}
+      />
 
       {!loading ? (
         <SectionCard title="Bootstrap Checklist">
           <div className="grid gap-3">
             {checklist.map((item) => (
-              <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={item.id}>
+              <article className={cn(styles.cellFrame, styles.cellSurfaceLevel1)} key={item.id}>
                 <strong>{item.title}</strong>
                 <p className="text-sm text-muted-foreground">
                   {item.complete ? "Complete" : "Incomplete"}

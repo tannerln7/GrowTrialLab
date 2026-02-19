@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
 import { backendFetch, normalizeBackendError } from "@/lib/backend";
-import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
+import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { Textarea } from "@/src/components/ui/textarea";
@@ -77,7 +77,7 @@ export default function NewExperimentPage() {
     return (
       <PageShell title="New Experiment">
         <SectionCard>
-          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
+          <PageAlerts notInvited />
         </SectionCard>
       </PageShell>
     );
@@ -118,10 +118,7 @@ export default function NewExperimentPage() {
             </Link>
           </div>
 
-          {error ? <p className={"text-sm text-destructive"}>{error}</p> : null}
-          {offline ? (
-            <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" />
-          ) : null}
+          <PageAlerts error={error} offline={offline} />
         </form>
       </SectionCard>
     </PageShell>

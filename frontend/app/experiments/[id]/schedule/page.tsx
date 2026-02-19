@@ -1,24 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
 } from "@/lib/experiment-status";
-import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { NativeSelect } from "@/src/components/ui/native-select";
-import { Notice } from "@/src/components/ui/notice";
+import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import { Textarea } from "@/src/components/ui/textarea";
+import { useRouteParamString } from "@/src/lib/useRouteParamString";
 
 
 type Timeframe = "MORNING" | "AFTERNOON" | "EVENING" | "NIGHT";
@@ -228,18 +229,9 @@ function trayRestrictionHint(
 }
 
 export default function ExperimentSchedulePage() {
-  const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const experimentId = useMemo(() => {
-    if (typeof params.id === "string") {
-      return params.id;
-    }
-    if (Array.isArray(params.id)) {
-      return params.id[0] ?? "";
-    }
-    return "";
-  }, [params]);
+  const experimentId = useRouteParamString("id") || "";
   const plantFilter = searchParams.get("plant");
 
   const [loading, setLoading] = useState(true);
@@ -683,7 +675,7 @@ export default function ExperimentSchedulePage() {
     return (
       <PageShell title="Schedule">
         <SectionCard>
-          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
+          <PageAlerts notInvited />
         </SectionCard>
       </PageShell>
     );
@@ -699,10 +691,13 @@ export default function ExperimentSchedulePage() {
         </Link>
       }
     >
-      {loading ? <p className={"text-sm text-muted-foreground"}>Loading schedules...</p> : null}
-      {error ? <p className={"text-sm text-destructive"}>{error}</p> : null}
-      {notice ? <Notice variant="success">{notice}</Notice> : null}
-      {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
+      <PageAlerts
+        loading={loading}
+        loadingText="Loading schedules..."
+        error={error}
+        notice={notice}
+        offline={offline}
+      />
 
       <SectionCard title="Upcoming plan">
         <div className={"flex flex-wrap items-center gap-2"}>
@@ -724,7 +719,7 @@ export default function ExperimentSchedulePage() {
         {plan && unwrapList<SchedulePlan["slots"]["results"][number]>(plan.slots).length ? (
           <div className={"grid gap-3"}>
             {unwrapList<SchedulePlan["slots"]["results"][number]>(plan.slots).map((slot) => (
-              <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={`${slot.date}-${slot.exact_time || slot.timeframe}`}>
+              <article className={cn(styles.cellFrame, styles.cellSurfaceLevel1)} key={`${slot.date}-${slot.exact_time || slot.timeframe}`}>
                 <strong>{formatSlotTitle(slot.date, slot.timeframe, slot.exact_time)}</strong>
                 <div className={"grid gap-3"}>
                   {slot.actions.map((item) => (
@@ -827,7 +822,7 @@ export default function ExperimentSchedulePage() {
           {recurrenceMode === "weekly" ? (
             <div className={"grid gap-3"}>
               {weeklyRules.map((rule, index) => (
-                <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={`${rule.weekday}-${index}`}>
+                <article className={cn(styles.cellFrame, styles.cellSurfaceLevel1)} key={`${rule.weekday}-${index}`}>
                   <label className={"grid gap-2"}>
                     <span className={"text-sm text-muted-foreground"}>Weekday</span>
                     <NativeSelect
@@ -1029,7 +1024,7 @@ export default function ExperimentSchedulePage() {
           {scopeType === "TRAY" ? (
             <div className={"grid gap-3"}>
               {traysGroupedByTent.map(([group, trays]) => (
-                <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={group}>
+                <article className={cn(styles.cellFrame, styles.cellSurfaceLevel1)} key={group}>
                   <strong>{group}</strong>
                   {trays.map((tray) => (
                     <label className={"flex flex-wrap items-center gap-2"} key={tray.tray_id}>
@@ -1057,7 +1052,7 @@ export default function ExperimentSchedulePage() {
           {scopeType === "PLANT" ? (
             <div className={"grid gap-3"}>
               {plantsGroupedByLocation.map(([group, plants]) => (
-                <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={group}>
+                <article className={cn(styles.cellFrame, styles.cellSurfaceLevel1)} key={group}>
                   <strong>{group}</strong>
                   {plants.map((plant) => (
                     <label className={"flex flex-wrap items-center gap-2"} key={plant.uuid}>
@@ -1119,7 +1114,7 @@ export default function ExperimentSchedulePage() {
         ) : (
           <div className={"grid gap-3"}>
             {actions.map((action) => (
-              <article className={[styles.cellFrame, styles.cellSurfaceLevel1].join(" ")} key={action.id}>
+              <article className={cn(styles.cellFrame, styles.cellSurfaceLevel1)} key={action.id}>
                 <div className={"flex flex-wrap items-center gap-2"}>
                   <strong>{action.title}</strong>
                   <span className={"text-sm text-muted-foreground"}>{actionTypeLabel(action.action_type)}</span>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useRouteParamString } from "@/src/lib/useRouteParamString";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
@@ -10,7 +10,7 @@ import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { NativeSelect } from "@/src/components/ui/native-select";
-import { Notice } from "@/src/components/ui/notice";
+import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
@@ -54,16 +54,7 @@ const CARNIVOROUS_PLANT_PRESETS: PlantPreset[] = [
 ];
 
 export default function ExperimentPlantsPage() {
-  const params = useParams();
-  const experimentId = useMemo(() => {
-    if (typeof params.id === "string") {
-      return params.id;
-    }
-    if (Array.isArray(params.id)) {
-      return params.id[0] ?? "";
-    }
-    return "";
-  }, [params]);
+  const experimentId = useRouteParamString("id") || "";
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -303,7 +294,7 @@ export default function ExperimentPlantsPage() {
     return (
       <PageShell title="Plants">
         <SectionCard>
-          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
+          <PageAlerts notInvited />
         </SectionCard>
       </PageShell>
     );
@@ -321,10 +312,13 @@ export default function ExperimentPlantsPage() {
         </div>
       }
     >
-      {loading ? <p className={"text-sm text-muted-foreground"}>Loading plants...</p> : null}
-      {error ? <p className={"text-sm text-destructive"}>{error}</p> : null}
-      {notice ? <Notice variant="success">{notice}</Notice> : null}
-      {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
+      <PageAlerts
+        loading={loading}
+        loadingText="Loading plants..."
+        error={error}
+        notice={notice}
+        offline={offline}
+      />
 
       <SectionCard title="Add Plants (Manual)">
         <div className={"grid gap-3"}>

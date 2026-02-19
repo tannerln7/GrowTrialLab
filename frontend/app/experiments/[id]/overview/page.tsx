@@ -2,18 +2,20 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ExperimentStatusSummary } from "@/lib/experiment-status";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
-import { Notice } from "@/src/components/ui/notice";
+import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { api, isApiError } from "@/src/lib/api";
 import { queryKeys } from "@/src/lib/queryKeys";
+import { useRouteParamString } from "@/src/lib/useRouteParamString";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
+import { cn } from "@/lib/utils";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -232,29 +234,22 @@ function formatTrayHeading(node: LocationNode | null): string {
 }
 
 export default function ExperimentOverviewPage() {
-  const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
-  const experimentId = useMemo(() => {
-    if (typeof params.id === "string") {
-      return params.id;
-    }
-    if (Array.isArray(params.id)) {
-      return params.id[0] ?? "";
-    }
-    return "";
-  }, [params]);
+  const experimentId = useRouteParamString("id") || "";
 
   const refreshToken = searchParams.get("refresh");
 
   const [notice, setNotice] = useState("");
   const [actionError, setActionError] = useState("");
   const [experimentName, setExperimentName] = useState("");
+  const statusQueryKey = queryKeys.experiment.status(experimentId);
+  const overviewQueryKey = queryKeys.experiment.feature(experimentId, "overviewPlants");
 
   const statusQuery = useQuery({
-    queryKey: queryKeys.experimentStatus(experimentId),
+    queryKey: statusQueryKey,
     queryFn: () =>
       api.get<ExperimentStatusSummary>(
         `/api/v1/experiments/${experimentId}/status/summary`,
@@ -265,7 +260,7 @@ export default function ExperimentOverviewPage() {
   });
 
   const overviewQuery = useQuery({
-    queryKey: queryKeys.experimentOverviewPlants(experimentId),
+    queryKey: overviewQueryKey,
     queryFn: () =>
       api.get<OverviewResponse>(
         `/api/v1/experiments/${experimentId}/overview/plants`,
@@ -281,13 +276,13 @@ export default function ExperimentOverviewPage() {
   const invalidateOverviewData = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({
-        queryKey: queryKeys.experimentStatus(experimentId),
+        queryKey: statusQueryKey,
       }),
       queryClient.invalidateQueries({
-        queryKey: queryKeys.experimentOverviewPlants(experimentId),
+        queryKey: overviewQueryKey,
       }),
     ]);
-  }, [experimentId, queryClient]);
+  }, [overviewQueryKey, queryClient, statusQueryKey]);
 
   const startMutation = useMutation({
     mutationFn: () =>
@@ -410,7 +405,12 @@ export default function ExperimentOverviewPage() {
     (summary?.schedule.due_counts_today ?? 0) > 0 || summary?.schedule.next_scheduled_slot == null;
 
   function actionButtonClass(needsAttention: boolean): string {
-    return [needsAttention ? buttonVariants({ variant: "default" }) : buttonVariants({ variant: "secondary" }), styles.overviewActionButton].join(" ");
+    return cn(
+      needsAttention
+        ? buttonVariants({ variant: "default" })
+        : buttonVariants({ variant: "secondary" }),
+      styles.overviewActionButton,
+    );
   }
 
   const readinessItems = [
@@ -664,36 +664,36 @@ export default function ExperimentOverviewPage() {
       <Link
         key={plant.uuid}
         href={plantLink(plant)}
-        className={[
+        className={cn(
           styles.plantCell,
           styles.overviewPlantCellLink,
           styles.overviewPlantCell,
           styles.cellFrame,
           styles.cellSurfaceLevel1,
           styles.cellInteractive,
-        ].join(" ")}
+        )}
       >
         <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
-        <span className={[styles.plantCellSpecies, styles.overviewPlantSpecies].join(" ")}>{speciesLine}</span>
+        <span className={cn(styles.plantCellSpecies, styles.overviewPlantSpecies)}>{speciesLine}</span>
         <div className={styles.overviewPlantStatusRow}>
           <span
-            className={[
+            className={cn(
               styles.overviewPlantChip,
               plant.grade ? styles.overviewPlantChipReady : styles.overviewPlantChipMissing,
-            ].join(" ")}
+            )}
           >
             {plant.grade ? `Grade ${plant.grade}` : "No grade"}
           </span>
           <span
-            className={[
+            className={cn(
               styles.overviewPlantChip,
               plant.assigned_recipe ? styles.overviewPlantChipReady : styles.overviewPlantChipMissing,
-            ].join(" ")}
+            )}
           >
             {plant.assigned_recipe ? `Recipe ${plant.assigned_recipe.code}` : "No recipe"}
           </span>
           {plant.status !== "active" ? (
-            <span className={[styles.overviewPlantChip, styles.overviewPlantChipMissing].join(" ")}>
+            <span className={cn(styles.overviewPlantChip, styles.overviewPlantChipMissing)}>
               {statusLabel}
             </span>
           ) : null}
@@ -706,7 +706,7 @@ export default function ExperimentOverviewPage() {
     return (
       <PageShell title="Overview">
         <SectionCard>
-          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
+          <PageAlerts notInvited />
         </SectionCard>
       </PageShell>
     );
@@ -714,10 +714,13 @@ export default function ExperimentOverviewPage() {
 
   return (
     <PageShell title="Overview" subtitle={experimentName || experimentId}>
-      {loading ? <p className="text-sm text-muted-foreground">Loading overview...</p> : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {notice ? <Notice variant="success">{notice}</Notice> : null}
-      {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
+      <PageAlerts
+        loading={loading}
+        loadingText="Loading overview..."
+        error={error}
+        notice={notice}
+        offline={offline}
+      />
 
       <SectionCard title="Experiment State">
         <div className={styles.overviewStateCard}>
@@ -726,10 +729,10 @@ export default function ExperimentOverviewPage() {
             {readinessItems.map((item) => (
               <span
                 key={item.key}
-                className={[
+                className={cn(
                   styles.overviewReadinessChip,
                   item.value === 0 ? styles.overviewReadinessChipReady : styles.overviewReadinessChipPending,
-                ].join(" ")}
+                )}
               >
                 {item.label}: {item.value}
               </span>
@@ -737,7 +740,7 @@ export default function ExperimentOverviewPage() {
           </div>
           <div className={styles.overviewStateActionRow}>
             <button
-              className={[buttonVariants({ variant: "default" }), styles.overviewActionButton].join(" ")}
+              className={cn(buttonVariants({ variant: "default" }), styles.overviewActionButton)}
               type="button"
               disabled={busy || !startReady}
               onClick={startExperiment}
@@ -746,7 +749,7 @@ export default function ExperimentOverviewPage() {
             </button>
             {summary?.lifecycle.state === "running" ? (
               <button
-                className={[buttonVariants({ variant: "destructive" }), styles.overviewActionButton].join(" ")}
+                className={cn(buttonVariants({ variant: "destructive" }), styles.overviewActionButton)}
                 type="button"
                 disabled={busy}
                 onClick={stopExperiment}
@@ -796,7 +799,12 @@ export default function ExperimentOverviewPage() {
               return (
                 <article
                   key={tentGroup.tent.id}
-                  className={[styles.tentBoardCard, styles.overviewTentBoardCard, "rounded-lg border border-border", styles.cellSurfaceLevel4].join(" ")}
+                  className={cn(
+                    styles.tentBoardCard,
+                    styles.overviewTentBoardCard,
+                    "rounded-lg border border-border",
+                    styles.cellSurfaceLevel4,
+                  )}
                 >
                   <div className={styles.trayHeaderRow}>
                     <div className={styles.trayHeaderMeta}>
@@ -816,11 +824,11 @@ export default function ExperimentOverviewPage() {
                         <div key={`${tentGroup.tent.id}-shelf-${shelfGroup.shelfIndex}`} className={styles.overviewShelfGroup}>
                         <span className={styles.overviewShelfLabel}>Shelf {shelfGroup.shelfIndex}</span>
                         <div
-                          className={[
+                          className={cn(
                             styles.overviewTentSlotGrid,
                             styles.overviewShelfSlotGrid,
                             overviewSlotGridColumns(tentGroup.maxSlotCount),
-                          ].join(" ")}
+                          )}
                         >
                           {Array.from({ length: tentGroup.maxSlotCount }, (_, index) => {
                             const slotIndex = index + 1;
@@ -832,13 +840,13 @@ export default function ExperimentOverviewPage() {
                                     slotGroup?.slot.id ??
                                     `${tentGroup.tent.id}-shelf-${shelfGroup.shelfIndex}-slot-${slotIndex}`
                                   }
-                                  className={[
+                                  className={cn(
                                     styles.slotCell,
                                     styles.overviewSlotCell,
                                     styles.overviewSlotCellEmpty,
                                     styles.cellFrame,
                                     styles.cellSurfaceLevel3,
-                                  ].join(" ")}
+                                  )}
                                 >
                                   <span className={styles.slotCellLabel}>Slot {slotIndex}</span>
                                   <div className={styles.overviewSlotEmptyState}>Empty</div>
@@ -855,25 +863,23 @@ export default function ExperimentOverviewPage() {
                                   {slotGroup.trays.map((trayGroup) => (
                                     <article
                                       key={trayGroup.tray.id}
-                                      className={[
+                                      className={cn(
                                         styles.overviewTrayCell,
                                         styles.cellSurfaceLevel2,
                                         slotGroup.trays.length === 1 ? "h-full" : "",
-                                      ]
-                                        .filter(Boolean)
-                                        .join(" ")}
+                                      )}
                                     >
                                     <div className={styles.overviewTrayMeta}>
-                                      <strong className={[styles.trayGridCellId, "text-left"].join(" ")}>
+                                      <strong className={cn(styles.trayGridCellId, "text-left")}>
                                         {formatTrayHeading(trayGroup.tray)}
                                       </strong>
                                         {trayGroup.tray.current_count != null && trayGroup.tray.capacity != null ? (
-                                          <span className={[styles.recipeLegendItem, "shrink-0"].join(" ")}>
+                                          <span className={cn(styles.recipeLegendItem, "shrink-0")}>
                                             {trayGroup.tray.current_count}/{trayGroup.tray.capacity}
                                           </span>
                                         ) : null}
                                       </div>
-                                      <div className={[styles.plantCellGridTray, styles.cellGridResponsive].join(" ")} data-cell-size="sm">
+                                      <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
                                         {trayGroup.plants.map((plant) => renderPlantCell(plant))}
                                       </div>
                                     </article>
@@ -899,7 +905,7 @@ export default function ExperimentOverviewPage() {
 
       {placementGroups.unplaced.length > 0 ? (
         <SectionCard title="Unplaced Plants">
-          <div className={[styles.plantCellGrid, styles.cellGridResponsive].join(" ")} data-cell-size="sm">
+          <div className={cn(styles.plantCellGrid, styles.cellGridResponsive)} data-cell-size="sm">
             {placementGroups.unplaced.map((plant) => renderPlantCell(plant))}
           </div>
         </SectionCard>

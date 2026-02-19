@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
 import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
+import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
@@ -61,7 +62,7 @@ export default function ExperimentsPage() {
     return (
       <PageShell title="Experiments">
         <SectionCard>
-          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
+          <PageAlerts notInvited />
         </SectionCard>
       </PageShell>
     );
@@ -83,8 +84,7 @@ export default function ExperimentsPage() {
       }
     >
       <SectionCard title="All Experiments">
-        {loading ? <p className={"text-sm text-muted-foreground"}>Loading...</p> : null}
-        {error ? <p className={"text-sm text-destructive"}>{error}</p> : null}
+        <PageAlerts loading={loading} loadingText="Loading..." error={error} offline={offline} />
 
         {!loading && !error ? (
           <ResponsiveList
@@ -125,9 +125,6 @@ export default function ExperimentsPage() {
               />
             }
           />
-        ) : null}
-        {offline ? (
-          <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" />
         ) : null}
       </SectionCard>
       <SectionCard>

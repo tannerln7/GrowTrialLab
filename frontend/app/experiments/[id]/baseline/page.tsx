@@ -2,17 +2,17 @@
 
 import { RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
-import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import { NativeSelect } from "@/src/components/ui/native-select";
-import { Notice } from "@/src/components/ui/notice";
+import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { Textarea } from "@/src/components/ui/textarea";
+import { useRouteParamString } from "@/src/lib/useRouteParamString";
 import { cn } from "@/lib/utils";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
@@ -295,19 +295,10 @@ function baselineLabelSkin(plant: QueuePlant | null) {
 
 export default function BaselinePage() {
   const baselinePhotoInputId = useId();
-  const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const experimentId = useMemo(() => {
-    if (typeof params.id === "string") {
-      return params.id;
-    }
-    if (Array.isArray(params.id)) {
-      return params.id[0] ?? "";
-    }
-    return "";
-  }, [params]);
+  const experimentId = useRouteParamString("id") || "";
 
   const selectedPlantFromQuery = searchParams.get("plant") || "";
 
@@ -721,7 +712,7 @@ export default function BaselinePage() {
     return (
       <PageShell title="Baseline">
         <SectionCard>
-          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
+          <PageAlerts notInvited />
         </SectionCard>
       </PageShell>
     );
@@ -737,10 +728,13 @@ export default function BaselinePage() {
         </Link>
       }
     >
-      {loading ? <p className="text-sm text-muted-foreground">Loading baseline queue...</p> : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {notice ? <Notice variant="success">{notice}</Notice> : null}
-      {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
+      <PageAlerts
+        loading={loading}
+        loadingText="Loading baseline queue..."
+        error={error}
+        notice={notice}
+        offline={offline}
+      />
 
       <SectionCard title="Queue Status">
         <p className="text-sm text-muted-foreground">Remaining baselines: {queue?.remaining_count ?? 0}</p>
@@ -969,22 +963,20 @@ export default function BaselinePage() {
 
       <SectionCard title="Plant Queue">
         {queuePlants.length > 0 ? (
-          <div className={[styles.plantCellGrid, styles.cellGridResponsive].join(" ")} data-cell-size="sm">
+          <div className={cn(styles.plantCellGrid, styles.cellGridResponsive)} data-cell-size="sm">
             {queuePlants.map((plant) => {
               const selected = plant.uuid === selectedPlantId;
               return (
                 <article
                   key={plant.uuid}
-                  className={[
+                  className={cn(
                     styles.plantCell,
                     styles.baselineQueuePlantCell,
                     styles.cellFrame,
                     styles.cellSurfaceLevel1,
                     styles.cellInteractive,
                     selected ? styles.plantCellSelected : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
+                  )}
                   role="button"
                   tabIndex={0}
                   onClick={() => jumpToPlant(plant.uuid)}

@@ -11,7 +11,7 @@ import {
   Tag,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { backendFetch, backendUrl, normalizeBackendError, unwrapList } from "@/lib/backend";
@@ -22,6 +22,7 @@ import { Input } from "@/src/components/ui/input";
 import { NativeSelect } from "@/src/components/ui/native-select";
 import { Notice } from "@/src/components/ui/notice";
 import PageShell from "@/src/components/ui/PageShell";
+import { useRouteParamString } from "@/src/lib/useRouteParamString";
 import { Popover, PopoverContent, PopoverTrigger } from "@/src/components/ui/popover";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
@@ -282,19 +283,10 @@ function buildNowAction(cockpit: PlantCockpit | null): NowAction {
 }
 
 export default function PlantQrPage() {
-  const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const plantUuid = useMemo(() => {
-    if (typeof params.id === "string") {
-      return params.id;
-    }
-    if (Array.isArray(params.id)) {
-      return params.id[0] ?? "";
-    }
-    return "";
-  }, [params]);
+  const plantUuid = useRouteParamString("id") || "";
 
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);

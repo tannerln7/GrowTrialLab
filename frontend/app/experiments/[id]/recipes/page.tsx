@@ -2,16 +2,16 @@
 
 import { ArrowRight, Check, CheckSquare, Layers, Save, Trash2, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useRouteParamString } from "@/src/lib/useRouteParamString";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 import { parseBackendErrorPayload } from "@/src/lib/backend-errors";
-import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { NativeSelect } from "@/src/components/ui/native-select";
-import { Notice } from "@/src/components/ui/notice";
+import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
@@ -122,16 +122,7 @@ function TrayHeaderToggle({
 }
 
 export default function RecipesPage() {
-  const params = useParams();
-  const experimentId = useMemo(() => {
-    if (typeof params.id === "string") {
-      return params.id;
-    }
-    if (Array.isArray(params.id)) {
-      return params.id[0] ?? "";
-    }
-    return "";
-  }, [params]);
+  const experimentId = useRouteParamString("id") || "";
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -596,16 +587,14 @@ export default function RecipesPage() {
     return (
       <article
         key={plant.uuid}
-        className={[
+        className={cn(
           styles.plantCell,
           styles.cellFrame,
           styles.cellSurfaceLevel1,
           styles.cellInteractive,
           selected ? styles.plantCellSelected : "",
           dirty ? styles.plantCellDirty : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
+        )}
         onClick={() => togglePlantSelection(plant.uuid)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -639,7 +628,7 @@ export default function RecipesPage() {
     return (
       <PageShell title="Recipes">
         <SectionCard>
-          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
+          <PageAlerts notInvited />
         </SectionCard>
       </PageShell>
     );
@@ -655,10 +644,13 @@ export default function RecipesPage() {
         </Link>
       }
     >
-      {loading ? <p className="text-sm text-muted-foreground">Loading recipes...</p> : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {notice ? <Notice variant="success">{notice}</Notice> : null}
-      {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
+      <PageAlerts
+        loading={loading}
+        loadingText="Loading recipes..."
+        error={error}
+        notice={notice}
+        offline={offline}
+      />
 
       <SectionCard title="Recipe Tools">
         <form className={styles.recipeCreateCompact} onSubmit={(event) => void createRecipe(event)}>
@@ -685,10 +677,10 @@ export default function RecipesPage() {
           </button>
         </form>
 
-        <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
+        <div className={cn(styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2")}>
           <span className="text-sm text-muted-foreground">Recipes: {recipes.length}</span>
           <span className="text-sm text-muted-foreground">Selected: {selectedRecipeIds.size}</span>
-          <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
+          <div className={cn(styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2")}>
             <TooltipIconButton
               label="Clear recipe selection"
               icon={<X size={16} />}
@@ -709,22 +701,20 @@ export default function RecipesPage() {
           </div>
         </div>
 
-        <div className={[styles.trayMainGrid, styles.cellGridResponsive].join(" ")} data-cell-size="md">
+        <div className={cn(styles.trayMainGrid, styles.cellGridResponsive)} data-cell-size="md">
           {recipes.map((recipe) => {
             const selected = selectedRecipeIds.has(recipe.id);
             return (
               <article
                 key={recipe.id}
-                className={[
+                className={cn(
                   styles.trayGridCell,
                   styles.recipeCell,
                   styles.cellFrame,
                   styles.cellSurfaceLevel1,
                   styles.cellInteractive,
                   selected ? styles.plantCellSelected : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                )}
                 onClick={() => toggleRecipeSelection(recipe.id)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -765,7 +755,7 @@ export default function RecipesPage() {
               </option>
             ))}
           </NativeSelect>
-          <div className={[styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2"].join(" ")}>
+          <div className={cn(styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2")}>
             <TooltipIconButton
               label="Select all plants"
               icon={<CheckSquare size={16} />}
@@ -808,7 +798,7 @@ export default function RecipesPage() {
           </div>
         </div>
 
-        <div className={[styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2"].join(" ")}>
+        <div className={cn(styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2")}>
           <span className="text-sm text-muted-foreground">Plants in view: {allPlantIds.length}</span>
           <span className="text-sm text-muted-foreground">Selected plants: {selectedPlantIds.size}</span>
           <span className="text-sm text-muted-foreground">Draft changes: {draftChangeCount}</span>
@@ -824,14 +814,14 @@ export default function RecipesPage() {
           </div>
         ) : null}
 
-        <div className={[styles.trayManagerGrid, styles.cellGridResponsive].join(" ")} data-cell-size="lg">
+        <div className={cn(styles.trayManagerGrid, styles.cellGridResponsive)} data-cell-size="lg">
           {sortedTrays.map((tray) => {
             const trayPlantIds = trayPlantIdsByTray[tray.tray_id] || [];
             const selectedCount = trayPlantIds.filter((plantId) => selectedPlantIds.has(plantId)).length;
             const allSelected = trayPlantIds.length > 0 && selectedCount === trayPlantIds.length;
 
             return (
-              <article key={tray.tray_id} className={[styles.trayEditorCell, "rounded-lg border border-border shadow-sm", styles.cellSurfaceLevel2].join(" ")}>
+              <article key={tray.tray_id} className={cn(styles.trayEditorCell, "rounded-lg border border-border shadow-sm", styles.cellSurfaceLevel2)}>
                 <div className={styles.trayHeaderRow}>
                   <div className={styles.trayHeaderMeta}>
                     <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
@@ -847,7 +837,7 @@ export default function RecipesPage() {
                     />
                   </div>
                 </div>
-                <div className={[styles.plantCellGridTray, styles.cellGridResponsive].join(" ")} data-cell-size="sm">
+                <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
                   {trayPlantIds.map((plantId) => renderPlantCell(plantId))}
                 </div>
               </article>
@@ -855,7 +845,7 @@ export default function RecipesPage() {
           })}
 
           {unplacedPlantIds.length > 0 ? (
-            <article className={[styles.trayEditorCell, "rounded-lg border border-border shadow-sm", styles.cellSurfaceLevel2].join(" ")}>
+            <article className={cn(styles.trayEditorCell, "rounded-lg border border-border shadow-sm", styles.cellSurfaceLevel2)}>
               <div className={styles.trayHeaderRow}>
                 <div className={styles.trayHeaderMeta}>
                   <strong>Unplaced</strong>
@@ -873,7 +863,7 @@ export default function RecipesPage() {
                   />
                 </div>
               </div>
-              <div className={[styles.plantCellGridTray, styles.cellGridResponsive].join(" ")} data-cell-size="sm">
+              <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
                 {unplacedPlantIds.map((plantId) => renderPlantCell(plantId))}
               </div>
             </article>
