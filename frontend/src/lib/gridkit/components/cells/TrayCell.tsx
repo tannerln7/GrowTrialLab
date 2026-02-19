@@ -28,6 +28,7 @@ type TrayCellProps = {
   metaClassName?: string;
   meta?: React.ReactNode;
   children?: React.ReactNode;
+  interactiveElement?: "button" | "div";
 };
 
 export function TrayCell({
@@ -51,6 +52,7 @@ export function TrayCell({
   metaClassName,
   meta,
   children,
+  interactiveElement,
 }: TrayCellProps) {
   const resolvedSummaryLines = summaryLines.length
     ? summaryLines
@@ -63,6 +65,7 @@ export function TrayCell({
       state={state}
       chips={chips}
       interactive={interactive}
+      interactiveElement={interactiveElement}
       onPress={onPress}
       ariaLabel={ariaLabel || (typeof title === "string" ? title : trayId)}
       className={cn(LEAF_SIZING_CLASS_NAME, className)}

@@ -27,6 +27,15 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Step 2 Hydration Fix: Nested Button Markup)
+- `Completed` Fixed invalid nested button markup on placement Step 2 tray cards.
+  - `CellChrome` now supports `interactiveElement="div"` for interactive cards that also contain child button controls.
+  - `TrayCell` forwards `interactiveElement`; Step 2 tray cards now use div-role interactive wrappers while keeping click/keyboard selection behavior.
+  - updated files:
+    - `frontend/src/lib/gridkit/components/CellChrome.tsx`
+    - `frontend/src/lib/gridkit/components/cells/TrayCell.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step2Trays.tsx`
+
 ### 2026-02-19 (Placement Step 1 Tent Selection-Delete Draft Flow + Shared Confirm Dialog)
 - `Completed` Placement Step 1 tent removal now uses selection-delete staging instead of immediate decrement deletion.
   - Tent Manager toolbar now keeps add (`+`) and contextual remove-selected trash controls.

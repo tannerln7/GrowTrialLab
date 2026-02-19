@@ -212,6 +212,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 - Destructive draft actions for filled containers should use shared confirmation popup:
   - `frontend/src/components/ui/confirm-dialog.tsx`
   - includes warning text/details and confirm/cancel footer actions.
+- For interactive grid cards that contain nested button controls (for example Step 2 tray cards with in-card `+/-` buttons), use `interactiveElement="div"` on `CellChrome`/`TrayCell` to avoid invalid nested `<button>` markup while keeping keyboard activation behavior.
 - Shared route style maps exist for complex geometry reuse:
   - `experiments-styles.ts`, `cockpit-styles.ts`
   - Overview nested tray metadata rows should stay single-line with tray label left and occupancy chip right (use `overviewTrayMeta` pattern).

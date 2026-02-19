@@ -18,6 +18,7 @@ type CellChromeProps = {
   footer?: React.ReactNode;
   children?: React.ReactNode;
   dataAttributes?: Record<string, string | number | undefined>;
+  interactiveElement?: "button" | "div";
 };
 
 const BASE_CLASS =
@@ -50,10 +51,12 @@ export function CellChrome({
   footer,
   children,
   dataAttributes,
+  interactiveElement = "button",
 }: CellChromeProps) {
   const isDisabled = disabled || locked || Boolean(state?.disabled) || Boolean(state?.locked);
   const isInteractive = (interactive || Boolean(onPress)) && !isDisabled;
   const resolvedBody = body ?? children;
+  const useButtonElement = interactiveElement === "button";
   const commonClassName = cn(
     BASE_CLASS,
     TONE_CLASS[state?.tone || "default"],
@@ -73,6 +76,33 @@ export function CellChrome({
   );
 
   if (isInteractive || onPress || interactive) {
+    if (!useButtonElement) {
+      return (
+        <div
+          role="button"
+          tabIndex={isDisabled ? -1 : 0}
+          className={commonClassName}
+          onClick={isDisabled ? undefined : onPress}
+          onKeyDown={
+            isDisabled || !onPress
+              ? undefined
+              : (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onPress();
+                  }
+                }
+          }
+          aria-pressed={state?.selected}
+          aria-label={ariaLabel}
+          aria-disabled={isDisabled || undefined}
+          {...dataAttributes}
+        >
+          {content}
+        </div>
+      );
+    }
+
     return (
       <button
         type="button"

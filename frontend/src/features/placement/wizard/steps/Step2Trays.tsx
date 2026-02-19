@@ -120,6 +120,7 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
                 title={formatTrayDisplay(tray.name, tray.tray_id)}
                 state={{ selected, tone: trayDirty ? "warn" : undefined }}
                 interactive={!model.saving && !model.locked}
+                interactiveElement="div"
                 onPress={
                   model.saving || model.locked
                     ? undefined
@@ -180,6 +181,7 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
                 title="New tray"
                 state={{ selected, tone: "warn" }}
                 interactive={!model.saving && !model.locked}
+                interactiveElement="div"
                 onPress={
                   model.saving || model.locked
                     ? undefined
