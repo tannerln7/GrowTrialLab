@@ -5,6 +5,7 @@ import type { CellState, ChipSpec, DndSpec, PositionSpec } from "@/src/lib/gridk
 import { CellChrome } from "../CellChrome";
 import { CellMeta, CellSubtitle, CellTitle } from "../CellText";
 import { getGridCellDataAttributes } from "./dataAttributes";
+import { LEAF_CONTENT_CLASS_NAME, LEAF_SIZING_CLASS_NAME } from "./leafSizing";
 
 type TrayCellProps = {
   trayId: string;
@@ -64,14 +65,14 @@ export function TrayCell({
       interactive={interactive}
       onPress={onPress}
       ariaLabel={ariaLabel || (typeof title === "string" ? title : trayId)}
-      className={cn(className)}
+      className={cn(LEAF_SIZING_CLASS_NAME, className)}
       dataAttributes={getGridCellDataAttributes({
         cellKind: "tray",
         position,
         dnd,
       })}
     >
-      <div className={cn("grid h-full content-start gap-1", contentClassName)}>
+      <div className={cn(LEAF_CONTENT_CLASS_NAME, contentClassName)}>
         <CellTitle className={cn(titleClassName)}>{title}</CellTitle>
         {subtitle ? <CellSubtitle>{subtitle}</CellSubtitle> : null}
         {meta ? <CellMeta className={cn(metaClassName)}>{meta}</CellMeta> : null}

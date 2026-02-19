@@ -10,6 +10,7 @@ import type {
 import { CellChrome } from "../CellChrome";
 import { CellSubtitle, CellTitle } from "../CellText";
 import { getGridCellDataAttributes } from "./dataAttributes";
+import { LEAF_CONTENT_CLASS_NAME, LEAF_SIZING_CLASS_NAME } from "./leafSizing";
 
 export type SlotCellVariant = "empty" | "define";
 
@@ -92,21 +93,23 @@ export function SlotCell({
       interactive={interactive}
       onPress={onPress}
       ariaLabel={ariaLabel || (typeof slotLabel === "string" ? slotLabel : "Slot")}
-      className={cn(className)}
+      className={cn(LEAF_SIZING_CLASS_NAME, className)}
       dataAttributes={getGridCellDataAttributes({
         cellKind: "slot",
         position,
         dnd: resolvedDnd,
       })}
     >
-      <CellTitle className={cn(titleClassName)}>{slotLabel}</CellTitle>
-      {defaultSubtitle ? (
-        <CellSubtitle className={cn(subtitleClassName)}>{defaultSubtitle}</CellSubtitle>
-      ) : null}
-      {emptyStatus ? (
-        <span className={cn("text-sm text-muted-foreground", statusClassName)}>{emptyStatus}</span>
-      ) : null}
-      {children}
+      <div className={LEAF_CONTENT_CLASS_NAME}>
+        <CellTitle className={cn(titleClassName)}>{slotLabel}</CellTitle>
+        {defaultSubtitle ? (
+          <CellSubtitle className={cn(subtitleClassName)}>{defaultSubtitle}</CellSubtitle>
+        ) : null}
+        {emptyStatus ? (
+          <span className={cn("text-sm text-muted-foreground", statusClassName)}>{emptyStatus}</span>
+        ) : null}
+        {children}
+      </div>
     </CellChrome>
   );
 }

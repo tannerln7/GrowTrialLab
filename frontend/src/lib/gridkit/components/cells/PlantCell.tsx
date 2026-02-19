@@ -6,6 +6,7 @@ import type { CellState, ChipSpec, DndSpec, PositionSpec } from "@/src/lib/gridk
 import { CellChrome } from "../CellChrome";
 import { CellMeta, CellSubtitle, CellTitle } from "../CellText";
 import { getGridCellDataAttributes } from "./dataAttributes";
+import { LEAF_CONTENT_CLASS_NAME, LEAF_SIZING_CLASS_NAME } from "./leafSizing";
 
 type PlantCellProps = {
   plantId: string;
@@ -49,7 +50,7 @@ export function PlantCell({
   children,
 }: PlantCellProps) {
   const content = (
-    <div className={cn("grid h-full content-start gap-1", contentClassName)}>
+    <div className={cn(LEAF_CONTENT_CLASS_NAME, contentClassName)}>
       <CellTitle className={cn(titleClassName)}>{title}</CellTitle>
       {subtitle ? <CellSubtitle className={cn(subtitleClassName)}>{subtitle}</CellSubtitle> : null}
       {meta ? <CellMeta className={cn(metaClassName)}>{meta}</CellMeta> : null}
@@ -64,7 +65,7 @@ export function PlantCell({
       interactive={interactive}
       onPress={onPress}
       ariaLabel={ariaLabel || (typeof title === "string" ? title : plantId)}
-      className={cn(className)}
+      className={cn(LEAF_SIZING_CLASS_NAME, className)}
       dataAttributes={getGridCellDataAttributes({
         cellKind: "plant",
         position,
@@ -72,7 +73,7 @@ export function PlantCell({
       })}
     >
       {linkHref && !onPress ? (
-        <Link href={linkHref} className="h-full">
+        <Link href={linkHref} className="block h-full w-full">
           {content}
         </Link>
       ) : (

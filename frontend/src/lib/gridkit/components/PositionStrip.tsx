@@ -19,6 +19,15 @@ type PositionStripProps = {
   ariaLabel?: string;
 };
 
+const PAGE_COL_CLASS_MAP: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+  4: "grid-cols-4",
+  5: "grid-cols-5",
+  6: "grid-cols-6",
+};
+
 function clampPage(value: number, pageCount: number): number {
   if (pageCount <= 0) {
     return 0;
@@ -37,6 +46,7 @@ export function PositionStrip({
 }: PositionStripProps) {
   const safePageSize = Math.max(1, Math.trunc(pageSize));
   const pages = useMemo(() => chunkArray(positions, safePageSize), [positions, safePageSize]);
+  const pagedGridColsClass = PAGE_COL_CLASS_MAP[safePageSize] || PAGE_COL_CLASS_MAP[4];
 
   const stripRef = useRef<HTMLDivElement>(null);
   const scrollRafRef = useRef<number | null>(null);
@@ -99,6 +109,42 @@ export function PositionStrip({
     return null;
   }
 
+  const renderPositionItem = (position: PositionSpec) => {
+    const dndSpec = {
+      ...(position.occupant.dnd || {}),
+      ...(position.dnd || {}),
+    };
+    return (
+      <div
+        key={position.id}
+        className={cn("w-full", positionClassName)}
+        data-cell-kind="position"
+        data-pos-id={position.id}
+        data-pos-index={position.positionIndex}
+        data-position-index={position.positionIndex}
+        data-shelf-id={position.shelfId}
+        data-tent-id={position.tentId}
+        {...getDndDataAttributes(dndSpec)}
+      >
+        {renderPosition(position)}
+      </div>
+    );
+  };
+
+  if (positions.length <= safePageSize) {
+    return (
+      <div className={cn("relative", className)}>
+        <div
+          className={cn("grid items-stretch gap-2", pageGridClassName)}
+          style={{ gridTemplateColumns: `repeat(${Math.max(1, positions.length)}, minmax(0, 1fr))` }}
+          aria-label={ariaLabel || "Shelf positions"}
+        >
+          {positions.map(renderPositionItem)}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("relative", className)}>
       {showArrows && canPrev ? (
@@ -137,28 +183,8 @@ export function PositionStrip({
               data-gridkit-page-index={pageIndex}
               data-gridkit-page-size={safePageSize}
             >
-              <div className={cn("grid grid-cols-4 items-stretch gap-2", pageGridClassName)}>
-                {page.map((position) => {
-                  const dndSpec = {
-                    ...(position.occupant.dnd || {}),
-                    ...(position.dnd || {}),
-                  };
-                  return (
-                    <div
-                      key={position.id}
-                      className={positionClassName}
-                      data-cell-kind="position"
-                      data-pos-id={position.id}
-                      data-pos-index={position.positionIndex}
-                      data-position-index={position.positionIndex}
-                      data-shelf-id={position.shelfId}
-                      data-tent-id={position.tentId}
-                      {...getDndDataAttributes(dndSpec)}
-                    >
-                      {renderPosition(position)}
-                    </div>
-                  );
-                })}
+              <div className={cn("grid items-stretch gap-2", pagedGridColsClass, pageGridClassName)}>
+                {page.map(renderPositionItem)}
               </div>
             </div>
           ))}
