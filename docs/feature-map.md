@@ -27,6 +27,15 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Recipes Auto-Increment Defaults)
+- `Completed` Recipe create defaults now auto-increment code and name from existing recipes.
+  - Initial suggestion when empty: `R0` / `Control`.
+  - Subsequent suggestions: `R1` / `Treatment 1`, `R2` / `Treatment 2`, and so on.
+  - Suggestion logic now lives in:
+    - `frontend/src/features/experiments/recipes/utils.ts` (`suggestNextRecipeDraft`)
+  - Recipes page uses this helper for initial/default and post-create suggestions:
+    - `frontend/src/features/experiments/recipes/ExperimentRecipesPageClient.tsx`
+
 ### 2026-02-19 (Step 2 Hydration Fix: Nested Button Markup)
 - `Completed` Fixed invalid nested button markup on placement Step 2 tray cards.
   - `CellChrome` now supports `interactiveElement="div"` for interactive cards that also contain child button controls.

@@ -57,3 +57,53 @@ export function buildPersistedRecipeMap<TPlant extends PlantWithRecipe<{ id: str
   }
   return nextPersisted;
 }
+
+function parseRecipeCodeIndex(code: string): number | null {
+  const match = code.trim().toUpperCase().match(/^R(\d+)$/);
+  if (!match) {
+    return null;
+  }
+  const value = Number.parseInt(match[1], 10);
+  return Number.isFinite(value) ? value : null;
+}
+
+function parseTreatmentIndex(name: string): number | null {
+  const match = name.trim().match(/^treatment\s+(\d+)$/i);
+  if (!match) {
+    return null;
+  }
+  const value = Number.parseInt(match[1], 10);
+  return Number.isFinite(value) ? value : null;
+}
+
+export function suggestNextRecipeDraft(recipes: Array<{ code: string; name: string }>): {
+  code: string;
+  name: string;
+} {
+  if (recipes.length === 0) {
+    return { code: "R0", name: "Control" };
+  }
+
+  let maxCodeIndex = -1;
+  let maxTreatmentIndex = 0;
+
+  for (const recipe of recipes) {
+    const codeIndex = parseRecipeCodeIndex(recipe.code);
+    if (codeIndex != null) {
+      maxCodeIndex = Math.max(maxCodeIndex, codeIndex);
+    }
+
+    const treatmentIndex = parseTreatmentIndex(recipe.name);
+    if (treatmentIndex != null) {
+      maxTreatmentIndex = Math.max(maxTreatmentIndex, treatmentIndex);
+    }
+  }
+
+  const nextCodeIndex = Math.max(0, maxCodeIndex + 1);
+  const nextTreatmentIndex = Math.max(1, maxTreatmentIndex + 1);
+
+  return {
+    code: `R${nextCodeIndex}`,
+    name: `Treatment ${nextTreatmentIndex}`,
+  };
+}

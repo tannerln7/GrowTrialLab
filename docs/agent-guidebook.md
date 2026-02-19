@@ -114,6 +114,9 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 
 ## Recipes page UX (per-plant assignment with tray grouping)
 - Page purpose: per-plant recipe mapping, tray grouping as a selection aid.
+- Recipe create defaults should auto-suggest sequenced values:
+  - first recipe defaults to `R0` / `Control`
+  - additional defaults increment as `R1` / `Treatment 1`, `R2` / `Treatment 2`, etc.
 - Interactions:
   - select/deselect plants
   - tray-level toggle selects all plants in a tray

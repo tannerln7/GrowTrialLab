@@ -3,7 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { unwrapList } from "@/lib/backend";
 import { api, isApiError } from "@/src/lib/api";
@@ -20,7 +20,13 @@ import {
   RecipePlantDraftPanel,
   RecipeToolsPanel,
 } from "@/src/features/experiments/recipes/components/RecipePanels";
-import { buildPersistedRecipeMap, isActivePlant, recipeLabel, sortPlantsById } from "@/src/features/experiments/recipes/utils";
+import {
+  buildPersistedRecipeMap,
+  isActivePlant,
+  recipeLabel,
+  sortPlantsById,
+  suggestNextRecipeDraft,
+} from "@/src/features/experiments/recipes/utils";
 import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
 import { PlantCell } from "@/src/lib/gridkit/components";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
@@ -103,6 +109,10 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
 
   const [persistedRecipeByPlantId, setPersistedRecipeByPlantId] = useState<Record<string, string | null>>({});
   const [draftPlantRecipe, setDraftPlantRecipe] = useState<Record<string, string | null>>({});
+  const lastSuggestedRecipeRef = useRef<{ code: string; name: string }>({
+    code: "R0",
+    name: "Control",
+  });
 
   const recipesQueryKey = queryKeys.experiment.feature(experimentId, "recipes");
   const placementQueryKey = queryKeys.experiment.feature(experimentId, "placementSummary");
@@ -133,6 +143,11 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     }
   }, [recipesQuery.data]);
 
+  const nextRecipeSuggestion = useMemo(
+    () => suggestNextRecipeDraft(recipes),
+    [recipes],
+  );
+
   const placement = placementQuery.data ?? null;
 
   useEffect(() => {
@@ -142,6 +157,21 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
       return setWithAll(Array.from(current).filter((recipeId) => validIds.has(recipeId)));
     });
   }, [recipes]);
+
+  useEffect(() => {
+    const previousSuggestion = lastSuggestedRecipeRef.current;
+    setCode((current) => {
+      const normalizedCurrent = current.trim().toUpperCase();
+      const normalizedPrevious = previousSuggestion.code.toUpperCase();
+      return !normalizedCurrent || normalizedCurrent === normalizedPrevious ? nextRecipeSuggestion.code : current;
+    });
+    setName((current) => {
+      const normalizedCurrent = current.trim().toLowerCase();
+      const normalizedPrevious = previousSuggestion.name.toLowerCase();
+      return !normalizedCurrent || normalizedCurrent === normalizedPrevious ? nextRecipeSuggestion.name : current;
+    });
+    lastSuggestedRecipeRef.current = nextRecipeSuggestion;
+  }, [nextRecipeSuggestion]);
 
   const sortedTrays = useMemo(() => {
     return [...(placement?.trays.results || [])].sort((left, right) => left.name.localeCompare(right.name));
@@ -363,11 +393,11 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
   }, [allPlantIds, draftPlantRecipe, persistedRecipeByPlantId, saveDraftMutation]);
 
   const createRecipeMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (draft: { code: string; name: string; notes: string }) =>
       api.post<{ detail?: string; id?: string }>(`/api/v1/experiments/${experimentId}/recipes`, {
-        code: code.trim().toUpperCase(),
-        name: name.trim(),
-        notes: notes.trim(),
+        code: draft.code,
+        name: draft.name,
+        notes: draft.notes,
       }),
     onMutate: () => {
       setSaving(true);
@@ -376,10 +406,15 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
       setDiagnostics(null);
       setOffline(false);
     },
-    onSuccess: async (payload) => {
+    onSuccess: async (payload, draft) => {
       setNotice("Recipe created.");
-      setCode(`R${recipes.length}`);
-      setName(`Treatment ${Math.max(1, recipes.length)}`);
+      const nextSuggestion = suggestNextRecipeDraft([
+        ...recipes,
+        { id: payload.id || "__new__", code: draft.code, name: draft.name, notes: draft.notes },
+      ]);
+      setCode(nextSuggestion.code);
+      setName(nextSuggestion.name);
+      lastSuggestedRecipeRef.current = nextSuggestion;
       setNotes("");
       await queryClient.invalidateQueries({ queryKey: recipesQueryKey });
       if (payload.id) {
@@ -400,8 +435,13 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
 
   const createRecipe = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await createRecipeMutation.mutateAsync().catch(() => null);
-  }, [createRecipeMutation]);
+    const draft = {
+      code: code.trim().toUpperCase(),
+      name: name.trim(),
+      notes: notes.trim(),
+    };
+    await createRecipeMutation.mutateAsync(draft).catch(() => null);
+  }, [code, createRecipeMutation, name, notes]);
 
   const toggleRecipeSelection = useCallback((recipeId: string) => {
     setSelectedRecipeIds((current) => toggleSet(current, recipeId));
