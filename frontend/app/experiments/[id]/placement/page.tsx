@@ -24,6 +24,7 @@ import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { CountAdjustToolbar } from "@/src/components/ui/count-adjust-toolbar";
 import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
+import { DraftChangeMarker } from "@/src/components/ui/draft-change-marker";
 import { Input } from "@/src/components/ui/input";
 import { NativeSelect } from "@/src/components/ui/native-select";
 import { Notice } from "@/src/components/ui/notice";
@@ -784,6 +785,24 @@ export default function PlacementPage() {
     return count;
   }, [draftPlantToTray, persistedPlantToTray, sortedPlantIds]);
 
+  const dirtyPlantContainerTrayIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const plantId of sortedPlantIds) {
+      const persistedTrayId = persistedPlantToTray[plantId] ?? null;
+      const draftTrayId = draftPlantToTray[plantId] ?? persistedTrayId;
+      if ((persistedTrayId || null) === (draftTrayId || null)) {
+        continue;
+      }
+      if (persistedTrayId) {
+        ids.add(persistedTrayId);
+      }
+      if (draftTrayId) {
+        ids.add(draftTrayId);
+      }
+    }
+    return ids;
+  }, [draftPlantToTray, persistedPlantToTray, sortedPlantIds]);
+
   const traySlotDraftChangeCount = useMemo(() => {
     let count = 0;
     for (const trayId of sortedTrayIds) {
@@ -794,6 +813,24 @@ export default function PlacementPage() {
       }
     }
     return count;
+  }, [draftTrayToSlot, persistedTrayToSlot, sortedTrayIds]);
+
+  const dirtySlotIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const trayId of sortedTrayIds) {
+      const persistedSlotId = persistedTrayToSlot[trayId] ?? null;
+      const draftSlotId = draftTrayToSlot[trayId] ?? persistedSlotId;
+      if ((persistedSlotId || null) === (draftSlotId || null)) {
+        continue;
+      }
+      if (persistedSlotId) {
+        ids.add(persistedSlotId);
+      }
+      if (draftSlotId) {
+        ids.add(draftSlotId);
+      }
+    }
+    return ids;
   }, [draftTrayToSlot, persistedTrayToSlot, sortedTrayIds]);
 
   const tentSlotDraftChangeCount = useMemo(() => {
@@ -1842,7 +1879,7 @@ export default function PlacementPage() {
             <Check size={12} />
           </span>
         ) : null}
-        {dirty ? <span className={styles.draftChangedDot} /> : null}
+        {dirty ? <DraftChangeMarker /> : null}
         <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
         <span className={styles.plantCellSpecies}>{plant.species_name}</span>
         <div className={[styles.plantCellMetaRow, "justify-center"].join(" ")}>
@@ -1893,7 +1930,7 @@ export default function PlacementPage() {
             <Check size={12} />
           </span>
         ) : null}
-        {dirty ? <span className={styles.draftChangedDot} /> : null}
+        {dirty ? <DraftChangeMarker /> : null}
         <strong
           className={[
             styles.trayGridCellId,
@@ -2198,6 +2235,17 @@ export default function PlacementPage() {
                   tentAllowedSpeciesDraftById[tent.tent_id] || tent.allowed_species.map((item) => item.id),
                 );
                 const tentDraft = tentDraftById[tent.tent_id] || { name: tent.name, code: tent.code };
+                const draftTentName = tentDraft.name.trim();
+                const draftTentCode = tentDraft.code.trim();
+                const tentNameDirty = draftTentName !== tent.name;
+                const tentCodeDirty = draftTentCode !== tent.code;
+                const persistedAllowedSpeciesIds = tent.allowed_species.map((item) => item.id);
+                const draftAllowedSpeciesIds =
+                  tentAllowedSpeciesDraftById[tent.tent_id] || persistedAllowedSpeciesIds;
+                const restrictionsDirty = !areStringSetsEqual(
+                  draftAllowedSpeciesIds,
+                  persistedAllowedSpeciesIds,
+                );
                 const sortedTentSlots = [...tent.slots].sort((left, right) => {
                   if (left.shelf_index !== right.shelf_index) {
                     return left.shelf_index - right.shelf_index;
@@ -2216,6 +2264,10 @@ export default function PlacementPage() {
                     slotsByShelf.set(slot.shelf_index, [slot]);
                   }
                 }
+                const persistedShelfCounts = buildPersistedShelfCounts(tent);
+                const shelvesDirty =
+                  tent.slots.length === 0 ||
+                  !areShelfCountsEqual(normalizedDraftShelfCounts, persistedShelfCounts);
                 const previewShelfSlotGroups = normalizedDraftShelfCounts.map((draftSlotCount, index) => {
                   const shelfIndex = index + 1;
                   const persistedSlots: PreviewSlot[] = (slotsByShelf.get(shelfIndex) || []).map((slot) => ({
@@ -2255,12 +2307,19 @@ export default function PlacementPage() {
                   <SectionCard
                     key={tent.tent_id}
                     title={`${tent.name}${tent.code ? ` (${tent.code})` : ""}`}
-                    className={dirtyTentIds.has(tent.tent_id) ? styles.draftChangedSurface : ""}
                     actions={dirtyTentIds.has(tent.tent_id) ? <DraftChangeChip label="Draft changes" /> : null}
                   >
                     <div className={"grid gap-3"}>
                       <div className={styles.trayControlRow}>
-                        <label className="grid gap-1 sm:w-auto sm:min-w-[11rem] sm:flex-1">
+                        <label
+                          className={[
+                            "grid gap-1 sm:w-auto sm:min-w-[11rem] sm:flex-1",
+                            tentNameDirty ? `${styles.draftChangedSurface} relative rounded-md p-1` : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {tentNameDirty ? <DraftChangeMarker /> : null}
                           <span className="text-xs text-muted-foreground">Tent Name</span>
                           <Input
                             value={tentDraft.name}
@@ -2276,7 +2335,15 @@ export default function PlacementPage() {
                             aria-label="Tent name"
                           />
                         </label>
-                        <label className="grid gap-1 sm:w-auto sm:min-w-[11rem] sm:flex-1">
+                        <label
+                          className={[
+                            "grid gap-1 sm:w-auto sm:min-w-[11rem] sm:flex-1",
+                            tentCodeDirty ? `${styles.draftChangedSurface} relative rounded-md p-1` : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {tentCodeDirty ? <DraftChangeMarker /> : null}
                           <span className="text-xs text-muted-foreground">Tent ID</span>
                           <Input
                             value={tentDraft.code}
@@ -2295,7 +2362,16 @@ export default function PlacementPage() {
                       </div>
 
                       <div className={"grid gap-2"}>
-                        <details className={["rounded-lg border border-border", styles.cellSurfaceLevel1].join(" ")}>
+                        <details
+                          className={[
+                            "rounded-lg border border-border",
+                            styles.cellSurfaceLevel1,
+                            restrictionsDirty ? `${styles.draftChangedSurface} relative` : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {restrictionsDirty ? <DraftChangeMarker /> : null}
                           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm text-foreground">
                             <span>Allowed species restrictions</span>
                             <span className={styles.recipeLegendItem}>
@@ -2340,28 +2416,44 @@ export default function PlacementPage() {
 
                       <div className={"grid gap-2"}>
                         <span className={"text-sm text-muted-foreground"}>Shelves layout</span>
-                        <CountAdjustToolbar
-                          count={shelfCounts.length}
-                          countLabel="Total shelves"
-                          onDecrement={() => removeShelf(tent.tent_id)}
-                          onIncrement={() => addShelf(tent.tent_id)}
-                          decrementDisabled={saving || placementLocked || shelfCounts.length <= 1}
-                          incrementDisabled={saving || placementLocked}
-                        />
+                        <div
+                          className={
+                            shelvesDirty
+                              ? [styles.draftChangedSurface, "relative rounded-md p-1"].join(" ")
+                              : ""
+                          }
+                        >
+                          {shelvesDirty ? <DraftChangeMarker /> : null}
+                          <CountAdjustToolbar
+                            count={shelfCounts.length}
+                            countLabel="Total shelves"
+                            onDecrement={() => removeShelf(tent.tent_id)}
+                            onIncrement={() => addShelf(tent.tent_id)}
+                            decrementDisabled={saving || placementLocked || shelfCounts.length <= 1}
+                            incrementDisabled={saving || placementLocked}
+                          />
+                        </div>
                       </div>
 
                       <div className={"grid gap-2"}>
                         <span className={"text-sm text-muted-foreground"}>Current slots</span>
                         <div className={styles.step1ShelfPreviewLane}>
-                          {previewShelfSlotGroups.map((group) => (
-                            <article
-                              key={`${tent.tent_id}-shelf-${group.shelfIndex}`}
-                              className={[
-                                styles.trayEditorCell,
-                                styles.step1ShelfPreviewCard,
-                                styles.cellSurfaceLevel2,
-                              ].join(" ")}
-                            >
+                          {previewShelfSlotGroups.map((group) => {
+                            const persistedCount = persistedShelfCounts[group.shelfIndex - 1] || 0;
+                            const shelfDirty = tent.slots.length === 0 || group.slots.length !== persistedCount;
+                            return (
+                              <article
+                                key={`${tent.tent_id}-shelf-${group.shelfIndex}`}
+                                className={[
+                                  styles.trayEditorCell,
+                                  styles.step1ShelfPreviewCard,
+                                  styles.cellSurfaceLevel2,
+                                  shelfDirty ? styles.draftChangedSurface : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ")}
+                              >
+                                {shelfDirty ? <DraftChangeMarker /> : null}
                               <div className={styles.trayHeaderRow}>
                                 <div className={styles.trayHeaderMeta}>
                                   <strong>{`Shelf ${group.shelfIndex}`}</strong>
@@ -2407,8 +2499,9 @@ export default function PlacementPage() {
                                 ))}
                                 {group.slots.length === 0 ? <span className="text-sm text-muted-foreground">No slots.</span> : null}
                               </div>
-                            </article>
-                          ))}
+                              </article>
+                            );
+                          })}
                           {previewShelfSlotGroups.length === 0 ? <span className="text-sm text-muted-foreground">No shelves configured yet.</span> : null}
                         </div>
                       </div>
@@ -2430,14 +2523,23 @@ export default function PlacementPage() {
                   ) : null
                 }
               >
-                <CountAdjustToolbar
-                  count={draftTrayCount}
-                  countLabel="Total trays"
-                  onDecrement={decrementDraftTrayCount}
-                  onIncrement={incrementDraftTrayCount}
-                  decrementDisabled={saving || placementLocked || draftTrayCount === 0}
-                  incrementDisabled={saving || placementLocked}
-                />
+                <div
+                  className={
+                    trayCountDraftChangeCount > 0
+                      ? [styles.draftChangedSurface, "relative rounded-md p-1"].join(" ")
+                      : ""
+                  }
+                >
+                  {trayCountDraftChangeCount > 0 ? <DraftChangeMarker /> : null}
+                  <CountAdjustToolbar
+                    count={draftTrayCount}
+                    countLabel="Total trays"
+                    onDecrement={decrementDraftTrayCount}
+                    onIncrement={incrementDraftTrayCount}
+                    decrementDisabled={saving || placementLocked || draftTrayCount === 0}
+                    incrementDisabled={saving || placementLocked}
+                  />
+                </div>
 
                 <div className={[styles.trayManagerGrid, styles.cellGridResponsive].join(" ")} data-cell-size="lg">
                   {sortedTrayIds.map((trayId) => {
@@ -2459,7 +2561,7 @@ export default function PlacementPage() {
                           .filter(Boolean)
                           .join(" ")}
                       >
-                        {dirtyTrayCapacityIds.has(trayId) ? <span className={styles.draftChangedDot} /> : null}
+                        {dirtyTrayCapacityIds.has(trayId) ? <DraftChangeMarker /> : null}
                         <strong className={styles.trayGridCellId}>
                           {formatTrayDisplay(tray.name, tray.tray_id)}
                         </strong>
@@ -2497,7 +2599,7 @@ export default function PlacementPage() {
                             styles.draftChangedSurface,
                           ].join(" ")}
                         >
-                          <span className={styles.draftChangedDot} />
+                          <DraftChangeMarker />
                           <strong className={styles.trayGridCellId}>New tray</strong>
                           <div className={styles.trayEditorBadgeRow}>
                             <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
@@ -2619,7 +2721,20 @@ export default function PlacementPage() {
                     const selectedInTray = selectedInTrayByTrayId[trayId] || [];
 
                     return (
-                      <article key={trayId} className={[styles.trayEditorCell, "rounded-lg border border-border", styles.cellSurfaceLevel2].join(" ")}>
+                      <article
+                        key={trayId}
+                        className={[
+                          styles.trayEditorCell,
+                          "rounded-lg border border-border",
+                          styles.cellSurfaceLevel2,
+                          dirtyPlantContainerTrayIds.has(trayId) ? styles.draftChangedSurface : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      >
+                        {dirtyPlantContainerTrayIds.has(trayId) ? (
+                          <DraftChangeMarker />
+                        ) : null}
                         <div className={styles.trayHeaderRow}>
                           <div className={styles.trayHeaderMeta}>
                             <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
@@ -2786,11 +2901,15 @@ export default function PlacementPage() {
                                       styles.slotCell,
                                       styles.slotContainerCellFrame,
                                       styles.cellSurfaceLevel1,
+                                      dirtySlotIds.has(slot.slot_id) ? styles.draftChangedSurface : "",
                                       slotSelected ? styles.plantCellSelected : "",
                                     ]
                                       .filter(Boolean)
                                       .join(" ")}
                                   >
+                                    {dirtySlotIds.has(slot.slot_id) ? (
+                                      <DraftChangeMarker />
+                                    ) : null}
                                     {slotSelected ? (
                                       <span className={styles.plantCellCheck}>
                                         <Check size={12} />

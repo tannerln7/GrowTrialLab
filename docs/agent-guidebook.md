@@ -164,6 +164,7 @@ Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce
 - Shared primitive usage conventions:
   - Use `CountAdjustToolbar` (`frontend/src/components/ui/count-adjust-toolbar.tsx`) for shared add/remove count toolbars (tent/shelf/tray manager rows).
   - Use `DraftChangeChip` (`frontend/src/components/ui/draft-change-chip.tsx`) for consistent draft-highlight labels across step cards and nav controls.
+  - Use `DraftChangeMarker` (`frontend/src/components/ui/draft-change-marker.tsx`) for the dot marker on changed cells/surfaces; combine with `experimentsStyles.draftChangedSurface` ring style.
   - Use `StepNavBar` (`frontend/src/components/ui/step-nav-bar.tsx`) for the placement-style back/save-next bar with blocker hints + draft indicators.
   - Use `TooltipIconButton` (`frontend/src/components/ui/tooltip-icon-button.tsx`) for icon-only actions that need tooltip labels.
   - Use `StepAdjustButton` (`frontend/src/components/ui/step-adjust-button.tsx`) for shared `+/-` count controls instead of route-local button styling.

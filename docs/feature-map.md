@@ -41,12 +41,14 @@ This file is the execution-focused feature map for product and engineering statu
   - Step 1 shelf preview cards now auto-size to slot-cell rows (content-fit) rather than fixed minimum shelf widths.
   - Step 1 shelf preview lane now wraps shelf cards to new rows on narrow viewports.
   - Draft highlights now use shared primitives/styles across all 4 steps (`DraftChangeChip` + shared ring/dot draft markers on changed cards/cells).
+  - Draft removal highlighting now marks affected container cells (source/destination tray/slot containers), not just moved item cells.
   - Placement apply flow now uses shared bottom navigation save+advance behavior (`Save & Next`) when pending changes exist.
   - Draft-change chip now renders in the shared nav bar instead of per-step apply rows.
   - Relevant files:
     - `frontend/app/experiments/[id]/placement/page.tsx`
     - `frontend/src/components/ui/count-adjust-toolbar.tsx`
     - `frontend/src/components/ui/draft-change-chip.tsx`
+    - `frontend/src/components/ui/draft-change-marker.tsx`
     - `frontend/src/components/ui/step-nav-bar.tsx`
     - `frontend/src/components/ui/step-adjust-button.tsx`
     - `docs/agent-guidebook.md`
