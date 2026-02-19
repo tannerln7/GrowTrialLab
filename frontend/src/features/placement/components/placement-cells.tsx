@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import type { PlantCell, TrayCell } from "@/src/features/placement/types";
 import { formatTrayDisplay } from "@/src/features/placement/utils";
 import { Badge } from "@/src/components/ui/badge";
@@ -17,17 +18,15 @@ export function PlantSelectableCell({ plant, selected, dirty, onToggle }: PlantS
   const gradeLabel = plant.grade ? `Grade ${plant.grade}` : "Grade -";
   return (
     <article
-      className={[
+      className={cn(
         styles.plantCell,
         styles.cellFrame,
         styles.cellSurfaceLevel1,
         styles.cellInteractive,
         "justify-items-center text-center",
-        dirty ? styles.draftChangedSurface : "",
-        selected ? styles.plantCellSelected : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+        dirty && styles.draftChangedSurface,
+        selected && styles.plantCellSelected,
+      )}
       onClick={() => onToggle(plant.uuid)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -47,7 +46,7 @@ export function PlantSelectableCell({ plant, selected, dirty, onToggle }: PlantS
       {dirty ? <DraftChangeMarker /> : null}
       <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
       <span className={styles.plantCellSpecies}>{plant.species_name}</span>
-      <div className={[styles.plantCellMetaRow, "justify-center"].join(" ")}>
+      <div className={cn(styles.plantCellMetaRow, "justify-center")}>
         <Badge variant={plant.grade ? "secondary" : "outline"}>{gradeLabel}</Badge>
       </div>
     </article>
@@ -71,17 +70,15 @@ export function TraySelectableCell({
 }: TraySelectableCellProps) {
   return (
     <article
-      className={[
+      className={cn(
         styles.trayGridCell,
         inSlot ? styles.cellFrameCompact : styles.cellFrame,
         styles.cellSurfaceLevel1,
         styles.cellInteractive,
-        inSlot ? styles.slotTrayCellFill : "",
-        dirty ? styles.draftChangedSurface : "",
-        selected ? styles.plantCellSelected : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+        inSlot && styles.slotTrayCellFill,
+        dirty && styles.draftChangedSurface,
+        selected && styles.plantCellSelected,
+      )}
       onClick={() => onToggle(tray.tray_id)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -100,15 +97,13 @@ export function TraySelectableCell({
       ) : null}
       {dirty ? <DraftChangeMarker /> : null}
       <strong
-        className={[styles.trayGridCellId, inSlot ? styles.trayGridCellIdInSlot : ""]
-          .filter(Boolean)
-          .join(" ")}
+        className={cn(styles.trayGridCellId, inSlot && styles.trayGridCellIdInSlot)}
       >
         {formatTrayDisplay(tray.name, tray.tray_id)}
       </strong>
       <Badge
         variant="secondary"
-        className={[styles.recipeLegendItemCompact, inSlot ? "justify-self-center" : ""].filter(Boolean).join(" ")}
+        className={cn(styles.recipeLegendItemCompact, inSlot && "justify-self-center")}
       >
         {tray.current_count}/{tray.capacity} plants
       </Badge>

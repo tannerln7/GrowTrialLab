@@ -1,6 +1,7 @@
 import { Check, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { cn } from "@/lib/utils";
 import type { SlotSummary, TentSummary } from "@/src/features/placement/types";
 import { groupSlotsByShelf } from "@/src/features/placement/utils";
 import { DraftChangeMarker } from "@/src/components/ui/draft-change-marker";
@@ -36,10 +37,10 @@ export function TentSlotBoard({
         return (
           <article
             key={tent.tent_id}
-            className={[styles.tentBoardCard, "rounded-lg border border-border", styles.cellSurfaceLevel3].join(" ")}
+            className={cn(styles.tentBoardCard, "rounded-lg border border-border", styles.cellSurfaceLevel3)}
           >
-            <div className={[styles.trayHeaderRow, "items-center"].join(" ")}>
-              <div className={[styles.trayHeaderMeta, "py-0.5"].join(" ")}>
+            <div className={cn(styles.trayHeaderRow, "items-center")}>
+              <div className={cn(styles.trayHeaderMeta, "py-0.5")}>
                 <strong className={styles.trayGridCellId}>{tent.name}</strong>
               </div>
               <div className={styles.trayHeaderActions}>
@@ -59,9 +60,9 @@ export function TentSlotBoard({
 
             <div className={styles.tentShelfRow}>
               {Array.from(slotsByShelf.entries()).map(([shelfIndex, shelfSlots]) => (
-                <article key={`${tent.tent_id}-shelf-${shelfIndex}`} className={[styles.tentShelfCard, styles.cellSurfaceLevel2].join(" ")}>
-                  <div className={[styles.trayHeaderRow, "items-center"].join(" ")}>
-                    <div className={[styles.trayHeaderMeta, "py-0.5"].join(" ")}>
+                <article key={`${tent.tent_id}-shelf-${shelfIndex}`} className={cn(styles.tentShelfCard, styles.cellSurfaceLevel2)}>
+                  <div className={cn(styles.trayHeaderRow, "items-center")}>
+                    <div className={cn(styles.trayHeaderMeta, "py-0.5")}>
                       <strong className={styles.trayGridCellId}>Shelf {shelfIndex}</strong>
                     </div>
                   </div>
@@ -113,15 +114,13 @@ function SlotCell({
   }
   return (
     <div
-      className={[
+      className={cn(
         styles.slotCell,
         styles.slotContainerCellFrame,
         styles.cellSurfaceLevel1,
-        dirty ? styles.draftChangedSurface : "",
-        slotSelected ? styles.plantCellSelected : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+        dirty && styles.draftChangedSurface,
+        slotSelected && styles.plantCellSelected,
+      )}
     >
       {dirty ? <DraftChangeMarker /> : null}
       {slotSelected ? (
@@ -132,9 +131,7 @@ function SlotCell({
       <span className={styles.slotCellLabel}>{slot.code}</span>
       <button
         type="button"
-        className={[styles.slotCellEmpty, slotSelected ? styles.slotCellEmptyActive : ""]
-          .filter(Boolean)
-          .join(" ")}
+        className={cn(styles.slotCellEmpty, slotSelected && styles.slotCellEmptyActive)}
         onClick={() => onToggleDestinationSlot(slot.slot_id)}
       >
         Empty
