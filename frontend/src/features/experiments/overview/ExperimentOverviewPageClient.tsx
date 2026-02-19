@@ -402,10 +402,20 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
     stopMutation.mutate();
   }, [stopMutation]);
 
-  function plantLink(plant: PlantOccupantSpec): string {
-    const from = encodeURIComponent(`/experiments/${experimentId}/overview?${searchParams.toString()}`);
-    return `/p/${plant.id}?from=${from}`;
-  }
+  const plantLink = useCallback(
+    (plant: PlantOccupantSpec): string => {
+      const from = encodeURIComponent(`/experiments/${experimentId}/overview?${searchParams.toString()}`);
+      return `/p/${plant.id}?from=${from}`;
+    },
+    [experimentId, searchParams],
+  );
+
+  const handleTrayPlantPress = useCallback(
+    (_plantId: string, plant: PlantOccupantSpec) => {
+      router.push(plantLink(plant));
+    },
+    [plantLink, router],
+  );
 
   function renderPlantCell(plant: PlantOccupantSpec) {
     const speciesLine = plant.subtitle || "";
@@ -550,7 +560,10 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
 
       {overviewLayoutSpec.tents.length > 0 ? (
         <SectionCard title="Tent -> Slot -> Tray -> Plants">
-          <LegacyOverviewTentLayoutAdapter spec={overviewLayoutSpec} renderPlantCell={renderPlantCell} />
+          <LegacyOverviewTentLayoutAdapter
+            spec={overviewLayoutSpec}
+            onTrayPlantPress={handleTrayPlantPress}
+          />
         </SectionCard>
       ) : null}
 

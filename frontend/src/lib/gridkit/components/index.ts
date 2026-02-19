@@ -3,5 +3,7 @@ export * from "./CellChips";
 export * from "./CellText";
 export * from "./PositionStrip";
 export * from "./cells";
+export * from "./grids";
+export * from "./overlays";
 export * from "./containers";
 export * from "./adapters";

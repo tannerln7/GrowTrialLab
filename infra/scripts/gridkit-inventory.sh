@@ -58,6 +58,8 @@ report_bucket "position_strip_usages" "<PositionStrip\\b"
 report_bucket "position_strip_with_renderers_usages" "<PositionStripWithRenderers\\b"
 report_bucket "renderer_registry_usages" "defaultPositionRendererMap|createPositionRendererMap|PositionStripWithRenderers"
 report_bucket "canonical_leaf_cell_usages" "<SlotCell\\b|<TrayCell\\b|<PlantCell\\b"
+report_bucket "tray_folder_overlay_usages" "<TrayFolderOverlay\\b|<TrayCellExpandable\\b|<TrayFolderProvider\\b"
+report_bucket "tray_folder_ctx_usages" "trayFolder:\\s*\\{"
 report_bucket \
   "remaining_direct_renderPosition_lambdas" \
   "renderPosition=\\{" \
@@ -85,3 +87,7 @@ report_bucket \
   "remaining_bespoke_leaf_cell_heuristics" \
   "<CellChrome\\b|renderPlantCell\\(|renderTrayCell\\(|PlantSelectableCellImpl|TraySelectableCellImpl" \
   "frontend/src/lib/gridkit/components/cells/|frontend/src/lib/gridkit/renderers/"
+report_bucket \
+  "remaining_bespoke_tray_overlay_heuristics" \
+  "<Popover\\b|<Dialog\\b|createPortal|openTray|expandedTray|activeTray|trayFolder\\s*[:=]" \
+  "frontend/src/lib/gridkit/components/overlays/TrayFolderOverlay.tsx|frontend/src/lib/gridkit/components/cells/TrayCellExpandable.tsx|frontend/src/lib/gridkit/state/trayFolderManager.tsx|frontend/src/lib/gridkit/state/index.ts|frontend/src/lib/gridkit/renderers/types.ts|frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx|frontend/src/lib/gridkit/components/overlays/index.ts|frontend/src/components/ui/popover.tsx|frontend/src/components/ui/dialog.tsx|frontend/src/lib/gridkit/presets.ts"

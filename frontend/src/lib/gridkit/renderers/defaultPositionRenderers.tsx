@@ -1,6 +1,7 @@
 import { PlantCell } from "@/src/lib/gridkit/components/cells/PlantCell";
 import { SlotCell } from "@/src/lib/gridkit/components/cells/SlotCell";
 import { TrayCell } from "@/src/lib/gridkit/components/cells/TrayCell";
+import { TrayCellExpandable } from "@/src/lib/gridkit/components/cells/TrayCellExpandable";
 import type { PositionRendererMap } from "./types";
 
 export const defaultPositionRendererMap: PositionRendererMap = {
@@ -25,6 +26,23 @@ export const defaultPositionRendererMap: PositionRendererMap = {
     if (occupant.kind !== "tray") {
       return null;
     }
+    const trayFolderEnabled = Boolean(ctx.trayFolder?.enabled);
+    const trayPlants = trayFolderEnabled
+      ? ctx.trayFolder?.getPlantsForTray(occupant.trayId, position) || []
+      : [];
+
+    if (trayFolderEnabled && trayPlants.length > 0) {
+      return (
+        <TrayCellExpandable
+          tray={occupant}
+          position={position}
+          plants={trayPlants}
+          onTrayPress={ctx.actions?.onTrayPress}
+          onPlantPress={ctx.trayFolder?.onPlantPress}
+        />
+      );
+    }
+
     return (
       <TrayCell
         trayId={occupant.trayId}
