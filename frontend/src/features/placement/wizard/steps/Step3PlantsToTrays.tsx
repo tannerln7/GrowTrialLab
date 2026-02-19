@@ -1,0 +1,188 @@
+import { CheckSquare, Layers, MoveRight, Trash2, X } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import { draftChipLabelForStep, formatTrayDisplay } from "@/src/features/placement/utils";
+import type { Step3Actions, Step3Model } from "@/src/features/placement/wizard/types";
+import { PlantSelectableCell } from "@/src/features/placement/components/placement-cells";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
+import { DraftChangeMarker } from "@/src/components/ui/draft-change-marker";
+import { NativeSelect } from "@/src/components/ui/native-select";
+import SectionCard from "@/src/components/ui/SectionCard";
+import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
+
+import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+
+type Step3PlantsToTraysProps = {
+  model: Step3Model;
+  actions: Step3Actions;
+};
+
+export function Step3PlantsToTrays({ model, actions }: Step3PlantsToTraysProps) {
+  return (
+    <div className="grid gap-3">
+      <SectionCard
+        title="Plants -> Trays (Draft)"
+        actions={
+          model.placementDraftChangeCount > 0 ? (
+            <DraftChangeChip label={draftChipLabelForStep(3, model.placementDraftChangeCount)} />
+          ) : null
+        }
+      >
+        <div className={styles.placementToolbar}>
+          <NativeSelect
+            className={styles.toolbarInlineSelect}
+            value={model.destinationTrayId}
+            onChange={(event) => actions.setDestinationTrayId(event.target.value)}
+            aria-label="Destination tray"
+          >
+            <option value="">Select destination tray</option>
+            {model.sortedTrayIds.map((trayId) => {
+              const tray = model.trayById.get(trayId);
+              if (!tray) {
+                return null;
+              }
+              return (
+                <option key={trayId} value={trayId}>
+                  {formatTrayDisplay(tray.name, tray.tray_id)} ({model.draftPlantCountByTray[trayId] || 0}/{tray.capacity})
+                </option>
+              );
+            })}
+          </NativeSelect>
+          <div className={cn(styles.toolbarActionsCompact, "flex flex-wrap items-center gap-2")}>
+            <TooltipIconButton
+              label="Select all unplaced plants"
+              icon={<CheckSquare size={16} />}
+              onClick={actions.selectAllPlantsInMainGrid}
+              disabled={model.mainGridPlantIds.length === 0}
+            />
+            <TooltipIconButton
+              label="Select same species"
+              icon={<Layers size={16} />}
+              onClick={actions.selectSameSpeciesInMainGrid}
+              disabled={model.sameSpeciesDisabled}
+            />
+            <TooltipIconButton
+              label="Clear plant selection"
+              icon={<X size={16} />}
+              onClick={actions.clearPlantSelection}
+              disabled={model.selectedPlantIds.size === 0}
+            />
+            <Button
+              type="button"
+              disabled={model.locked || !model.destinationTrayId || model.selectedInMainGrid.length === 0}
+              onClick={actions.stageMovePlantsToTray}
+            >
+              <MoveRight size={16} />
+              Move selected
+            </Button>
+          </div>
+        </div>
+
+        <div className={cn(styles.toolbarSummaryRow, "flex flex-wrap items-center gap-2")}>
+          <span className="text-sm text-muted-foreground">Unplaced active plants: {model.mainGridPlantIds.length}</span>
+          <span className="text-sm text-muted-foreground">Selected in main grid: {model.selectedInMainGrid.length}</span>
+          {model.sortedTrayIds.length === 0 ? <Badge variant="secondary">Create at least one tray.</Badge> : null}
+        </div>
+
+        {model.diagnostics?.reason_counts ? (
+          <div className="grid gap-2">
+            <span>Move diagnostics</span>
+            <strong>{Object.entries(model.diagnostics.reason_counts).map(([key, value]) => `${key}: ${value}`).join(" · ")}</strong>
+            {model.diagnostics.unplaceable_plants?.slice(0, 8).map((plant) => (
+              <span key={`${plant.plant_id}-${plant.reason}`}>{`${plant.plant_id || "(pending)"} · ${plant.species_name} · ${plant.reason}`}</span>
+            ))}
+          </div>
+        ) : null}
+
+        <div className={cn(styles.plantCellGrid, styles.cellGridResponsive)} data-cell-size="sm">
+          {model.mainGridPlantIds.map((plantId) => {
+            const plant = model.plantById.get(plantId);
+            if (!plant) {
+              return null;
+            }
+            return (
+              <PlantSelectableCell
+                key={plant.uuid}
+                plant={plant}
+                selected={model.selectedPlantIds.has(plantId)}
+                dirty={
+                  (model.persistedPlantToTray[plantId] ?? null) !==
+                  (model.draftPlantToTray[plantId] ?? model.persistedPlantToTray[plantId] ?? null)
+                }
+                onToggle={actions.togglePlantSelection}
+              />
+            );
+          })}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Tray Containers">
+        <div className={cn(styles.trayManagerGrid, styles.cellGridResponsive)} data-cell-size="lg">
+          {model.sortedTrayIds.map((trayId) => {
+            const tray = model.trayById.get(trayId);
+            if (!tray) {
+              return null;
+            }
+            const trayPlantIds = model.trayPlantIdsByTray[trayId] || [];
+            const selectedInTray = model.selectedInTrayByTrayId[trayId] || [];
+
+            return (
+              <article
+                key={trayId}
+                className={cn(
+                  styles.trayEditorCell,
+                  "rounded-lg border border-border",
+                  styles.cellSurfaceLevel2,
+                  model.dirtyPlantContainerTrayIds.has(trayId) && styles.draftChangedSurface,
+                )}
+              >
+                {model.dirtyPlantContainerTrayIds.has(trayId) ? <DraftChangeMarker /> : null}
+                <div className={styles.trayHeaderRow}>
+                  <div className={styles.trayHeaderMeta}>
+                    <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
+                    <span className={styles.recipeLegendItemCompact}>
+                      {(model.draftPlantCountByTray[trayId] || 0)}/{tray.capacity}
+                    </span>
+                  </div>
+                  <div className={styles.trayHeaderActions}>
+                    {selectedInTray.length > 0 ? (
+                      <TooltipIconButton
+                        label="Return selected plants to unplaced"
+                        icon={<Trash2 size={16} />}
+                        onClick={() => actions.stageRemovePlantsFromTray(trayId)}
+                        variant="destructive"
+                      />
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
+                  {trayPlantIds.map((plantId) => {
+                    const plant = model.plantById.get(plantId);
+                    if (!plant) {
+                      return null;
+                    }
+                    return (
+                      <PlantSelectableCell
+                        key={plant.uuid}
+                        plant={plant}
+                        selected={model.selectedPlantIds.has(plantId)}
+                        dirty={
+                          (model.persistedPlantToTray[plantId] ?? null) !==
+                          (model.draftPlantToTray[plantId] ?? model.persistedPlantToTray[plantId] ?? null)
+                        }
+                        onToggle={actions.togglePlantSelection}
+                      />
+                    );
+                  })}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
