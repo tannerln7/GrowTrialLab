@@ -10,7 +10,7 @@ import { createPositionRendererMap, PositionStripWithRenderers, type PositionRen
 import { SlotCell } from "../cells";
 import { ShelfCard, ShelfStack, TentCard, TentGrid } from "../containers";
 
-type LegacyPlacementTentLayoutAdapterProps = {
+type PlacementTentLayoutBaseProps = {
   spec: TentLayoutSpec;
   onReturnSelectedFromTent: (tentId: string) => void;
   onToggleDestinationSlot: (slotId: string) => void;
@@ -28,13 +28,14 @@ function readTentMeta(tent: TentSpec): { selectedTrayIds: string[]; slotCount: n
   return { selectedTrayIds, slotCount };
 }
 
-// Temporary bridge adapter: spec -> current placement board markup.
-export function LegacyPlacementTentLayoutAdapter({
+export type PlacementTentLayoutProps = PlacementTentLayoutBaseProps;
+
+export function PlacementTentLayout({
   spec,
   onReturnSelectedFromTent,
   onToggleDestinationSlot,
   renderTrayCell,
-}: LegacyPlacementTentLayoutAdapterProps) {
+}: PlacementTentLayoutProps) {
   const placementRenderers: PositionRendererMap = useMemo(
     () =>
       createPositionRendererMap({

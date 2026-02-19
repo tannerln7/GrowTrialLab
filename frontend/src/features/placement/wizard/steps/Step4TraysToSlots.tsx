@@ -12,7 +12,7 @@ import { NativeSelect } from "@/src/components/ui/native-select";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
 import { buildTentLayoutSpecFromPlacementStep4 } from "@/src/lib/gridkit/builders";
-import { LegacyPlacementTentLayoutAdapter } from "@/src/lib/gridkit/components";
+import { PlacementTentLayout } from "@/src/lib/gridkit/components";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -134,7 +134,7 @@ function Step4TraysToSlotsImpl({ model, actions }: Step4TraysToSlotsProps) {
         </div>
       </SectionCard>
 
-      <LegacyPlacementTentLayoutAdapter
+      <PlacementTentLayout
         spec={tentLayoutSpec}
         onReturnSelectedFromTent={actions.stageRemoveTraysFromTent}
         onToggleDestinationSlot={actions.toggleDestinationSlot}

@@ -8,16 +8,17 @@ import { createPositionRendererMap, PositionStripWithRenderers, type PositionRen
 import { SlotCell } from "../cells";
 import { ShelfCard, ShelfStack } from "../containers";
 
-type LegacyPlacementShelfPreviewAdapterProps = {
+type PlacementShelfPreviewBaseProps = {
   tentSpec: TentSpec;
   onAdjustShelfSlotCount: (tentId: string, shelfIndex: number, delta: number) => void;
 };
 
-// Temporary bridge adapter: step1 shelf spec -> current preview card markup.
-export function LegacyPlacementShelfPreviewAdapter({
+export type PlacementShelfPreviewProps = PlacementShelfPreviewBaseProps;
+
+export function PlacementShelfPreview({
   tentSpec,
   onAdjustShelfSlotCount,
-}: LegacyPlacementShelfPreviewAdapterProps) {
+}: PlacementShelfPreviewProps) {
   const previewRenderers: PositionRendererMap = useMemo(
     () =>
       createPositionRendererMap({

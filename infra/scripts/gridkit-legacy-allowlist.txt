@@ -1,6 +1,2 @@
-# Paths allowed to keep legacy-grid patterns temporarily.
-# Shrink this list as GridKit migrations land in later phases.
-frontend/src/components/ui/experiments-styles.ts
-frontend/src/features/placement/components/tent-slot-board.tsx
-frontend/src/features/placement/wizard/steps/Step1Tents.tsx
-frontend/src/features/placement/wizard/steps/Step4TraysToSlots.tsx
+# Phase 8: legacy allowlist retired.
+# Keep this file empty unless a temporary exception is explicitly approved.

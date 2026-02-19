@@ -10,7 +10,7 @@ import { DraftChangeMarker } from "@/src/components/ui/draft-change-marker";
 import { Input } from "@/src/components/ui/input";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { buildTentLayoutSpecFromPlacementStep1 } from "@/src/lib/gridkit/builders";
-import { LegacyPlacementShelfPreviewAdapter, TentCard, TentGrid } from "@/src/lib/gridkit/components";
+import { PlacementShelfPreview, TentCard, TentGrid } from "@/src/lib/gridkit/components";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -167,7 +167,7 @@ export function Step1Tents({ model, actions }: Step1TentsProps) {
                 <div className="grid gap-2">
                   <span className="text-sm text-muted-foreground">Current slots</span>
                   {tentSpec ? (
-                    <LegacyPlacementShelfPreviewAdapter
+                    <PlacementShelfPreview
                       tentSpec={tentSpec}
                       onAdjustShelfSlotCount={actions.adjustShelfSlotCount}
                     />

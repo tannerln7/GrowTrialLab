@@ -17,7 +17,7 @@ function readTrayCount(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-type LegacyOverviewTentLayoutAdapterProps = {
+type OverviewTentLayoutBaseProps = {
   spec: TentLayoutSpec;
   onTrayPlantPress?: (
     plantId: string,
@@ -26,11 +26,12 @@ type LegacyOverviewTentLayoutAdapterProps = {
   ) => void;
 };
 
-// Temporary bridge adapter: overview tent layout spec -> current board markup.
-export function LegacyOverviewTentLayoutAdapter({
+export type OverviewTentLayoutProps = OverviewTentLayoutBaseProps;
+
+export function OverviewTentLayout({
   spec,
   onTrayPlantPress,
-}: LegacyOverviewTentLayoutAdapterProps) {
+}: OverviewTentLayoutProps) {
   const overviewRenderCtx: GridRenderContext = useMemo(
     () => ({
       trayFolder: {

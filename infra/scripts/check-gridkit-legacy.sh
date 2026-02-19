@@ -5,238 +5,142 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 TARGET_DIR="frontend/src"
-ALLOWLIST_FILE="${ALLOWLIST_FILE:-infra/scripts/gridkit-legacy-allowlist.txt}"
-MODE="${1:---report-only}"
+MODE="${1:---enforce}"
 TOP_N="${TOP_N:-20}"
-LEGACY_PATTERN="${LEGACY_PATTERN:-TentSlotBoard|tent-slot-board|overviewTentShelfStack|step1ShelfPreviewSlotGrid|tentShelfSlotGrid|slotGridInline}"
-BUILDER_PATTERN="${BUILDER_PATTERN:-buildTentLayoutSpecFrom[A-Za-z0-9_]*\\(}"
-MAPPING_PATTERN="${MAPPING_PATTERN:-groupSlotsByShelf|buildStep1ShelfPreviewGroups|slotsByShelf\\s*=\\s*new Map|slotByIndex\\s*=\\s*new Map|tentMap\\s*=\\s*new Map}"
-CHIP_PATTERN="${CHIP_PATTERN:-DraftChangeMarker|plantCellCheck|plantCellDirtyDot|slotPlacedChip|absolute[^\\n]*(top|bottom|left|right).*text-xs}"
-CELL_SHELL_PATTERN="${CELL_SHELL_PATTERN:-styles\\.cellFrame|styles\\.cellInteractive|styles\\.cellSurfaceLevel[0-9]|rounded-lg border border-border}"
-CONTAINER_PATTERN="${CONTAINER_PATTERN:-<TentGrid\\b|<TentCard\\b|<ShelfStack\\b|<ShelfCard\\b}"
-POSITION_STRIP_PATTERN="${POSITION_STRIP_PATTERN:-<PositionStrip\\b}"
-POSITION_STRIP_WITH_RENDERERS_PATTERN="${POSITION_STRIP_WITH_RENDERERS_PATTERN:-<PositionStripWithRenderers\\b}"
-RENDERER_REGISTRY_PATTERN="${RENDERER_REGISTRY_PATTERN:-defaultPositionRendererMap|createPositionRendererMap|PositionStripWithRenderers}"
-CANONICAL_LEAF_PATTERN="${CANONICAL_LEAF_PATTERN:-<SlotCell\\b|<TrayCell\\b|<PlantCell\\b}"
-DIRECT_RENDER_POSITION_PATTERN="${DIRECT_RENDER_POSITION_PATTERN:-renderPosition=\\{}"
-LEAF_CELL_PATTERN="${LEAF_CELL_PATTERN:-<CellChrome\\b|renderPlantCell\\(|renderTrayCell\\(|PlantSelectableCellImpl|TraySelectableCellImpl}"
-TRAY_FOLDER_PATTERN="${TRAY_FOLDER_PATTERN:-<TrayFolderOverlay\\b|<TrayCellExpandable\\b|<TrayFolderProvider\\b}"
-TRAY_FOLDER_CTX_PATTERN="${TRAY_FOLDER_CTX_PATTERN:-trayFolder:\\s*\\{}"
-BESPOKE_TRAY_OVERLAY_PATTERN="${BESPOKE_TRAY_OVERLAY_PATTERN:-<Popover\\b|<Dialog\\b|createPortal|openTray|expandedTray|activeTray|trayFolder\\s*[:=]}"
-LEGACY_SHELF_STRIP_PATTERN="${LEGACY_SHELF_STRIP_PATTERN:-styles\\.overviewTentShelfStack|styles\\.overviewTentSlotGrid|styles\\.overviewShelfSlotGrid|styles\\.step1ShelfPreviewSlotGrid|styles\\.tentShelfSlotGrid|scrollLeft|scrollTo\\(|wheel}"
-TENT_SHELF_WRAPPER_PATTERN="${TENT_SHELF_WRAPPER_PATTERN:-styles\\.overviewTentBoardGrid|styles\\.overviewTentBoardCard|styles\\.overviewTentShelfStack|styles\\.overviewShelfGroup|styles\\.tentBoardGrid|styles\\.tentBoardCard|styles\\.tentShelfRow|styles\\.tentShelfCard|styles\\.step1ShelfPreviewLane|styles\\.step1ShelfPreviewCard|\\[grid-template-columns:repeat\\(auto-fit,minmax\\(min\\(100%,28rem\\),1fr\\)\\)\\]}"
-VIRTUAL_PATTERN="${VIRTUAL_PATTERN:-<VirtualList\\b|<VirtualGrid\\b}"
-SCROLL_PATTERN="${SCROLL_PATTERN:-overflow-y-auto|overflow-y-scroll|max-h-\\[}"
-MAP_LOOP_PATTERN="${MAP_LOOP_PATTERN:-\\.map\\(}"
 
 if [[ "$MODE" != "--report-only" && "$MODE" != "--enforce" ]]; then
-  echo "[gridkit-legacy-guard] Usage: $0 [--report-only|--enforce]"
+  echo "[gridkit-guard] Usage: $0 [--enforce|--report-only]"
   exit 2
 fi
 
-raw_matches="$(mktemp)"
-violations="$(mktemp)"
-chip_tmp="$(mktemp)"
-shell_tmp="$(mktemp)"
-wrapper_tmp="$(mktemp)"
-legacy_strip_tmp="$(mktemp)"
-leaf_tmp="$(mktemp)"
-tray_overlay_tmp="$(mktemp)"
-scroll_files_tmp="$(mktemp)"
-map_files_tmp="$(mktemp)"
-scroll_map_tmp="$(mktemp)"
-scroll_map_offender_tmp="$(mktemp)"
-trap 'rm -f "$raw_matches" "$violations" "$chip_tmp" "$shell_tmp" "$wrapper_tmp" "$legacy_strip_tmp" "$leaf_tmp" "$tray_overlay_tmp" "$scroll_files_tmp" "$map_files_tmp" "$scroll_map_tmp" "$scroll_map_offender_tmp"' EXIT
+LEGACY_ADAPTER_PATTERN="${LEGACY_ADAPTER_PATTERN:-Legacy[A-Za-z0-9_]+|components/adapters|TentSlotBoard|tent-slot-board}"
+LEGACY_SHELF_STRIP_PATTERN="${LEGACY_SHELF_STRIP_PATTERN:-styles\\.overviewTentShelfStack|styles\\.overviewTentSlotGrid|styles\\.overviewShelfSlotGrid|styles\\.step1ShelfPreviewSlotGrid|styles\\.tentShelfSlotGrid|scrollLeft|scrollTo\\(|\\bwheel\\b}"
+DIRECT_RENDER_POSITION_PATTERN="${DIRECT_RENDER_POSITION_PATTERN:-renderPosition=\\{}"
+BESPOKE_TRAY_OVERLAY_PATTERN="${BESPOKE_TRAY_OVERLAY_PATTERN:-openTray|expandedTray|trayOverlay|trayFolderOpen|setOpenTray|setExpandedTray}"
+SCROLL_PATTERN="${SCROLL_PATTERN:-overflow-y-auto|overflow-y-scroll|max-h-\\[}"
+MAP_LOOP_PATTERN="${MAP_LOOP_PATTERN:-\\.map\\(}"
+VIRTUAL_PATTERN="${VIRTUAL_PATTERN:-<VirtualList\\b|<VirtualGrid\\b}"
+LAYOUT_USAGE_PATTERN="${LAYOUT_USAGE_PATTERN:-<OverviewTentLayout\\b|<PlacementTentLayout\\b|<PlacementShelfPreview\\b}"
 
-rg -n -S "$LEGACY_PATTERN" "$TARGET_DIR" >"$raw_matches" || true
+FAILURES=0
 
-declare -a allowlist_entries=()
-if [[ -f "$ALLOWLIST_FILE" ]]; then
-  while IFS= read -r line; do
-    [[ -z "$line" || "$line" == \#* ]] && continue
-    allowlist_entries+=("$line")
-  done <"$ALLOWLIST_FILE"
-fi
-
-is_allowlisted() {
-  local file_path="$1"
-  for allowed in "${allowlist_entries[@]}"; do
-    if [[ "$file_path" == "$allowed" ]]; then
-      return 0
-    fi
-  done
-  return 1
+print_matches() {
+  local label="$1"
+  local file_path="$2"
+  if [[ ! -s "$file_path" ]]; then
+    return
+  fi
+  echo "[gridkit-guard] $label offenders (top ${TOP_N}):"
+  head -n "$TOP_N" "$file_path" | sed 's/^/  /'
 }
 
-while IFS= read -r match_line; do
-  [[ -z "$match_line" ]] && continue
-  file_path="${match_line%%:*}"
-  if ! is_allowlisted "$file_path"; then
-    printf '%s\n' "$match_line" >>"$violations"
+run_check() {
+  local label="$1"
+  local pattern="$2"
+  local exclude_pattern="${3:-}"
+  local tmp_raw
+  local tmp_filtered
+  tmp_raw="$(mktemp)"
+  tmp_filtered="$(mktemp)"
+
+  rg -n -S "$pattern" "$TARGET_DIR" >"$tmp_raw" || true
+  cp "$tmp_raw" "$tmp_filtered"
+
+  if [[ -n "$exclude_pattern" ]]; then
+    grep -E -v "$exclude_pattern" "$tmp_raw" >"$tmp_filtered" || true
   fi
-done <"$raw_matches"
 
-total_matches="$(wc -l <"$raw_matches" | tr -d ' ')"
-total_files="$(
-  if [[ -s "$raw_matches" ]]; then
-    cut -d: -f1 "$raw_matches" | sort -u | wc -l | tr -d ' '
-  else
-    echo "0"
+  local count
+  count="$(wc -l <"$tmp_filtered" | tr -d ' ')"
+  echo "[gridkit-guard] ${label}=${count}"
+
+  if [[ "$count" -gt 0 ]]; then
+    print_matches "$label" "$tmp_filtered"
+    if [[ "$MODE" == "--enforce" ]]; then
+      FAILURES=$((FAILURES + 1))
+    fi
   fi
-)"
-violation_matches="$(wc -l <"$violations" | tr -d ' ')"
-violation_files="$(
-  if [[ -s "$violations" ]]; then
-    cut -d: -f1 "$violations" | sort -u | wc -l | tr -d ' '
-  else
-    echo "0"
+
+  rm -f "$tmp_raw" "$tmp_filtered"
+}
+
+run_scroll_map_check() {
+  local label="$1"
+  local scroll_tmp
+  local map_tmp
+  local both_tmp
+  local offenders_tmp
+  scroll_tmp="$(mktemp)"
+  map_tmp="$(mktemp)"
+  both_tmp="$(mktemp)"
+  offenders_tmp="$(mktemp)"
+
+  rg -l -S "$SCROLL_PATTERN" "$TARGET_DIR" >"$scroll_tmp" || true
+  rg -l -S "$MAP_LOOP_PATTERN" "$TARGET_DIR" >"$map_tmp" || true
+  comm -12 <(sort "$scroll_tmp") <(sort "$map_tmp") >"$both_tmp" || true
+
+  while IFS= read -r file_path; do
+    [[ -z "$file_path" ]] && continue
+    [[ "$file_path" == *"frontend/src/lib/gridkit/components/virtual/"* ]] && continue
+    if rg -q -S "$VIRTUAL_PATTERN" "$file_path"; then
+      continue
+    fi
+    printf '%s\n' "$file_path" >>"$offenders_tmp"
+  done <"$both_tmp"
+
+  local count
+  count="$(wc -l <"$offenders_tmp" | tr -d ' ')"
+  echo "[gridkit-guard] ${label}=${count}"
+
+  if [[ "$count" -gt 0 ]]; then
+    echo "[gridkit-guard] ${label} offenders (top ${TOP_N}):"
+    head -n "$TOP_N" "$offenders_tmp" | sed 's/^/  /'
+    if [[ "$MODE" == "--enforce" ]]; then
+      FAILURES=$((FAILURES + 1))
+    fi
   fi
-)"
 
-echo "[gridkit-legacy-guard] mode=$MODE pattern=$LEGACY_PATTERN"
-echo "[gridkit-legacy-guard] allowlist_file=$ALLOWLIST_FILE entries=${#allowlist_entries[@]}"
-echo "[gridkit-legacy-guard] matches_total=$total_matches files_total=$total_files"
-echo "[gridkit-legacy-guard] matches_non_allowlisted=$violation_matches files_non_allowlisted=$violation_files"
-builder_match_count="$( (rg -n -S "$BUILDER_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
-mapping_match_count="$( (rg -n -S "$MAPPING_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
-cellchrome_count="$( (rg -n -S "<CellChrome\\b" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
-cellchips_count="$( (rg -n -S "<CellChips\\b" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
-container_count="$( (rg -n -S "$CONTAINER_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
-position_strip_count="$( (rg -n -S "$POSITION_STRIP_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
-position_strip_with_renderers_count="$( (rg -n -S "$POSITION_STRIP_WITH_RENDERERS_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
-renderer_registry_count="$( (rg -n -S "$RENDERER_REGISTRY_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
-canonical_leaf_count="$( (rg -n -S "$CANONICAL_LEAF_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
-direct_render_position_count="$(
-  (
-    (rg -n -S "$DIRECT_RENDER_POSITION_PATTERN" "$TARGET_DIR" || true) | grep -E -v "frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx" || true
-  ) | wc -l | tr -d ' '
-)"
-leaf_cell_match_count="$(
-  (
-    (rg -n -S "$LEAF_CELL_PATTERN" "$TARGET_DIR" || true) | grep -E -v "frontend/src/lib/gridkit/components/cells/|frontend/src/lib/gridkit/renderers/" || true
-  ) | wc -l | tr -d ' '
-)"
-tray_folder_usage_count="$( (rg -n -S "$TRAY_FOLDER_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
-tray_folder_ctx_usage_count="$( (rg -n -S "$TRAY_FOLDER_CTX_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
-virtual_usage_count="$( (rg -n -S "$VIRTUAL_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
-bespoke_tray_overlay_count="$(
-  (
-    (rg -n -S "$BESPOKE_TRAY_OVERLAY_PATTERN" "$TARGET_DIR" || true) \
-      | grep -E -v "frontend/src/lib/gridkit/components/overlays/TrayFolderOverlay.tsx|frontend/src/lib/gridkit/components/cells/TrayCellExpandable.tsx|frontend/src/lib/gridkit/state/trayFolderManager.tsx|frontend/src/lib/gridkit/state/index.ts|frontend/src/lib/gridkit/renderers/types.ts|frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx|frontend/src/lib/gridkit/components/overlays/index.ts|frontend/src/components/ui/popover.tsx|frontend/src/components/ui/dialog.tsx|frontend/src/lib/gridkit/presets.ts" || true
-  ) | wc -l | tr -d ' '
-)"
-chip_match_count="$(
-  (
-    (rg -n -S "$CHIP_PATTERN" "$TARGET_DIR" || true) | grep -E -v "frontend/src/lib/gridkit/components/CellChips.tsx" || true
-  ) | wc -l | tr -d ' '
-)"
-cell_shell_match_count="$(
-  (
-    (rg -n -S "$CELL_SHELL_PATTERN" "$TARGET_DIR" || true) | grep -E -v "frontend/src/lib/gridkit/components/CellChrome.tsx" || true
-  ) | wc -l | tr -d ' '
-)"
-tent_shelf_wrapper_match_count="$(
-  (
-    (rg -n -S "$TENT_SHELF_WRAPPER_PATTERN" "$TARGET_DIR" || true) | grep -E -v "frontend/src/components/ui/experiments-styles.ts" || true
-  ) | wc -l | tr -d ' '
-)"
-legacy_shelf_strip_match_count="$(
-  (
-    (rg -n -S "$LEGACY_SHELF_STRIP_PATTERN" "$TARGET_DIR" || true) | grep -E -v "frontend/src/lib/gridkit/components/PositionStrip.tsx|frontend/src/components/ui/experiments-styles.ts" || true
-  ) | wc -l | tr -d ' '
-)"
-rg -l -S "$SCROLL_PATTERN" "$TARGET_DIR" >"$scroll_files_tmp" || true
-rg -l -S "$MAP_LOOP_PATTERN" "$TARGET_DIR" >"$map_files_tmp" || true
-comm -12 <(sort "$scroll_files_tmp") <(sort "$map_files_tmp") >"$scroll_map_tmp" || true
-while IFS= read -r file_path; do
-  [[ -z "$file_path" ]] && continue
-  if [[ "$file_path" == *"frontend/src/lib/gridkit/components/virtual/"* ]]; then
-    continue
+  rm -f "$scroll_tmp" "$map_tmp" "$both_tmp" "$offenders_tmp"
+}
+
+usage_count() {
+  local label="$1"
+  local pattern="$2"
+  local count
+  count="$( (rg -n -S "$pattern" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
+  echo "[gridkit-guard] ${label}=${count}"
+  if [[ "$MODE" == "--enforce" && "$count" -eq 0 ]]; then
+    echo "[gridkit-guard] ${label} expected at least one usage"
+    FAILURES=$((FAILURES + 1))
   fi
-  if rg -q -S "$VIRTUAL_PATTERN" "$file_path"; then
-    continue
-  fi
-  printf '%s\n' "$file_path" >>"$scroll_map_offender_tmp"
-done <"$scroll_map_tmp"
-remaining_large_map_scroll_count="$(wc -l <"$scroll_map_offender_tmp" | tr -d ' ')"
-echo "[gridkit-legacy-guard] builder_callsites=$builder_match_count"
-echo "[gridkit-legacy-guard] remaining_mapping_heuristics=$mapping_match_count"
-echo "[gridkit-legacy-guard] cellchrome_usages=$cellchrome_count"
-echo "[gridkit-legacy-guard] cellchips_usages=$cellchips_count"
-echo "[gridkit-legacy-guard] gridkit_container_callsites=$container_count"
-echo "[gridkit-legacy-guard] position_strip_usages=$position_strip_count"
-echo "[gridkit-legacy-guard] position_strip_with_renderers_usages=$position_strip_with_renderers_count"
-echo "[gridkit-legacy-guard] renderer_registry_usages=$renderer_registry_count"
-echo "[gridkit-legacy-guard] canonical_leaf_cell_usages=$canonical_leaf_count"
-echo "[gridkit-legacy-guard] tray_folder_overlay_usages=$tray_folder_usage_count"
-echo "[gridkit-legacy-guard] tray_folder_ctx_usages=$tray_folder_ctx_usage_count"
-echo "[gridkit-legacy-guard] virtual_list_grid_usages=$virtual_usage_count"
-echo "[gridkit-legacy-guard] remaining_large_map_loops_in_scroll_containers=$remaining_large_map_scroll_count"
-echo "[gridkit-legacy-guard] remaining_direct_renderPosition_lambdas=$direct_render_position_count"
-echo "[gridkit-legacy-guard] remaining_bespoke_leaf_cell_heuristics=$leaf_cell_match_count"
-echo "[gridkit-legacy-guard] remaining_bespoke_tray_overlay_heuristics=$bespoke_tray_overlay_count"
-echo "[gridkit-legacy-guard] remaining_bespoke_tent_shelf_wrappers=$tent_shelf_wrapper_match_count"
-echo "[gridkit-legacy-guard] remaining_legacy_shelf_strip_patterns=$legacy_shelf_strip_match_count"
-echo "[gridkit-legacy-guard] remaining_bespoke_chip_overlays=$chip_match_count"
-echo "[gridkit-legacy-guard] remaining_bespoke_cell_shells=$cell_shell_match_count"
+}
 
-if [[ -s "$raw_matches" ]]; then
-  echo "[gridkit-legacy-guard] top_matched_files:"
-  cut -d: -f1 "$raw_matches" | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
-fi
+echo "[gridkit-guard] mode=${MODE} target=${TARGET_DIR}"
 
-if [[ -s "$violations" ]]; then
-  echo "[gridkit-legacy-guard] non_allowlisted_files:"
-  cut -d: -f1 "$violations" | sort -u | sed 's/^/  /'
-fi
+run_check "remaining_legacy_adapter_refs" "$LEGACY_ADAPTER_PATTERN"
+run_check \
+  "remaining_legacy_shelf_strip_patterns" \
+  "$LEGACY_SHELF_STRIP_PATTERN" \
+  "frontend/src/lib/gridkit/components/PositionStrip.tsx|frontend/src/components/ui/experiments-styles.ts"
+run_check \
+  "remaining_direct_renderPosition_lambdas" \
+  "$DIRECT_RENDER_POSITION_PATTERN" \
+  "frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx"
+run_check "remaining_bespoke_tray_overlay_patterns" "$BESPOKE_TRAY_OVERLAY_PATTERN"
+run_scroll_map_check "remaining_large_map_loops_in_scroll_containers"
 
-rg -n -S "$CHIP_PATTERN" "$TARGET_DIR" >"$chip_tmp" || true
-rg -n -S "$CELL_SHELL_PATTERN" "$TARGET_DIR" >"$shell_tmp" || true
-rg -n -S "$TENT_SHELF_WRAPPER_PATTERN" "$TARGET_DIR" >"$wrapper_tmp" || true
-rg -n -S "$LEGACY_SHELF_STRIP_PATTERN" "$TARGET_DIR" >"$legacy_strip_tmp" || true
-rg -n -S "$BESPOKE_TRAY_OVERLAY_PATTERN" "$TARGET_DIR" >"$tray_overlay_tmp" || true
+usage_count "gridkit_layout_usages" "$LAYOUT_USAGE_PATTERN"
+usage_count "position_strip_with_renderers_usages" "<PositionStripWithRenderers\\b"
+usage_count "tray_folder_overlay_usages" "<TrayFolderOverlay\\b|<TrayCellExpandable\\b|<TrayFolderProvider\\b"
+usage_count "virtual_list_grid_usages" "$VIRTUAL_PATTERN"
 
-if [[ -s "$chip_tmp" ]]; then
-  echo "[gridkit-legacy-guard] bespoke_chip_overlay_top_files:"
-  grep -E -v "frontend/src/lib/gridkit/components/CellChips.tsx" "$chip_tmp" | cut -d: -f1 | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
-fi
-
-if [[ -s "$shell_tmp" ]]; then
-  echo "[gridkit-legacy-guard] bespoke_cell_shell_top_files:"
-  grep -E -v "frontend/src/lib/gridkit/components/CellChrome.tsx" "$shell_tmp" | cut -d: -f1 | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
-fi
-
-if [[ -s "$wrapper_tmp" ]]; then
-  echo "[gridkit-legacy-guard] bespoke_tent_shelf_wrapper_top_files:"
-  grep -E -v "frontend/src/components/ui/experiments-styles.ts" "$wrapper_tmp" | cut -d: -f1 | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
-fi
-
-if [[ -s "$legacy_strip_tmp" ]]; then
-  echo "[gridkit-legacy-guard] legacy_shelf_strip_top_files:"
-  grep -E -v "frontend/src/lib/gridkit/components/PositionStrip.tsx|frontend/src/components/ui/experiments-styles.ts" "$legacy_strip_tmp" | cut -d: -f1 | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
-fi
-
-rg -n -S "$LEAF_CELL_PATTERN" "$TARGET_DIR" >"$leaf_tmp" || true
-if [[ -s "$leaf_tmp" ]]; then
-  echo "[gridkit-legacy-guard] bespoke_leaf_cell_top_files:"
-  grep -E -v "frontend/src/lib/gridkit/components/cells/|frontend/src/lib/gridkit/renderers/" "$leaf_tmp" | cut -d: -f1 | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
-fi
-
-if [[ -s "$tray_overlay_tmp" ]]; then
-  echo "[gridkit-legacy-guard] bespoke_tray_overlay_top_files:"
-  grep -E -v "frontend/src/lib/gridkit/components/overlays/TrayFolderOverlay.tsx|frontend/src/lib/gridkit/components/cells/TrayCellExpandable.tsx|frontend/src/lib/gridkit/state/trayFolderManager.tsx|frontend/src/lib/gridkit/state/index.ts|frontend/src/lib/gridkit/renderers/types.ts|frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx|frontend/src/lib/gridkit/components/overlays/index.ts|frontend/src/components/ui/popover.tsx|frontend/src/components/ui/dialog.tsx|frontend/src/lib/gridkit/presets.ts" "$tray_overlay_tmp" | cut -d: -f1 | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
-fi
-
-if [[ -s "$scroll_map_offender_tmp" ]]; then
-  echo "[gridkit-legacy-guard] large_map_scroll_top_files:"
-  sort "$scroll_map_offender_tmp" | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
-fi
-
-if [[ "$MODE" == "--enforce" && "$violation_matches" -gt 0 ]]; then
-  echo "[gridkit-legacy-guard] FAIL: found non-allowlisted legacy grid matches"
+if [[ "$MODE" == "--enforce" && "$FAILURES" -gt 0 ]]; then
+  echo "[gridkit-guard] FAIL: ${FAILURES} guardrail check(s) failed"
   exit 1
 fi
 
 if [[ "$MODE" == "--report-only" ]]; then
-  echo "[gridkit-legacy-guard] report-only mode: no CI failure"
+  echo "[gridkit-guard] report-only mode: no CI failure"
+else
+  echo "[gridkit-guard] OK"
 fi

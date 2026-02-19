@@ -53,7 +53,6 @@ export const experimentsStyles = {
   overviewReadinessChipReady: "border-success/55 bg-success/20 text-success-foreground",
   overviewReadinessRow: "flex flex-wrap items-center gap-2",
   overviewScheduleCard: "grid gap-2",
-  overviewShelfGroup: "grid gap-1",
   overviewShelfLabel: "text-[0.72rem] leading-tight text-muted-foreground",
   overviewShelfSlotGrid: "grid items-stretch gap-2 max-sm:gap-1",
   overviewSlotCell: "h-full min-h-[118px] [grid-template-rows:auto_1fr] max-sm:min-h-[104px] max-sm:p-1",
@@ -62,9 +61,6 @@ export const experimentsStyles = {
   overviewSlotTrayStack: "grid min-h-full content-start gap-1",
   overviewStateActionRow: "flex flex-wrap items-center gap-2",
   overviewStateCard: "grid gap-3",
-  overviewTentBoardCard: "h-fit content-start",
-  overviewTentBoardGrid: "grid grid-cols-1 items-start gap-2 min-[920px]:grid-cols-2",
-  overviewTentShelfStack: "grid grid-flow-col auto-cols-[minmax(280px,1fr)] gap-2 overflow-x-auto pb-1",
   overviewTentSlotGrid: "items-start",
   overviewTrayCell:
     "relative grid min-h-0 gap-1 rounded-lg border border-border p-2",
@@ -102,10 +98,6 @@ export const experimentsStyles = {
     "inline-flex items-center justify-center justify-self-center rounded-full border border-success/55 bg-success/20 px-2 py-0.5 text-[0.72rem] leading-none text-success-foreground",
   slotCellLabel: "text-[0.72rem] text-muted-foreground",
   draftChangedSurface: "ring-1 ring-ring/70",
-  step1ShelfPreviewCard: "w-fit max-w-full min-w-0 rounded-lg border border-border",
-  step1ShelfPreviewLane: "flex flex-wrap items-start gap-2",
-  step1ShelfPreviewSlotGrid:
-    "grid w-fit max-w-full min-w-0 grid-flow-col auto-cols-[minmax(6.9rem,1fr)] gap-2 overflow-x-auto pb-1 [--gt-cell-min-height:6.5rem] [--gt-cell-pad:var(--gt-space-md)]",
   stepPanel: "mt-3 animate-in fade-in slide-in-from-right-2 duration-200",
   stepperIndex: "inline-flex h-4 w-4 items-center justify-center rounded-full bg-muted text-[0.72rem]",
   stepperItem:
@@ -114,12 +106,6 @@ export const experimentsStyles = {
   stepperItemDone: "border-success/55 bg-success/20 text-success-foreground",
   stepperRow: "grid gap-2 [grid-template-columns:repeat(4,minmax(0,1fr))]",
   toolbarInlineSelect: "w-full sm:min-w-[16rem] sm:max-w-[26rem] sm:flex-1",
-  tentBoardCard: "grid min-w-0 gap-2 p-2",
-  tentBoardGrid: "grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(min(100%,28rem),1fr))]",
-  tentShelfRow: "grid gap-2",
-  tentShelfCard: "grid min-w-0 gap-2 rounded-lg border border-border p-2",
-  tentShelfSlotGrid:
-    "grid min-w-0 grid-flow-col auto-cols-[minmax(6rem,1fr)] items-stretch gap-2 overflow-x-auto pb-1",
   toolbarActionsCompact: "gap-2",
   toolbarSummaryRow: "gap-2",
   trayControlRow: "flex flex-wrap items-center gap-2",

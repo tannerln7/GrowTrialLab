@@ -18,7 +18,7 @@ import {
   buildTentLayoutSpecFromOverviewPlants,
 } from "@/src/lib/gridkit/builders";
 import {
-  LegacyOverviewTentLayoutAdapter,
+  OverviewTentLayout,
   PlantCell,
 } from "@/src/lib/gridkit/components";
 import type { PlantOccupantSpec } from "@/src/lib/gridkit/spec";
@@ -560,7 +560,7 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
 
       {overviewLayoutSpec.tents.length > 0 ? (
         <SectionCard title="Tent -> Slot -> Tray -> Plants">
-          <LegacyOverviewTentLayoutAdapter
+          <OverviewTentLayout
             spec={overviewLayoutSpec}
             onTrayPlantPress={handleTrayPlantPress}
           />

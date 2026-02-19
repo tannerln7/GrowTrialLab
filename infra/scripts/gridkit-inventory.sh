@@ -95,6 +95,7 @@ report_bucket "spec_builder_callsites" "buildTentLayoutSpecFrom[A-Za-z0-9_]*\\("
 report_bucket "cellchrome_usages" "<CellChrome\\b"
 report_bucket "cellchips_usages" "<CellChips\\b"
 report_bucket "gridkit_container_callsites" "<TentGrid\\b|<TentCard\\b|<ShelfStack\\b|<ShelfCard\\b"
+report_bucket "gridkit_layout_usages" "<OverviewTentLayout\\b|<PlacementTentLayout\\b|<PlacementShelfPreview\\b"
 report_bucket "position_strip_usages" "<PositionStrip\\b"
 report_bucket "position_strip_with_renderers_usages" "<PositionStripWithRenderers\\b"
 report_bucket "renderer_registry_usages" "defaultPositionRendererMap|createPositionRendererMap|PositionStripWithRenderers"
@@ -102,6 +103,7 @@ report_bucket "canonical_leaf_cell_usages" "<SlotCell\\b|<TrayCell\\b|<PlantCell
 report_bucket "virtual_list_grid_usages" "<VirtualList\\b|<VirtualGrid\\b"
 report_bucket "tray_folder_overlay_usages" "<TrayFolderOverlay\\b|<TrayCellExpandable\\b|<TrayFolderProvider\\b"
 report_bucket "tray_folder_ctx_usages" "trayFolder:\\s*\\{"
+report_bucket "remaining_legacy_adapter_refs" "Legacy[A-Za-z0-9_]+|components/adapters|TentSlotBoard|tent-slot-board"
 report_scroll_map_hotspots \
   "remaining_large_map_loops_in_scroll_containers" \
   "overflow-y-auto|overflow-y-scroll|max-h-\\[" \
@@ -133,8 +135,7 @@ report_bucket \
 report_bucket \
   "remaining_bespoke_leaf_cell_heuristics" \
   "<CellChrome\\b|renderPlantCell\\(|renderTrayCell\\(|PlantSelectableCellImpl|TraySelectableCellImpl" \
-  "frontend/src/lib/gridkit/components/cells/|frontend/src/lib/gridkit/renderers/"
+  "frontend/src/lib/gridkit/components/cells/|frontend/src/lib/gridkit/renderers/|frontend/src/lib/gridkit/components/layouts/"
 report_bucket \
   "remaining_bespoke_tray_overlay_heuristics" \
-  "<Popover\\b|<Dialog\\b|createPortal|openTray|expandedTray|activeTray|trayFolder\\s*[:=]" \
-  "frontend/src/lib/gridkit/components/overlays/TrayFolderOverlay.tsx|frontend/src/lib/gridkit/components/cells/TrayCellExpandable.tsx|frontend/src/lib/gridkit/state/trayFolderManager.tsx|frontend/src/lib/gridkit/state/index.ts|frontend/src/lib/gridkit/renderers/types.ts|frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx|frontend/src/lib/gridkit/components/overlays/index.ts|frontend/src/components/ui/popover.tsx|frontend/src/components/ui/dialog.tsx|frontend/src/lib/gridkit/presets.ts"
+  "openTray|expandedTray|trayOverlay|trayFolderOpen|setOpenTray|setExpandedTray"

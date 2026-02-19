@@ -7,4 +7,4 @@ export * from "./grids";
 export * from "./virtual";
 export * from "./overlays";
 export * from "./containers";
-export * from "./adapters";
+export * from "./layouts";
