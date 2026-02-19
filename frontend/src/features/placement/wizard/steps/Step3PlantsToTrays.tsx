@@ -9,10 +9,11 @@ import { PlantSelectableCell } from "@/src/features/placement/components/placeme
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
-import { DraftChangeMarker } from "@/src/components/ui/draft-change-marker";
 import { NativeSelect } from "@/src/components/ui/native-select";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
+import { CellChrome, CellMeta, CellTitle } from "@/src/lib/gridkit/components";
+import type { ChipSpec } from "@/src/lib/gridkit/spec";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -132,26 +133,35 @@ function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
             }
             const trayPlantIds = model.trayPlantIdsByTray[trayId] || [];
             const selectedInTray = model.selectedInTrayByTrayId[trayId] || [];
+            const trayDirty = model.dirtyPlantContainerTrayIds.has(trayId);
+            const chips: ChipSpec[] = trayDirty
+              ? [
+                  {
+                    id: `${trayId}-dirty`,
+                    label: "•",
+                    tone: "warn",
+                    placement: "tl",
+                  },
+                ]
+              : [];
 
             return (
-              <article
+              <CellChrome
                 key={trayId}
+                state={{ tone: trayDirty ? "warn" : undefined }}
+                chips={chips}
                 className={cn(
                   styles.trayEditorCell,
-                  "rounded-lg border border-border",
-                  styles.cellSurfaceLevel2,
-                  model.dirtyPlantContainerTrayIds.has(trayId) && styles.draftChangedSurface,
                 )}
               >
-                {model.dirtyPlantContainerTrayIds.has(trayId) ? <DraftChangeMarker /> : null}
                 <div className={styles.trayHeaderRow}>
                   <div className={styles.trayHeaderMeta}>
-                    <strong>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
+                    <CellTitle>{formatTrayDisplay(tray.name, tray.tray_id)}</CellTitle>
                     <span className={styles.recipeLegendItemCompact}>
                       {(model.draftPlantCountByTray[trayId] || 0)}/{tray.capacity}
                     </span>
                   </div>
-                  <div className={styles.trayHeaderActions}>
+                  <CellMeta className={styles.trayHeaderActions}>
                     {selectedInTray.length > 0 ? (
                       <TooltipIconButton
                         label="Return selected plants to unplaced"
@@ -160,7 +170,7 @@ function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
                         variant="destructive"
                       />
                     ) : null}
-                  </div>
+                  </CellMeta>
                 </div>
 
                 <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
@@ -180,7 +190,7 @@ function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
                     );
                   })}
                 </div>
-              </article>
+              </CellChrome>
             );
           })}
         </div>

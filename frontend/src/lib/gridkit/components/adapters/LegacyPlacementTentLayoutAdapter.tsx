@@ -1,11 +1,13 @@
-import { Check, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { DraftChangeMarker } from "@/src/components/ui/draft-change-marker";
 import { TooltipIconButton } from "@/src/components/ui/tooltip-icon-button";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import type { TentLayoutSpec, TentSpec } from "@/src/lib/gridkit/spec";
+import { CellChrome } from "../CellChrome";
+import { CellTitle } from "../CellText";
 
 type LegacyPlacementTentLayoutAdapterProps = {
   spec: TentLayoutSpec;
@@ -93,33 +95,45 @@ export function LegacyPlacementTentLayoutAdapter({
                         (typeof position.label === "string" && position.label.trim()) ||
                         (position.occupant.kind === "emptySlot" ? position.occupant.label : "") ||
                         `Slot ${position.positionIndex}`;
+                      const chips: ChipSpec[] = [];
+                      if (dirty) {
+                        chips.push({
+                          id: `${position.id}-dirty`,
+                          label: "•",
+                          tone: "warn",
+                          placement: "tl",
+                        });
+                      }
+                      if (slotSelected) {
+                        chips.push({
+                          id: `${position.id}-selected`,
+                          label: "✓",
+                          tone: "info",
+                          placement: "tr",
+                        });
+                      }
 
                       return (
-                        <div
+                        <CellChrome
                           key={position.id}
+                          state={{
+                            selected: slotSelected,
+                            tone: dirty ? "warn" : undefined,
+                          }}
+                          interactive
+                          onPress={() => onToggleDestinationSlot(position.id)}
+                          ariaLabel={slotLabel}
+                          chips={chips}
                           className={cn(
                             styles.slotCell,
                             styles.slotContainerCellFrame,
-                            styles.cellSurfaceLevel1,
-                            dirty && styles.draftChangedSurface,
-                            slotSelected && styles.plantCellSelected,
                           )}
                         >
-                          {dirty ? <DraftChangeMarker /> : null}
-                          {slotSelected ? (
-                            <span className={styles.plantCellCheck}>
-                              <Check size={12} />
-                            </span>
-                          ) : null}
-                          <span className={styles.slotCellLabel}>{slotLabel}</span>
-                          <button
-                            type="button"
-                            className={cn(styles.slotCellEmpty, slotSelected && styles.slotCellEmptyActive)}
-                            onClick={() => onToggleDestinationSlot(position.id)}
-                          >
+                          <CellTitle className={styles.slotCellLabel}>{slotLabel}</CellTitle>
+                          <span className={cn(styles.slotCellEmpty, slotSelected && styles.slotCellEmptyActive)}>
                             Empty
-                          </button>
-                        </div>
+                          </span>
+                        </CellChrome>
                       );
                     })}
                   </div>

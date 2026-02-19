@@ -2,12 +2,10 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { unwrapList } from "@/lib/backend";
-import { cn } from "@/lib/utils";
 import { api, isApiError } from "@/src/lib/api";
 import { parseApiErrorPayload } from "@/src/lib/errors/backendErrors";
 import { addManyToSet, removeManyFromSet, setHasAll, setWithAll, toggleSet } from "@/src/lib/collections/sets";
@@ -24,6 +22,8 @@ import {
 } from "@/src/features/experiments/recipes/components/RecipePanels";
 import { buildPersistedRecipeMap, isActivePlant, recipeLabel, sortPlantsById } from "@/src/features/experiments/recipes/utils";
 import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
+import { CellChrome, CellMeta, CellSubtitle, CellTitle } from "@/src/lib/gridkit/components";
+import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
@@ -485,44 +485,46 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     const draftRecipeId = getDraftOrPersisted<string | null>(draftPlantRecipe, persistedRecipeByPlantId, plantId, null);
     const draftRecipe = draftRecipeId ? recipeById.get(draftRecipeId) || null : null;
     const dirty = isDirtyValue(persistedRecipeId, draftRecipeId);
+    const chips: ChipSpec[] = [];
+    if (dirty) {
+      chips.push({
+        id: `${plant.uuid}-dirty`,
+        label: "•",
+        tone: "warn",
+        placement: "tl",
+      });
+    }
+    if (selected) {
+      chips.push({
+        id: `${plant.uuid}-selected`,
+        label: "✓",
+        tone: "info",
+        placement: "tr",
+      });
+    }
 
     return (
-      <article
+      <CellChrome
         key={plant.uuid}
-        className={cn(
-          styles.plantCell,
-          styles.cellFrame,
-          styles.cellSurfaceLevel1,
-          styles.cellInteractive,
-          selected ? styles.plantCellSelected : "",
-          dirty ? styles.plantCellDirty : "",
-        )}
-        onClick={() => togglePlantSelection(plant.uuid)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            togglePlantSelection(plant.uuid);
-          }
+        state={{
+          selected,
+          tone: dirty ? "warn" : undefined,
         }}
-        role="button"
-        tabIndex={0}
-        aria-pressed={selected}
+        interactive
+        onPress={() => togglePlantSelection(plant.uuid)}
+        ariaLabel={plant.plant_id || "Plant"}
+        chips={chips}
+        className={styles.plantCell}
       >
-        {selected ? (
-          <span className={styles.plantCellCheck}>
-            <Check size={12} />
-          </span>
-        ) : null}
-        {dirty ? <span className={styles.plantCellDirtyDot} aria-hidden="true" /> : null}
-        <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
-        <span className={styles.plantCellSpecies}>{plant.species_name}</span>
-        <div className={styles.plantCellMetaRow}>
+        <CellTitle className={styles.plantCellId}>{plant.plant_id || "(pending)"}</CellTitle>
+        <CellSubtitle className={styles.plantCellSpecies}>{plant.species_name}</CellSubtitle>
+        <CellMeta className={styles.plantCellMetaRow}>
           <span className={draftRecipe ? styles.recipeBadge : styles.recipeBadgeEmpty}>
             {draftRecipe ? draftRecipe.code : "No recipe"}
           </span>
           {dirty ? <span className={styles.recipeLegendItem}>Draft</span> : null}
-        </div>
-      </article>
+        </CellMeta>
+      </CellChrome>
     );
   }, [draftPlantRecipe, persistedRecipeByPlantId, plantById, recipeById, selectedPlantIds, togglePlantSelection]);
 

@@ -2,6 +2,8 @@ import { cn } from "@/lib/utils";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import type { PlantOccupantSpec, TentLayoutSpec, TrayOccupantSpec } from "@/src/lib/gridkit/spec";
 import type { ReactNode } from "react";
+import { CellChrome } from "../CellChrome";
+import { CellTitle } from "../CellText";
 
 const OVERVIEW_SLOT_COLUMN_CLASSES = [
   "grid-cols-1",
@@ -81,19 +83,17 @@ export function LegacyOverviewTentLayoutAdapter({
                       {shelf.positions.map((position) => {
                         if (position.occupant.kind === "emptySlot") {
                           return (
-                            <div
+                            <CellChrome
                               key={position.key}
                               className={cn(
                                 styles.slotCell,
                                 styles.overviewSlotCell,
                                 styles.overviewSlotCellEmpty,
-                                styles.cellFrame,
-                                styles.cellSurfaceLevel3,
                               )}
                             >
-                              <span className={styles.slotCellLabel}>Slot {position.positionIndex}</span>
+                              <CellTitle className={styles.slotCellLabel}>Slot {position.positionIndex}</CellTitle>
                               <div className={styles.overviewSlotEmptyState}>Empty</div>
-                            </div>
+                            </CellChrome>
                           );
                         }
 
@@ -106,19 +106,17 @@ export function LegacyOverviewTentLayoutAdapter({
 
                         if (trays.length === 0) {
                           return (
-                            <div
+                            <CellChrome
                               key={position.key}
                               className={cn(
                                 styles.slotCell,
                                 styles.overviewSlotCell,
                                 styles.overviewSlotCellEmpty,
-                                styles.cellFrame,
-                                styles.cellSurfaceLevel3,
                               )}
                             >
-                              <span className={styles.slotCellLabel}>Slot {position.positionIndex}</span>
+                              <CellTitle className={styles.slotCellLabel}>Slot {position.positionIndex}</CellTitle>
                               <div className={styles.overviewSlotEmptyState}>Empty</div>
-                            </div>
+                            </CellChrome>
                           );
                         }
 
@@ -126,18 +124,17 @@ export function LegacyOverviewTentLayoutAdapter({
                           <div key={position.key} className="h-full min-h-[118px] max-sm:min-h-[104px]">
                             <div className={styles.overviewSlotTrayStack}>
                               {trays.map((tray) => (
-                                <article
+                                <CellChrome
                                   key={tray.id}
                                   className={cn(
                                     styles.overviewTrayCell,
-                                    styles.cellSurfaceLevel2,
                                     trays.length === 1 ? "h-full" : "",
                                   )}
                                 >
                                   <div className={styles.overviewTrayMeta}>
-                                    <strong className={cn(styles.trayGridCellId, "text-left")}>
+                                    <CellTitle className={cn(styles.trayGridCellId, "text-left")}>
                                       {tray.title}
-                                    </strong>
+                                    </CellTitle>
                                     {tray.currentCount != null && tray.capacity != null ? (
                                       <span className={cn(styles.recipeLegendItem, "shrink-0")}>
                                         {tray.currentCount}/{tray.capacity}
@@ -147,7 +144,7 @@ export function LegacyOverviewTentLayoutAdapter({
                                   <div className={cn(styles.plantCellGridTray, styles.cellGridResponsive)} data-cell-size="sm">
                                     {(tray.plants || []).map((plant) => renderPlantCell(plant))}
                                   </div>
-                                </article>
+                                </CellChrome>
                               ))}
                             </div>
                           </div>

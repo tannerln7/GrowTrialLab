@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/src/components/ui/button";
 import SectionCard from "@/src/components/ui/SectionCard";
+import { CellChrome, CellMeta, CellSubtitle, CellTitle } from "@/src/lib/gridkit/components";
+import type { ChipSpec } from "@/src/lib/gridkit/spec";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -85,35 +87,35 @@ export function BaselinePlantQueuePanel({ model, actions }: { model: PlantQueueM
         <div className={cn(styles.plantCellGrid, styles.cellGridResponsive)} data-cell-size="sm">
           {model.queuePlants.map((plant) => {
             const selected = plant.uuid === model.selectedPlantId;
+            const chips: ChipSpec[] = selected
+              ? [
+                  {
+                    id: `${plant.uuid}-selected`,
+                    label: "✓",
+                    tone: "info",
+                    placement: "tr",
+                  },
+                ]
+              : [];
+
             return (
-              <article
+              <CellChrome
                 key={plant.uuid}
-                className={cn(
-                  styles.plantCell,
-                  styles.baselineQueuePlantCell,
-                  styles.cellFrame,
-                  styles.cellSurfaceLevel1,
-                  styles.cellInteractive,
-                  selected ? styles.plantCellSelected : "",
-                )}
-                role="button"
-                tabIndex={0}
-                onClick={() => actions.onJumpToPlant(plant.uuid)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    actions.onJumpToPlant(plant.uuid);
-                  }
-                }}
+                state={{ selected }}
+                interactive
+                onPress={() => actions.onJumpToPlant(plant.uuid)}
+                ariaLabel={plant.plant_id || "Plant"}
+                chips={chips}
+                className={cn(styles.plantCell, styles.baselineQueuePlantCell, "justify-items-center text-center")}
               >
-                <strong className={styles.plantCellId}>{plant.plant_id || "(pending)"}</strong>
-                <span className={styles.plantCellSpecies}>{plant.species_name}</span>
-                <div className={styles.baselineQueueStatusRow}>
+                <CellTitle className={styles.plantCellId}>{plant.plant_id || "(pending)"}</CellTitle>
+                <CellSubtitle className={styles.plantCellSpecies}>{plant.species_name}</CellSubtitle>
+                <CellMeta className={styles.baselineQueueStatusRow}>
                   <span className={plant.has_baseline ? styles.baselineStatusReady : styles.baselineStatusMissing}>
                     {plant.has_baseline ? "Captured" : "No baseline"}
                   </span>
-                </div>
-              </article>
+                </CellMeta>
+              </CellChrome>
             );
           })}
         </div>

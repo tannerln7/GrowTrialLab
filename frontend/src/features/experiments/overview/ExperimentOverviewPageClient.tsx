@@ -19,6 +19,10 @@ import {
   buildTentLayoutSpecFromOverviewPlants,
 } from "@/src/lib/gridkit/builders";
 import {
+  CellChrome,
+  CellMeta,
+  CellSubtitle,
+  CellTitle,
   LegacyOverviewTentLayoutAdapter,
 } from "@/src/lib/gridkit/components";
 import type { PlantOccupantSpec } from "@/src/lib/gridkit/spec";
@@ -415,44 +419,50 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
         : "Unknown";
 
     return (
-      <Link
+      <CellChrome
         key={plant.id}
-        href={plantLink(plant)}
         className={cn(
           styles.plantCell,
-          styles.overviewPlantCellLink,
           styles.overviewPlantCell,
-          styles.cellFrame,
-          styles.cellSurfaceLevel1,
-          styles.cellInteractive,
+          "p-0",
         )}
       >
-        <strong className={styles.plantCellId}>{plant.title || "(pending)"}</strong>
-        <span className={cn(styles.plantCellSpecies, styles.overviewPlantSpecies)}>{speciesLine}</span>
-        <div className={styles.overviewPlantStatusRow}>
-          <span
-            className={cn(
-              styles.overviewPlantChip,
-              plant.grade ? styles.overviewPlantChipReady : styles.overviewPlantChipMissing,
-            )}
-          >
-            {plant.grade ? `Grade ${plant.grade}` : "No grade"}
-          </span>
-          <span
-            className={cn(
-              styles.overviewPlantChip,
-              plant.recipeCode ? styles.overviewPlantChipReady : styles.overviewPlantChipMissing,
-            )}
-          >
-            {plant.recipeCode ? `Recipe ${plant.recipeCode}` : "No recipe"}
-          </span>
-          {plant.status !== "active" ? (
-            <span className={cn(styles.overviewPlantChip, styles.overviewPlantChipMissing)}>
-              {statusLabel}
+        <Link
+          href={plantLink(plant)}
+          className={cn(
+            "grid h-full content-start gap-1 p-[var(--gt-cell-pad,var(--gt-space-md))]",
+            styles.overviewPlantCellLink,
+          )}
+        >
+          <CellTitle className={styles.plantCellId}>{plant.title || "(pending)"}</CellTitle>
+          <CellSubtitle className={cn(styles.plantCellSpecies, styles.overviewPlantSpecies)}>
+            {speciesLine}
+          </CellSubtitle>
+          <CellMeta className={styles.overviewPlantStatusRow}>
+            <span
+              className={cn(
+                styles.overviewPlantChip,
+                plant.grade ? styles.overviewPlantChipReady : styles.overviewPlantChipMissing,
+              )}
+            >
+              {plant.grade ? `Grade ${plant.grade}` : "No grade"}
             </span>
-          ) : null}
-        </div>
-      </Link>
+            <span
+              className={cn(
+                styles.overviewPlantChip,
+                plant.recipeCode ? styles.overviewPlantChipReady : styles.overviewPlantChipMissing,
+              )}
+            >
+              {plant.recipeCode ? `Recipe ${plant.recipeCode}` : "No recipe"}
+            </span>
+            {plant.status !== "active" ? (
+              <span className={cn(styles.overviewPlantChip, styles.overviewPlantChipMissing)}>
+                {statusLabel}
+              </span>
+            ) : null}
+          </CellMeta>
+        </Link>
+      </CellChrome>
     );
   }
 

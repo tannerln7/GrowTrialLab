@@ -11,6 +11,8 @@ TOP_N="${TOP_N:-20}"
 LEGACY_PATTERN="${LEGACY_PATTERN:-TentSlotBoard|tent-slot-board|overviewTentShelfStack|step1ShelfPreviewSlotGrid|tentShelfSlotGrid|slotGridInline}"
 BUILDER_PATTERN="${BUILDER_PATTERN:-buildTentLayoutSpecFrom[A-Za-z0-9_]*\\(}"
 MAPPING_PATTERN="${MAPPING_PATTERN:-groupSlotsByShelf|buildStep1ShelfPreviewGroups|slotsByShelf\\s*=\\s*new Map|slotByIndex\\s*=\\s*new Map|tentMap\\s*=\\s*new Map}"
+CHIP_PATTERN="${CHIP_PATTERN:-DraftChangeMarker|plantCellCheck|plantCellDirtyDot|slotPlacedChip|absolute[^\\n]*(top|bottom|left|right).*text-xs}"
+CELL_SHELL_PATTERN="${CELL_SHELL_PATTERN:-styles\\.cellFrame|styles\\.cellInteractive|styles\\.cellSurfaceLevel[0-9]|rounded-lg border border-border}"
 
 if [[ "$MODE" != "--report-only" && "$MODE" != "--enforce" ]]; then
   echo "[gridkit-legacy-guard] Usage: $0 [--report-only|--enforce]"
@@ -19,7 +21,9 @@ fi
 
 raw_matches="$(mktemp)"
 violations="$(mktemp)"
-trap 'rm -f "$raw_matches" "$violations"' EXIT
+chip_tmp="$(mktemp)"
+shell_tmp="$(mktemp)"
+trap 'rm -f "$raw_matches" "$violations" "$chip_tmp" "$shell_tmp"' EXIT
 
 rg -n -S "$LEGACY_PATTERN" "$TARGET_DIR" >"$raw_matches" || true
 
@@ -72,8 +76,20 @@ echo "[gridkit-legacy-guard] matches_total=$total_matches files_total=$total_fil
 echo "[gridkit-legacy-guard] matches_non_allowlisted=$violation_matches files_non_allowlisted=$violation_files"
 builder_match_count="$( (rg -n -S "$BUILDER_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
 mapping_match_count="$( (rg -n -S "$MAPPING_PATTERN" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
+cellchrome_count="$( (rg -n -S "<CellChrome\\b" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
+cellchips_count="$( (rg -n -S "<CellChips\\b" "$TARGET_DIR" || true) | wc -l | tr -d ' ')"
+chip_match_count="$(
+  (rg -n -S "$CHIP_PATTERN" "$TARGET_DIR" || true) | grep -E -v "frontend/src/lib/gridkit/components/CellChips.tsx" | wc -l | tr -d ' '
+)"
+cell_shell_match_count="$(
+  (rg -n -S "$CELL_SHELL_PATTERN" "$TARGET_DIR" || true) | grep -E -v "frontend/src/lib/gridkit/components/CellChrome.tsx" | wc -l | tr -d ' '
+)"
 echo "[gridkit-legacy-guard] builder_callsites=$builder_match_count"
 echo "[gridkit-legacy-guard] remaining_mapping_heuristics=$mapping_match_count"
+echo "[gridkit-legacy-guard] cellchrome_usages=$cellchrome_count"
+echo "[gridkit-legacy-guard] cellchips_usages=$cellchips_count"
+echo "[gridkit-legacy-guard] remaining_bespoke_chip_overlays=$chip_match_count"
+echo "[gridkit-legacy-guard] remaining_bespoke_cell_shells=$cell_shell_match_count"
 
 if [[ -s "$raw_matches" ]]; then
   echo "[gridkit-legacy-guard] top_matched_files:"
@@ -83,6 +99,19 @@ fi
 if [[ -s "$violations" ]]; then
   echo "[gridkit-legacy-guard] non_allowlisted_files:"
   cut -d: -f1 "$violations" | sort -u | sed 's/^/  /'
+fi
+
+rg -n -S "$CHIP_PATTERN" "$TARGET_DIR" >"$chip_tmp" || true
+rg -n -S "$CELL_SHELL_PATTERN" "$TARGET_DIR" >"$shell_tmp" || true
+
+if [[ -s "$chip_tmp" ]]; then
+  echo "[gridkit-legacy-guard] bespoke_chip_overlay_top_files:"
+  grep -E -v "frontend/src/lib/gridkit/components/CellChips.tsx" "$chip_tmp" | cut -d: -f1 | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
+fi
+
+if [[ -s "$shell_tmp" ]]; then
+  echo "[gridkit-legacy-guard] bespoke_cell_shell_top_files:"
+  grep -E -v "frontend/src/lib/gridkit/components/CellChrome.tsx" "$shell_tmp" | cut -d: -f1 | sort | uniq -c | sort -nr | head -n "$TOP_N" | sed 's/^/  /' || true
 fi
 
 if [[ "$MODE" == "--enforce" && "$violation_matches" -gt 0 ]]; then

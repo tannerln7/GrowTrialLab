@@ -3,10 +3,11 @@ import { draftChipLabelForStep, formatTrayDisplay } from "@/src/features/placeme
 import type { Step2Actions, Step2Model } from "@/src/features/placement/wizard/types";
 import { Badge } from "@/src/components/ui/badge";
 import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
-import { DraftChangeMarker } from "@/src/components/ui/draft-change-marker";
 import { CountAdjustToolbar } from "@/src/components/ui/count-adjust-toolbar";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { StepAdjustButton } from "@/src/components/ui/step-adjust-button";
+import { CellChrome, CellMeta, CellTitle } from "@/src/lib/gridkit/components";
+import type { ChipSpec } from "@/src/lib/gridkit/spec";
 
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 
@@ -43,20 +44,27 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
             }
             const draftCapacity = Math.max(1, model.trayCapacityDraftById[trayId] ?? tray.capacity);
             const trayMarkedForRemoval = model.draftRemovedTrayIds.has(trayId);
+            const trayDirty = model.dirtyTrayCapacityIds.has(trayId) || trayMarkedForRemoval;
+            const chips: ChipSpec[] = trayDirty
+              ? [
+                  {
+                    id: `${trayId}-dirty`,
+                    label: "•",
+                    tone: "warn",
+                    placement: "tl",
+                  },
+                ]
+              : [];
+
             return (
-              <article
+              <CellChrome
                 key={trayId}
-                className={cn(
-                  styles.trayEditorCell,
-                  "rounded-lg border border-border",
-                  styles.cellSurfaceLevel1,
-                  "justify-items-center text-center",
-                  (model.dirtyTrayCapacityIds.has(trayId) || trayMarkedForRemoval) && styles.draftChangedSurface,
-                )}
+                state={{ tone: trayDirty ? "warn" : undefined }}
+                chips={chips}
+                className={cn(styles.trayEditorCell, "justify-items-center text-center")}
               >
-                {model.dirtyTrayCapacityIds.has(trayId) || trayMarkedForRemoval ? <DraftChangeMarker /> : null}
-                <strong className={styles.trayGridCellId}>{formatTrayDisplay(tray.name, tray.tray_id)}</strong>
-                <div className={styles.trayEditorBadgeRow}>
+                <CellTitle className={styles.trayGridCellId}>{formatTrayDisplay(tray.name, tray.tray_id)}</CellTitle>
+                <CellMeta className={styles.trayEditorBadgeRow}>
                   <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
                     {draftCapacity} {draftCapacity === 1 ? "plant" : "plants"}
                   </Badge>
@@ -65,7 +73,7 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
                       Pending removal
                     </Badge>
                   ) : null}
-                </div>
+                </CellMeta>
                 <div className={styles.trayEditorAdjustRow}>
                   <StepAdjustButton
                     direction="decrement"
@@ -78,30 +86,38 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
                     disabled={model.saving || model.locked}
                   />
                 </div>
-              </article>
+              </CellChrome>
             );
           })}
           {model.draftTrayCount > model.sortedTrayIds.length
             ? Array.from({ length: model.draftTrayCount - model.sortedTrayIds.length }, (_, index) => {
                 const draftCapacity = Math.max(1, model.newTrayCapacities[index] ?? model.defaultTrayCapacity);
+                const chips: ChipSpec[] = [
+                  {
+                    id: `draft-tray-${index + 1}-dirty`,
+                    label: "•",
+                    tone: "warn",
+                    placement: "tl",
+                  },
+                ];
+
                 return (
-                  <article
+                  <CellChrome
                     key={`draft-tray-${index + 1}`}
+                    state={{ tone: "warn" }}
+                    chips={chips}
                     className={cn(
                       styles.trayEditorCell,
-                      "rounded-lg border border-dashed border-border",
-                      styles.cellSurfaceLevel2,
                       "justify-items-center text-center",
-                      styles.draftChangedSurface,
+                      "border-dashed",
                     )}
                   >
-                    <DraftChangeMarker />
-                    <strong className={styles.trayGridCellId}>New tray</strong>
-                    <div className={styles.trayEditorBadgeRow}>
+                    <CellTitle className={styles.trayGridCellId}>New tray</CellTitle>
+                    <CellMeta className={styles.trayEditorBadgeRow}>
                       <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
                         {draftCapacity} {draftCapacity === 1 ? "plant" : "plants"}
                       </Badge>
-                    </div>
+                    </CellMeta>
                     <div className={styles.trayEditorAdjustRow}>
                       <StepAdjustButton
                         direction="decrement"
@@ -114,7 +130,7 @@ export function Step2Trays({ model, actions }: Step2TraysProps) {
                         disabled={model.saving || model.locked}
                       />
                     </div>
-                  </article>
+                  </CellChrome>
                 );
               })
             : null}

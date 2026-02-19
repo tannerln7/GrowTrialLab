@@ -1,8 +1,10 @@
 import { cn } from "@/lib/utils";
-import { DraftChangeMarker } from "@/src/components/ui/draft-change-marker";
 import { StepAdjustButton } from "@/src/components/ui/step-adjust-button";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
+import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import type { TentSpec } from "@/src/lib/gridkit/spec";
+import { CellChrome } from "../CellChrome";
+import { CellTitle } from "../CellText";
 
 type LegacyPlacementShelfPreviewAdapterProps = {
   tentSpec: TentSpec;
@@ -36,7 +38,6 @@ export function LegacyPlacementShelfPreviewAdapter({
               shelfDirty && styles.draftChangedSurface,
             )}
           >
-            {shelfDirty ? <DraftChangeMarker /> : null}
             <div className={styles.trayHeaderRow}>
               <div className={styles.trayHeaderMeta}>
                 <strong>{shelf.label}</strong>
@@ -67,28 +68,40 @@ export function LegacyPlacementShelfPreviewAdapter({
                 const isDraft = Boolean(position.occupant.isDraft);
                 const slotIndex = position.occupant.slotIndex;
                 const slotCode = position.occupant.code;
+                const chips: ChipSpec[] = [];
+                if (isAddedSlot) {
+                  chips.push({
+                    id: `${position.id}-added`,
+                    label: "•",
+                    tone: "warn",
+                    placement: "tl",
+                  });
+                }
+                if (isDraft) {
+                  chips.push({
+                    id: `${position.id}-new`,
+                    label: "New",
+                    tone: "success",
+                    placement: "bottom",
+                  });
+                }
 
                 return (
-                  <article
+                  <CellChrome
                     key={position.id}
+                    state={{ tone: isAddedSlot ? "warn" : undefined }}
+                    chips={chips}
                     className={cn(
                       styles.trayGridCell,
-                      styles.cellFrame,
-                      styles.cellSurfaceLevel1,
                       "justify-items-center text-center",
-                      isAddedSlot && styles.draftChangedSurface,
                       isDraft && "[grid-template-rows:auto_1fr]",
                     )}
                   >
-                    {isAddedSlot ? <DraftChangeMarker /> : null}
-                    <strong className={styles.trayGridCellId}>{`Slot ${slotIndex}`}</strong>
+                    <CellTitle className={styles.trayGridCellId}>{`Slot ${slotIndex}`}</CellTitle>
                     {!isDraft && slotCode !== `Slot ${slotIndex}` ? (
                       <span className="text-sm text-muted-foreground">{slotCode}</span>
                     ) : null}
-                    {isDraft ? (
-                      <span className={cn(styles.slotPlacedChip, "self-end")}>New</span>
-                    ) : null}
-                  </article>
+                  </CellChrome>
                 );
               })}
               {slotCount === 0 ? <span className="text-sm text-muted-foreground">No slots.</span> : null}
