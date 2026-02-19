@@ -27,6 +27,18 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Overview Topology Uses Layout Spine Capacity)
+- `Completed` Overview tent/shelf topology now uses per-shelf layout capacity from placement summary instead of deriving slot capacity from observed plants.
+  - Updated overview builder input contract and slot-position construction:
+    - `frontend/src/lib/gridkit/builders/overview.ts`
+    - `frontend/src/lib/gridkit/builders/shelfPositions.ts`
+  - Overview page now fetches placement summary spine and passes layout/tray placements into the builder:
+    - `frontend/src/features/experiments/overview/ExperimentOverviewPageClient.tsx`
+  - Result:
+    - shelves render full configured slot capacity even when trailing slots have zero plants
+    - trays placed in slots still render when plant count is zero, when tray placement data is available
+  - Refs: `605b968`
+
 ### 2026-02-19 (GridKit Fixed Shelf Column Geometry + Paging Recovery)
 - `Completed` Shelf strips now preserve 4-up leaf sizing density for low slot counts and keep desktop paging behavior for multi-page shelves.
   - Added fixed-column support to strip primitives:

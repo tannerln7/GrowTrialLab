@@ -200,6 +200,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
   - Overview nested tray metadata rows should stay single-line with tray label left and occupancy chip right (use `overviewTrayMeta` pattern).
   - Overview shelf groups should render as horizontal rows within each tent (scrollable on narrow widths), not vertical stacks.
   - Overview slot display convention: empty slot cells show `Slot x` + `Empty`; filled slots render tray content directly without repeating slot labels.
+  - Overview slot topology should be built from placement summary spine (`tent.layout.shelves[*].tray_count` plus tray location metadata) so shelves render configured slot capacity even when a slot has zero plants.
 - Shared primitive foundations:
   - `frontend/src/components/ui/ui-foundations.ts` is the single source for:
     - focus/disabled interaction classes (`uiInteraction`)
