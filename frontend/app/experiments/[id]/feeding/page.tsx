@@ -1,25 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useMemo, useState, useEffect } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
 } from "@/lib/experiment-status";
-import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Badge } from "@/src/components/ui/badge";
 import { buttonVariants } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
 import { NativeSelect } from "@/src/components/ui/native-select";
 import { Notice } from "@/src/components/ui/notice";
+import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import ResponsiveList from "@/src/components/ui/ResponsiveList";
 import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
 import { Textarea } from "@/src/components/ui/textarea";
+import { useRouteParamString } from "@/src/lib/useRouteParamString";
 
 
 type Location = {
@@ -123,19 +124,10 @@ function locationLabel(plant: FeedingQueuePlant): string {
 }
 
 export default function FeedingPage() {
-  const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const experimentId = useMemo(() => {
-    if (typeof params.id === "string") {
-      return params.id;
-    }
-    if (Array.isArray(params.id)) {
-      return params.id[0] ?? "";
-    }
-    return "";
-  }, [params]);
+  const experimentId = useRouteParamString("id") || "";
   const preselectedPlantId = useMemo(() => searchParams.get("plant"), [searchParams]);
   const rawFromParam = useMemo(() => searchParams.get("from"), [searchParams]);
 
@@ -326,7 +318,7 @@ export default function FeedingPage() {
     return (
       <PageShell title="Feeding">
         <SectionCard>
-          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
+          <PageAlerts notInvited />
         </SectionCard>
       </PageShell>
     );
@@ -342,10 +334,13 @@ export default function FeedingPage() {
         </Link>
       }
     >
-      {loading ? <p className={"text-sm text-muted-foreground"}>Loading feeding queue...</p> : null}
-      {error ? <p className={"text-sm text-destructive"}>{error}</p> : null}
-      {notice ? <Notice variant="success">{notice}</Notice> : null}
-      {offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
+      <PageAlerts
+        loading={loading}
+        loadingText="Loading feeding queue..."
+        error={error}
+        notice={notice}
+        offline={offline}
+      />
 
       {statusSummary && statusSummary.lifecycle.state !== "running" ? (
         <SectionCard title="Feeding Requires Running State">

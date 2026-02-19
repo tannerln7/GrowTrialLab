@@ -1,11 +1,12 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { backendFetch, normalizeBackendError, unwrapList } from "@/lib/backend";
 import { parseBackendErrorPayload } from "@/src/lib/backend-errors";
 import { ensureUnlocked, useSavingAction } from "@/src/lib/async/useSavingAction";
+import { useRouteParamString } from "@/src/lib/useRouteParamString";
 import {
   fetchExperimentStatusSummary,
   type ExperimentStatusSummary,
@@ -48,18 +49,9 @@ import {
 import type { PlacementWizardController } from "@/src/features/placement/wizard/types";
 
 export function usePlacementWizard(initialStep: number): PlacementWizardController {
-  const params = useParams();
   const router = useRouter();
 
-  const experimentId = useMemo(() => {
-    if (typeof params.id === "string") {
-      return params.id;
-    }
-    if (Array.isArray(params.id)) {
-      return params.id[0] ?? "";
-    }
-    return "";
-  }, [params]);
+  const experimentId = useRouteParamString("id") || "";
 
   const [currentStep, setCurrentStep] = useState<number>(parseStep(String(initialStep)));
 

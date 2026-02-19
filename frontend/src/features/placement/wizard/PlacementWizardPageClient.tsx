@@ -10,10 +10,9 @@ import { Step1Tents } from "@/src/features/placement/wizard/steps/Step1Tents";
 import { Step2Trays } from "@/src/features/placement/wizard/steps/Step2Trays";
 import { Step3PlantsToTrays } from "@/src/features/placement/wizard/steps/Step3PlantsToTrays";
 import { Step4TraysToSlots } from "@/src/features/placement/wizard/steps/Step4TraysToSlots";
-import IllustrationPlaceholder from "@/src/components/IllustrationPlaceholder";
 import { Button } from "@/src/components/ui/button";
 import { DraftChangeChip } from "@/src/components/ui/draft-change-chip";
-import { Notice } from "@/src/components/ui/notice";
+import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
 import SectionCard from "@/src/components/ui/SectionCard";
 import { StepNavBar } from "@/src/components/ui/step-nav-bar";
@@ -32,7 +31,7 @@ export function PlacementWizardPageClient({ initialStep }: PlacementWizardPageCl
     return (
       <PageShell title="Placement">
         <SectionCard>
-          <IllustrationPlaceholder inventoryId="ILL-001" kind="notInvited" />
+          <PageAlerts notInvited />
         </SectionCard>
       </PageShell>
     );
@@ -48,10 +47,13 @@ export function PlacementWizardPageClient({ initialStep }: PlacementWizardPageCl
         </Button>
       }
     >
-      {ui.loading ? <p className="text-sm text-muted-foreground">Loading placement...</p> : null}
-      {ui.error ? <p className="text-sm text-destructive">{ui.error}</p> : null}
-      {ui.notice ? <Notice variant="success">{ui.notice}</Notice> : null}
-      {ui.offline ? <IllustrationPlaceholder inventoryId="ILL-003" kind="offline" /> : null}
+      <PageAlerts
+        loading={ui.loading}
+        loadingText="Loading placement..."
+        error={ui.error}
+        notice={ui.notice}
+        offline={ui.offline}
+      />
 
       {locked ? (
         <SectionCard title="Placement Locked">

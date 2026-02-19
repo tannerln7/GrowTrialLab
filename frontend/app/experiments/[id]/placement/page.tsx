@@ -1,4 +1,5 @@
 import { parseStep } from "@/src/features/placement/utils";
+import { getParamString } from "@/src/lib/routing";
 import { PlacementWizardPageClient } from "@/src/features/placement/wizard/PlacementWizardPageClient";
 
 type PlacementPageProps = {
@@ -7,8 +8,7 @@ type PlacementPageProps = {
 
 export default async function PlacementPage({ searchParams }: PlacementPageProps) {
   const resolved = searchParams ? await searchParams : {};
-  const rawStep = resolved.step;
-  const stepValue = Array.isArray(rawStep) ? (rawStep[0] ?? null) : (rawStep ?? null);
+  const stepValue = getParamString(resolved.step);
   const initialStep = parseStep(stepValue);
 
   return <PlacementWizardPageClient initialStep={initialStep} />;
