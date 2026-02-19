@@ -9,6 +9,10 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { unwrapList } from "@/lib/backend";
 import { cn } from "@/lib/utils";
 import { api, isApiError } from "@/src/lib/api";
+import { parseApiErrorPayload } from "@/src/lib/errors/backendErrors";
+import { addManyToSet, removeManyFromSet, setHasAll, setWithAll, toggleSet } from "@/src/lib/collections/sets";
+import { formatTrayDisplay } from "@/src/lib/format/labels";
+import { buildChangeset, getDraftOrPersisted, isDirtyValue } from "@/src/lib/state/drafts";
 import { buttonVariants } from "@/src/components/ui/button";
 import PageAlerts from "@/src/components/ui/PageAlerts";
 import PageShell from "@/src/components/ui/PageShell";
@@ -18,7 +22,8 @@ import {
   RecipePlantDraftPanel,
   RecipeToolsPanel,
 } from "@/src/features/experiments/recipes/components/RecipePanels";
-import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { buildPersistedRecipeMap, isActivePlant, recipeLabel, sortPlantsById } from "@/src/features/experiments/recipes/utils";
+import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
@@ -73,39 +78,6 @@ type Diagnostics = {
   reason_counts?: Record<string, number>;
   invalid_updates?: Array<{ plant_id: string; reason: string }>;
 };
-
-function isActivePlant(status: string): boolean {
-  return status.toLowerCase() === "active";
-}
-
-function sortPlantsById(left: PlantCell, right: PlantCell): number {
-  const leftCode = left.plant_id || "";
-  const rightCode = right.plant_id || "";
-  if (leftCode !== rightCode) {
-    return leftCode.localeCompare(rightCode);
-  }
-  return left.uuid.localeCompare(right.uuid);
-}
-
-function recipeLabel(recipe: RecipeSummary | Recipe): string {
-  return recipe.name ? `${recipe.code} - ${recipe.name}` : recipe.code;
-}
-
-function formatTrayDisplay(rawValue: string | null | undefined, fallbackValue?: string): string {
-  const raw = (rawValue || "").trim() || (fallbackValue || "").trim();
-  if (!raw) {
-    return "";
-  }
-  const match = raw.match(/^(?:tray|tr|t)?[\s_-]*0*([0-9]+)$/i);
-  if (!match) {
-    return raw;
-  }
-  const trayNumber = Number.parseInt(match[1], 10);
-  if (!Number.isFinite(trayNumber)) {
-    return raw;
-  }
-  return `Tray ${trayNumber}`;
-}
 
 type ExperimentRecipesPageClientProps = {
   experimentId: string;
@@ -166,14 +138,8 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
   useEffect(() => {
     setSelectedBulkRecipeId((current) => (current && recipes.some((recipe) => recipe.id === current) ? current : recipes[0]?.id || ""));
     setSelectedRecipeIds((current) => {
-      const validIds = new Set(recipes.map((recipe) => recipe.id));
-      const next = new Set<string>();
-      for (const recipeId of current) {
-        if (validIds.has(recipeId)) {
-          next.add(recipeId);
-        }
-      }
-      return next;
+      const validIds = setWithAll(recipes.map((recipe) => recipe.id));
+      return setWithAll(Array.from(current).filter((recipeId) => validIds.has(recipeId)));
     });
   }, [recipes]);
 
@@ -230,37 +196,16 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
       return;
     }
 
-    const nextPersisted: Record<string, string | null> = {};
-    for (const tray of placement.trays.results) {
-      for (const plant of tray.plants) {
-        if (isActivePlant(plant.status)) {
-          nextPersisted[plant.uuid] = plant.assigned_recipe?.id || null;
-        }
-      }
-    }
-    for (const plant of placement.unplaced_plants.results) {
-      if (isActivePlant(plant.status)) {
-        nextPersisted[plant.uuid] = plant.assigned_recipe?.id || null;
-      }
-    }
-
+    const nextPersisted = buildPersistedRecipeMap(placement);
     setPersistedRecipeByPlantId(nextPersisted);
     setDraftPlantRecipe(nextPersisted);
-    setSelectedPlantIds(new Set());
+    setSelectedPlantIds(setWithAll<string>([]));
     setActivePlantAnchorId(null);
     setDiagnostics(null);
   }, [placement]);
 
   const draftChangeCount = useMemo(() => {
-    let count = 0;
-    for (const plantId of allPlantIds) {
-      const persistedRecipeId = persistedRecipeByPlantId[plantId] ?? null;
-      const draftRecipeId = draftPlantRecipe[plantId] ?? persistedRecipeId;
-      if ((persistedRecipeId || null) !== (draftRecipeId || null)) {
-        count += 1;
-      }
-    }
-    return count;
+    return buildChangeset<string | null>(allPlantIds, persistedRecipeByPlantId, draftPlantRecipe, { fallback: null }).length;
   }, [allPlantIds, draftPlantRecipe, persistedRecipeByPlantId]);
 
   const sameSpeciesDisabled = useMemo(() => {
@@ -281,15 +226,7 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     if (!plantById.has(plantId)) {
       return;
     }
-    setSelectedPlantIds((current) => {
-      const next = new Set(current);
-      if (next.has(plantId)) {
-        next.delete(plantId);
-      } else {
-        next.add(plantId);
-      }
-      return next;
-    });
+    setSelectedPlantIds((current) => toggleSet(current, plantId));
     setActivePlantAnchorId(plantId);
   }, [plantById]);
 
@@ -298,21 +235,15 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
       return;
     }
     setSelectedPlantIds((current) => {
-      const next = new Set(current);
-      const allSelected = plantIds.every((plantId) => next.has(plantId));
-      for (const plantId of plantIds) {
-        if (allSelected) {
-          next.delete(plantId);
-        } else {
-          next.add(plantId);
-        }
+      if (setHasAll(current, plantIds)) {
+        return removeManyFromSet(current, plantIds);
       }
-      return next;
+      return addManyToSet(current, plantIds);
     });
   }, []);
 
   const selectAllPlants = useCallback(() => {
-    setSelectedPlantIds(new Set(allPlantIds));
+    setSelectedPlantIds(setWithAll(allPlantIds));
     setActivePlantAnchorId((current) => current || allPlantIds[0] || null);
   }, [allPlantIds]);
 
@@ -325,11 +256,11 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
       return;
     }
     const matching = allPlantIds.filter((plantId) => plantById.get(plantId)?.species_id === anchor.species_id);
-    setSelectedPlantIds(new Set(matching));
+    setSelectedPlantIds(setWithAll(matching));
   }, [activePlantAnchorId, allPlantIds, plantById]);
 
   const clearPlantSelection = useCallback(() => {
-    setSelectedPlantIds(new Set());
+    setSelectedPlantIds(setWithAll<string>([]));
     setActivePlantAnchorId(null);
   }, []);
 
@@ -399,8 +330,9 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
     },
     onError: (mutationError) => {
       if (isApiError(mutationError)) {
-        setError(mutationError.detail || "Unable to save recipe assignments.");
-        setDiagnostics((mutationError.diagnostics as Diagnostics | undefined) || null);
+        const parsed = parseApiErrorPayload<Diagnostics>(mutationError, "Unable to save recipe assignments.");
+        setError(parsed.detail);
+        setDiagnostics(parsed.diagnostics);
         return;
       }
       const normalized = normalizeUserFacingError(mutationError, "Unable to save recipe assignments.");
@@ -415,19 +347,12 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
   });
 
   const saveDrafts = useCallback(async () => {
-    const updates = allPlantIds
-      .map((plantId) => {
-        const persistedRecipeId = persistedRecipeByPlantId[plantId] ?? null;
-        const draftRecipeId = draftPlantRecipe[plantId] ?? persistedRecipeId;
-        if ((persistedRecipeId || null) === (draftRecipeId || null)) {
-          return null;
-        }
-        return {
-          plant_id: plantId,
-          assigned_recipe_id: draftRecipeId,
-        };
-      })
-      .filter((item): item is { plant_id: string; assigned_recipe_id: string | null } => item !== null);
+    const updates = buildChangeset<string | null>(allPlantIds, persistedRecipeByPlantId, draftPlantRecipe, { fallback: null }).map(
+      (change) => ({
+        plant_id: change.key,
+        assigned_recipe_id: change.draftValue,
+      }),
+    );
 
     if (updates.length === 0) {
       setNotice("No staged recipe changes to save.");
@@ -479,19 +404,11 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
   }, [createRecipeMutation]);
 
   const toggleRecipeSelection = useCallback((recipeId: string) => {
-    setSelectedRecipeIds((current) => {
-      const next = new Set(current);
-      if (next.has(recipeId)) {
-        next.delete(recipeId);
-      } else {
-        next.add(recipeId);
-      }
-      return next;
-    });
+    setSelectedRecipeIds((current) => toggleSet(current, recipeId));
   }, []);
 
   const clearRecipeSelection = useCallback(() => {
-    setSelectedRecipeIds(new Set());
+    setSelectedRecipeIds(setWithAll<string>([]));
   }, []);
 
   const deleteRecipesMutation = useMutation({
@@ -515,7 +432,7 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
       setOffline(false);
     },
     onSuccess: async ({ deletedCount }) => {
-      setSelectedRecipeIds(new Set());
+      setSelectedRecipeIds(setWithAll<string>([]));
       setNotice(`Deleted ${deletedCount} recipe(s).`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: recipesQueryKey }),
@@ -532,8 +449,9 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
       }
 
       if (isApiError(details.mutationError)) {
-        setError(details.mutationError.detail || "Unable to delete selected recipes.");
-        setDiagnostics((details.mutationError.diagnostics as Diagnostics | undefined) || null);
+        const parsed = parseApiErrorPayload<Diagnostics>(details.mutationError, "Unable to delete selected recipes.");
+        setError(parsed.detail);
+        setDiagnostics(parsed.diagnostics);
         return;
       }
 
@@ -564,9 +482,9 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
 
     const selected = selectedPlantIds.has(plantId);
     const persistedRecipeId = persistedRecipeByPlantId[plantId] ?? null;
-    const draftRecipeId = draftPlantRecipe[plantId] ?? persistedRecipeId;
+    const draftRecipeId = getDraftOrPersisted<string | null>(draftPlantRecipe, persistedRecipeByPlantId, plantId, null);
     const draftRecipe = draftRecipeId ? recipeById.get(draftRecipeId) || null : null;
-    const dirty = (persistedRecipeId || null) !== (draftRecipeId || null);
+    const dirty = isDirtyValue(persistedRecipeId, draftRecipeId);
 
     return (
       <article

@@ -19,7 +19,7 @@ import SectionCard from "@/src/components/ui/SectionCard";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import { Textarea } from "@/src/components/ui/textarea";
 import { api, isApiError } from "@/src/lib/api";
-import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
 

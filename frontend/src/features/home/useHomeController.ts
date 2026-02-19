@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api } from "@/src/lib/api";
-import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
 
 export function useHomeController() {
   const [result, setResult] = useState<string>("");

@@ -19,7 +19,7 @@ import {
   RotationTraysPanel,
 } from "@/src/features/experiments/rotation/components/RotationPanels";
 import { api } from "@/src/lib/api";
-import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
 

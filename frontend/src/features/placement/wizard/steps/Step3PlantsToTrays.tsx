@@ -1,6 +1,7 @@
 import { CheckSquare, Layers, MoveRight, Trash2, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { getDraftOrPersisted, isDirtyValue } from "@/src/lib/state/drafts";
 import { draftChipLabelForStep, formatTrayDisplay } from "@/src/features/placement/utils";
 import type { Step3Actions, Step3Model } from "@/src/features/placement/wizard/types";
 import { PlantSelectableCell } from "@/src/features/placement/components/placement-cells";
@@ -20,6 +21,12 @@ type Step3PlantsToTraysProps = {
 };
 
 export function Step3PlantsToTrays({ model, actions }: Step3PlantsToTraysProps) {
+  const isPlantPlacementDirty = (plantId: string): boolean => {
+    const persisted = model.persistedPlantToTray[plantId] ?? null;
+    const draft = getDraftOrPersisted<string | null>(model.draftPlantToTray, model.persistedPlantToTray, plantId, null);
+    return isDirtyValue(persisted, draft);
+  };
+
   return (
     <div className="grid gap-3">
       <SectionCard
@@ -107,10 +114,7 @@ export function Step3PlantsToTrays({ model, actions }: Step3PlantsToTraysProps) 
                 key={plant.uuid}
                 plant={plant}
                 selected={model.selectedPlantIds.has(plantId)}
-                dirty={
-                  (model.persistedPlantToTray[plantId] ?? null) !==
-                  (model.draftPlantToTray[plantId] ?? model.persistedPlantToTray[plantId] ?? null)
-                }
+                dirty={isPlantPlacementDirty(plantId)}
                 onToggle={actions.togglePlantSelection}
               />
             );
@@ -169,10 +173,7 @@ export function Step3PlantsToTrays({ model, actions }: Step3PlantsToTraysProps) 
                         key={plant.uuid}
                         plant={plant}
                         selected={model.selectedPlantIds.has(plantId)}
-                        dirty={
-                          (model.persistedPlantToTray[plantId] ?? null) !==
-                          (model.draftPlantToTray[plantId] ?? model.persistedPlantToTray[plantId] ?? null)
-                        }
+                        dirty={isPlantPlacementDirty(plantId)}
                         onToggle={actions.togglePlantSelection}
                       />
                     );

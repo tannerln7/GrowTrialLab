@@ -1,7 +1,7 @@
 import type { QueryObserverResult } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
 
 export type PageErrorKind =
   | "offline"

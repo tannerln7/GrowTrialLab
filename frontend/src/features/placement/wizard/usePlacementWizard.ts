@@ -7,8 +7,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { unwrapList } from "@/lib/backend";
 import { ensureUnlocked, useSavingAction } from "@/src/lib/async/useSavingAction";
+import { addManyToSet, removeManyFromSet, setDifference, setWithAll, toggleSet } from "@/src/lib/collections/sets";
 import { api, isApiError } from "@/src/lib/api";
+import { parseApiErrorPayload } from "@/src/lib/errors/backendErrors";
 import { queryKeys } from "@/src/lib/queryKeys";
+import { buildChangeset } from "@/src/lib/state/drafts";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
 import { useRouteParamString } from "@/src/lib/useRouteParamString";
 import { type ExperimentStatusSummary } from "@/lib/experiment-status";
@@ -98,20 +101,6 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     setOffline,
     setDiagnostics,
   });
-
-  function toApiErrorPayload(
-    requestError: unknown,
-    fallback: string,
-  ): { detail: string; diagnostics: Diagnostics | null } {
-    if (isApiError(requestError)) {
-      const payload = requestError.payload as { detail?: string; diagnostics?: Diagnostics } | undefined;
-      return {
-        detail: payload?.detail || requestError.detail || fallback,
-        diagnostics: payload?.diagnostics ?? null,
-      };
-    }
-    return { detail: fallback, diagnostics: null };
-  }
 
   const placementLocked = statusSummary?.lifecycle.state === "running";
 
@@ -391,8 +380,8 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
 
     setDestinationTrayId((current) => (current && trayById.has(current) ? current : trays[0]?.tray_id || ""));
     setDestinationSlotId((current) => (current && slotById.has(current) ? current : ""));
-    setSelectedPlantIds(new Set());
-    setSelectedTrayIds(new Set());
+    setSelectedPlantIds(setWithAll<string>([]));
+    setSelectedTrayIds(setWithAll<string>([]));
     setActivePlantAnchorId(null);
   }, [slotById, summary?.unplaced_plants.results, tents, trayById, trays]);
 
@@ -672,13 +661,13 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       setNotice("Discarded step 2 draft changes.");
     } else if (currentStep === 3) {
       setDraftPlantToTray(persistedPlantToTray);
-      setSelectedPlantIds(new Set());
+      setSelectedPlantIds(setWithAll<string>([]));
       setActivePlantAnchorId(null);
       setDiagnostics(null);
       setNotice("Discarded step 3 draft changes.");
     } else {
       setDraftTrayToSlot(persistedTrayToSlot);
-      setSelectedTrayIds(new Set());
+      setSelectedTrayIds(setWithAll<string>([]));
       setDestinationSlotId("");
       setDiagnostics(null);
       setNotice("Discarded step 4 draft changes.");
@@ -713,7 +702,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
             allowed_species: [],
           });
         } catch (requestError) {
-          const payload = toApiErrorPayload(requestError, "Unable to create tent.");
+          const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to create tent.");
           setError(payload.detail);
           return false;
         }
@@ -748,7 +737,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
         try {
           await api.delete(`/api/v1/tents/${removableTent.tent_id}`);
         } catch (requestError) {
-          const payload = toApiErrorPayload(requestError, "Unable to remove tent.");
+          const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to remove tent.");
           setError(payload.detail);
           setDiagnostics(payload.diagnostics);
           return false;
@@ -825,7 +814,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
               allowed_species: tentDraftMeta.draftAllowedSpeciesIds,
             });
           } catch (requestError) {
-            const payload = toApiErrorPayload(requestError, "Unable to update tent details.");
+            const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to update tent details.");
             setError(`${tent.name}: ${payload.detail}`);
             setDiagnostics(payload.diagnostics);
             return false;
@@ -850,7 +839,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
           try {
             await api.post(`/api/v1/tents/${tent.tent_id}/slots/generate`, { layout });
           } catch (requestError) {
-            const payload = toApiErrorPayload(requestError, "Unable to generate slots.");
+            const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to generate slots.");
             const orphanDiagnostics = payload.diagnostics as
               | {
                   would_orphan_trays?: Array<{ tray_code: string; slot_shelf_index: number; slot_index: number }>;
@@ -958,7 +947,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
               createdCount += 1;
               mutationCount += 1;
             } catch (requestError) {
-              const payload = toApiErrorPayload(requestError, "Unable to add trays.");
+              const payload = parseApiErrorPayload<Diagnostics>(requestError, "Unable to add trays.");
               if (mutationCount > 0) {
                 await reloadPlacementData();
               }
@@ -974,7 +963,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
             try {
               await api.delete(`/api/v1/trays/${trayId}/`);
             } catch (requestError) {
-              const parsed = toApiErrorPayload(requestError, "Unable to remove trays.");
+              const parsed = parseApiErrorPayload<Diagnostics>(requestError, "Unable to remove trays.");
               setError(parsed.detail);
               setDiagnostics(parsed.diagnostics);
               if (mutationCount > 0) {
@@ -1005,7 +994,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
               capacity: draftCapacity,
             });
           } catch (requestError) {
-            const parsed = toApiErrorPayload(requestError, "Unable to update tray capacity.");
+            const parsed = parseApiErrorPayload<Diagnostics>(requestError, "Unable to update tray capacity.");
             setError(parsed.detail);
             setDiagnostics(parsed.diagnostics);
             if (mutationCount > 0) {
@@ -1039,26 +1028,12 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       return;
     }
 
-    setSelectedPlantIds((current) => {
-      const next = new Set(current);
-      if (next.has(plantId)) {
-        next.delete(plantId);
-      } else {
-        next.add(plantId);
-      }
-      return next;
-    });
+    setSelectedPlantIds((current) => toggleSet(current, plantId));
     setActivePlantAnchorId(plantId);
   }
 
   function selectAllPlantsInMainGrid() {
-    setSelectedPlantIds((current) => {
-      const next = new Set(current);
-      for (const plantId of mainGridPlantIds) {
-        next.add(plantId);
-      }
-      return next;
-    });
+    setSelectedPlantIds((current) => addManyToSet(current, mainGridPlantIds));
     setActivePlantAnchorId((current) => current || mainGridPlantIds[0] || null);
   }
 
@@ -1071,28 +1046,20 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       return;
     }
 
-    const mainGridSet = new Set(mainGridPlantIds);
+    const mainGridSet = setWithAll(mainGridPlantIds);
     const matching = mainGridPlantIds.filter((plantId) => {
       const plant = plantById.get(plantId);
       return !!plant && plant.species_id === anchor.species_id;
     });
 
     setSelectedPlantIds((current) => {
-      const next = new Set<string>();
-      for (const plantId of current) {
-        if (!mainGridSet.has(plantId)) {
-          next.add(plantId);
-        }
-      }
-      for (const plantId of matching) {
-        next.add(plantId);
-      }
-      return next;
+      const outsideMainGrid = setDifference(current, mainGridSet);
+      return addManyToSet(outsideMainGrid, matching);
     });
   }
 
   function clearPlantSelection() {
-    setSelectedPlantIds(new Set());
+    setSelectedPlantIds(setWithAll<string>([]));
     setActivePlantAnchorId(null);
   }
 
@@ -1186,11 +1153,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     });
 
     setSelectedPlantIds((current) => {
-      const next = new Set(current);
-      for (const plantId of selectedInMainGrid) {
-        next.delete(plantId);
-      }
-      return next;
+      return removeManyFromSet(current, selectedInMainGrid);
     });
 
     setDiagnostics(null);
@@ -1219,11 +1182,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     });
 
     setSelectedPlantIds((current) => {
-      const next = new Set(current);
-      for (const plantId of selectedInTray) {
-        next.delete(plantId);
-      }
-      return next;
+      return removeManyFromSet(current, selectedInTray);
     });
 
     setDiagnostics(null);
@@ -1236,29 +1195,15 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       return;
     }
 
-    setSelectedTrayIds((current) => {
-      const next = new Set(current);
-      if (next.has(trayId)) {
-        next.delete(trayId);
-      } else {
-        next.add(trayId);
-      }
-      return next;
-    });
+    setSelectedTrayIds((current) => toggleSet(current, trayId));
   }
 
   function clearTraySelection() {
-    setSelectedTrayIds(new Set());
+    setSelectedTrayIds(setWithAll<string>([]));
   }
 
   function selectAllTraysInMainGrid() {
-    setSelectedTrayIds((current) => {
-      const next = new Set(current);
-      for (const trayId of mainGridTrayIds) {
-        next.add(trayId);
-      }
-      return next;
-    });
+    setSelectedTrayIds((current) => addManyToSet(current, mainGridTrayIds));
   }
 
   function toggleDestinationSlot(slotId: string) {
@@ -1290,7 +1235,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       return;
     }
 
-    const selectedSet = new Set(selected);
+    const selectedSet = setWithAll(selected);
     const availableSlots = sortedSlots
       .slice(startIndex)
       .filter((slot) => {
@@ -1323,7 +1268,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       return next;
     });
 
-    setSelectedTrayIds(new Set());
+    setSelectedTrayIds(setWithAll<string>([]));
     setDiagnostics(null);
     setError("");
     setNotice(`${selected.length} tray(s) staged into slots.`);
@@ -1348,11 +1293,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     });
 
     setSelectedTrayIds((current) => {
-      const next = new Set(current);
-      for (const trayId of selectedInTent) {
-        next.delete(trayId);
-      }
-      return next;
+      return removeManyFromSet(current, selectedInTent);
     });
 
     setError("");
@@ -1365,24 +1306,15 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       return false;
     }
 
-    const placementChanges = sortedPlantIds
-      .map((plantId) => {
-        const persistedTrayId = persistedPlantToTray[plantId] ?? null;
-        const stagedTrayId = draftPlantToTray[plantId] ?? persistedTrayId;
-        if ((persistedTrayId || null) === (stagedTrayId || null)) {
-          return null;
-        }
-        return {
-          plantId,
-          persistedTrayId,
-          stagedTrayId,
-          plantCode: plantById.get(plantId)?.plant_id || plantId,
-        };
-      })
-      .filter(
-        (item): item is { plantId: string; persistedTrayId: string | null; stagedTrayId: string | null; plantCode: string } =>
-          item !== null,
-      )
+    const placementChanges = buildChangeset<string | null>(sortedPlantIds, persistedPlantToTray, draftPlantToTray, {
+      fallback: null,
+    })
+      .map((change) => ({
+        plantId: change.key,
+        persistedTrayId: change.persistedValue,
+        stagedTrayId: change.draftValue,
+        plantCode: plantById.get(change.key)?.plant_id || change.key,
+      }))
       .sort((left, right) => left.plantCode.localeCompare(right.plantCode));
 
     if (placementChanges.length === 0) {
@@ -1408,7 +1340,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
           try {
             await api.delete(`/api/v1/trays/${removal.persistedTrayId}/plants/${row.trayPlantId}`);
           } catch (requestError) {
-            const parsed = toApiErrorPayload(requestError, "Unable to apply plant/tray layout changes.");
+            const parsed = parseApiErrorPayload<Diagnostics>(requestError, "Unable to apply plant/tray layout changes.");
             setError(parsed.detail);
             setDiagnostics(parsed.diagnostics);
             return false;
@@ -1423,7 +1355,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
           try {
             await api.post(`/api/v1/trays/${addition.stagedTrayId}/plants`, { plant_id: addition.plantId });
           } catch (requestError) {
-            const parsed = toApiErrorPayload(requestError, "Unable to apply plant/tray layout changes.");
+            const parsed = parseApiErrorPayload<Diagnostics>(requestError, "Unable to apply plant/tray layout changes.");
             setError(parsed.detail);
             setDiagnostics(parsed.diagnostics);
             return false;
@@ -1442,23 +1374,13 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
       return false;
     }
 
-    const slotChanges = sortedTrayIds
-      .map((trayId) => {
-        const persistedSlotId = persistedTrayToSlot[trayId] ?? null;
-        const draftSlotId = draftTrayToSlot[trayId] ?? persistedSlotId;
-        if ((persistedSlotId || null) === (draftSlotId || null)) {
-          return null;
-        }
-        return {
-          trayId,
-          persistedSlotId,
-          draftSlotId,
-        };
-      })
-      .filter(
-        (item): item is { trayId: string; persistedSlotId: string | null; draftSlotId: string | null } =>
-          item !== null,
-      );
+    const slotChanges = buildChangeset<string | null>(sortedTrayIds, persistedTrayToSlot, draftTrayToSlot, {
+      fallback: null,
+    }).map((change) => ({
+      trayId: change.key,
+      persistedSlotId: change.persistedValue,
+      draftSlotId: change.draftValue,
+    }));
 
     if (slotChanges.length === 0) {
       setNotice("No staged tray/slot changes to apply.");
@@ -1479,7 +1401,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
           try {
             await api.patch(`/api/v1/trays/${change.trayId}/`, { slot_id: null });
           } catch (requestError) {
-            const parsed = toApiErrorPayload(requestError, "Unable to apply tray/slot layout changes.");
+            const parsed = parseApiErrorPayload<Diagnostics>(requestError, "Unable to apply tray/slot layout changes.");
             setError(parsed.detail);
             setDiagnostics(parsed.diagnostics);
             return false;
@@ -1494,7 +1416,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
           try {
             await api.patch(`/api/v1/trays/${change.trayId}/`, { slot_id: change.draftSlotId });
           } catch (requestError) {
-            const parsed = toApiErrorPayload(requestError, "Unable to apply tray/slot layout changes.");
+            const parsed = parseApiErrorPayload<Diagnostics>(requestError, "Unable to apply tray/slot layout changes.");
             setError(parsed.detail);
             setDiagnostics(parsed.diagnostics);
             return false;
@@ -1544,12 +1466,7 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
 
   const toggleTentAllowedSpecies = useCallback((tentId: string, speciesId: string) => {
     setTentAllowedSpeciesDraftById((current) => {
-      const next = new Set(current[tentId] || []);
-      if (next.has(speciesId)) {
-        next.delete(speciesId);
-      } else {
-        next.add(speciesId);
-      }
+      const next = toggleSet(setWithAll(current[tentId] || []), speciesId);
       return { ...current, [tentId]: Array.from(next) };
     });
   }, []);

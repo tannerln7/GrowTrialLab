@@ -2,6 +2,7 @@ import { ArrowRight, CheckSquare, X } from "lucide-react";
 import { useCallback } from "react";
 
 import { cn } from "@/lib/utils";
+import { getDraftOrPersisted, isDirtyValue } from "@/src/lib/state/drafts";
 import { draftChipLabelForStep, formatTrayDisplay } from "@/src/features/placement/utils";
 import type { Step4Actions, Step4Model } from "@/src/features/placement/wizard/types";
 import { TentSlotBoard } from "@/src/features/placement/components/tent-slot-board";
@@ -20,6 +21,15 @@ type Step4TraysToSlotsProps = {
 };
 
 export function Step4TraysToSlots({ model, actions }: Step4TraysToSlotsProps) {
+  const isTraySlotDirty = useCallback(
+    (trayId: string) => {
+      const persisted = model.persistedTrayToSlot[trayId] ?? null;
+      const draft = getDraftOrPersisted<string | null>(model.draftTrayToSlot, model.persistedTrayToSlot, trayId, null);
+      return isDirtyValue(persisted, draft);
+    },
+    [model.draftTrayToSlot, model.persistedTrayToSlot],
+  );
+
   const renderTrayCell = useCallback(
     (trayId: string, inSlot?: boolean) => {
       const tray = model.trayById.get(trayId);
@@ -33,12 +43,12 @@ export function Step4TraysToSlots({ model, actions }: Step4TraysToSlotsProps) {
           tray={tray}
           inSlot={inSlot}
           selected={model.selectedTrayIds.has(trayId)}
-          dirty={(model.persistedTrayToSlot[trayId] ?? null) !== (model.draftTrayToSlot[trayId] ?? model.persistedTrayToSlot[trayId] ?? null)}
+          dirty={isTraySlotDirty(trayId)}
           onToggle={actions.toggleTraySelection}
         />
       );
     },
-    [actions.toggleTraySelection, model.draftTrayToSlot, model.persistedTrayToSlot, model.selectedTrayIds, model.trayById],
+    [actions.toggleTraySelection, isTraySlotDirty, model.selectedTrayIds, model.trayById],
   );
 
   return (

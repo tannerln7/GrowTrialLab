@@ -1,3 +1,7 @@
+import { setHasAll, setWithAll } from "@/src/lib/collections/sets";
+import { formatTrayDisplay } from "@/src/lib/format/labels";
+import { buildChangeset } from "@/src/lib/state/drafts";
+
 import type {
   PlantCell,
   PersistedTrayPlantRow,
@@ -125,16 +129,11 @@ export function areStringSetsEqual(left: string[], right: string[]): boolean {
   if (left.length !== right.length) {
     return false;
   }
-  const leftSet = new Set(left);
+  const leftSet = setWithAll(left);
   if (leftSet.size !== right.length) {
     return false;
   }
-  for (const value of right) {
-    if (!leftSet.has(value)) {
-      return false;
-    }
-  }
-  return true;
+  return setHasAll(leftSet, right);
 }
 
 export function parseStep(rawStep: string | null): number {
@@ -145,21 +144,7 @@ export function parseStep(rawStep: string | null): number {
   return Math.min(4, Math.max(1, parsed));
 }
 
-export function formatTrayDisplay(rawValue: string | null | undefined, fallbackValue?: string): string {
-  const raw = (rawValue || "").trim() || (fallbackValue || "").trim();
-  if (!raw) {
-    return "";
-  }
-  const match = raw.match(/^(?:tray|tr|t)?[\s_-]*0*([0-9]+)$/i);
-  if (!match) {
-    return raw;
-  }
-  const trayNumber = Number.parseInt(match[1], 10);
-  if (!Number.isFinite(trayNumber)) {
-    return raw;
-  }
-  return `Tray ${trayNumber}`;
-}
+export { formatTrayDisplay };
 
 export function formatDraftChipLabel(count: number, singular: string): string {
   return `${count} ${singular}${count === 1 ? "" : "s"}`;
@@ -285,23 +270,17 @@ export function buildPlantDraftStats(
   persistedPlantToTray: Record<string, string | null>,
   draftPlantToTray: Record<string, string | null>,
 ): { changeCount: number; dirtyContainerTrayIds: Set<string> } {
-  let changeCount = 0;
+  const changes = buildChangeset<string | null>(sortedPlantIds, persistedPlantToTray, draftPlantToTray, { fallback: null });
   const dirtyContainerTrayIds = new Set<string>();
-  for (const plantId of sortedPlantIds) {
-    const persistedTrayId = persistedPlantToTray[plantId] ?? null;
-    const draftTrayId = draftPlantToTray[plantId] ?? persistedTrayId;
-    if ((persistedTrayId || null) === (draftTrayId || null)) {
-      continue;
+  for (const change of changes) {
+    if (change.persistedValue) {
+      dirtyContainerTrayIds.add(change.persistedValue);
     }
-    changeCount += 1;
-    if (persistedTrayId) {
-      dirtyContainerTrayIds.add(persistedTrayId);
-    }
-    if (draftTrayId) {
-      dirtyContainerTrayIds.add(draftTrayId);
+    if (change.draftValue) {
+      dirtyContainerTrayIds.add(change.draftValue);
     }
   }
-  return { changeCount, dirtyContainerTrayIds };
+  return { changeCount: changes.length, dirtyContainerTrayIds };
 }
 
 export function buildTraySlotDraftStats(
@@ -309,23 +288,17 @@ export function buildTraySlotDraftStats(
   persistedTrayToSlot: Record<string, string | null>,
   draftTrayToSlot: Record<string, string | null>,
 ): { changeCount: number; dirtySlotIds: Set<string> } {
-  let changeCount = 0;
+  const changes = buildChangeset<string | null>(sortedTrayIds, persistedTrayToSlot, draftTrayToSlot, { fallback: null });
   const dirtySlotIds = new Set<string>();
-  for (const trayId of sortedTrayIds) {
-    const persistedSlotId = persistedTrayToSlot[trayId] ?? null;
-    const draftSlotId = draftTrayToSlot[trayId] ?? persistedSlotId;
-    if ((persistedSlotId || null) === (draftSlotId || null)) {
-      continue;
+  for (const change of changes) {
+    if (change.persistedValue) {
+      dirtySlotIds.add(change.persistedValue);
     }
-    changeCount += 1;
-    if (persistedSlotId) {
-      dirtySlotIds.add(persistedSlotId);
-    }
-    if (draftSlotId) {
-      dirtySlotIds.add(draftSlotId);
+    if (change.draftValue) {
+      dirtySlotIds.add(change.draftValue);
     }
   }
-  return { changeCount, dirtySlotIds };
+  return { changeCount: changes.length, dirtySlotIds };
 }
 
 export function buildTrayCapacityDraftStats(

@@ -18,7 +18,7 @@ import {
   PlantsToolsPanel,
 } from "@/src/features/experiments/plants/components/PlantsPanels";
 import { api, isApiError } from "@/src/lib/api";
-import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
 

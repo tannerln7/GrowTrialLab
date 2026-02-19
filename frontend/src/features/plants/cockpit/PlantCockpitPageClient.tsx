@@ -30,7 +30,8 @@ import SectionCard from "@/src/components/ui/SectionCard";
 import StickyActionBar from "@/src/components/ui/StickyActionBar";
 import { Textarea } from "@/src/components/ui/textarea";
 import { api, isApiError } from "@/src/lib/api";
-import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { formatRecipeLabel } from "@/src/lib/format/labels";
+import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
 
@@ -223,10 +224,6 @@ function formatScheduleSlot(dateValue: string, timeframe: string | null, exactTi
     return `${day} · ${timeframe.toLowerCase()}`;
   }
   return day;
-}
-
-function recipeLabel(recipe: { code: string; name: string }): string {
-  return recipe.name ? `${recipe.code} - ${recipe.name}` : recipe.code;
 }
 
 function trayOccupancyLabel(cockpit: PlantCockpit): string {
@@ -660,7 +657,7 @@ export function PlantCockpitPageClient({ plantUuid }: PlantCockpitPageClientProp
                 </Badge>
                 {cockpit.derived.assigned_recipe ? (
                   <Badge variant="secondary">
-                    Recipe: {recipeLabel(cockpit.derived.assigned_recipe)}
+                    Recipe: {formatRecipeLabel(cockpit.derived.assigned_recipe)}
                   </Badge>
                 ) : (
                   <Badge variant="secondary">Recipe: Unassigned</Badge>
@@ -793,7 +790,7 @@ export function PlantCockpitPageClient({ plantUuid }: PlantCockpitPageClientProp
                             <option value="">Select recipe</option>
                             {recipes.map((recipe) => (
                               <option key={recipe.id} value={recipe.id}>
-                                {recipeLabel(recipe)}
+                                {formatRecipeLabel(recipe)}
                               </option>
                             ))}
                           </NativeSelect>

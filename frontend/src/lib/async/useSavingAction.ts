@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import { normalizeUserFacingError } from "@/src/lib/error-normalization";
+import { normalizeUserFacingError } from "@/src/lib/errors/normalizeError";
 
 type EnsureUnlockedArgs = {
   locked: boolean;
