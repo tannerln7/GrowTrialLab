@@ -15,6 +15,9 @@ export type BackendErrorShape = {
   message: string;
 };
 
+/**
+ * @deprecated Use `api.*` helpers from `frontend/src/lib/api.ts` for UI/server-state calls.
+ */
 export async function backendFetch(
   path: string,
   init?: RequestInit,
