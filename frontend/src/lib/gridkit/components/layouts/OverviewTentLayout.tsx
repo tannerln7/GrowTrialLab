@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
-import { Badge } from "@/src/components/ui/badge";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import { POSITION_STRIP_PRESET } from "@/src/lib/gridkit/presets";
 import type { PlantOccupantSpec, PositionSpec, TentLayoutSpec, TrayOccupantSpec } from "@/src/lib/gridkit/spec";
@@ -17,6 +16,31 @@ import { ShelfCard, ShelfStack, TentCard, TentGrid } from "../containers";
 
 function readTrayCount(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function withOverviewOccupancyChip(
+  tray: TrayOccupantSpec,
+  occupancy: {
+    currentCount: number | null | undefined;
+    capacity: number | null | undefined;
+  },
+): TrayOccupantSpec {
+  if (occupancy.currentCount == null || occupancy.capacity == null) {
+    return tray;
+  }
+
+  return {
+    ...tray,
+    chips: [
+      ...(tray.chips || []),
+      {
+        id: `${tray.id}-occupancy`,
+        label: `${occupancy.currentCount}/${occupancy.capacity} Plants`,
+        tone: "muted",
+        placement: "bottom",
+      },
+    ],
+  };
 }
 
 type OverviewTentLayoutBaseProps = {
@@ -79,21 +103,24 @@ export function OverviewTentLayout({
             <div className="h-full min-h-[118px] max-sm:min-h-[104px]">
               <div className={styles.overviewSlotTrayStack}>
                 <TrayCellExpandable
-                  tray={{ ...position.occupant, summaryLines: [] }}
+                  tray={withOverviewOccupancyChip(
+                    {
+                      ...position.occupant,
+                      summaryLines: [],
+                      currentCount: null,
+                      capacity: null,
+                    },
+                    {
+                      currentCount: position.occupant.currentCount,
+                      capacity: position.occupant.capacity,
+                    },
+                  )}
                   position={position}
                   plants={plants}
                   onPlantPress={ctx.trayFolder?.onPlantPress}
                   className={cn(styles.overviewTrayCell, "h-full")}
                   titleClassName={cn(styles.trayGridCellId, "w-full text-center")}
                   metaClassName={cn(styles.overviewTrayMeta, "mt-auto justify-center")}
-                  triggerMeta={
-                    position.occupant.currentCount != null &&
-                    position.occupant.capacity != null ? (
-                      <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
-                        {position.occupant.currentCount}/{position.occupant.capacity} Plants
-                      </Badge>
-                    ) : null
-                  }
                 />
               </div>
             </div>
@@ -120,20 +147,24 @@ export function OverviewTentLayout({
                 {trays.map((tray) => (
                   <TrayCellExpandable
                     key={tray.id}
-                    tray={{ ...tray, summaryLines: [] }}
+                    tray={withOverviewOccupancyChip(
+                      {
+                        ...tray,
+                        summaryLines: [],
+                        currentCount: null,
+                        capacity: null,
+                      },
+                      {
+                        currentCount: tray.currentCount,
+                        capacity: tray.capacity,
+                      },
+                    )}
                     position={position}
                     plants={ctx.trayFolder?.getPlantsForTray(tray.trayId, position) || tray.plants || []}
                     onPlantPress={ctx.trayFolder?.onPlantPress}
                     className={cn(styles.overviewTrayCell, trays.length === 1 ? "h-full" : "")}
                     titleClassName={cn(styles.trayGridCellId, "w-full text-center")}
                     metaClassName={cn(styles.overviewTrayMeta, "mt-auto justify-center")}
-                    triggerMeta={
-                      tray.currentCount != null && tray.capacity != null ? (
-                        <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
-                          {tray.currentCount}/{tray.capacity} Plants
-                        </Badge>
-                      ) : null
-                    }
                   />
                 ))}
               </div>
