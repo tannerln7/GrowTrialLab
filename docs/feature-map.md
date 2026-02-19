@@ -1,6 +1,6 @@
 # GrowTrialLab Feature Map
 
-Last updated: 2026-02-18  
+Last updated: 2026-02-19  
 Source set reviewed: `docs/unified-project-notes.md` + `docs/legacy/*` (decisions, checklist, watch-outs, findings, testing notes, illustration inventory)
 
 This file is the execution-focused feature map for product and engineering status.
@@ -26,6 +26,32 @@ This file is the execution-focused feature map for product and engineering statu
   - nested location object
 
 ## Timeline: Completed Features
+
+### 2026-02-19 (Placement Wizard Modular Refactor)
+- `Completed` Placement route was refactored into a thin wrapper plus modular wizard feature implementation without changing operator behavior.
+  - Route wrapper now parses `searchParams.step` once and passes `initialStep` into the client orchestrator.
+  - Added `frontend/src/features/placement/wizard/*` with `PlacementWizardPageClient`, `usePlacementWizard`, and step modules (`Step1Tents`, `Step2Trays`, `Step3PlantsToTrays`, `Step4TraysToSlots`).
+  - Added shared generic workflow helpers:
+    - `frontend/src/lib/async/useSavingAction.ts` (`ensureUnlocked`, `useSavingAction`)
+    - `frontend/src/lib/backend-errors.ts` (`parseBackendErrorPayload`)
+  - Removed duplicate placement initial-load status fetch by reusing the first status payload.
+  - Moved placement className join/filter patterns to `cn(...)` in extracted step modules and placement shared components.
+  - Reused shared backend-error parsing on `recipes` as a bounded non-wizard adoption.
+  - Relevant files:
+    - `frontend/app/experiments/[id]/placement/page.tsx`
+    - `frontend/src/features/placement/wizard/PlacementWizardPageClient.tsx`
+    - `frontend/src/features/placement/wizard/usePlacementWizard.ts`
+    - `frontend/src/features/placement/wizard/steps/Step1Tents.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step2Trays.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step3PlantsToTrays.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step4TraysToSlots.tsx`
+    - `frontend/src/features/placement/components/placement-cells.tsx`
+    - `frontend/src/features/placement/components/tent-slot-board.tsx`
+    - `frontend/src/lib/async/useSavingAction.ts`
+    - `frontend/src/lib/backend-errors.ts`
+    - `frontend/app/experiments/[id]/recipes/page.tsx`
+    - `docs/agent-guidebook.md`
+  - Refs: `e274b4e`, `92c3a55`, `cb1e288`
 
 ### 2026-02-18 (Placement Step 2 Mobile Tray Controls)
 - `Completed` Placement Step 2 tray setup now uses staged mobile-first count/capacity controls.

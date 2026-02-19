@@ -1,6 +1,6 @@
 # GrowTrialLab Agent Guidebook
 
-Last updated: 2026-02-18
+Last updated: 2026-02-19
 
 ## Purpose
 This guide helps coding agents (including Codex) work effectively in this repo by explaining **current** architecture, flows, conventions, and where to look for canonical truth. Repo-wide invariants/guardrails live in `AGENTS.md`; this guide is allowed to evolve as the product evolves.
@@ -51,6 +51,8 @@ This guide helps coding agents (including Codex) work effectively in this repo b
 
 ## Placement workflow (single route, 4 steps)
 Placement lives entirely under `/experiments/{id}/placement`. Do not reintroduce standalone `/slots` navigation.
+
+Implementation structure (current): keep `frontend/app/experiments/[id]/placement/page.tsx` as a thin route wrapper and place wizard behavior in `frontend/src/features/placement/wizard/*` (`PlacementWizardPageClient`, `usePlacementWizard`, and `steps/*`).
 
 ### Step 1: Tents + Slots
 - Define tents, restrictions/parameters, and slot layout (shelves/slots).
