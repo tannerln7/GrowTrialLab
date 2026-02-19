@@ -27,6 +27,13 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Placement Bootstrap Redirect Loop Fix)
+- `Completed` Placement wizard no longer forces users back to setup during bootstrap.
+  - Removed setup-incomplete redirect from placement wizard data load path.
+  - Setup checklist `Go to placement` now stays on `/experiments/{id}/placement?step=1` so users can complete placement setup steps.
+  - updated file:
+    - `frontend/src/features/placement/wizard/usePlacementWizard.ts`
+
 ### 2026-02-19 (Placement Step 2 Selection-Based Tray Deletion Drafts)
 - `Completed` Placement Step 2 tray removal moved from count-decrement semantics to explicit tray selection drafts.
   - Tray Manager toolbar now keeps add (`+`) and contextual remove-selected trash controls; top-level decrement was removed.

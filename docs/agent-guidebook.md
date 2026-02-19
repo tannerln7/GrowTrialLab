@@ -25,6 +25,7 @@ This guide helps coding agents (including Codex) work effectively in this repo b
 - Redirect behavior:
   - Bootstrap incomplete → `/experiments/{id}/setup`
   - Bootstrap complete → `/experiments/{id}/overview`
+  - Direct placement route remains accessible during bootstrap (`/experiments/{id}/placement`) so setup checklist links can complete tent/slot/tray configuration.
 - Bootstrap scope (minimal):
   - Plants, Tents + Slots, Recipes
 - Operations pages:

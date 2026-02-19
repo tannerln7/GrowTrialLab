@@ -329,15 +329,11 @@ export function usePlacementWizard(initialStep: number): PlacementWizardControll
     if (!data) {
       return;
     }
-    if (!data.statusPayload.setup.is_complete) {
-      router.replace(`/experiments/${experimentId}/setup`);
-      return;
-    }
     setSummary(data.summaryPayload);
     setStatusSummary(data.statusPayload);
     setSpecies(data.species);
     setError("");
-  }, [experimentId, placementDataQuery.data, router]);
+  }, [placementDataQuery.data]);
 
   useEffect(() => {
     if (!placementDataQuery.isError || notInvited) {
