@@ -27,6 +27,41 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (GridKit Phase 5 Canonical Leaf Cells + Renderer Registry + DnD Seams)
+- `Completed` GridKit leaf rendering is now standardized around canonical slot/tray/plant cells and a shared occupant renderer registry.
+  - Added canonical leaf cells:
+    - `frontend/src/lib/gridkit/components/cells/SlotCell.tsx`
+    - `frontend/src/lib/gridkit/components/cells/TrayCell.tsx`
+    - `frontend/src/lib/gridkit/components/cells/PlantCell.tsx`
+  - Added canonical renderer registry and wrapper:
+    - `frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx`
+    - `frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx`
+    - `frontend/src/lib/gridkit/renderers/types.ts`
+  - Migrated all GridKit adapter shelf render paths to registry-driven rendering:
+    - `frontend/src/lib/gridkit/components/adapters/LegacyOverviewTentLayoutAdapter.tsx`
+    - `frontend/src/lib/gridkit/components/adapters/LegacyPlacementTentLayoutAdapter.tsx`
+    - `frontend/src/lib/gridkit/components/adapters/LegacyPlacementShelfPreviewAdapter.tsx`
+  - Added passive DnD metadata helpers and standardized leaf-cell `data-*` attributes (no active DnD context/hooks):
+    - `frontend/src/lib/dnd/attributes.ts`
+    - `frontend/src/lib/dnd/shells.tsx`
+    - `frontend/src/lib/gridkit/components/CellChrome.tsx` (`dataAttributes` passthrough)
+  - Inventory/guardrail reporting now includes:
+    - `canonical_leaf_cell_usages`
+    - `renderer_registry_usages`
+    - `remaining_direct_renderPosition_lambdas`
+    - `remaining_bespoke_leaf_cell_heuristics`
+  - Relevant files:
+    - `frontend/src/features/placement/components/placement-cells.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step2Trays.tsx`
+    - `frontend/src/features/placement/wizard/steps/Step3PlantsToTrays.tsx`
+    - `frontend/src/features/experiments/overview/ExperimentOverviewPageClient.tsx`
+    - `frontend/src/features/experiments/recipes/ExperimentRecipesPageClient.tsx`
+    - `frontend/src/features/experiments/recipes/components/RecipePanels.tsx`
+    - `frontend/src/features/experiments/baseline/components/BaselinePanels.tsx`
+    - `infra/scripts/gridkit-inventory.sh`
+    - `infra/scripts/check-gridkit-legacy.sh`
+  - Refs: `6e684cb`
+
 ### 2026-02-19 (GridKit Phase 4 PositionStrip Paging Standardization)
 - `Completed` Shelf position paging is now standardized through one native scroll-snap primitive across tent/shelf adapters.
   - Added canonical `PositionStrip`:

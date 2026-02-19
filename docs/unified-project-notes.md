@@ -175,6 +175,11 @@ This document is the single consolidated source for current status, architecture
   - fixed page size of 4 positions (`POSITION_STRIP_PRESET.maxVisible`)
   - desktop arrow paging (one full page per click) with reduced-motion fallback
   - stable DnD seam `data-*` attributes (`data-pos-id`, `data-draggable-id`, `data-droppable-id`, etc.) applied on position wrappers without enabling DnD behavior.
+- [x] GridKit canonical leaf cells + renderer registry are now active for slot/tray/plant rendering paths:
+  - canonical leaf cells: `frontend/src/lib/gridkit/components/cells/SlotCell.tsx`, `frontend/src/lib/gridkit/components/cells/TrayCell.tsx`, `frontend/src/lib/gridkit/components/cells/PlantCell.tsx`
+  - canonical renderer registry + wrapper: `frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx`, `frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx`
+  - all GridKit shelf adapters now render through renderer maps (`LegacyOverviewTentLayoutAdapter`, `LegacyPlacementTentLayoutAdapter`, `LegacyPlacementShelfPreviewAdapter`) instead of direct `renderPosition` lambdas
+  - DnD seam metadata helpers now live in `frontend/src/lib/dnd/attributes.ts` and `frontend/src/lib/dnd/shells.tsx`, with canonical leaf cells emitting consistent `data-cell-kind`, `data-tent-id`, `data-shelf-id`, `data-position-index`, `data-draggable-id`, and `data-droppable-id` attributes without enabling active DnD behavior.
 - [x] Tailwind-first migration is now active across the primary operator routes (`overview`, `recipes`, `placement`, `baseline`, `feeding`, `rotation`, `schedule`, `setup` + supporting setup routes, and cockpit `/p/{id}`): legacy `gt-*` class usage was removed from these flows and styling is now driven by Tailwind utility composition plus shadcn-style components/primitives.
 - [x] Route CSS modules for experiments/cockpit styling were retired in favor of shared Tailwind style maps and reusable UI primitives:
   - removed: `frontend/app/experiments/experiments.module.css`

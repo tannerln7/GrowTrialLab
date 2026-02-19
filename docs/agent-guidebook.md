@@ -211,6 +211,10 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
     - `CellChrome` (`frontend/src/lib/gridkit/components/CellChrome.tsx`) as the outer shell (selected/hover/focus/disabled/locked semantics).
     - `CellChips` (`frontend/src/lib/gridkit/components/CellChips.tsx`) for fixed-placement chip overlays (`tl`, `tr`, `bl`, `br`, `top`, `bottom`).
     - `CellTitle`/`CellSubtitle`/`CellMeta` (`frontend/src/lib/gridkit/components/CellText.tsx`) for repeatable text rows.
+    - canonical leaf cells:
+      - `SlotCell`: `frontend/src/lib/gridkit/components/cells/SlotCell.tsx`
+      - `TrayCell`: `frontend/src/lib/gridkit/components/cells/TrayCell.tsx`
+      - `PlantCell`: `frontend/src/lib/gridkit/components/cells/PlantCell.tsx`
   - Use GridKit structural containers for tent/shelf scaffolding:
     - `TentGrid` for responsive tent layout (`1` column on small, `2` on `md+`).
     - `TentCard` as the tent wrapper (header + body).
@@ -222,6 +226,13 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
     - fixed page size is `4` positions (`POSITION_STRIP_PRESET.maxVisible`).
     - desktop arrow controls page by one viewport-width strip.
     - hide scrollbars with `.hide-scrollbar`; preserve touch momentum.
+  - For shelf-position rendering, use renderer registry wiring instead of direct position lambdas:
+    - default map: `frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx`
+    - wrapper: `frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx`
+    - adapters/pages can override only specific occupant kinds while inheriting defaults.
+  - DnD seam metadata is helper-driven and passive in this phase:
+    - helpers: `frontend/src/lib/dnd/attributes.ts`, `frontend/src/lib/dnd/shells.tsx`
+    - no `DndContext`/sensors/hooks are active yet; only stable `data-*` attributes are emitted.
   - Use `CountAdjustToolbar` (`frontend/src/components/ui/count-adjust-toolbar.tsx`) for shared add/remove count toolbars (tent/shelf/tray manager rows).
   - Use `DraftChangeChip` (`frontend/src/components/ui/draft-change-chip.tsx`) for consistent draft-highlight labels across step cards and nav controls.
 - Use `DraftChangeMarker` (`frontend/src/components/ui/draft-change-marker.tsx`) only for non-GridKit surfaces that have not yet migrated to `CellChips`; combine with `experimentsStyles.draftChangedSurface` ring style when applicable.
