@@ -237,6 +237,10 @@ This document is the single consolidated source for current status, architecture
   - remove-selected tray action now appears in the popup header (top-right inline with tray label), not on the tray trigger card surface.
   - tray occupancy now renders as a centered badge directly below the tray title on the trigger card.
   - tray body children render in a shrinkable content region (`min-h-0 flex-1`) to prevent clipping while preserving selection and staged move/remove semantics.
+- [x] Overview tray/slot trigger alignment was simplified:
+  - tray trigger suppresses redundant summary lines and renders a single centered bottom chip: `x/x Plants`
+  - tray title is centered horizontally
+  - empty-slot `Slot x` title is centered horizontally and `Empty` status is centered both vertically/horizontally.
 - [x] GridKit shelf strip page geometry was corrected after leaf sizing regression:
   - canonical leaf sizing now keeps square cells without desktop `min-w` constraints (`frontend/src/lib/gridkit/components/cells/leafSizing.ts`), so shelf strips retain 4 columns at `POSITION_STRIP_PRESET.maxVisible = 4` when viewport width allows.
   - desktop horizontal paging in `PositionStrip` remains viewport-page-based and no longer competes with leaf min-width sizing.
