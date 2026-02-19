@@ -27,6 +27,35 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (GridKit Phase 7 Virtualization + Targeted Performance Pass)
+- `Completed` GridKit performance baseline now includes reusable virtualization primitives plus thresholded tray-overlay plant-grid virtualization without DnD/behavior changes.
+  - Added canonical virtual primitives:
+    - `frontend/src/lib/gridkit/components/virtual/VirtualList.tsx`
+    - `frontend/src/lib/gridkit/components/virtual/VirtualGrid.tsx`
+    - `frontend/src/lib/gridkit/components/virtual/index.ts`
+  - `TrayPlantGrid` now uses deterministic thresholding:
+    - `plants.length <= 24`: static grid
+    - `plants.length > 24`: `VirtualGrid` row virtualization (`base=2`, `sm=3`, `md=4`)
+  - `TrayFolderOverlay` now keeps overlay framing/animation while delegating scroll-container ownership to `TrayPlantGrid` for virtualized and static modes.
+  - Targeted rerender/perf updates:
+    - memoized renderer/context setup in:
+      - `frontend/src/lib/gridkit/components/adapters/LegacyOverviewTentLayoutAdapter.tsx`
+      - `frontend/src/lib/gridkit/components/adapters/LegacyPlacementTentLayoutAdapter.tsx`
+      - `frontend/src/lib/gridkit/components/adapters/LegacyPlacementShelfPreviewAdapter.tsx`
+      - `frontend/src/lib/gridkit/renderers/PositionStripWithRenderers.tsx`
+    - added `.perf-content-auto` utility and applied to GridKit card bodies:
+      - `frontend/app/globals.css`
+      - `frontend/src/lib/gridkit/components/containers/TentCard.tsx`
+      - `frontend/src/lib/gridkit/components/containers/ShelfCard.tsx`
+  - Inventory/guardrail reporting now includes:
+    - `virtual_list_grid_usages`
+    - `remaining_large_map_loops_in_scroll_containers`
+  - Relevant files:
+    - `frontend/src/lib/gridkit/components/grids/TrayPlantGrid.tsx`
+    - `infra/scripts/gridkit-inventory.sh`
+    - `infra/scripts/check-gridkit-legacy.sh`
+  - Refs: `a3814f7`
+
 ### 2026-02-19 (GridKit Phase 6 Tray Folder Overlay Standardization)
 - `Completed` Tray expansion now uses one GridKit folder-overlay system (Radix Popover + Framer Motion) with single-open coordination and renderer-context wiring.
   - Added canonical tray folder overlay primitives:

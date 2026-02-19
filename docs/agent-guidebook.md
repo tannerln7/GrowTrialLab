@@ -236,6 +236,13 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
     - `TrayPlantGrid`: `frontend/src/lib/gridkit/components/grids/TrayPlantGrid.tsx` (overlay plant grid content using canonical `PlantCell`).
     - `TrayFolderProvider`/`useTrayFolderManager`: `frontend/src/lib/gridkit/state/trayFolderManager.tsx` for single-open coordination in a logical view scope.
     - enable expansion per renderer context via `ctx.trayFolder`; keep it disabled for views that should remain static.
+  - For virtualization/perf-sensitive GridKit surfaces:
+    - use `VirtualList`/`VirtualGrid` from `frontend/src/lib/gridkit/components/virtual/*` for large vertical scroll collections.
+    - keep deterministic thresholds so small sets stay static (`TrayPlantGrid`: static at `<=24`, virtualized above).
+    - do not virtualize scroll-snap shelf strips; virtualization currently targets vertical list/grid containers (for example tray folder plant grids).
+    - inventory scripts expose virtualization adoption and remaining scroll-container map hotspots:
+      - `pnpm frontend:gridkit:inventory`
+      - `pnpm frontend:gridkit:guardrail`
   - DnD seam metadata is helper-driven and passive in this phase:
     - helpers: `frontend/src/lib/dnd/attributes.ts`, `frontend/src/lib/dnd/shells.tsx`
     - no `DndContext`/sensors/hooks are active yet; only stable `data-*` attributes are emitted.

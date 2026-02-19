@@ -190,6 +190,16 @@ This document is the single consolidated source for current status, architecture
   - renderer context now supports tray-folder wiring (`ctx.trayFolder`) and default tray rendering can switch between static `TrayCell` and expandable tray-folder behavior without changing DnD mode.
   - overview tent/shelf adapter now scopes a `TrayFolderProvider` and renders tray occupants through expandable tray cells; placement adapters remain static (no new overlay behavior introduced there).
   - inventory/guardrail scripts now report tray-folder usage and remaining bespoke tray-overlay heuristics in report-only mode.
+- [x] GridKit virtualization + targeted performance pass is now active for high-density overlay grids and renderer hot paths:
+  - canonical virtualization primitives:
+    - `frontend/src/lib/gridkit/components/virtual/VirtualList.tsx`
+    - `frontend/src/lib/gridkit/components/virtual/VirtualGrid.tsx`
+  - tray folder plant grids now use thresholded virtualization in `TrayPlantGrid` (`<=24` static render; `>24` virtualized rows), while preserving ordering/click semantics.
+  - GridKit adapter renderer/context objects are memoized in the hottest tent/shelf render paths (`LegacyOverviewTentLayoutAdapter`, `LegacyPlacementTentLayoutAdapter`, `LegacyPlacementShelfPreviewAdapter`, `PositionStripWithRenderers`) to reduce avoidable rerender churn.
+  - safe `content-visibility` hints are now available via `.perf-content-auto` and applied to GridKit tent/shelf card bodies (not to scroll-snap strip containers).
+  - inventory/guardrail scripts now report:
+    - `virtual_list_grid_usages`
+    - `remaining_large_map_loops_in_scroll_containers`
 - [x] Tailwind-first migration is now active across the primary operator routes (`overview`, `recipes`, `placement`, `baseline`, `feeding`, `rotation`, `schedule`, `setup` + supporting setup routes, and cockpit `/p/{id}`): legacy `gt-*` class usage was removed from these flows and styling is now driven by Tailwind utility composition plus shadcn-style components/primitives.
 - [x] Route CSS modules for experiments/cockpit styling were retired in favor of shared Tailwind style maps and reusable UI primitives:
   - removed: `frontend/app/experiments/experiments.module.css`
