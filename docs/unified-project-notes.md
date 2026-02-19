@@ -208,6 +208,10 @@ This document is the single consolidated source for current status, architecture
   - normalized API helper (`frontend/src/lib/api.ts`)
   - shared query-state hook (`frontend/src/lib/usePageQueryState.ts`)
   - overview page migration to query/mutation pattern
+- [x] Phase 2 data-layer migration is complete for active frontend routes:
+  - route/controller-level `backendFetch` usage was removed from app/feature UI code and replaced with `api + react-query`.
+  - query keys are standardized through `frontend/src/lib/queryKeys.ts` (including plant-cockpit scoped keys).
+  - setup/operation pages and cockpit pages now use `useQuery`/`useMutation` with targeted invalidation for persisted server state.
 - [x] Phase 1.5 mechanical frontend helper rollout is complete for route/page conventions:
   - route/page param parsing now standardizes on `useRouteParamString("id")` / `getParamString(...)` across experiment and cockpit pages.
   - standard top-of-page alert slabs now use shared `PageAlerts` in core experiment routes.
@@ -215,7 +219,7 @@ This document is the single consolidated source for current status, architecture
   - existing React Query usage (`overview`) now uses generic `queryKeys.experiment.*` helpers rather than legacy aliases.
 
 ### In Progress / Not Complete
-- [ ] Continue page-by-page React Query + RHF/Zod migration (baseline/placement/rotation/feeding/schedule forms and fetch orchestration).
+- [ ] Continue form-controller normalization and validation unification (RHF/Zod) now that server-state migration is complete.
 - [ ] Refine Overview action tiles into a stable operator runbook interaction pattern.
 - [ ] Expand photo UX beyond cockpit inline capture into fuller experiment-level flows.
 

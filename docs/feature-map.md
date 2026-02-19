@@ -27,6 +27,34 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Frontend Phase 2 Data Layer Migration)
+- `Completed` Frontend server-state reads/writes were migrated from `backendFetch + useEffect` loading patterns to shared `api + @tanstack/react-query` usage across active experiment/cockpit routes.
+  - Removed route-level `backendFetch(...)` callsites from `frontend/app/*` and `frontend/src/features/*`; `backendFetch` now remains only as a legacy helper in `frontend/lib/backend.ts`.
+  - Standardized query keys through `frontend/src/lib/queryKeys.ts` (including new `queryKeys.plant.cockpit(...)`) and removed ad-hoc inline query key arrays.
+  - Migrated high-traffic pages to query/mutation flows with existing UX preserved:
+    - experiment index/new/landing/setup
+    - overview-adjacent operation pages (plants, recipes, rotation, feeding, schedule, baseline)
+    - public plant cockpit (`/p/{id}`)
+    - placement wizard controller hook (`usePlacementWizard`) load + mutation paths
+  - Added/normalized query invalidation and fetch refresh behavior for sequential apply flows (placement, recipes, schedule, feeding) and upload flows (baseline/cockpit photos).
+  - Relevant files:
+    - `frontend/app/page.tsx`
+    - `frontend/app/experiments/page.tsx`
+    - `frontend/app/experiments/new/page.tsx`
+    - `frontend/app/experiments/[id]/page.tsx`
+    - `frontend/app/experiments/[id]/setup/page.tsx`
+    - `frontend/app/experiments/[id]/baseline/page.tsx`
+    - `frontend/app/experiments/[id]/feeding/page.tsx`
+    - `frontend/app/experiments/[id]/plants/page.tsx`
+    - `frontend/app/experiments/[id]/recipes/page.tsx`
+    - `frontend/app/experiments/[id]/rotation/page.tsx`
+    - `frontend/app/experiments/[id]/schedule/page.tsx`
+    - `frontend/app/p/[id]/page.tsx`
+    - `frontend/src/features/placement/wizard/usePlacementWizard.ts`
+    - `frontend/src/lib/queryKeys.ts`
+    - `frontend/lib/experiment-status.ts`
+  - Refs: `ca8c706`
+
 ### 2026-02-19 (Frontend Phase 1.5 Mechanical Helper Rollout)
 - `Completed` Frontend route/page conventions from Phase 1 were rolled out mechanically across the active experiment/cockpit pages without feature-flow changes.
   - Route-param parsing boilerplate (`params.id` with `string | string[]` checks) was standardized to `useRouteParamString("id")` for client pages and existing `getParamString(...)` wrapper usage for route wrappers.

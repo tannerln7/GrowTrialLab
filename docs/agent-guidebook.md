@@ -119,6 +119,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 ## Frontend engineering conventions (current)
 ### Data layer
 - React Query provider scaffold exists and query key discipline is required.
+- Active frontend route-level server state uses `api + react-query`; avoid introducing new `backendFetch + useEffect` loader patterns in UI code.
 - Shared helpers:
   - `frontend/src/lib/queryKeys.ts`
   - `frontend/src/lib/api.ts`
