@@ -8,12 +8,12 @@ type CellChipsProps = {
 };
 
 const CHIP_PLACEMENT_CLASS: Record<ChipSpec["placement"], string> = {
-  tl: "left-1 top-1",
-  tr: "right-1 top-1",
-  bl: "left-1 bottom-1",
-  br: "right-1 bottom-1",
-  top: "left-1/2 top-1 -translate-x-1/2",
-  bottom: "left-1/2 bottom-1 -translate-x-1/2",
+  tl: "left-2 top-2",
+  tr: "right-2 top-2",
+  bl: "left-2 bottom-2",
+  br: "right-2 bottom-2",
+  top: "left-1/2 top-2 -translate-x-1/2",
+  bottom: "left-1/2 bottom-2 -translate-x-1/2",
 };
 
 const CHIP_TONE_CLASS: Record<NonNullable<ChipSpec["tone"]>, string> = {
@@ -26,7 +26,7 @@ const CHIP_TONE_CLASS: Record<NonNullable<ChipSpec["tone"]>, string> = {
 };
 
 const CHIP_BASE_CLASS =
-  "pointer-events-none absolute z-[1] inline-flex max-w-[calc(100%-0.5rem)] items-center justify-center rounded-full border px-2 py-0.5 text-[0.68rem] leading-none whitespace-nowrap";
+  "pointer-events-none absolute z-[1] inline-flex max-w-[calc(100%-1rem)] items-center justify-center rounded-full border px-2 py-0.5 text-[0.68rem] leading-none whitespace-nowrap";
 
 export function CellChips({ chips, className }: CellChipsProps) {
   if (!chips || chips.length === 0) {

@@ -27,6 +27,20 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Plant Chip Layout + Compact Labels)
+- `Completed` Standardized plant grade/recipe chips through GridKit `PlantCell`.
+  - Grade and recipe now render as bottom-left/bottom-right overlay chips on one row.
+  - Labels are compact: `G:x` and `R:x` (with `-` fallback when missing).
+  - Main plant-cell surfaces now rely on primitive-driven chip rendering:
+    - `frontend/src/features/experiments/overview/ExperimentOverviewPageClient.tsx`
+    - `frontend/src/lib/gridkit/components/grids/TrayPlantGrid.tsx`
+    - `frontend/src/features/experiments/recipes/ExperimentRecipesPageClient.tsx`
+    - `frontend/src/features/placement/components/placement-cells.tsx`
+  - Primitive updates:
+    - `frontend/src/lib/gridkit/components/cells/PlantCell.tsx`
+    - `frontend/src/lib/gridkit/renderers/defaultPositionRenderers.tsx`
+    - `frontend/src/lib/gridkit/components/CellChips.tsx` (inset spacing increased)
+
 ### 2026-02-19 (Placement Step 3 Tray Trigger Alignment + Occupancy Placement)
 - `Completed` Step 3 tray trigger cards now place occupancy under the tray name and center trigger content using GridKit primitives.
   - Removed top-right occupancy chip on tray triggers.

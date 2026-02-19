@@ -549,6 +549,8 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
         plantId={plant.uuid}
         title={plant.plant_id || "(pending)"}
         subtitle={plant.species_name}
+        grade={plant.grade}
+        recipeCode={draftRecipe?.code || null}
         state={{
           selected,
           tone: dirty ? "warn" : undefined,
@@ -561,14 +563,7 @@ export function ExperimentRecipesPageClient({ experimentId }: ExperimentRecipesP
         titleClassName={styles.plantCellId}
         subtitleClassName={styles.plantCellSpecies}
         metaClassName={styles.plantCellMetaRow}
-        meta={
-          <>
-            <span className={draftRecipe ? styles.recipeBadge : styles.recipeBadgeEmpty}>
-              {draftRecipe ? draftRecipe.code : "No recipe"}
-            </span>
-            {dirty ? <span className={styles.recipeLegendItem}>Draft</span> : null}
-          </>
-        }
+        meta={dirty ? <span className={styles.recipeLegendItem}>Draft</span> : null}
       />
     );
   }, [draftPlantRecipe, persistedRecipeByPlantId, plantById, recipeById, selectedPlantIds, togglePlantSelection]);

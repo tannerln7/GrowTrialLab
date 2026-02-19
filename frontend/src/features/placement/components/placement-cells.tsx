@@ -51,12 +51,13 @@ type PlantSelectableCellProps = {
 };
 
 function PlantSelectableCellImpl({ plant, selected, dirty, onToggle }: PlantSelectableCellProps) {
-  const gradeLabel = plant.grade ? `Grade ${plant.grade}` : "Grade -";
   return (
     <PlantCell
       plantId={plant.uuid}
       title={plant.plant_id || "(pending)"}
       subtitle={plant.species_name}
+      grade={plant.grade}
+      recipeCode={plant.assigned_recipe?.code || null}
       state={{
         selected,
         tone: dirty ? "warn" : undefined,
@@ -72,10 +73,6 @@ function PlantSelectableCellImpl({ plant, selected, dirty, onToggle }: PlantSele
       className={cn(styles.plantCell, "justify-items-center text-center")}
       titleClassName={styles.plantCellId}
       subtitleClassName={styles.plantCellSpecies}
-      metaClassName={cn(styles.plantCellMetaRow, "justify-center")}
-      meta={
-        <Badge variant={plant.grade ? "secondary" : "outline"}>{gradeLabel}</Badge>
-      }
       contentClassName="justify-items-center text-center"
     />
   );

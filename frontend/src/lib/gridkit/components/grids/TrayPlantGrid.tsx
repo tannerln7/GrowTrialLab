@@ -38,6 +38,8 @@ export function TrayPlantGrid({
       plantId={plant.plantId}
       title={plant.title || "(pending)"}
       subtitle={plant.subtitle}
+      grade={plant.grade}
+      recipeCode={plant.recipeCode}
       position={position}
       state={plant.state}
       chips={plant.chips}
@@ -51,12 +53,6 @@ export function TrayPlantGrid({
       metaClassName="flex flex-wrap items-center gap-1"
       meta={
         <>
-          <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[0.62rem] leading-none">
-            {plant.grade ? `Grade ${plant.grade}` : "No grade"}
-          </span>
-          <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[0.62rem] leading-none">
-            {plant.recipeCode ? `Recipe ${plant.recipeCode}` : "No recipe"}
-          </span>
           {plant.status && plant.status !== "active" ? (
             <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[0.62rem] leading-none">
               {formatStatusLabel(plant.status)}

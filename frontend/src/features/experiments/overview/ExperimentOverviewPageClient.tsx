@@ -526,6 +526,8 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
         plantId={plant.plantId}
         title={plant.title || "(pending)"}
         subtitle={speciesLine}
+        grade={plant.grade}
+        recipeCode={plant.recipeCode}
         className={cn(styles.plantCell, styles.overviewPlantCell, "p-0")}
         contentClassName={cn(
           "gap-1 p-[var(--gt-cell-pad,var(--gt-space-md))]",
@@ -537,22 +539,6 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
         linkHref={plantLink(plant)}
         meta={
           <>
-            <span
-              className={cn(
-                styles.overviewPlantChip,
-                plant.grade ? styles.overviewPlantChipReady : styles.overviewPlantChipMissing,
-              )}
-            >
-              {plant.grade ? `Grade ${plant.grade}` : "No grade"}
-            </span>
-            <span
-              className={cn(
-                styles.overviewPlantChip,
-                plant.recipeCode ? styles.overviewPlantChipReady : styles.overviewPlantChipMissing,
-              )}
-            >
-              {plant.recipeCode ? `Recipe ${plant.recipeCode}` : "No recipe"}
-            </span>
             {plant.status !== "active" ? (
               <span className={cn(styles.overviewPlantChip, styles.overviewPlantChipMissing)}>
                 {statusLabel}

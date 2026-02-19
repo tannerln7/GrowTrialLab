@@ -228,6 +228,10 @@ This document is the single consolidated source for current status, architecture
   - icon-only grid controls now use `GridControlButton` (`frontend/src/components/ui/grid-control-button.tsx`) with fixed `h-8 w-8` + `h-4 w-4` icon sizing.
   - placement/grid `+/-` controls (`StepAdjustButton`) and `PositionStrip` desktop arrows now share the same control footprint.
   - conditional destructive actions in tray/tent grid contexts now render via absolute overlay wrappers (`pointer-events-none` container + `pointer-events-auto` button) with opacity/scale animation only, preventing row/card height shifts when selection toggles.
+- [x] Plant leaf chip conventions are now standardized in GridKit `PlantCell`:
+  - grade and recipe render as bottom-row overlay chips (`bl`/`br`) on one line
+  - compact labels use `G:x` and `R:x` format (`x` falls back to `-` when missing)
+  - chip inset spacing was increased globally in `CellChips` so corner/edge chips sit slightly further inward from card edges.
 - [x] Placement Step 3 tray containers now use the same GridKit tray popup/folder interaction model as overview (`TrayCellExpandable` + `TrayFolderProvider`) and no longer embed full-size placement plant cards inline in tray bodies.
   - tray click opens the tray folder popout; plant selection toggles continue to run through the existing staged placement handlers.
   - remove-selected tray action now appears in the popup header (top-right inline with tray label), not on the tray trigger card surface.

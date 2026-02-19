@@ -12,6 +12,8 @@ type PlantCellProps = {
   plantId: string;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
+  grade?: string | null;
+  recipeCode?: string | null;
   position?: Pick<PositionSpec, "id" | "tentId" | "shelfId" | "positionIndex">;
   state?: CellState;
   chips?: ChipSpec[];
@@ -33,6 +35,8 @@ export function PlantCell({
   plantId,
   title,
   subtitle,
+  grade,
+  recipeCode,
   position,
   state,
   chips,
@@ -49,6 +53,25 @@ export function PlantCell({
   meta,
   children,
 }: PlantCellProps) {
+  const hasGradeRecipeChips = grade !== undefined || recipeCode !== undefined;
+  const resolvedChips: ChipSpec[] | undefined = hasGradeRecipeChips
+    ? [
+        ...(chips || []),
+        {
+          id: `${plantId}-grade`,
+          label: `G:${(grade || "").trim() || "-"}`,
+          tone: grade ? "success" : "muted",
+          placement: "bl",
+        },
+        {
+          id: `${plantId}-recipe`,
+          label: `R:${((recipeCode || "").trim().replace(/^R[\s:-]*/i, "") || "-")}`,
+          tone: recipeCode ? "success" : "muted",
+          placement: "br",
+        },
+      ]
+    : chips;
+
   const content = (
     <div className={cn(LEAF_CONTENT_CLASS_NAME, contentClassName)}>
       <CellTitle className={cn(titleClassName)}>{title}</CellTitle>
@@ -61,7 +84,7 @@ export function PlantCell({
   return (
     <CellChrome
       state={state}
-      chips={chips}
+      chips={resolvedChips}
       interactive={interactive}
       onPress={onPress}
       ariaLabel={ariaLabel || (typeof title === "string" ? title : plantId)}
