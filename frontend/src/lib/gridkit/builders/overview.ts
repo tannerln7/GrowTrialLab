@@ -1,11 +1,10 @@
 import { buildDndId } from "@/src/lib/dnd";
 
+import { buildShelfSlotPositions, type ShelfSlotPlacement } from "./shelfPositions";
 import type {
-  EmptySlotOccupantSpec,
   PlantOccupantSpec,
   TentLayoutSpec,
   TrayOccupantSpec,
-  TrayStackOccupantSpec,
 } from "../spec";
 
 type LocationNode = {
@@ -13,6 +12,16 @@ type LocationNode = {
   code?: string | null;
   name?: string | null;
   label?: string | null;
+};
+
+type OverviewSlotNode = LocationNode & {
+  shelf_index?: number | null;
+  slot_index?: number | null;
+};
+
+type OverviewTrayNode = LocationNode & {
+  capacity?: number | null;
+  current_count?: number | null;
 };
 
 export type OverviewBuilderPlant = {
@@ -26,23 +35,44 @@ export type OverviewBuilderPlant = {
   location: {
     status: "placed" | "unplaced";
     tent: LocationNode | null;
-    slot: (LocationNode & { shelf_index?: number | null; slot_index?: number | null }) | null;
-    tray: (LocationNode & { capacity?: number | null; current_count?: number | null }) | null;
+    slot: OverviewSlotNode | null;
+    tray: OverviewTrayNode | null;
   };
 };
 
-type TentSlotAccumulator = {
-  slot: NonNullable<OverviewBuilderPlant["location"]["slot"]>;
-  rawShelfIndex: number | null;
-  rawSlotIndex: number | null;
-  trays: Map<string, { tray: NonNullable<OverviewBuilderPlant["location"]["tray"]>; plants: OverviewBuilderPlant[] }>;
+export type OverviewLayoutSpine = {
+  tents: Array<{
+    id: string;
+    name?: string | null;
+    shelves: Array<{
+      shelfIndex: number;
+      slotCount: number;
+    }>;
+  }>;
 };
 
-type ShelfSlotAccumulator = {
-  slot: NonNullable<OverviewBuilderPlant["location"]["slot"]>;
+export type OverviewTrayPlacement = {
+  trayId: string;
+  tentId: string;
   shelfIndex: number;
   slotIndex: number;
-  trays: TrayOccupantSpec[];
+  slot?: LocationNode | null;
+  tray?: OverviewTrayNode | null;
+};
+
+type LayoutTentSpine = {
+  tent: LocationNode;
+  shelfSlotCountByIndex: Map<number, number>;
+};
+
+type TrayAccumulator = {
+  trayId: string;
+  tentId: string;
+  shelfIndex: number;
+  slotIndex: number;
+  slot: LocationNode | null;
+  tray: OverviewTrayNode | null;
+  plants: OverviewBuilderPlant[];
 };
 
 function normalizeGridIndex(value: number | null | undefined): number | null {
@@ -51,6 +81,14 @@ function normalizeGridIndex(value: number | null | undefined): number | null {
   }
   const normalized = Math.trunc(value as number);
   return normalized < 1 ? null : normalized;
+}
+
+function normalizeNonNegativeInt(value: number | null | undefined): number | null {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  const normalized = Math.trunc(value as number);
+  return normalized < 0 ? 0 : normalized;
 }
 
 function locationLabel(node: LocationNode | null, fallback: string): string {
@@ -99,237 +137,291 @@ function buildOverviewPlantSpec(plant: OverviewBuilderPlant): PlantOccupantSpec 
   };
 }
 
+function ensureLayoutTent(
+  tentSpineById: Map<string, LayoutTentSpine>,
+  tentId: string,
+  tentName: string | null | undefined,
+): LayoutTentSpine {
+  if (!tentSpineById.has(tentId)) {
+    tentSpineById.set(tentId, {
+      tent: {
+        id: tentId,
+        name: tentName || null,
+      },
+      shelfSlotCountByIndex: new Map(),
+    });
+  }
+  const existing = tentSpineById.get(tentId);
+  if (!existing) {
+    return {
+      tent: {
+        id: tentId,
+        name: tentName || null,
+      },
+      shelfSlotCountByIndex: new Map(),
+    };
+  }
+
+  if ((!existing.tent.name || !existing.tent.name.trim()) && tentName?.trim()) {
+    existing.tent.name = tentName;
+  }
+
+  return existing;
+}
+
+function traySortLabel(tray: TrayOccupantSpec): string {
+  const trayNode = (
+    tray.meta as { tray?: { code?: string | null; name?: string | null } } | undefined
+  )?.tray;
+  return (trayNode?.code || trayNode?.name || tray.title || "").toLowerCase();
+}
+
+function buildTrayOccupantSpec(trayAccumulator: TrayAccumulator): TrayOccupantSpec {
+  const sortedPlants = [...trayAccumulator.plants].sort((left, right) =>
+    (left.plant_id || "").localeCompare(right.plant_id || ""),
+  );
+  const plantSpecs = sortedPlants.map((plant) => buildOverviewPlantSpec(plant));
+  const summaryLines: string[] = [];
+
+  if (
+    trayAccumulator.tray?.current_count != null &&
+    trayAccumulator.tray.capacity != null
+  ) {
+    summaryLines.push(
+      `${trayAccumulator.tray.current_count}/${trayAccumulator.tray.capacity}`,
+    );
+  }
+  summaryLines.push(`${plantSpecs.length} plant${plantSpecs.length === 1 ? "" : "s"}`);
+
+  return {
+    kind: "tray",
+    id: trayAccumulator.trayId,
+    trayId: trayAccumulator.trayId,
+    title: formatTrayHeading(trayAccumulator.tray),
+    currentCount: trayAccumulator.tray?.current_count,
+    capacity: trayAccumulator.tray?.capacity,
+    summaryLines,
+    plants: plantSpecs,
+    dnd: {
+      draggableId: buildDndId("tray", trayAccumulator.trayId),
+      meta: {
+        slot_id: trayAccumulator.slot?.id,
+      },
+    },
+    meta: {
+      tray: trayAccumulator.tray,
+    },
+  };
+}
+
 export function buildTentLayoutSpecFromOverviewPlants(input: {
   plants: ReadonlyArray<OverviewBuilderPlant>;
+  layout?: OverviewLayoutSpine;
+  trayPlacements?: ReadonlyArray<OverviewTrayPlacement>;
 }): TentLayoutSpec {
-  const tentMap = new Map<
-    string,
-    {
-      tent: NonNullable<OverviewBuilderPlant["location"]["tent"]>;
-      slots: Map<string, TentSlotAccumulator>;
-    }
-  >();
+  const tentSpineById = new Map<string, LayoutTentSpine>();
+  const trayAccumulatorById = new Map<string, TrayAccumulator>();
   const unplaced: PlantOccupantSpec[] = [];
+
+  for (const layoutTent of input.layout?.tents || []) {
+    if (!layoutTent.id) {
+      continue;
+    }
+    const tentSpine = ensureLayoutTent(tentSpineById, layoutTent.id, layoutTent.name);
+
+    for (const shelf of layoutTent.shelves || []) {
+      const shelfIndex = normalizeGridIndex(shelf.shelfIndex);
+      const slotCount = normalizeNonNegativeInt(shelf.slotCount);
+      if (!shelfIndex || slotCount == null) {
+        continue;
+      }
+      tentSpine.shelfSlotCountByIndex.set(shelfIndex, slotCount);
+    }
+  }
+
+  for (const placement of input.trayPlacements || []) {
+    if (!placement.trayId || !placement.tentId) {
+      continue;
+    }
+
+    const shelfIndex = normalizeGridIndex(placement.shelfIndex);
+    const slotIndex = normalizeGridIndex(placement.slotIndex);
+    if (!shelfIndex || !slotIndex) {
+      continue;
+    }
+
+    ensureLayoutTent(tentSpineById, placement.tentId, null);
+
+    const existing = trayAccumulatorById.get(placement.trayId);
+    if (existing) {
+      existing.tentId = placement.tentId;
+      existing.shelfIndex = shelfIndex;
+      existing.slotIndex = slotIndex;
+      if (placement.slot) {
+        existing.slot = placement.slot;
+      }
+      if (placement.tray) {
+        existing.tray = placement.tray;
+      }
+      continue;
+    }
+
+    trayAccumulatorById.set(placement.trayId, {
+      trayId: placement.trayId,
+      tentId: placement.tentId,
+      shelfIndex,
+      slotIndex,
+      slot: placement.slot || null,
+      tray: placement.tray || null,
+      plants: [],
+    });
+  }
 
   for (const plant of input.plants) {
     const plantSpec = buildOverviewPlantSpec(plant);
     const { location } = plant;
 
-    if (
-      location.status !== "placed" ||
-      !location.tent ||
-      !location.slot ||
-      !location.tray
-    ) {
+    if (location.status !== "placed" || !location.tent || !location.slot || !location.tray) {
       unplaced.push(plantSpec);
       continue;
     }
 
     const tentId = location.tent.id;
-    const slotId = location.slot.id;
     const trayId = location.tray.id;
-    const rawShelfIndex = normalizeGridIndex(location.slot.shelf_index);
-    const rawSlotIndex = normalizeGridIndex(location.slot.slot_index);
+    const shelfIndex = normalizeGridIndex(location.slot.shelf_index) || 1;
+    const slotIndex = normalizeGridIndex(location.slot.slot_index) || 1;
 
-    if (!tentMap.has(tentId)) {
-      tentMap.set(tentId, { tent: location.tent, slots: new Map() });
-    }
-    const tentGroup = tentMap.get(tentId);
-    if (!tentGroup) {
-      continue;
-    }
+    ensureLayoutTent(tentSpineById, tentId, location.tent.name || null);
 
-    if (!tentGroup.slots.has(slotId)) {
-      tentGroup.slots.set(slotId, {
+    if (!trayAccumulatorById.has(trayId)) {
+      trayAccumulatorById.set(trayId, {
+        trayId,
+        tentId,
+        shelfIndex,
+        slotIndex,
         slot: location.slot,
-        rawShelfIndex,
-        rawSlotIndex,
-        trays: new Map(),
+        tray: location.tray,
+        plants: [],
       });
     }
-    const slotGroup = tentGroup.slots.get(slotId);
-    if (!slotGroup) {
+
+    const trayAccumulator = trayAccumulatorById.get(trayId);
+    if (!trayAccumulator) {
       continue;
     }
 
-    if (!slotGroup.trays.has(trayId)) {
-      slotGroup.trays.set(trayId, { tray: location.tray, plants: [] });
+    trayAccumulator.tentId = trayAccumulator.tentId || tentId;
+    trayAccumulator.shelfIndex = trayAccumulator.shelfIndex || shelfIndex;
+    trayAccumulator.slotIndex = trayAccumulator.slotIndex || slotIndex;
+
+    if (!trayAccumulator.slot && location.slot) {
+      trayAccumulator.slot = location.slot;
     }
-    slotGroup.trays.get(trayId)?.plants.push(plant);
+    if (!trayAccumulator.tray && location.tray) {
+      trayAccumulator.tray = location.tray;
+    }
+
+    trayAccumulator.plants.push(plant);
   }
 
-  const tents = Array.from(tentMap.values())
-    .map((tentGroup) => {
-      const slotsByShelf = new Map<number, ShelfSlotAccumulator[]>();
+  const trayPlacementsByTentShelfSlot = new Map<
+    string,
+    Map<number, Map<number, ShelfSlotPlacement>>
+  >();
 
-      Array.from(tentGroup.slots.values())
-        .map((slotGroup) => {
-          const trays = Array.from(slotGroup.trays.values())
-            .map((trayGroup) => {
-              const sortedPlants = [...trayGroup.plants].sort((left, right) =>
-                (left.plant_id || "").localeCompare(right.plant_id || ""),
-              );
-              const plantSpecs = sortedPlants.map((plant) => buildOverviewPlantSpec(plant));
-              const summaryLines: string[] = [];
-              if (trayGroup.tray.current_count != null && trayGroup.tray.capacity != null) {
-                summaryLines.push(`${trayGroup.tray.current_count}/${trayGroup.tray.capacity}`);
-              }
-              summaryLines.push(`${plantSpecs.length} plant${plantSpecs.length === 1 ? "" : "s"}`);
+  for (const trayAccumulator of trayAccumulatorById.values()) {
+    const shelfMap =
+      trayPlacementsByTentShelfSlot.get(trayAccumulator.tentId) || new Map<number, Map<number, ShelfSlotPlacement>>();
 
-              return {
-                kind: "tray" as const,
-                id: trayGroup.tray.id,
-                trayId: trayGroup.tray.id,
-                title: formatTrayHeading(trayGroup.tray),
-                currentCount: trayGroup.tray.current_count,
-                capacity: trayGroup.tray.capacity,
-                summaryLines,
-                plants: plantSpecs,
-                dnd: {
-                  draggableId: buildDndId("tray", trayGroup.tray.id),
-                  meta: {
-                    slot_id: slotGroup.slot.id,
-                  },
-                },
-                meta: {
-                  tray: trayGroup.tray,
-                },
-              } satisfies TrayOccupantSpec;
-            })
-            .sort((left, right) => {
-              const leftTray = (
-                left.meta as { tray?: { code?: string | null; name?: string | null } } | undefined
-              )?.tray;
-              const rightTray = (
-                right.meta as { tray?: { code?: string | null; name?: string | null } } | undefined
-              )?.tray;
-              const leftLabel = (leftTray?.code || leftTray?.name || "").toLowerCase();
-              const rightLabel = (rightTray?.code || rightTray?.name || "").toLowerCase();
-              return leftLabel.localeCompare(rightLabel);
-            });
+    const slotMap = shelfMap.get(trayAccumulator.shelfIndex) || new Map<number, ShelfSlotPlacement>();
+
+    const traySpec = buildTrayOccupantSpec(trayAccumulator);
+    const slotPlacement: ShelfSlotPlacement = slotMap.get(trayAccumulator.slotIndex) || {
+      slotId: trayAccumulator.slot?.id || null,
+      slotLabel: locationLabel(trayAccumulator.slot, `Slot ${trayAccumulator.slotIndex}`),
+      slotMeta: trayAccumulator.slot ? { ...trayAccumulator.slot } : null,
+      trays: [],
+    };
+
+    if (!slotPlacement.slotId && trayAccumulator.slot?.id) {
+      slotPlacement.slotId = trayAccumulator.slot.id;
+    }
+    if (!slotPlacement.slotMeta && trayAccumulator.slot) {
+      slotPlacement.slotMeta = { ...trayAccumulator.slot };
+    }
+
+    slotPlacement.trays.push(traySpec);
+
+    slotMap.set(trayAccumulator.slotIndex, slotPlacement);
+    shelfMap.set(trayAccumulator.shelfIndex, slotMap);
+    trayPlacementsByTentShelfSlot.set(trayAccumulator.tentId, shelfMap);
+  }
+
+  const allTentIds = new Set<string>([
+    ...Array.from(tentSpineById.keys()),
+    ...Array.from(trayPlacementsByTentShelfSlot.keys()),
+  ]);
+
+  const tents = Array.from(allTentIds)
+    .map((tentId) => {
+      const tentSpine = tentSpineById.get(tentId);
+      const tentPlacementMap = trayPlacementsByTentShelfSlot.get(tentId) || new Map<number, Map<number, ShelfSlotPlacement>>();
+
+      const shelfIndexes = new Set<number>([
+        ...Array.from(tentSpine?.shelfSlotCountByIndex.keys() || []),
+        ...Array.from(tentPlacementMap.keys()),
+      ]);
+
+      const shelves = Array.from(shelfIndexes)
+        .sort((left, right) => left - right)
+        .map((shelfIndex) => {
+          const shelfId = buildDndId("shelf", tentId, shelfIndex);
+          const slotMap = tentPlacementMap.get(shelfIndex) || new Map<number, ShelfSlotPlacement>();
+          for (const slotPlacement of slotMap.values()) {
+            slotPlacement.trays.sort((left, right) => traySortLabel(left).localeCompare(traySortLabel(right)));
+          }
+
+          const observedMaxSlotIndex = slotMap.size > 0 ? Math.max(...Array.from(slotMap.keys())) : 0;
+          const layoutSlotCount = tentSpine?.shelfSlotCountByIndex.get(shelfIndex);
+          const shelfSlotCount =
+            layoutSlotCount != null ? layoutSlotCount : Math.max(1, observedMaxSlotIndex);
+
+          const positions = buildShelfSlotPositions({
+            tentId,
+            shelfId,
+            shelfIndex,
+            slotCount: shelfSlotCount,
+            trayBySlotIndex: slotMap,
+          });
+
+          if (
+            process.env.NODE_ENV !== "production" &&
+            layoutSlotCount != null &&
+            positions.length !== layoutSlotCount
+          ) {
+            console.warn(
+              "[gridkit/overview] shelf slot count mismatch",
+              {
+                tentId,
+                shelfIndex,
+                expected: layoutSlotCount,
+                actual: positions.length,
+              },
+            );
+          }
 
           return {
-            slot: slotGroup.slot,
-            rawShelfIndex: slotGroup.rawShelfIndex,
-            rawSlotIndex: slotGroup.rawSlotIndex,
-            trays,
+            shelfId,
+            label: `Shelf ${shelfIndex}`,
+            positions,
+            dnd: {
+              droppableId: shelfId,
+            },
+            meta: {
+              shelfIndex,
+            },
           };
-        })
-        .sort((left, right) => {
-          const leftShelf = left.rawShelfIndex ?? Number.MAX_SAFE_INTEGER;
-          const rightShelf = right.rawShelfIndex ?? Number.MAX_SAFE_INTEGER;
-          if (leftShelf !== rightShelf) {
-            return leftShelf - rightShelf;
-          }
-          const leftIndex = left.rawSlotIndex ?? Number.MAX_SAFE_INTEGER;
-          const rightIndex = right.rawSlotIndex ?? Number.MAX_SAFE_INTEGER;
-          if (leftIndex !== rightIndex) {
-            return leftIndex - rightIndex;
-          }
-          const leftLabel = (left.slot.code || left.slot.label || "").toLowerCase();
-          const rightLabel = (right.slot.code || right.slot.label || "").toLowerCase();
-          return leftLabel.localeCompare(rightLabel);
-        })
-        .forEach((slotGroup) => {
-          const shelfIndex = slotGroup.rawShelfIndex ?? 1;
-          const existing = slotsByShelf.get(shelfIndex) || [];
-          existing.push({
-            slot: slotGroup.slot,
-            shelfIndex,
-            slotIndex: slotGroup.rawSlotIndex ?? 0,
-            trays: slotGroup.trays,
-          });
-          slotsByShelf.set(shelfIndex, existing);
         });
-
-      const normalizedShelves = Array.from(slotsByShelf.entries())
-        .sort((left, right) => left[0] - right[0])
-        .map(([shelfIndex, slots]) => {
-          const orderedSlots = [...slots].sort((left, right) => {
-            const leftIndex = left.slotIndex > 0 ? left.slotIndex : Number.MAX_SAFE_INTEGER;
-            const rightIndex = right.slotIndex > 0 ? right.slotIndex : Number.MAX_SAFE_INTEGER;
-            if (leftIndex !== rightIndex) {
-              return leftIndex - rightIndex;
-            }
-            return locationLabel(left.slot, "").toLowerCase().localeCompare(locationLabel(right.slot, "").toLowerCase());
-          });
-          const usedSlotIndexes = new Set<number>();
-          const normalizedSlots = orderedSlots.map((slotGroup) => {
-            let resolvedIndex = slotGroup.slotIndex > 0 ? slotGroup.slotIndex : 0;
-            if (resolvedIndex <= 0 || usedSlotIndexes.has(resolvedIndex)) {
-              resolvedIndex = 1;
-              while (usedSlotIndexes.has(resolvedIndex)) {
-                resolvedIndex += 1;
-              }
-            }
-            usedSlotIndexes.add(resolvedIndex);
-            return {
-              ...slotGroup,
-              slotIndex: resolvedIndex,
-            };
-          });
-          return { shelfIndex, slots: normalizedSlots };
-        });
-
-      const maxSlotCount = Math.max(
-        1,
-        ...normalizedShelves.flatMap((shelf) => shelf.slots.map((slot) => slot.slotIndex)),
-      );
-
-      const shelves = normalizedShelves.map((shelf) => {
-        const slotByIndex = new Map(shelf.slots.map((slotGroup) => [slotGroup.slotIndex, slotGroup] as const));
-
-        return {
-          shelfId: buildDndId("shelf", tentGroup.tent.id, shelf.shelfIndex),
-          label: `Shelf ${shelf.shelfIndex}`,
-          positions: Array.from({ length: maxSlotCount }, (_, index) => {
-            const positionIndex = index + 1;
-            const slotGroup = slotByIndex.get(positionIndex);
-            const occupant = !slotGroup || slotGroup.trays.length === 0
-              ? ({
-                  kind: "emptySlot",
-                  id: slotGroup?.slot.id || buildDndId("slot", tentGroup.tent.id, shelf.shelfIndex, positionIndex),
-                  slotIndex: positionIndex,
-                  label: `Slot ${positionIndex}`,
-                  dnd: {
-                    droppableId: buildDndId("slot", tentGroup.tent.id, shelf.shelfIndex, positionIndex),
-                    meta: {
-                      tent_id: tentGroup.tent.id,
-                    },
-                  },
-                } satisfies EmptySlotOccupantSpec)
-              : slotGroup.trays.length === 1
-                ? slotGroup.trays[0]
-                : ({
-                    kind: "trayStack",
-                    id: slotGroup.slot.id,
-                    trays: slotGroup.trays,
-                  } satisfies TrayStackOccupantSpec);
-
-            return {
-              id: slotGroup?.slot.id || buildDndId("slot", tentGroup.tent.id, shelf.shelfIndex, positionIndex),
-              key: slotGroup?.slot.id || `${tentGroup.tent.id}-shelf-${shelf.shelfIndex}-slot-${positionIndex}`,
-              tentId: tentGroup.tent.id,
-              shelfId: buildDndId("shelf", tentGroup.tent.id, shelf.shelfIndex),
-              positionIndex,
-              label: `Slot ${positionIndex}`,
-              occupant,
-              dnd: {
-                droppableId: buildDndId("slot", tentGroup.tent.id, shelf.shelfIndex, positionIndex),
-              },
-              meta: {
-                slot: slotGroup?.slot || null,
-              },
-            };
-          }),
-          dnd: {
-            droppableId: buildDndId("shelf", tentGroup.tent.id, shelf.shelfIndex),
-          },
-          meta: {
-            shelfIndex: shelf.shelfIndex,
-          },
-        };
-      });
 
       const trayCount = shelves.reduce(
         (total, shelf) =>
@@ -368,15 +460,14 @@ export function buildTentLayoutSpecFromOverviewPlants(input: {
       );
 
       return {
-        tentId: tentGroup.tent.id,
-        label: tentGroup.tent.name || tentGroup.tent.code || "Tent",
+        tentId,
+        label: locationLabel(tentSpine?.tent || null, "Tent"),
         shelves,
         dnd: {
-          droppableId: buildDndId("tent", tentGroup.tent.id),
+          droppableId: buildDndId("tent", tentId),
         },
         meta: {
-          tent: tentGroup.tent,
-          maxSlotCount,
+          tent: tentSpine?.tent || { id: tentId, name: null },
           trayCount,
           plantCount,
         },
@@ -385,7 +476,11 @@ export function buildTentLayoutSpecFromOverviewPlants(input: {
     .sort((left, right) => {
       const leftLabel = left.label.toLowerCase();
       const rightLabel = right.label.toLowerCase();
-      return leftLabel.localeCompare(rightLabel);
+      const labelCompare = leftLabel.localeCompare(rightLabel);
+      if (labelCompare !== 0) {
+        return labelCompare;
+      }
+      return left.tentId.localeCompare(right.tentId);
     });
 
   return {

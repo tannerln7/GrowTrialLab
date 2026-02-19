@@ -16,12 +16,15 @@ import {
 } from "@/src/features/experiments/overview/components/OverviewPanels";
 import {
   buildTentLayoutSpecFromOverviewPlants,
+  type OverviewLayoutSpine,
+  type OverviewTrayPlacement,
 } from "@/src/lib/gridkit/builders";
 import {
   OverviewTentLayout,
   PlantCell,
 } from "@/src/lib/gridkit/components";
 import type { PlantOccupantSpec } from "@/src/lib/gridkit/spec";
+import type { PlacementSummary } from "@/src/features/placement/types";
 import { api, isApiError } from "@/src/lib/api";
 import { queryKeys } from "@/src/lib/queryKeys";
 import { usePageQueryState } from "@/src/lib/usePageQueryState";
@@ -181,6 +184,7 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
   const [actionError, setActionError] = useState("");
   const statusQueryKey = queryKeys.experiment.status(experimentId);
   const overviewQueryKey = queryKeys.experiment.feature(experimentId, "overviewPlants");
+  const placementSummaryQueryKey = queryKeys.experiment.feature(experimentId, "placementSummary");
   const experimentDetailQueryKey = queryKeys.experiments.detail(experimentId);
 
   const statusQuery = useQuery({
@@ -205,6 +209,17 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
     refetchOnWindowFocus: false,
   });
 
+  const placementSummaryQuery = useQuery({
+    queryKey: placementSummaryQueryKey,
+    queryFn: () =>
+      api.get<PlacementSummary>(
+        `/api/v1/experiments/${experimentId}/placement/summary`,
+      ),
+    enabled: Boolean(experimentId) && Boolean(statusQuery.data?.setup.is_complete),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
   const experimentDetailQuery = useQuery({
     queryKey: experimentDetailQueryKey,
     queryFn: () => api.get<{ name?: string }>(`/api/v1/experiments/${experimentId}/`),
@@ -215,12 +230,18 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
 
   const statusPageState = usePageQueryState(statusQuery);
   const overviewPageState = usePageQueryState(overviewQuery);
+  const placementSummaryPageState = usePageQueryState(placementSummaryQuery);
 
   const refreshOverviewData = useCallback(async () => {
-    await queryClient.invalidateQueries({
-      queryKey: overviewQueryKey,
-    });
-  }, [overviewQueryKey, queryClient]);
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: overviewQueryKey,
+      }),
+      queryClient.invalidateQueries({
+        queryKey: placementSummaryQueryKey,
+      }),
+    ]);
+  }, [overviewQueryKey, placementSummaryQueryKey, queryClient]);
 
   const startMutation = useMutation({
     mutationFn: () =>
@@ -279,11 +300,13 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
 
   const notInvited =
     statusPageState.errorKind === "forbidden" ||
-    overviewPageState.errorKind === "forbidden";
+    overviewPageState.errorKind === "forbidden" ||
+    placementSummaryPageState.errorKind === "forbidden";
 
   const loading =
     statusPageState.isLoading ||
-    (Boolean(statusQuery.data?.setup.is_complete) && overviewPageState.isLoading);
+    (Boolean(statusQuery.data?.setup.is_complete) &&
+      (overviewPageState.isLoading || placementSummaryPageState.isLoading));
 
   const queryError = useMemo(() => {
     if (notInvited) {
@@ -295,14 +318,26 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
     if (overviewPageState.isError) {
       return overviewPageState.message || "Unable to load overview roster.";
     }
+    if (placementSummaryPageState.isError) {
+      return placementSummaryPageState.message || "Unable to load placement summary.";
+    }
     return "";
-  }, [notInvited, overviewPageState.isError, overviewPageState.message, statusPageState.isError, statusPageState.message]);
+  }, [
+    notInvited,
+    overviewPageState.isError,
+    overviewPageState.message,
+    placementSummaryPageState.isError,
+    placementSummaryPageState.message,
+    statusPageState.isError,
+    statusPageState.message,
+  ]);
 
   const error = actionError || queryError;
 
   const offline =
     statusPageState.errorKind === "offline" ||
     overviewPageState.errorKind === "offline" ||
+    placementSummaryPageState.errorKind === "offline" ||
     isOfflineError(startMutation.error) ||
     isOfflineError(stopMutation.error);
   const startReady = Boolean(summary?.readiness.ready_to_start);
@@ -368,12 +403,73 @@ export function ExperimentOverviewPageClient({ experimentId }: ExperimentOvervie
     });
   }, [visiblePlants]);
 
+  const placementSummary = placementSummaryQuery.data ?? null;
+
+  const overviewLayoutSpine = useMemo<OverviewLayoutSpine | undefined>(() => {
+    if (!placementSummary) {
+      return undefined;
+    }
+
+    return {
+      tents: placementSummary.tents.results.map((tent) => ({
+        id: tent.tent_id,
+        name: tent.name,
+        shelves: (tent.layout?.shelves || []).map((shelf) => ({
+          shelfIndex: shelf.index,
+          slotCount: shelf.tray_count,
+        })),
+      })),
+    };
+  }, [placementSummary]);
+
+  const overviewTrayPlacements = useMemo<OverviewTrayPlacement[] | undefined>(() => {
+    if (!placementSummary) {
+      return undefined;
+    }
+
+    const placements: OverviewTrayPlacement[] = [];
+    for (const tray of placementSummary.trays.results) {
+      const location = tray.location;
+      if (
+        location.status !== "placed" ||
+        !location.tent ||
+        !location.slot
+      ) {
+        continue;
+      }
+
+      placements.push({
+        trayId: tray.tray_id,
+        tentId: location.tent.id,
+        shelfIndex: location.slot.shelf_index,
+        slotIndex: location.slot.slot_index,
+        slot: {
+          id: location.slot.id,
+          code: location.slot.code,
+          label: location.slot.label,
+          name: location.slot.label,
+        },
+        tray: {
+          id: tray.tray_id,
+          code: tray.name,
+          name: tray.name,
+          capacity: tray.capacity,
+          current_count: tray.current_count,
+        },
+      });
+    }
+
+    return placements;
+  }, [placementSummary]);
+
   const overviewLayoutSpec = useMemo(
     () =>
       buildTentLayoutSpecFromOverviewPlants({
         plants: sortedPlants,
+        layout: overviewLayoutSpine,
+        trayPlacements: overviewTrayPlacements,
       }),
-    [sortedPlants],
+    [overviewLayoutSpine, overviewTrayPlacements, sortedPlants],
   );
 
   const unplacedPlantSpecs = useMemo(() => {
