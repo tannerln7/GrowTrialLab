@@ -158,11 +158,6 @@ function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
                     },
                   ]
                 : [];
-              chips.push({
-                id: `${trayId}-occupancy`,
-                label: occupancyLabel,
-                placement: "tr",
-              });
 
               const traySpec: TrayOccupantSpec = {
                 kind: "tray",
@@ -198,10 +193,12 @@ function Step3PlantsToTraysImpl({ model, actions }: Step3PlantsToTraysProps) {
                   position={position}
                   plants={trayPlants}
                   onPlantPress={(plantId) => actions.togglePlantSelection(plantId)}
-                  className={styles.trayEditorCell}
-                  metaClassName={styles.trayHeaderActions}
+                  className="justify-items-center text-center"
+                  metaClassName="justify-center"
                   triggerMeta={
-                    <span className="text-sm text-muted-foreground">Selected: {selectedInTray.length}</span>
+                    <Badge variant="secondary" className={styles.recipeLegendItemCompact}>
+                      {occupancyLabel}
+                    </Badge>
                   }
                   overlayTitle={
                     <div className="flex items-center justify-between gap-2">

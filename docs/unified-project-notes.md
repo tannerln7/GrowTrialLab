@@ -231,7 +231,7 @@ This document is the single consolidated source for current status, architecture
 - [x] Placement Step 3 tray containers now use the same GridKit tray popup/folder interaction model as overview (`TrayCellExpandable` + `TrayFolderProvider`) and no longer embed full-size placement plant cards inline in tray bodies.
   - tray click opens the tray folder popout; plant selection toggles continue to run through the existing staged placement handlers.
   - remove-selected tray action now appears in the popup header (top-right inline with tray label), not on the tray trigger card surface.
-  - tray occupancy is now a top-right tray chip (`placement: "tr"`) rather than summary-line text below metadata.
+  - tray occupancy now renders as a centered badge directly below the tray title on the trigger card.
   - tray body children render in a shrinkable content region (`min-h-0 flex-1`) to prevent clipping while preserving selection and staged move/remove semantics.
 - [x] GridKit shelf strip page geometry was corrected after leaf sizing regression:
   - canonical leaf sizing now keeps square cells without desktop `min-w` constraints (`frontend/src/lib/gridkit/components/cells/leafSizing.ts`), so shelf strips retain 4 columns at `POSITION_STRIP_PRESET.maxVisible = 4` when viewport width allows.

@@ -93,7 +93,7 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
 - Dense, mobile-first selection grid.
 - Selection is multi-select; bulk move into trays is staged in UI state.
 - Nothing persists until explicit save/confirm.
-- Tray containers should use GridKit tray popout behavior (`TrayCellExpandable` under `TrayFolderProvider`) so clicking a tray opens the same folder-style plant view used in overview, with occupancy shown as a tray chip and plant taps routed to existing selection toggles. Remove-selected tray action belongs in the popout header (top-right inline with tray label).
+- Tray containers should use GridKit tray popout behavior (`TrayCellExpandable` under `TrayFolderProvider`) so clicking a tray opens the same folder-style plant view used in overview, with occupancy shown as centered trigger metadata directly under the tray name and plant taps routed to existing selection toggles. Remove-selected tray action belongs in the popout header (top-right inline with tray label).
 
 ### Step 4: Trays → Slots (draft then apply)
 - Trays are placed into tent slots using the same multi-select → bulk move model.

@@ -27,6 +27,14 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Placement Step 3 Tray Trigger Alignment + Occupancy Placement)
+- `Completed` Step 3 tray trigger cards now place occupancy under the tray name and center trigger content using GridKit primitives.
+  - Removed top-right occupancy chip on tray triggers.
+  - Occupancy now renders as centered badge metadata under tray title.
+  - Step-local style overrides for tray trigger alignment were removed in favor of primitive class semantics.
+  - updated file:
+    - `frontend/src/features/placement/wizard/steps/Step3PlantsToTrays.tsx`
+
 ### 2026-02-19 (Baseline Save/Next Queue Refresh Fix)
 - `Completed` Baseline capture now forces fresh queue/plant data after save mutations to avoid stale queue replay.
   - `refreshBaselineInitialData` now uses `fetchQuery(..., { staleTime: 0 })`.
@@ -141,7 +149,7 @@ This file is the execution-focused feature map for product and engineering statu
     - `frontend/src/features/placement/components/placement-cells.tsx` (`TrayPlantContentsGrid`)
   - Updated Step 3 tray containers:
     - use compact tray content grid instead of embedding large `PlantSelectableCell` cards inside tray cells
-    - move occupancy from summary text to top-right chip (`placement: "tr"`)
+    - move occupancy from summary text to tray trigger metadata under title (centered badge)
     - switch tray container density to `data-cell-size="sm"`
     - file: `frontend/src/features/placement/wizard/steps/Step3PlantsToTrays.tsx`
   - Added minimal GridKit tray content safety fix:
@@ -152,7 +160,7 @@ This file is the execution-focused feature map for product and engineering statu
       - `frontend/src/lib/gridkit/components/cells/leafSizing.ts`
   - Result:
     - tray contents no longer clip/truncate due oversized embedded leaf cards
-    - occupancy chip stays stable at top-right without shifting tray body layout
+    - occupancy badge stays stable under tray title without shifting tray body layout
 
 ### 2026-02-19 (Overview Topology Uses Layout Spine Capacity)
 - `Completed` Overview tent/shelf topology now uses per-shelf layout capacity from placement summary instead of deriving slot capacity from observed plants.
