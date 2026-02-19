@@ -9,6 +9,9 @@
     "frontend:no-backendfetch": "bash infra/scripts/check-no-backendfetch.sh",
     "frontend:no-inline-querykeys": "bash infra/scripts/check-no-inline-querykeys.sh",
     "frontend:no-filter-join-classnames": "bash infra/scripts/check-no-filter-join-classnames.sh",
+    "frontend:gridkit:inventory": "bash infra/scripts/gridkit-inventory.sh",
+    "frontend:gridkit:guardrail": "bash infra/scripts/check-gridkit-legacy.sh --report-only",
+    "frontend:gridkit:guardrail:enforce": "bash infra/scripts/check-gridkit-legacy.sh --enforce",
     "frontend:guardrails": "pnpm frontend:no-backendfetch && pnpm frontend:no-inline-querykeys && pnpm frontend:no-filter-join-classnames",
     "backend:lint": "cd backend && uv run ruff check",
     "backend:typecheck": "cd backend && uv run pyright"

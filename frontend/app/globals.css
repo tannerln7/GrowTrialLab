@@ -52,3 +52,13 @@ a:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+
+/* Shared utility for scrollable lanes where rails should stay hidden. */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
