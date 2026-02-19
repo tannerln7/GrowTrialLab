@@ -27,6 +27,36 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Frontend Phase 3 Route Architecture Normalization)
+- `Completed` Frontend route architecture now follows a thin-wrapper pattern across interactive app routes.
+  - Route files under `frontend/app/**/page.tsx` are now thin server wrappers that parse route params via `getParamString(...)` and render feature `*PageClient` modules.
+  - Interactive page implementations were moved out of route files into `frontend/src/features/**/**/*PageClient.tsx`.
+  - Added controller-hook convention callsites for normalized page state ownership on core entry/checklist pages:
+    - `useHomeController`
+    - `useExperimentsListController`
+    - `useNewExperimentController`
+    - `useExperimentLandingController`
+    - `useExperimentSetupController`
+  - Existing placement wizard architecture remains canonical (`PlacementWizardPageClient` + `usePlacementWizard`).
+  - Relevant files:
+    - `frontend/app/page.tsx`
+    - `frontend/app/experiments/page.tsx`
+    - `frontend/app/experiments/new/page.tsx`
+    - `frontend/app/experiments/[id]/page.tsx`
+    - `frontend/app/experiments/[id]/setup/page.tsx`
+    - `frontend/app/experiments/[id]/overview/page.tsx`
+    - `frontend/app/experiments/[id]/baseline/page.tsx`
+    - `frontend/app/experiments/[id]/feeding/page.tsx`
+    - `frontend/app/experiments/[id]/plants/page.tsx`
+    - `frontend/app/experiments/[id]/recipes/page.tsx`
+    - `frontend/app/experiments/[id]/rotation/page.tsx`
+    - `frontend/app/experiments/[id]/schedule/page.tsx`
+    - `frontend/app/p/[id]/page.tsx`
+    - `frontend/src/features/home/HomePageClient.tsx`
+    - `frontend/src/features/experiments/**/**/*PageClient.tsx`
+    - `frontend/src/features/plants/cockpit/PlantCockpitPageClient.tsx`
+  - Refs: `bba6348`
+
 ### 2026-02-19 (Frontend Phase 2 Data Layer Migration)
 - `Completed` Frontend server-state reads/writes were migrated from `backendFetch + useEffect` loading patterns to shared `api + @tanstack/react-query` usage across active experiment/cockpit routes.
   - Removed route-level `backendFetch(...)` callsites from `frontend/app/*` and `frontend/src/features/*`; `backendFetch` now remains only as a legacy helper in `frontend/lib/backend.ts`.

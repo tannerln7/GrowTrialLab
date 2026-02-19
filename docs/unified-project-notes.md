@@ -212,6 +212,10 @@ This document is the single consolidated source for current status, architecture
   - route/controller-level `backendFetch` usage was removed from app/feature UI code and replaced with `api + react-query`.
   - query keys are standardized through `frontend/src/lib/queryKeys.ts` (including plant-cockpit scoped keys).
   - setup/operation pages and cockpit pages now use `useQuery`/`useMutation` with targeted invalidation for persisted server state.
+- [x] Phase 3 route architecture normalization is active across interactive frontend routes:
+  - app-route `page.tsx` files are thin server wrappers.
+  - interactive implementations live in feature `*PageClient.tsx` modules under `frontend/src/features/**`.
+  - controller-hook pattern is established for entry/checklist pages and the placement wizard (`usePlacementWizard`) remains the canonical complex-flow controller pattern.
 - [x] Phase 1.5 mechanical frontend helper rollout is complete for route/page conventions:
   - route/page param parsing now standardizes on `useRouteParamString("id")` / `getParamString(...)` across experiment and cockpit pages.
   - standard top-of-page alert slabs now use shared `PageAlerts` in core experiment routes.

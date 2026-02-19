@@ -117,6 +117,14 @@ Implementation structure (current): keep `frontend/app/experiments/[id]/placemen
   - UI allows override via grade control
 
 ## Frontend engineering conventions (current)
+### Route architecture
+- App routes should be thin server wrappers (`frontend/app/**/page.tsx`) that do minimal orchestration:
+  - parse params with `getParamString(...)`
+  - pass compact props into feature clients
+  - keep redirects/gating behavior equivalent to prior route behavior
+- Interactive route logic should live in feature clients: `frontend/src/features/**/**/*PageClient.tsx`.
+- Complex logic should use feature controller hooks (`use<Feature>Controller`, `use<Feature>Wizard`) with grouped return shapes (for example `ui`, `data`, `actions`, `wizard/nav`).
+
 ### Data layer
 - React Query provider scaffold exists and query key discipline is required.
 - Active frontend route-level server state uses `api + react-query`; avoid introducing new `backendFetch + useEffect` loader patterns in UI code.
