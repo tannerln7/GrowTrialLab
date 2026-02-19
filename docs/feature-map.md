@@ -27,6 +27,15 @@ This file is the execution-focused feature map for product and engineering statu
 
 ## Timeline: Completed Features
 
+### 2026-02-19 (Placement Step 3 Tray Popout Parity With Overview)
+- `Completed` Placement Step 3 tray containers now use the same tray popup/folder interaction model as overview tray cells.
+  - Step 3 tray cards now render through `TrayCellExpandable` under `TrayFolderProvider`, so tray click opens the GridKit popout plant view.
+  - Selection semantics are preserved: clicking plants in the popout still toggles staged selection state.
+  - Shared helper for selectable plant occupant specs is now exported from:
+    - `frontend/src/features/placement/components/placement-cells.tsx`
+  - Updated file:
+    - `frontend/src/features/placement/wizard/steps/Step3PlantsToTrays.tsx`
+
 ### 2026-02-19 (Placement Step 3 Tray Contents Compact Grid Fix)
 - `Completed` Placement Step 3 tray containers now render tray plant contents with the GridKit compact tray-plant renderer pattern used by overview folder content.
   - Added reusable placement tray-content bridge:

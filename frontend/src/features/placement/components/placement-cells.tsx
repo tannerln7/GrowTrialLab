@@ -6,7 +6,6 @@ import { formatTrayDisplay } from "@/src/features/placement/utils";
 import { Badge } from "@/src/components/ui/badge";
 import { experimentsStyles as styles } from "@/src/components/ui/experiments-styles";
 import { PlantCell, TrayCell } from "@/src/lib/gridkit/components";
-import { TrayPlantGrid } from "@/src/lib/gridkit/components/grids/TrayPlantGrid";
 import type { ChipSpec } from "@/src/lib/gridkit/spec";
 import type { PlantOccupantSpec } from "@/src/lib/gridkit/spec";
 
@@ -137,21 +136,16 @@ function TraySelectableCellImpl({
 
 export const TraySelectableCell = memo(TraySelectableCellImpl);
 
-type TrayPlantContentsGridProps = {
+export type SelectablePlantSpecsInput = {
   plantIds: string[];
   plantById: Map<string, PlantCellModel>;
   selectedPlantIds: Set<string>;
   isDirty: (plantId: string) => boolean;
-  onToggle: (plantId: string) => void;
-  className?: string;
 };
 
-function buildTrayPlantSpecs(input: {
-  plantIds: string[];
-  plantById: Map<string, PlantCellModel>;
-  selectedPlantIds: Set<string>;
-  isDirty: (plantId: string) => boolean;
-}): PlantOccupantSpec[] {
+export function buildSelectablePlantOccupantSpecs(
+  input: SelectablePlantSpecsInput,
+): PlantOccupantSpec[] {
   const specs: PlantOccupantSpec[] = [];
 
   for (const plantId of input.plantIds) {
@@ -188,29 +182,3 @@ function buildTrayPlantSpecs(input: {
 
   return specs;
 }
-
-function TrayPlantContentsGridImpl({
-  plantIds,
-  plantById,
-  selectedPlantIds,
-  isDirty,
-  onToggle,
-  className,
-}: TrayPlantContentsGridProps) {
-  const plants = buildTrayPlantSpecs({
-    plantIds,
-    plantById,
-    selectedPlantIds,
-    isDirty,
-  });
-
-  return (
-    <TrayPlantGrid
-      plants={plants}
-      onPlantPress={(plantId) => onToggle(plantId)}
-      className={cn("h-full min-h-0", className)}
-    />
-  );
-}
-
-export const TrayPlantContentsGrid = memo(TrayPlantContentsGridImpl);
